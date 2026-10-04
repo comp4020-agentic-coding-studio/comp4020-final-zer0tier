@@ -227,11 +227,14 @@ function write(pet: Pet): void {
 }
 
 // Finishes the pet's activity if it's due. The scheduler calls this when one
-// ends; `finished` says whether anything changed.
-export function settle(id: string): { pet: Pet; finished: boolean } | undefined {
+// ends, passing `endedAt`, the end its timer counted down to: timers run on a
+// steady clock, so that end has truly passed even if the wall clock has since
+// jumped backwards. An activity ending later than that (a newer one) waits.
+// `finished` says whether anything changed.
+export function settle(id: string, endedAt = 0): { pet: Pet; finished: boolean } | undefined {
   const pet = getPet(id);
   if (!pet) return undefined;
-  const finished = finishIfDue(pet, Date.now());
+  const finished = finishIfDue(pet, Math.max(Date.now(), endedAt));
   if (finished) write(pet);
   return { pet: finished ? getPet(id)! : pet, finished };
 }

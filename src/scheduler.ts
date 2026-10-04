@@ -10,9 +10,11 @@ export function schedule(id: string, busyUntil: number): void {
   clearTimeout(timers.get(id));
   const timer = setTimeout(() => {
     timers.delete(id);
-    const result = settle(id);
+    // The timer has waited out the activity, whatever the wall clock now says.
+    const result = settle(id, busyUntil);
     if (result?.finished) broadcast({ type: "pet:updated", pet: result.pet });
-    // A timer can fire a hair early; try again at the recorded end.
+    // A newer activity is running (an hourglass skipped the old one, then a
+    // new one began): wait for that one instead.
     else if (result?.pet.busyUntil) schedule(id, result.pet.busyUntil);
   }, Math.max(0, busyUntil - Date.now()));
   timers.set(id, timer);
