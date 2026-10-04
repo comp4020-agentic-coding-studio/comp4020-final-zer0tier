@@ -48,12 +48,22 @@ recruiting other players' pets, and leaderboards. Each adds interaction, but the
 first version proves the core loop (train, work, fight, see others do the same)
 before widening it.
 
-**What I read or looked at:** the
-[Final Project brief](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/assessments/final-project/)
-(its multi-user, real-time and persists requirements are the backbone of this
-definition), and QQ Pets (Tencent, 2005), the game this one is modelled on:
-study for stats, work for money, care for your pet's needs, and share a world
-with other players.
+**What I read or looked at:**
+
+- Clay Shirky,
+  ["Situated Software"](https://gwern.net/doc/technology/2004-03-30-shirky-situatedsoftware.html)
+  (2004). Software for a small group works when it shows the group to itself
+  ("What does everyone else think?") and doesn't rely on people checking back.
+  It made me think it's important to keep everything in sync and make it easier
+  for players to interact: every change reaches every open window live, and the
+  Arena shows who else is playing.
+- The
+  [Final Project brief](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/assessments/final-project/):
+  its multi-user, real-time and persists requirements are the backbone of this
+  definition.
+- QQ Pets (Tencent, 2005), the game this one is modelled on: study for stats,
+  work for money, care for your pet's needs, and share a world with other
+  players.
 
 ## Playing
 
