@@ -90,3 +90,17 @@ export async function studyTimes(id: string, course: string, times: number): Pro
   }
   return pet;
 }
+
+// Works (and looks after the pet) until it can afford an hourglass, buys one,
+// and leaves the pet fit to study or work. Returns the pet after all that.
+export async function buyHourglass(id: string): Promise<any> {
+  const { items } = await getRules();
+  const { price } = items.find((item: any) => item.id === "hourglass");
+  for (let pet = await getPet(id); pet.money < price; pet = await getPet(id)) {
+    await readyToStudy(id);
+    await workHour(id);
+  }
+  await must(`/api/pets/${id}/buy/hourglass`);
+  await readyToStudy(id);
+  return getPet(id);
+}

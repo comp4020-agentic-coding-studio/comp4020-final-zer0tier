@@ -1,6 +1,6 @@
 import { connect } from "node:net";
 import { expect, it } from "vitest";
-import { baseUrl, freshId, post, readyToStudy, studyTimes, workHour, signUp } from "./helpers.ts";
+import { baseUrl, buyHourglass, freshId, post, readyToStudy, studyTimes, workHour, signUp } from "./helpers.ts";
 
 const wsUrl = (): string => new URL("/ws", baseUrl).href.replace(/^http/, "ws");
 
@@ -188,16 +188,14 @@ it("pet:updated — a new player's pet reaches every open window within 1s, so i
 it("pet:updated — skipping a shift with an hourglass reaches every open window within 1s", async () => {
   const id = freshId();
   await signUp(id);
-  await workHour(id);
-  await workHour(id);
-  expect((await post(`/api/pets/${id}/buy/hourglass`)).status).toBe(200);
-  expect((await post(`/api/pets/${id}/work/office`, { minutes: 120 })).status).toBe(200);
+  const { money } = await buyHourglass(id);
+  expect((await post(`/api/pets/${id}/work/office`, { minutes: 60 })).status).toBe(200);
   const windows = [await open(), await open()];
   try {
     const updates = windows.map((ws) => nextUpdate(ws, id));
     expect((await post(`/api/pets/${id}/use/hourglass`)).status).toBe(200);
     for (const event of await Promise.all(updates)) {
-      expect(event.pet).toMatchObject({ id, activity: "idle", hourglass: 0, money: 60 });
+      expect(event.pet).toMatchObject({ id, activity: "idle", hourglass: 0, money: money + 25 });
     }
   } finally {
     for (const ws of windows) ws.close();

@@ -120,7 +120,7 @@ export const STUDY_NEEDS: Needs = {
 export const ITEMS = [
   { id: "food", name: "Food", price: 15, effect: "restore", restores: "stamina", amount: 40 },
   { id: "soap", name: "Soap", price: 10, effect: "restore", restores: "hygiene", amount: 50 },
-  { id: "hourglass", name: "Hourglass", price: 40, effect: "skip" },
+  { id: "hourglass", name: "Hourglass", price: 150, effect: "skip" },
 ] as const satisfies readonly (
   | { id: keyof Pet; name: string; price: number; effect: "restore"; restores: Care; amount: number }
   | { id: keyof Pet; name: string; price: number; effect: "skip" }

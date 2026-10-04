@@ -83,7 +83,7 @@ Buy items at the shop with the pet's money, then use them:
 | --------- | ----- | ------------------------------------------------- |
 | Food      | $15   | Feed: +40 stamina                                 |
 | Soap      | $10   | Clean: +50 hygiene                                |
-| Hourglass | $40   | Skip: finishes the current lesson or shift now    |
+| Hourglass | $150  | Skip: finishes the current lesson or shift now    |
 
 Stamina and hygiene don't go above 100, and food or soap can't be used when that
 need is already full. An **hourglass** skips the wait: the lesson or shift ends

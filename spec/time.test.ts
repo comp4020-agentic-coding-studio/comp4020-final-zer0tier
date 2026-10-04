@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { finish, freshId, getPet, getRules, post, workHour, signUp } from "./helpers.ts";
+import { buyHourglass, finish, freshId, getPet, getRules, post, workHour, signUp } from "./helpers.ts";
 
 async function newPet(): Promise<string> {
   const id = freshId();
@@ -70,22 +70,30 @@ it("a busy pet can't start another lesson or shift, but can still shop and eat",
   expect((await finish(id)).money).toBe(10 + 100);
 });
 
-// Works two hours (for $50) and buys an hourglass, leaving $10.
+// A new pet that has earned and bought an hourglass, fit to study or work.
 async function withHourglass(): Promise<string> {
   const id = await newPet();
-  await workHour(id);
-  await workHour(id);
-  expect((await act(id, "buy/hourglass")).body).toMatchObject({ money: 10, hourglass: 1 });
+  expect((await buyHourglass(id)).hourglass).toBe(1);
   return id;
 }
 
-it("an hourglass ($40) finishes a shift on the spot, with its full pay", async () => {
+it("an hourglass costs $150", async () => {
+  const { items } = await getRules();
+  expect(items.find((item: any) => item.id === "hourglass").price).toBe(150);
+  const id = await newPet();
+  await workHour(id);
+  const broke = await act(id, "buy/hourglass");
+  expect(broke.status).toBe(409);
+  expect(broke.body.error).toMatch(/\$150/);
+});
+
+it("an hourglass finishes a shift on the spot, with its full pay", async () => {
   const id = await withHourglass();
-  // Two hours' work leaves hygiene 60: enough for a 2-hour shift (−40).
-  expect((await act(id, "work/construction", { minutes: 120 })).body.activity).toBe("working");
+  const { money } = await getPet(id);
+  expect((await act(id, "work/construction", { minutes: 60 })).body.activity).toBe("working");
   const { status, body } = await act(id, "use/hourglass");
   expect(status).toBe(200);
-  expect(body).toMatchObject({ activity: "idle", busyUntil: null, reward: null, hourglass: 0, money: 10 + 50 });
+  expect(body).toMatchObject({ activity: "idle", busyUntil: null, reward: null, hourglass: 0, money: money + 25 });
   expect((await act(id, "work/office", { minutes: 15 })).status).toBe(200); // free to start something new
 });
 
