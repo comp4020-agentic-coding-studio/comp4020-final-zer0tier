@@ -23,6 +23,7 @@ db.exec(`
     hygiene      INTEGER NOT NULL DEFAULT 100,
     food         INTEGER NOT NULL DEFAULT 0,
     soap         INTEGER NOT NULL DEFAULT 0,
+    hourglass    INTEGER NOT NULL DEFAULT 0,
     construction_rank INTEGER NOT NULL DEFAULT 0,
     office_rank       INTEGER NOT NULL DEFAULT 0,
     theatre_rank      INTEGER NOT NULL DEFAULT 0,
@@ -59,6 +60,7 @@ if (!columns.has("stamina")) db.exec("ALTER TABLE pets ADD COLUMN stamina INTEGE
 if (!columns.has("hygiene")) db.exec("ALTER TABLE pets ADD COLUMN hygiene INTEGER NOT NULL DEFAULT 100");
 if (!columns.has("food")) db.exec("ALTER TABLE pets ADD COLUMN food INTEGER NOT NULL DEFAULT 0");
 if (!columns.has("soap")) db.exec("ALTER TABLE pets ADD COLUMN soap INTEGER NOT NULL DEFAULT 0");
+if (!columns.has("hourglass")) db.exec("ALTER TABLE pets ADD COLUMN hourglass INTEGER NOT NULL DEFAULT 0");
 if (!columns.has("construction_rank")) db.exec("ALTER TABLE pets ADD COLUMN construction_rank INTEGER NOT NULL DEFAULT 0");
 if (!columns.has("office_rank")) db.exec("ALTER TABLE pets ADD COLUMN office_rank INTEGER NOT NULL DEFAULT 0");
 if (!columns.has("task")) db.exec("ALTER TABLE pets ADD COLUMN task TEXT");

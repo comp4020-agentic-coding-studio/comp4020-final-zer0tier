@@ -18,6 +18,7 @@ it("creates a pet with base stats for an unknown ID", async () => {
     hygiene: 100,
     food: 0,
     soap: 0,
+    hourglass: 0,
     jobs: { construction: 0, office: 0, theatre: 0 },
     task: null,
     busySince: null,

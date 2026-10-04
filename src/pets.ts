@@ -18,6 +18,7 @@ export interface Pet {
   hygiene: number;
   food: number;
   soap: number;
+  hourglass: number;
   jobs: Record<LocationId, number>; // index into that location's ranks
   wins: number;
   losses: number;
@@ -114,10 +115,16 @@ export const STUDY_NEEDS: Needs = {
   hygiene: STUDY_COST.hygiene + WORK_COST_PER_HOUR.hygiene,
 };
 
+// Items restore a need, or (the hourglass) finish the pet's lesson or shift
+// on the spot, paying its reward as if it had run its full time.
 export const ITEMS = [
-  { id: "food", name: "Food", price: 15, restores: "stamina", amount: 40 },
-  { id: "soap", name: "Soap", price: 10, restores: "hygiene", amount: 50 },
-] as const satisfies readonly { id: keyof Pet; name: string; price: number; restores: Care; amount: number }[];
+  { id: "food", name: "Food", price: 15, effect: "restore", restores: "stamina", amount: 40 },
+  { id: "soap", name: "Soap", price: 10, effect: "restore", restores: "hygiene", amount: 50 },
+  { id: "hourglass", name: "Hourglass", price: 40, effect: "skip" },
+] as const satisfies readonly (
+  | { id: keyof Pet; name: string; price: number; effect: "restore"; restores: Care; amount: number }
+  | { id: keyof Pet; name: string; price: number; effect: "skip" }
+)[];
 export type ItemId = (typeof ITEMS)[number]["id"];
 
 export const findCourse = (id: string) => COURSES.find((c) => c.id === id);
@@ -130,17 +137,18 @@ export const isValidId = (id: unknown): id is string =>
 
 const select = db.prepare(
   `SELECT id, strength, intelligence, charisma, money, activity, school, credits, stamina, hygiene, food, soap,
-          construction_rank, office_rank, theatre_rank, task, busy_since, busy_until, reward, wins, losses
+          hourglass, construction_rank, office_rank, theatre_rank, task, busy_since, busy_until, reward, wins, losses
      FROM pets WHERE id = ?`,
 );
 // The bot first, then the newest pets, so a player who just joined is easy to
-// find. (created_at is to the second; rowid breaks ties in creation order.)
-const listIds = db.prepare("SELECT id FROM pets ORDER BY id = ? DESC, created_at DESC, rowid DESC LIMIT ?");
+// find. Newest means inserted last (rowid), not created_at: that's only to the
+// second, and follows the wall clock, which can jump backwards.
+const listIds = db.prepare("SELECT id FROM pets ORDER BY id = ? DESC, rowid DESC LIMIT ?");
 const busyPets = db.prepare("SELECT id, busy_until FROM pets WHERE busy_until IS NOT NULL");
 const insert = db.prepare("INSERT OR IGNORE INTO pets (id) VALUES (?)");
 const save = db.prepare(
   `UPDATE pets SET strength = ?, intelligence = ?, charisma = ?, money = ?, school = ?, credits = ?,
-     stamina = ?, hygiene = ?, food = ?, soap = ?, construction_rank = ?, office_rank = ?, theatre_rank = ?,
+     stamina = ?, hygiene = ?, food = ?, soap = ?, hourglass = ?, construction_rank = ?, office_rank = ?, theatre_rank = ?,
      activity = ?, task = ?, busy_since = ?, busy_until = ?, reward = ?, wins = ?, losses = ?
    WHERE id = ?`,
 );
@@ -211,7 +219,7 @@ function finishIfDue(pet: Pet, now: number): boolean {
 function write(pet: Pet): void {
   save.run(
     pet.strength, pet.intelligence, pet.charisma, pet.money, pet.school, pet.credits,
-    pet.stamina, pet.hygiene, pet.food, pet.soap,
+    pet.stamina, pet.hygiene, pet.food, pet.soap, pet.hourglass,
     pet.jobs.construction, pet.jobs.office, pet.jobs.theatre,
     pet.activity, pet.task, pet.busySince, pet.busyUntil, pet.reward === null ? null : JSON.stringify(pet.reward),
     pet.wins, pet.losses, pet.id,
@@ -333,6 +341,14 @@ export function use(id: string, itemId: ItemId): Outcome {
   const item = findItem(itemId)!;
   return act(id, (pet) => {
     if (pet[item.id] < 1) return `No ${item.name.toLowerCase()} left. Buy some at the shop.`;
+    if (item.effect === "skip") {
+      if (pet.activity === "idle") return "Your pet isn't studying or working, so there's nothing to skip.";
+      pet[item.id]--;
+      // End it now and pay out; its timer finds nothing left when it fires.
+      pet.busyUntil = Date.now();
+      finishIfDue(pet, pet.busyUntil);
+      return undefined;
+    }
     if (pet[item.restores] >= MAX_CARE) return `Your pet's ${item.restores} is already full.`;
     pet[item.id]--;
     pet[item.restores] = Math.min(MAX_CARE, pet[item.restores] + item.amount);

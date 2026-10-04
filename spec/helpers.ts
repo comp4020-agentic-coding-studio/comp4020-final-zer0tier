@@ -49,7 +49,7 @@ export async function workHour(id: string, location = "construction"): Promise<a
 export async function readyToStudy(id: string): Promise<void> {
   const { study, items } = await getRules();
   for (let pet = await finish(id); ; ) {
-    const low = items.find((item: any) => pet[item.restores] < study.needs[item.restores]);
+    const low = items.find((item: any) => item.effect === "restore" && pet[item.restores] < study.needs[item.restores]);
     if (!low) return;
     if (pet[low.id] > 0) pet = await must(`/api/pets/${id}/use/${low.id}`);
     else if (pet.money >= low.price) pet = await must(`/api/pets/${id}/buy/${low.id}`);

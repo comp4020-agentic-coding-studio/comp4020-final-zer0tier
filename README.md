@@ -72,13 +72,17 @@ rank's requirement, **Upgrade** moves it up; ranks are kept for good.
 
 Buy items at the shop with the pet's money, then use them:
 
-| Item | Price | Use                       |
-| ---- | ----- | ------------------------- |
-| Food | $15   | Feed: +40 stamina          |
-| Soap | $10   | Clean: +50 hygiene         |
+| Item      | Price | Use                                               |
+| --------- | ----- | ------------------------------------------------- |
+| Food      | $15   | Feed: +40 stamina                                 |
+| Soap      | $10   | Clean: +50 hygiene                                |
+| Hourglass | $40   | Skip: finishes the current lesson or shift now    |
 
-Neither goes above 100, and an item can't be used when that need is already
-full. Open the same pet in two windows and both update together.
+Stamina and hygiene don't go above 100, and food or soap can't be used when that
+need is already full. An **hourglass** skips the wait: the lesson or shift ends
+straight away and pays its full reward, as if it had run its whole time. It can
+only be used while the pet is studying or working; the busy banner has a Skip
+button for it. Open the same pet in two windows and both update together.
 
 ### Other pets and fights
 

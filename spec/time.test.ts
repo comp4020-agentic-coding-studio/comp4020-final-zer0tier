@@ -69,3 +69,42 @@ it("a busy pet can't start another lesson or shift, but can still shop and eat",
   expect((await act(id, "use/food")).body).toMatchObject({ activity: "working", food: 0, stamina: 90 });
   expect((await finish(id)).money).toBe(10 + 100);
 });
+
+// Works two hours (for $50) and buys an hourglass, leaving $10.
+async function withHourglass(): Promise<string> {
+  const id = await newPet();
+  await workHour(id);
+  await workHour(id);
+  expect((await act(id, "buy/hourglass")).body).toMatchObject({ money: 10, hourglass: 1 });
+  return id;
+}
+
+it("an hourglass ($40) finishes a shift on the spot, with its full pay", async () => {
+  const id = await withHourglass();
+  // Two hours' work leaves hygiene 60: enough for a 2-hour shift (−40).
+  expect((await act(id, "work/construction", { minutes: 120 })).body.activity).toBe("working");
+  const { status, body } = await act(id, "use/hourglass");
+  expect(status).toBe(200);
+  expect(body).toMatchObject({ activity: "idle", busyUntil: null, reward: null, hourglass: 0, money: 10 + 50 });
+  expect((await act(id, "work/office", { minutes: 15 })).status).toBe(200); // free to start something new
+});
+
+it("an hourglass finishes a lesson, with its points and credit", async () => {
+  const id = await withHourglass();
+  await act(id, "study/math");
+  expect((await act(id, "use/hourglass")).body).toMatchObject({ activity: "idle", intelligence: 6, credits: 1 });
+});
+
+it("refuses an hourglass when the pet isn't busy, or has none, and keeps it", async () => {
+  const id = await withHourglass();
+  const idle = await act(id, "use/hourglass");
+  expect(idle.status).toBe(409);
+  expect(idle.body.error).toMatch(/nothing to skip/i);
+  expect((await getPet(id)).hourglass).toBe(1);
+
+  const other = await newPet();
+  await act(other, "study/pe");
+  const none = await act(other, "use/hourglass");
+  expect(none.status).toBe(409);
+  expect(none.body.error).toMatch(/no hourglass/i);
+});

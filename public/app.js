@@ -4,7 +4,12 @@ let broadcasts = 0; // pet:updated events rendered; a resync older than one is s
 let rules = null; // schools, courses, items and costs, as the server publishes them
 const busy = new Set(); // buttons whose request is still in flight
 const LABELS = { strength: "Strength", intelligence: "Intelligence", charisma: "Charisma", stamina: "stamina", hygiene: "hygiene" };
-const VERBS = { food: "Feed", soap: "Clean" };
+const VERBS = { food: "Feed", soap: "Clean", hourglass: "Skip" };
+const effectText = (item) =>
+  item.effect === "skip" ? "Finishes a lesson or shift now" : `+${item.amount} ${LABELS[item.restores]}`;
+// Whether using the item right now would do anything.
+const usable = (item, pet) =>
+  item.effect === "skip" ? pet.activity !== "idle" : pet[item.restores] < rules.maxCare;
 
 let shiftMinutes = 60; // the shift length picked for work
 const costText = (cost) => `−${cost.stamina} stamina · −${cost.hygiene} hygiene`;
@@ -57,7 +62,7 @@ loadRules().then((loaded) => {
   }
   for (const item of rules.items) {
     const card = document.createElement("div");
-    card.className = `item item-${item.restores}`;
+    card.className = `item item-${item.effect === "skip" ? "skip" : item.restores}`;
     card.dataset.item = item.id;
     card.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-${item.id}" /></svg>
       <span><span class="item-name"></span> × <span class="item-count"></span></span>
@@ -67,7 +72,7 @@ loadRules().then((loaded) => {
         <button type="button" class="chip-btn chip-buy"></button>
       </div>`;
     card.querySelector(".item-name").textContent = item.name;
-    card.querySelector(".item-effect").textContent = `+${item.amount} ${LABELS[item.restores]}`;
+    card.querySelector(".item-effect").textContent = effectText(item);
     const use = card.querySelector(".chip-use");
     const buy = card.querySelector(".chip-buy");
     use.textContent = VERBS[item.id] ?? "Use";
@@ -77,6 +82,7 @@ loadRules().then((loaded) => {
     $("items").append(card);
   }
   $("study-cost").textContent = `${lengthText(rules.study.minutes)} · ${costText(rules.study.cost)}`;
+  $("skip").addEventListener("click", () => perform($("skip"), "use/hourglass", "care-error"));
   $("fight-cost").textContent = costText(rules.fight.cost);
   for (const minutes of rules.work.shiftMinutes) {
     const input = document.createElement("input");
@@ -152,7 +158,10 @@ async function perform(button, path, errorId, body) {
     $(errorId).textContent = "Couldn't reach the server, so nothing happened. Try again.";
   } finally {
     busy.delete(button);
-    if (current) renderControls(current);
+    if (current && rules) {
+      renderBusy(current);
+      renderControls(current);
+    }
   }
 }
 
@@ -207,6 +216,9 @@ function renderBusy(pet) {
   if (reward.money) gains.push(`+$${reward.money}`);
   if (reward.credits) gains.push(`+${reward.credits} credit`);
   $("busy-what").textContent = `${busyText(pet)} · ${gains.join(", ")} when done`;
+  const hourglasses = pet.hourglass;
+  $("skip-label").textContent = hourglasses ? `Skip (${hourglasses} left)` : "Skip: buy an hourglass";
+  $("skip").disabled = busy.has($("skip")) || hourglasses < 1;
   renderBusyClock(pet);
 }
 
@@ -271,7 +283,7 @@ function renderControls(pet) {
     const use = card.querySelector(".chip-use");
     const buy = card.querySelector(".chip-buy");
     card.querySelector(".item-count").textContent = pet[item.id];
-    use.disabled = busy.has(use) || pet[item.id] < 1 || pet[item.restores] >= rules.maxCare;
+    use.disabled = busy.has(use) || pet[item.id] < 1 || !usable(item, pet);
     buy.disabled = busy.has(buy) || pet.money < item.price;
   }
 }

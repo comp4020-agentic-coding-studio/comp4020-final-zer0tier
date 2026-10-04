@@ -280,6 +280,7 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 /* Stamina & hygiene */
 .stamina-tone, .meter-stamina, .item-stamina { --tone: var(--stamina); }
 .meter-hygiene, .item-hygiene { --tone: var(--hygiene); }
+.item-skip { --tone: var(--intelligence); }
 .meters { display: grid; gap: 0.4rem; margin-top: 0.75rem; }
 .meter { display: grid; grid-template-columns: 6.5rem 1fr 2.25rem; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
 .meter-label { display: flex; align-items: center; gap: 0.3rem; font-weight: 700; color: var(--tone); }
@@ -318,6 +319,19 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .busy-what { margin: 0; font-weight: 700; }
 .busy-progress { height: 10px; margin: 0.4rem 0 0.3rem; }
 .busy-progress .progress-fill { transition: transform 1s linear; }
+.chip-skip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--fg);
+  background: var(--surface);
+  border: 2px solid var(--intelligence);
+}
+.chip-skip:hover:not(:disabled) { background: color-mix(in srgb, var(--intelligence) 12%, var(--surface)); }
+.chip-skip .icon { color: var(--intelligence); }
+.chip-skip:disabled { border-color: var(--border); }
+.chip-skip:disabled .icon { color: var(--muted); }
 .busy-left { margin: 0; color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
