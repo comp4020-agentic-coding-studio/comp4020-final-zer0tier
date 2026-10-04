@@ -13,8 +13,52 @@ export const SESSION_COOKIE = "session";
 const SESSION_DAYS = 30;
 const SESSION_MS = SESSION_DAYS * 24 * 60 * 60 * 1000;
 
-const scryptAsync = promisify(scrypt) as (password: string, salt: Buffer, keylen: number) => Promise<Buffer>;
+const rawScrypt = promisify(scrypt) as (password: string, salt: Buffer, keylen: number) => Promise<Buffer>;
 const KEY_BYTES = 64;
+
+// scrypt takes ~16 MiB and one of libuv's four pool threads per hash, and that
+// pool also serves static files. Run at most two at once and queue a bounded
+// number more, so a flood of sign-ins can't starve the page or the memory.
+const SCRYPT_SLOTS = 2;
+const SCRYPT_QUEUE = 50;
+let scryptRunning = 0;
+const scryptWaiting: (() => void)[] = [];
+
+export class Busy extends Error {}
+
+async function scryptAsync(password: string, salt: Buffer, keylen: number): Promise<Buffer> {
+  if (scryptRunning >= SCRYPT_SLOTS) {
+    if (scryptWaiting.length >= SCRYPT_QUEUE) throw new Busy();
+    await new Promise<void>((resolve) => scryptWaiting.push(resolve));
+  }
+  scryptRunning++;
+  try {
+    return await rawScrypt(password, salt, keylen);
+  } finally {
+    scryptRunning--;
+    scryptWaiting.shift()?.();
+  }
+}
+
+// Failed sign-ins, counted per (address, ID) and per address, in memory: they
+// guard against guessing, not game state, so losing them on restart is fine.
+// Counting per address and ID means a stranger guessing can't lock the owner
+// out from their own address.
+const FAIL_WINDOW_MS = 15 * 60 * 1000;
+export const FAIL_LIMIT = { perId: 5, perAddress: 100 };
+const failures = new Map<string, { count: number; until: number }>();
+
+function failuresFor(key: string, now: number): number {
+  const entry = failures.get(key);
+  if (!entry || entry.until <= now) return 0;
+  return entry.count;
+}
+
+function recordFailure(key: string, now: number): void {
+  if (failures.size > 10_000) for (const [k, v] of failures) if (v.until <= now) failures.delete(k);
+  const count = failuresFor(key, now) + 1;
+  failures.set(key, { count, until: count === 1 ? now + FAIL_WINDOW_MS : failures.get(key)!.until });
+}
 
 async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
@@ -45,7 +89,7 @@ const tokenHash = (token: string): string => createHash("sha256").update(token).
 export const isValidPassword = (password: unknown): password is string =>
   typeof password === "string" && password.length >= PASSWORD.min && password.length <= PASSWORD.max;
 
-export type AuthOutcome = { pet: Pet; created: boolean; token: string } | { status: 401 | 409; error: string };
+export type AuthOutcome = { pet: Pet; created: boolean; token: string } | { status: 401 | 409 | 429; error: string };
 
 function startSession(id: string): string {
   const token = randomBytes(32).toString("base64url");
@@ -66,10 +110,20 @@ export async function signUp(id: string, password: string): Promise<AuthOutcome>
   return { pet, created, token: startSession(id) };
 }
 
-export async function signIn(id: string, password: string): Promise<AuthOutcome> {
+export async function signIn(id: string, password: string, address: string): Promise<AuthOutcome> {
+  const now = Date.now();
+  const pairKey = `${address} ${id}`;
+  if (failuresFor(pairKey, now) >= FAIL_LIMIT.perId || failuresFor(address, now) >= FAIL_LIMIT.perAddress) {
+    return { status: 429, error: "Too many wrong tries. Wait 15 minutes, then try again." };
+  }
   const account = selectAccount.get(id) as { password_hash: string } | undefined;
   const matches = await passwordMatches(password, account?.password_hash ?? (await decoy));
-  if (!account || !matches) return { status: 401, error: "Wrong player ID or password." };
+  if (!account || !matches) {
+    recordFailure(pairKey, now);
+    recordFailure(address, now);
+    return { status: 401, error: "Wrong player ID or password." };
+  }
+  failures.delete(pairKey);
   return { pet: getOrCreatePet(id).pet, created: false, token: startSession(id) };
 }
 

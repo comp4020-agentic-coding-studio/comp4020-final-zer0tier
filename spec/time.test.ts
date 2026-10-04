@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { buyHourglass, finish, freshId, getPet, getRules, post, workHour, signUp } from "./helpers.ts";
+import { buyHourglass, finish, freshId, getPet, getRules, post, readyToStudy, workHour, signUp } from "./helpers.ts";
 
 async function newPet(): Promise<string> {
   const id = freshId();
@@ -89,18 +89,33 @@ it("an hourglass costs $150", async () => {
 
 it("an hourglass finishes a shift on the spot, with its full pay", async () => {
   const id = await withHourglass();
+  // A 4-hour shift lasts 400 ms on the test clock: plenty of time to skip it.
+  await readyToStudy(id, { stamina: 40, hygiene: 80 });
   const { money } = await getPet(id);
-  expect((await act(id, "work/construction", { minutes: 60 })).body.activity).toBe("working");
+  expect((await act(id, "work/construction", { minutes: 240 })).body.activity).toBe("working");
   const { status, body } = await act(id, "use/hourglass");
   expect(status).toBe(200);
-  expect(body).toMatchObject({ activity: "idle", busyUntil: null, reward: null, hourglass: 0, money: money + 25 });
+  expect(body).toMatchObject({ activity: "idle", busyUntil: null, reward: null, hourglass: 0, money: money + 100 });
   expect((await act(id, "work/office", { minutes: 15 })).status).toBe(200); // free to start something new
 });
 
 it("an hourglass finishes a lesson, with its points and credit", async () => {
   const id = await withHourglass();
-  await act(id, "study/math");
-  expect((await act(id, "use/hourglass")).body).toMatchObject({ activity: "idle", intelligence: 6, credits: 1 });
+  // A lesson lasts only 50 ms on the test clock, so a slow round trip can
+  // arrive after it has ended ("nothing to skip"). Try a few lessons.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await readyToStudy(id);
+    const before = await getPet(id);
+    expect((await act(id, "study/math")).status).toBe(200);
+    const skip = await act(id, "use/hourglass");
+    if (skip.status === 409 && /nothing to skip/i.test(skip.body.error)) continue;
+    expect(skip.status).toBe(200);
+    expect(skip.body).toMatchObject({
+      activity: "idle", hourglass: 0, intelligence: before.intelligence + 1, credits: before.credits + 1,
+    });
+    return;
+  }
+  throw new Error("every lesson ended before the hourglass request arrived");
 });
 
 it("refuses an hourglass when the pet isn't busy, or has none, and keeps it", async () => {

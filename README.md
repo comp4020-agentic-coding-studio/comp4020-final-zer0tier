@@ -10,7 +10,8 @@ characters) and a password of at least 8 characters. Each ID has one account
 and one pet, so an ID someone else has signed up with is taken. A new pet starts
 with Strength 5, Intelligence 5, Charisma 5 and no money. **Sign in** with the
 same ID and password to come back to it; you stay signed in on that browser for
-30 days, or until you sign out.
+30 days, or until you sign out. After 5 wrong passwords for an ID, sign-ins to
+it from that address wait 15 minutes.
 
 Anyone can look at any pet, but only its owner can study, work, shop or fight
 with it. The bot's ID, `0`, can't be signed up or signed into. A pet from before

@@ -62,6 +62,19 @@ it("refuses a wrong password or an unknown ID, without saying which", async () =
   expect((await wrong.json()).error).toBe((await unknown.json()).error);
 });
 
+it("after 5 wrong passwords for an ID, its sign-ins wait 15 minutes, even with the right password", async () => {
+  const id = freshId();
+  await signUp(id);
+  for (let i = 0; i < 5; i++) expect((await signIn(id, "guess number " + i)).status).toBe(401);
+  const locked = await signIn(id);
+  expect(locked.status).toBe(429);
+  expect((await locked.json()).error).toMatch(/15 minutes/);
+
+  const other = freshId(); // other IDs are unaffected
+  await signUp(other);
+  expect((await signIn(other)).status).toBe(200);
+});
+
 it("nobody can sign up or sign in as the bot", async () => {
   expect((await signUp("0")).status).toBe(409);
   expect((await signIn("0")).status).toBe(401);

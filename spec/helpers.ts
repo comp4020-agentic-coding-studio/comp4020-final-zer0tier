@@ -68,10 +68,12 @@ export async function workHour(id: string, location = "construction"): Promise<a
 
 // Plays the pet back into shape to study, the way a player would: use what's
 // in the cupboard, buy what's missing, and work a shift when broke.
-export async function readyToStudy(id: string): Promise<void> {
+// `needs` defaults to what a lesson needs; pass more to get ready for a long shift.
+export async function readyToStudy(id: string, needs?: { stamina: number; hygiene: number }): Promise<void> {
   const { study, items } = await getRules();
+  const target = needs ?? study.needs;
   for (let pet = await finish(id); ; ) {
-    const low = items.find((item: any) => item.effect === "restore" && pet[item.restores] < study.needs[item.restores]);
+    const low = items.find((item: any) => item.effect === "restore" && pet[item.restores] < target[item.restores]);
     if (!low) return;
     if (pet[low.id] > 0) pet = await must(`/api/pets/${id}/use/${low.id}`);
     else if (pet.money >= low.price) pet = await must(`/api/pets/${id}/buy/${low.id}`);

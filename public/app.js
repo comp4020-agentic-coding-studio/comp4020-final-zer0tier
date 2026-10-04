@@ -151,6 +151,7 @@ async function perform(button, path, errorId, body) {
       body: body ? JSON.stringify(body) : undefined,
     });
     if (res.status === 401) return sessionEnded();
+    if (res.status === 403) return sessionChanged();
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       $(errorId).textContent = body.error ?? `Something went wrong (server error ${res.status}). Try again.`;
@@ -380,6 +381,7 @@ async function startFight(opponent) {
       method: "POST",
     });
     if (res.status === 401) return sessionEnded();
+    if (res.status === 403) return sessionChanged();
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       $("arena-error").textContent = body.error ?? `Something went wrong (server error ${res.status}). Try again.`;
@@ -508,6 +510,7 @@ $("tab-signup").addEventListener("click", () => setAuthMode("signup"));
 
 // Back to the sign-in form, e.g. after signing out or when a session ends.
 function showSignIn(message = "") {
+  $("notice").textContent = "";
   current = null;
   rivals = new Map();
   pinned = null;
@@ -519,6 +522,20 @@ function showSignIn(message = "") {
 }
 
 const sessionEnded = () => showSignIn("Your session has ended. Sign in again to carry on.");
+
+// "Not your pet": this browser's session now belongs to someone else, e.g.
+// another tab signed in to a different account. Follow it, or ask to sign in.
+async function sessionChanged() {
+  try {
+    const res = await fetch("/api/me");
+    if (!res.ok) return sessionEnded();
+    const pet = await res.json();
+    render(pet);
+    $("notice").textContent = `This browser is now signed in as ${pet.id} (from another tab), so you're seeing ${pet.id}'s pet.`;
+  } catch {
+    sessionEnded();
+  }
+}
 
 $("login").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -543,11 +560,16 @@ $("login").addEventListener("submit", async (e) => {
   }
 });
 
+// Only leave the pet once the server has really ended the session; otherwise
+// the cookie would still be live behind a sign-in form.
 $("signout").addEventListener("click", async () => {
+  $("notice").textContent = "";
   try {
-    await fetch("/api/signout", { method: "POST" });
-  } finally {
+    const res = await fetch("/api/signout", { method: "POST" });
+    if (!res.ok) throw new Error(`sign-out failed: ${res.status}`);
     showSignIn();
+  } catch {
+    $("notice").textContent = "Couldn't sign out, so you're still signed in. Check your connection and try again.";
   }
 });
 

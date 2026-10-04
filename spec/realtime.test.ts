@@ -188,14 +188,19 @@ it("pet:updated — a new player's pet reaches every open window within 1s, so i
 it("pet:updated — skipping a shift with an hourglass reaches every open window within 1s", async () => {
   const id = freshId();
   await signUp(id);
-  const { money } = await buyHourglass(id);
-  expect((await post(`/api/pets/${id}/work/office`, { minutes: 60 })).status).toBe(200);
+  await buyHourglass(id);
+  await readyToStudy(id, { stamina: 40, hygiene: 80 });
+  // Windows open first, and the shift is 4 hours (400 ms on the test clock),
+  // so it's still running when the hourglass is used.
   const windows = [await open(), await open()];
   try {
+    const res = await post(`/api/pets/${id}/work/office`, { minutes: 240 });
+    expect(res.status).toBe(200);
+    const { money } = await res.json();
     const updates = windows.map((ws) => nextUpdate(ws, id));
     expect((await post(`/api/pets/${id}/use/hourglass`)).status).toBe(200);
     for (const event of await Promise.all(updates)) {
-      expect(event.pet).toMatchObject({ id, activity: "idle", hourglass: 0, money: money + 25 });
+      expect(event.pet).toMatchObject({ id, activity: "idle", hourglass: 0, money: money + 100 });
     }
   } finally {
     for (const ws of windows) ws.close();

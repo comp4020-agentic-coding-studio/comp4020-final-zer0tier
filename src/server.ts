@@ -9,7 +9,7 @@ import {
   type Outcome,
 } from "./pets.ts";
 import {
-  PASSWORD, type AuthOutcome, clearedCookie, isValidPassword, playerFor, sessionCookie, sessionToken, signIn,
+  Busy, PASSWORD, type AuthOutcome, clearedCookie, isValidPassword, playerFor, sessionCookie, sessionToken, signIn,
   signOut, signUp,
 } from "./auth.ts";
 import { TIME_SCALE } from "./clock.ts";
@@ -33,11 +33,18 @@ app.get("/readme/", (_req, res) => {
 </html>`);
 });
 
+// On Fly, its proxy names the real client in Fly-Client-IP (and overwrites
+// any the client sent). Anywhere else that header could be forged, so the
+// socket's peer is the client.
+const onFly = process.env.FLY_APP_NAME !== undefined;
+const clientAddress = (req: express.Request): string =>
+  (onFly ? req.get("fly-client-ip") : undefined) ?? req.socket.remoteAddress ?? "unknown";
+
 // Sign up and sign in both take { id, password } and start a session.
 async function authenticate(
   req: express.Request,
   res: express.Response,
-  how: (id: string, password: string) => Promise<AuthOutcome>,
+  how: (id: string, password: string, address: string) => Promise<AuthOutcome>,
   okStatus: number,
 ): Promise<void> {
   const { id, password } = req.body ?? {};
@@ -49,7 +56,14 @@ async function authenticate(
     res.status(400).json({ error: `Password must be ${PASSWORD.min}–${PASSWORD.max} characters.` });
     return;
   }
-  const outcome = await how(id, password);
+  let outcome: AuthOutcome;
+  try {
+    outcome = await how(id, password, clientAddress(req));
+  } catch (err) {
+    if (!(err instanceof Busy)) throw err;
+    res.status(503).json({ error: "Lots of people are signing in right now. Try again in a moment." });
+    return;
+  }
   if ("error" in outcome) {
     res.status(outcome.status).json({ error: outcome.error });
     return;
