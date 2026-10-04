@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VirtuePets</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Varela+Round&display=swap" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="i-strength" viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11" /></symbol>
+      <symbol id="i-intelligence" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.9V16h5v-.2c0-.8.4-1.5 1-1.9A6 6 0 0 0 12 3Z" /></symbol>
+      <symbol id="i-charisma" viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7L12 3Z" /></symbol>
+      <symbol id="i-money" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6.5v1.5M12 16v1.5" /></symbol>
+      <symbol id="i-random" viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></symbol>
+      <symbol id="i-stamina" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" /></symbol>
+      <symbol id="i-hygiene" viewBox="0 0 24 24"><path d="M12 2.7S5 10 5 14.5a7 7 0 0 0 14 0C19 10 12 2.7 12 2.7Z" /></symbol>
+      <symbol id="i-food" viewBox="0 0 24 24"><path d="M12 7c-1.5-1-5-1.5-6.5 1.5S5 17 8 20c1.5 1.5 3 1 4 .5 1 .5 2.5 1 4-.5 3-3 4-8.5 2.5-11.5S13.5 6 12 7ZM12 7c0-2 1-4 3-4.5" /></symbol>
+      <symbol id="i-soap" viewBox="0 0 24 24"><rect x="3" y="11" width="14" height="9" rx="3" /><circle cx="15" cy="6" r="2.5" /><circle cx="20" cy="9.5" r="1.5" /><circle cx="9" cy="6.5" r="1.5" /></symbol>
+      <symbol id="i-work" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18" /></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></symbol>
+      <symbol id="i-swords" viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M9.5 6.5 14 2h3v3l-4.5 4.5M5 14l-2 2 3 3 2-2M7 17l-3 3" /></symbol>
+      <symbol id="i-school" viewBox="0 0 24 24"><path d="M22 9 12 4 2 9l10 5 10-5ZM6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5M22 9v6" /></symbol>
+    </svg>
+
+    <header class="topbar">
+      <a class="brand" href="/">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="18" r="11" /><circle cx="8" cy="8" r="4" /><circle cx="24" cy="8" r="4" /><circle cx="12.5" cy="17" r="1.6" class="eye" /><circle cx="19.5" cy="17" r="1.6" class="eye" /></svg>
+        VirtuePets
+      </a>
+      <p id="live" class="live" aria-live="polite">Connecting…</p>
+    </header>
+
+    <main>
+      <form id="login" class="card login">
+        <h1>Raise a pet worth bragging about</h1>
+        <p class="lede">Enter a player ID to claim a new pet, or to come back to the one you already have.</p>
+        <label for="player-id">Your player ID</label>
+        <input id="player-id" name="id" required maxlength="32" pattern="[A-Za-z0-9_\-]+" autocomplete="username" aria-describedby="player-id-help login-error" spellcheck="false" />
+        <p id="player-id-help" class="help">Letters, digits, <code>-</code> or <code>_</code>, up to 32 characters.</p>
+        <p id="login-error" class="error" role="alert"></p>
+        <button type="submit" class="btn">Claim / visit my pet</button>
+      </form>
+
+      <section id="dashboard" class="card dashboard" hidden aria-labelledby="pet-heading">
+        <div class="pet-hero">
+          <svg class="pet" viewBox="0 0 120 110" aria-hidden="true">
+            <ellipse class="pet-shadow" cx="60" cy="102" rx="34" ry="6" />
+            <g class="pet-body">
+              <circle class="ear" cx="30" cy="30" r="14" />
+              <circle class="ear" cx="90" cy="30" r="14" />
+              <ellipse class="body" cx="60" cy="62" rx="42" ry="38" />
+              <ellipse class="belly" cx="60" cy="74" rx="22" ry="17" />
+              <circle class="eye" cx="45" cy="55" r="5" />
+              <circle class="eye" cx="75" cy="55" r="5" />
+              <circle class="shine" cx="46.5" cy="53" r="1.6" />
+              <circle class="shine" cx="76.5" cy="53" r="1.6" />
+              <ellipse class="cheek" cx="35" cy="66" rx="6" ry="3.5" />
+              <ellipse class="cheek" cx="85" cy="66" rx="6" ry="3.5" />
+              <path class="mouth" d="M53 66q7 6 14 0" />
+            </g>
+          </svg>
+          <div>
+            <h2 id="pet-heading"><span id="pet-name"></span>'s pet</h2>
+            <p class="activity">Currently <small id="activity"></small></p>
+            <div class="meters">
+              <div class="meter meter-stamina">
+                <span class="meter-label" id="meter-stamina-label"><svg class="icon" aria-hidden="true"><use href="#i-stamina" /></svg>Stamina</span>
+                <div class="meter-track" id="meter-stamina" role="meter" aria-labelledby="meter-stamina-label" aria-valuemin="0" aria-valuemax="100">
+                  <div class="meter-fill"></div>
+                </div>
+                <span class="meter-value" id="meter-stamina-value"></span>
+              </div>
+              <div class="meter meter-hygiene">
+                <span class="meter-label" id="meter-hygiene-label"><svg class="icon" aria-hidden="true"><use href="#i-hygiene" /></svg>Hygiene</span>
+                <div class="meter-track" id="meter-hygiene" role="meter" aria-labelledby="meter-hygiene-label" aria-valuemin="0" aria-valuemax="100">
+                  <div class="meter-fill"></div>
+                </div>
+                <span class="meter-value" id="meter-hygiene-value"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="busy" class="busy" hidden>
+          <svg class="icon busy-icon" aria-hidden="true"><use href="#i-clock" /></svg>
+          <div class="busy-body">
+            <p id="busy-what" class="busy-what" role="status"></p>
+            <div class="progress busy-progress" id="busy-progress" role="progressbar" aria-labelledby="busy-what" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress-fill" id="busy-progress-fill"></div>
+            </div>
+            <p id="busy-left" class="busy-left"></p>
+          </div>
+        </div>
+
+        <dl class="stats">
+          <div class="stat stat-strength">
+            <dt><svg class="icon" aria-hidden="true"><use href="#i-strength" /></svg>Strength</dt>
+            <dd id="stat-strength"></dd>
+          </div>
+          <div class="stat stat-intelligence">
+            <dt><svg class="icon" aria-hidden="true"><use href="#i-intelligence" /></svg>Intelligence</dt>
+            <dd id="stat-intelligence"></dd>
+          </div>
+          <div class="stat stat-charisma">
+            <dt><svg class="icon" aria-hidden="true"><use href="#i-charisma" /></svg>Charisma</dt>
+            <dd id="stat-charisma"></dd>
+          </div>
+          <div class="stat stat-money">
+            <dt><svg class="icon" aria-hidden="true"><use href="#i-money" /></svg>Money</dt>
+            <dd id="stat-money"></dd>
+          </div>
+        </dl>
+
+        <section class="school" aria-labelledby="school-name">
+          <div class="school-head">
+            <svg class="icon school-icon" aria-hidden="true"><use href="#i-school" /></svg>
+            <div>
+              <h3 id="school-name"></h3>
+              <p id="school-level" class="school-level"></p>
+            </div>
+          </div>
+          <div class="progress" id="school-progress" role="progressbar" aria-labelledby="school-credits" aria-valuemin="0">
+            <div class="progress-fill" id="school-progress-fill"></div>
+          </div>
+          <p id="school-credits" class="school-credits"></p>
+          <p id="level-up" class="level-up" role="status"></p>
+        </section>
+
+        <section class="block" aria-labelledby="study-heading">
+          <h3 class="section-label" id="study-heading">Study <span class="section-cost" id="study-cost"></span></h3>
+          <div id="courses" class="courses"></div>
+          <p id="study-hint" class="hint"></p>
+          <p id="study-error" class="error" role="alert"></p>
+        </section>
+
+        <section class="block" aria-labelledby="work-heading">
+          <h3 class="section-label" id="work-heading">Work <span class="section-cost" id="work-cost"></span></h3>
+          <fieldset class="shift-picker">
+            <legend class="visually-hidden">Shift length</legend>
+            <div id="shift-options" class="shift-options"></div>
+          </fieldset>
+          <div id="locations" class="locations"></div>
+          <p id="work-hint" class="hint"></p>
+          <p id="work-error" class="error" role="alert"></p>
+        </section>
+
+        <section class="block" aria-labelledby="arena-heading">
+          <h3 class="section-label" id="arena-heading">Arena <span class="section-cost" id="fight-cost"></span></h3>
+          <form id="lookup" class="lookup">
+            <label for="lookup-id">Find a pet by player ID</label>
+            <div class="lookup-row">
+              <input id="lookup-id" name="id" required maxlength="32" pattern="[A-Za-z0-9_\-]+" spellcheck="false" autocomplete="off" />
+              <button type="submit" class="chip-btn chip-buy">Look up</button>
+            </div>
+          </form>
+          <p id="arena-hint" class="hint"></p>
+          <p id="fight-news" class="fight-news" role="status"></p>
+          <p id="arena-error" class="error" role="alert"></p>
+          <ul id="rivals" class="rivals" aria-label="Pets you can fight"></ul>
+          <h4 class="subhead">Your recent fights</h4>
+          <ul id="fight-log" class="fight-log"></ul>
+        </section>
+
+        <section class="block" aria-labelledby="care-heading">
+          <h3 class="section-label" id="care-heading">Care &amp; shop</h3>
+          <div id="items" class="items"></div>
+          <p id="care-error" class="error" role="alert"></p>
+        </section>
+      </section>
+    </main>
+
+    <footer class="footer"><a href="/readme/">How to play</a></footer>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

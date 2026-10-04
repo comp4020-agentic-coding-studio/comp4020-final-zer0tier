@@ -6,5 +6,10 @@ export default defineConfig({
   test: {
     include: ["spec/**/*.test.ts"],
     globalSetup: ["./spec/global-setup.ts"],
+    // Lessons and shifts run on the app's clock, so specs time real activities.
+    // One file at a time keeps that timing honest, and the longest specs play
+    // dozens of lessons and shifts through.
+    fileParallelism: false,
+    testTimeout: 30_000,
   },
 });
