@@ -1,6 +1,6 @@
 import { connect } from "node:net";
 import { expect, it } from "vitest";
-import { baseUrl, freshId, post, readyToStudy, studyTimes, workHour } from "./helpers.ts";
+import { baseUrl, freshId, post, readyToStudy, studyTimes, workHour, signUp } from "./helpers.ts";
 
 const wsUrl = (): string => new URL("/ws", baseUrl).href.replace(/^http/, "ws");
 
@@ -29,7 +29,7 @@ function nextUpdate(ws: WebSocket, id: string, matches: (pet: any) => boolean = 
 
 it("pet:updated — starting Study Math reaches every open window within 1s", async () => {
   const id = freshId();
-  await post("/api/login", { id });
+  await signUp(id);
   const windows = [await open(), await open()];
   try {
     const updates = windows.map((ws) => nextUpdate(ws, id));
@@ -44,7 +44,7 @@ it("pet:updated — starting Study Math reaches every open window within 1s", as
 
 it("pet:updated — moving up a school level reaches every open window within 1s", async () => {
   const id = freshId();
-  await post("/api/login", { id });
+  await signUp(id);
   await studyTimes(id, "pe", 4);
   await readyToStudy(id);
   const windows = [await open(), await open()];
@@ -79,7 +79,7 @@ it("survives a malformed WebSocket frame", async () => {
 
 it("pet:updated — a shift ending reaches every open window within 1s of the end", async () => {
   const id = freshId();
-  await post("/api/login", { id });
+  await signUp(id);
   // Windows open first, so a slow connection can't miss a short shift's end.
   const windows = [await open(), await open()];
   try {
@@ -98,7 +98,7 @@ it("pet:updated — a shift ending reaches every open window within 1s of the en
 
 it("pet:updated — starting a shift, shopping and feeding reach every open window within 1s", async () => {
   const id = freshId();
-  await post("/api/login", { id });
+  await signUp(id);
   await workHour(id);
   const windows = [await open(), await open()];
   try {
@@ -122,7 +122,7 @@ it("pet:updated — starting a shift, shopping and feeding reach every open wind
 
 it("pet:updated — a job upgrade reaches every open window within 1s", async () => {
   const id = freshId();
-  await post("/api/login", { id });
+  await signUp(id);
   await studyTimes(id, "drama", 10);
   const windows = [await open(), await open()];
   try {
@@ -153,8 +153,8 @@ function nextFight(ws: WebSocket): Promise<any> {
 it("fight:finished — a fight reaches the attacker's and the defender's windows within 1s", async () => {
   const attacker = freshId();
   const defender = freshId();
-  await post("/api/login", { id: attacker });
-  await post("/api/login", { id: defender });
+  await signUp(attacker);
+  await signUp(defender);
   const windows = [await open(), await open()]; // one each
   try {
     const fights = windows.map(nextFight);
@@ -178,7 +178,7 @@ it("pet:updated — a new player's pet reaches every open window within 1s, so i
   const windows = [await open(), await open()];
   try {
     const updates = windows.map((ws) => nextUpdate(ws, id));
-    expect((await post("/api/login", { id })).status).toBe(201);
+    expect((await signUp(id)).status).toBe(201);
     for (const event of await Promise.all(updates)) expect(event.pet).toMatchObject({ id, wins: 0, losses: 0 });
   } finally {
     for (const ws of windows) ws.close();
@@ -187,7 +187,7 @@ it("pet:updated — a new player's pet reaches every open window within 1s, so i
 
 it("pet:updated — skipping a shift with an hourglass reaches every open window within 1s", async () => {
   const id = freshId();
-  await post("/api/login", { id });
+  await signUp(id);
   await workHour(id);
   await workHour(id);
   expect((await post(`/api/pets/${id}/buy/hourglass`)).status).toBe(200);

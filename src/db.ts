@@ -46,6 +46,17 @@ db.exec(`
     defender_roll  REAL    NOT NULL,
     fought_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
+  CREATE TABLE IF NOT EXISTS accounts (
+    id            TEXT PRIMARY KEY REFERENCES pets (id),
+    password_hash TEXT NOT NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT    PRIMARY KEY,
+    player_id  TEXT    NOT NULL REFERENCES accounts (id),
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS sessions_by_expiry ON sessions (expires_at);
   CREATE INDEX IF NOT EXISTS fights_by_attacker ON fights (attacker, id);
   CREATE INDEX IF NOT EXISTS fights_by_defender ON fights (defender, id);
 `);

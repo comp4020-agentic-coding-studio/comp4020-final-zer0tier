@@ -150,6 +150,7 @@ async function perform(button, path, errorId, body) {
       headers: body ? { "content-type": "application/json" } : {},
       body: body ? JSON.stringify(body) : undefined,
     });
+    if (res.status === 401) return sessionEnded();
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       $(errorId).textContent = body.error ?? `Something went wrong (server error ${res.status}). Try again.`;
@@ -378,6 +379,7 @@ async function startFight(opponent) {
     const res = await fetch(`/api/pets/${encodeURIComponent(current.id)}/fight/${encodeURIComponent(opponent)}`, {
       method: "POST",
     });
+    if (res.status === 401) return sessionEnded();
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       $("arena-error").textContent = body.error ?? `Something went wrong (server error ${res.status}). Try again.`;
@@ -474,22 +476,65 @@ function render(pet) {
   }
   $("login").hidden = true;
   $("dashboard").hidden = false;
+  $("signout").hidden = false;
 }
+
+// Accounts --------------------------------------------------------------------
+
+let authMode = "signin"; // or "signup"
+const AUTH = {
+  signin: {
+    lede: "Welcome back. Sign in to see your pet.",
+    submit: "Sign in",
+    autocomplete: "current-password",
+  },
+  signup: {
+    lede: "Pick a player ID and a password. Each ID has one pet, and it's yours.",
+    submit: "Create account",
+    autocomplete: "new-password",
+  },
+};
+
+function setAuthMode(mode) {
+  authMode = mode;
+  for (const tab of ["signin", "signup"]) $(`tab-${tab}`).setAttribute("aria-selected", String(tab === mode));
+  $("auth-lede").textContent = AUTH[mode].lede;
+  $("auth-submit").textContent = AUTH[mode].submit;
+  $("password").autocomplete = AUTH[mode].autocomplete;
+  $("login-error").textContent = "";
+}
+$("tab-signin").addEventListener("click", () => setAuthMode("signin"));
+$("tab-signup").addEventListener("click", () => setAuthMode("signup"));
+
+// Back to the sign-in form, e.g. after signing out or when a session ends.
+function showSignIn(message = "") {
+  current = null;
+  rivals = new Map();
+  pinned = null;
+  $("dashboard").hidden = true;
+  $("signout").hidden = true;
+  $("login").hidden = false;
+  setAuthMode("signin");
+  $("login-error").textContent = message;
+}
+
+const sessionEnded = () => showSignIn("Your session has ended. Sign in again to carry on.");
 
 $("login").addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = $("player-id").value.trim();
-  const button = e.submitter ?? $("login").querySelector("button");
+  const button = $("auth-submit");
   button.disabled = true;
   $("login-error").textContent = "";
   try {
-    const res = await fetch("/api/login", {
+    const res = await fetch(`/api/${authMode}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, password: $("password").value }),
     });
     const body = await res.json();
     if (!res.ok) return void ($("login-error").textContent = body.error);
+    $("password").value = "";
     render(body);
   } catch {
     $("login-error").textContent = "Couldn't reach the server. Check your connection and try again.";
@@ -497,6 +542,20 @@ $("login").addEventListener("submit", async (e) => {
     button.disabled = false;
   }
 });
+
+$("signout").addEventListener("click", async () => {
+  try {
+    await fetch("/api/signout", { method: "POST" });
+  } finally {
+    showSignIn();
+  }
+});
+
+// A returning player with a live session goes straight to their pet.
+fetch("/api/me")
+  .then((res) => (res.ok ? res.json() : null))
+  .then((pet) => (pet ? render(pet) : showSignIn()))
+  .catch(() => showSignIn());
 
 // Reconnects after a drop (e.g. the Fly machine waking up) and resyncs.
 function connect() {

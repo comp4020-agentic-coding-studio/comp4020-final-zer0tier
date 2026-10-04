@@ -5,13 +5,35 @@ export const baseUrl = inject("baseUrl");
 // Specs run against a long-lived app, so every test claims a pet nobody has.
 export const freshId = (): string => `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-export async function post(path: string, body?: unknown): Promise<Response> {
+export const PASSWORD = "correct horse battery";
+
+// Each signed-up pet's session cookie, so a test acts as that pet's owner.
+const sessions = new Map<string, string>();
+
+export const sessionFor = (id: string): string | undefined => sessions.get(id);
+
+// POSTs as the owner of the pet in the path (/api/pets/:id/...), if the test
+// signed it up; `as` overrides that (null: no session at all).
+export async function post(path: string, body?: unknown, as?: string | null): Promise<Response> {
+  const owner = as === undefined ? path.match(/^\/api\/pets\/([^/]+)\//)?.[1] : as;
+  const cookie = owner ? sessions.get(owner) : undefined;
   return fetch(new URL(path, baseUrl), {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
+
+// Signs up (or in) and keeps the session cookie for later requests.
+async function authenticate(path: string, id: string, password: string): Promise<Response> {
+  const res = await post(path, { id, password }, null);
+  const cookie = res.headers.getSetCookie().find((c) => c.startsWith("session="));
+  if (res.ok && cookie) sessions.set(id, cookie.split(";")[0]);
+  return res;
+}
+
+export const signUp = (id: string, password = PASSWORD): Promise<Response> => authenticate("/api/signup", id, password);
+export const signIn = (id: string, password = PASSWORD): Promise<Response> => authenticate("/api/signin", id, password);
 
 export const getPet = async (id: string): Promise<any> => (await fetch(new URL(`/api/pets/${id}`, baseUrl))).json();
 

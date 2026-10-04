@@ -32,18 +32,28 @@
         <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="18" r="11" /><circle cx="8" cy="8" r="4" /><circle cx="24" cy="8" r="4" /><circle cx="12.5" cy="17" r="1.6" class="eye" /><circle cx="19.5" cy="17" r="1.6" class="eye" /></svg>
         VirtuePets
       </a>
-      <p id="live" class="live" aria-live="polite">Connecting…</p>
+      <div class="topbar-right">
+        <p id="live" class="live" aria-live="polite">Connecting…</p>
+        <button type="button" id="signout" class="chip-btn chip-buy" hidden>Sign out</button>
+      </div>
     </header>
 
     <main>
-      <form id="login" class="card login">
+      <form id="login" class="card login" hidden>
         <h1>Raise a pet worth bragging about</h1>
-        <p class="lede">Enter a player ID to claim a new pet, or to come back to the one you already have.</p>
-        <label for="player-id">Your player ID</label>
+        <div class="auth-tabs" role="tablist" aria-label="Account">
+          <button type="button" role="tab" id="tab-signin" aria-selected="true" aria-controls="login">Sign in</button>
+          <button type="button" role="tab" id="tab-signup" aria-selected="false" aria-controls="login">Create account</button>
+        </div>
+        <p class="lede" id="auth-lede"></p>
+        <label for="player-id">Player ID</label>
         <input id="player-id" name="id" required maxlength="32" pattern="[A-Za-z0-9_\-]+" autocomplete="username" aria-describedby="player-id-help login-error" spellcheck="false" />
-        <p id="player-id-help" class="help">Letters, digits, <code>-</code> or <code>_</code>, up to 32 characters.</p>
+        <p id="player-id-help" class="help">Letters, digits, <code>-</code> or <code>_</code>, up to 32 characters. It's also your pet's name in the arena.</p>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required minlength="8" maxlength="128" autocomplete="current-password" aria-describedby="password-help login-error" />
+        <p id="password-help" class="help">At least 8 characters.</p>
         <p id="login-error" class="error" role="alert"></p>
-        <button type="submit" class="btn">Claim / visit my pet</button>
+        <button type="submit" class="btn" id="auth-submit">Sign in</button>
       </form>
 
       <section id="dashboard" class="card dashboard" hidden aria-labelledby="pet-heading">

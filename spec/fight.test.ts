@@ -1,9 +1,9 @@
 import { expect, it } from "vitest";
-import { baseUrl, finish, freshId, getPet, post, readyToStudy, studyTimes } from "./helpers.ts";
+import { baseUrl, finish, freshId, getPet, post, readyToStudy, studyTimes, signUp } from "./helpers.ts";
 
 async function newPet(): Promise<string> {
   const id = freshId();
-  await post("/api/login", { id });
+  await signUp(id);
   return id;
 }
 
@@ -84,7 +84,7 @@ it("refuses to fight itself, a pet that doesn't exist, while busy, or when too d
   const id = await newPet();
   expect((await fight(id, id)).status).toBe(400);
   expect((await fight(id, freshId())).status).toBe(404);
-  expect((await fight(freshId(), "0")).status).toBe(404);
+  expect((await fight(freshId(), "0")).status).toBe(401); // nobody's signed in as it
 
   expect((await post(`/api/pets/${id}/work/office`, { minutes: 240 })).status).toBe(200);
   const busy = await fight(id, "0");

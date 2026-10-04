@@ -1,9 +1,9 @@
 import { expect, it } from "vitest";
-import { finish, freshId, getPet, getRules, post, workHour } from "./helpers.ts";
+import { finish, freshId, getPet, getRules, post, workHour, signUp } from "./helpers.ts";
 
 async function newPet(): Promise<string> {
   const id = freshId();
-  await post("/api/login", { id });
+  await signUp(id);
   return id;
 }
 

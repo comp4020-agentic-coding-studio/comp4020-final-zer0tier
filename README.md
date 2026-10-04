@@ -5,9 +5,16 @@ claim a pet, train it, and watch every change land live in every open window.
 
 ## Playing
 
-Enter any player ID (letters, digits, `-` or `_`, up to 32 characters). An ID
-nobody has used claims a new pet with Strength 5, Intelligence 5, Charisma 5
-and no money; an ID that's been used before brings that pet back.
+**Create an account** with a player ID (letters, digits, `-` or `_`, up to 32
+characters) and a password of at least 8 characters. Each ID has one account
+and one pet, so an ID someone else has signed up with is taken. A new pet starts
+with Strength 5, Intelligence 5, Charisma 5 and no money. **Sign in** with the
+same ID and password to come back to it; you stay signed in on that browser for
+30 days, or until you sign out.
+
+Anyone can look at any pet, but only its owner can study, work, shop or fight
+with it. The bot's ID, `0`, can't be signed up or signed into. A pet from before
+accounts existed is claimed by the first person to sign up with its ID.
 
 ### School
 
@@ -122,9 +129,16 @@ attached volume).
 ## How it's built
 
 Node 24 running TypeScript directly, Express for HTTP, `ws` for WebSockets and
-the built-in `node:sqlite` for storage. Players act through HTTP (`POST /api/pets/:id/`
-`study/:course`, `work/:location` (with `{"minutes": 60}`), `upgrade/:location`, `buy/:item`,
-`use/:item` and `fight/:opponent`; `GET /api/pets` lists pets,
-`GET /api/pets/:id/fights` a pet's recent fights, and `GET /api/rules` the
-schools, courses, work locations, items and costs); the server broadcasts a `pet:updated` event over the socket after
-every change, and a `fight:finished` event after each fight.
+the built-in `node:sqlite` for storage.
+
+- **Accounts:** `POST /api/signup`, `/api/signin` and `/api/signout`, and
+  `GET /api/me`. Passwords are hashed with scrypt; a session is a random token
+  in an HttpOnly cookie, stored only as a hash.
+- **Actions** (owner only): `POST /api/pets/:id/study/:course`,
+  `work/:location` (with `{"minutes": 60}`), `upgrade/:location`, `buy/:item`,
+  `use/:item` and `fight/:opponent`.
+- **Reading** (anyone): `GET /api/pets` lists pets, `GET /api/pets/:id` shows
+  one, `GET /api/pets/:id/fights` its recent fights, and `GET /api/rules` the
+  schools, courses, work locations, items and costs.
+- **Real time:** the server broadcasts a `pet:updated` event over the socket
+  after every change, and a `fight:finished` event after each fight.

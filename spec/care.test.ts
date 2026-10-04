@@ -1,9 +1,9 @@
 import { expect, it } from "vitest";
-import { finish, freshId, getPet, post } from "./helpers.ts";
+import { finish, freshId, getPet, post, signUp } from "./helpers.ts";
 
 async function newPet(): Promise<string> {
   const id = freshId();
-  await post("/api/login", { id });
+  await signUp(id);
   return id;
 }
 
@@ -95,9 +95,9 @@ it("refuses to use an item when that need is already full", async () => {
   expect((await getPet(id)).food).toBe(1);
 });
 
-it("404s for an item or pet that doesn't exist", async () => {
+it("404s for an item that doesn't exist, and refuses acting for a pet nobody owns", async () => {
   const id = await newPet();
   expect((await post(`/api/pets/${id}/buy/caviar`)).status).toBe(404);
   expect((await post(`/api/pets/${id}/use/caviar`)).status).toBe(404);
-  expect((await post(`/api/pets/${freshId()}/work/construction`, HOUR)).status).toBe(404);
+  expect((await post(`/api/pets/${freshId()}/work/construction`, HOUR)).status).toBe(401); // no one owns it
 });
