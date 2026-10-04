@@ -1,7 +1,59 @@
 # VirtuePets
 
-A multiplayer virtual pet game inspired by QQ Pets. Log in with a player ID to
-claim a pet, train it, and watch every change land live in every open window.
+A multiplayer virtual pet game inspired by QQ Pets. Create an account to claim
+a pet, train it, send it to work, fight other players' pets, and watch every
+change land live in every open window.
+
+## What good means
+
+**Good means the game is interactable with the other people playing it.** A
+virtual pet you raise alone is a to-do list; QQ Pets was worth coming back to
+because your pet lived beside everyone else's. So VirtuePets is good when what
+you do with your pet reaches other players, and what they do reaches you, and
+none of it is lost. That's the final project's three fixed requirements, read as
+the point of the game rather than boxes to tick:
+
+- **Other people are really there (multi-user).** Each player has their own
+  account and exactly one pet. Anyone can look at any pet in the Arena, but only
+  its owner can act for it, so a stranger can't train, spend or fight with
+  yours. A player who joins while you're playing appears in your Arena straight
+  away. *Enforced:* `spec/pets.test.ts` (one pet per ID, owner-only actions,
+  401/403), `spec/fight.test.ts` (new pets listed after the bot).
+- **You see each other act (real-time).** Every change to a pet, and every fight,
+  reaches every open window within a second, with no reload: your rival's shift
+  ending, their level-up, the fight they just started against you. *Enforced:*
+  `spec/realtime.test.ts` opens real WebSockets and fails if any event takes
+  longer than a second.
+- **Nothing you did is lost (persists).** Pets, accounts, fights and unfinished
+  lessons and shifts live in SQLite on the Fly volume, and a shift that was
+  running when the server restarted still finishes and pays. *Enforced:* signing
+  back in returns the same pet (`spec/pets.test.ts`). *Checked by hand:* survival
+  across a restart, which the spec can't trigger. I killed the server halfway
+  through a shift and started it again; the pet was still working, the shift
+  finished and paid on time, and the player was still signed in.
+- **Interacting is fair.** Fights are decided by published rules (power is
+  2 × Strength + Intelligence + Charisma, with limited luck), so training shows
+  in the results, and the bot `0` is a fair opponent nobody can control.
+  *Enforced:* `spec/fight.test.ts` (a pet with 1.5× the power always wins; the
+  bot can't be signed into).
+
+Some of good can only be judged: whether waiting 30 minutes for a lesson feels
+like anticipation or a chore, whether prices (a $150 hourglass) make choices
+interesting, and whether the Arena is more fun with a room full of people, which
+is the capstone showcase this is designed for. Those are tested by playing it
+with others, not by `spec/`.
+
+**What I chose not to build (yet):** chat, trading or gifting between pets,
+recruiting other players' pets, and leaderboards. Each adds interaction, but the
+first version proves the core loop (train, work, fight, see others do the same)
+before widening it.
+
+**What I read or looked at:** the
+[Final Project brief](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/assessments/final-project/)
+(its multi-user, real-time and persists requirements are the backbone of this
+definition), and QQ Pets (Tencent, 2005), the game this one is modelled on:
+study for stats, work for money, care for your pet's needs, and share a world
+with other players.
 
 ## Playing
 
