@@ -1,4 +1,4 @@
-import { announce } from "./feed.ts";
+import { followUp } from "./followups.ts";
 import { busyUntilById, settle } from "./pets.ts";
 import { broadcast } from "./realtime.ts";
 
@@ -15,7 +15,7 @@ export function schedule(id: string, busyUntil: number): void {
     const result = settle(id, busyUntil);
     if (result?.finished) {
       broadcast({ type: "pet:updated", pet: result.pet });
-      announce();
+      followUp();
     }
     // A newer activity is running (an hourglass skipped the old one, then a
     // new one began): wait for that one instead.

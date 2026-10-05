@@ -35,12 +35,16 @@ the point of the game rather than boxes to tick:
   finished and paid on time, and the player was still signed in.
 - **Interacting is fair.** Fights are decided by published rules (power is
   2 × Strength + Intelligence + Charisma, with limited luck), so training shows
-  in the results, and the bot `0` is a fair opponent nobody can control. Fights
+  in the results, and the bot `0` is a fair opponent nobody can control: it
+  keeps pace with the median player, so it never becomes a free win. Fights
   have stakes (the winner takes some of the loser's money), but a strong pet
   can't drain a weak one: it has to wait an hour before attacking the same pet
   again, while the pet it attacked can hit back straight away.
   *Enforced:* `spec/fight.test.ts` (a pet with 1.5× the power always wins; the
-  bot can't be signed into; spoils, the cooldown and revenge).
+  bot can't be signed into; spoils, the cooldown and revenge). *Checked by
+  hand:* the bot tracking the median, which the shared spec database can't pin
+  down. On a fresh database with pets at 7/5/5, 6/6/5 and 5/5/5 (Strength /
+  Intelligence / Charisma), the bot moved to 6/5/5 and every window heard it.
 
 Some of good can only be judged: whether waiting 30 minutes for a lesson feels
 like anticipation or a chore, whether prices (a $150 hourglass) make choices
@@ -167,6 +171,10 @@ look any pet up by its player ID. Each shows its school, what it's doing, its
 attributes, its power and its wins and losses.
 
 Pet **`0` is a bot**. It always exists, so there's always someone to fight.
+It keeps pace with the players: each of its attributes is the **median** of
+every player's pet (rounded down, and never below a new pet's 5), updated the
+moment any pet's change moves the median. So the bot is always an even match for
+a typical player: beating it reliably means your pet is ahead of the pack.
 
 Press **Fight** to attack another pet. Each pet's **power** is
 2 × Strength + Intelligence + Charisma. Both sides roll their power times a

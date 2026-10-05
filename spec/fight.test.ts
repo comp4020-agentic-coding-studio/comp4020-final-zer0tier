@@ -75,6 +75,19 @@ it("a much weaker attacker always loses", async () => {
   expect(body.defender.wins).toBe(1);
 });
 
+// The bot follows the median player, which the shared spec database can't pin
+// down; README.md records the hand check. What always holds: it's never weaker
+// than a new pet, and it never goes off to study or work.
+it("the bot keeps pace with the players: never weaker than a new pet", async () => {
+  await newPet();
+  const bot = await getPet("0");
+  for (const attribute of ["strength", "intelligence", "charisma"]) {
+    expect(Number.isInteger(bot[attribute])).toBe(true);
+    expect(bot[attribute]).toBeGreaterThanOrEqual(5);
+  }
+  expect(bot.activity).toBe("idle");
+});
+
 it("anyone can fight the bot", async () => {
   const id = await newPet();
   const { status, body } = await fight(id, "0");

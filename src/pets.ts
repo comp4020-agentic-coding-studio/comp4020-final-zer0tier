@@ -183,6 +183,36 @@ export const busyUntilById = (): { id: string; busyUntil: number }[] =>
 export const listPets = (limit: number): Pet[] =>
   (listIds.all(BOT_ID, limit) as { id: string }[]).map((r) => getPet(r.id)!);
 
+// The bot keeps pace with the players: each of its attributes is the median of
+// the players' pets (rounded down, never below a new pet's), so it stays an
+// even match for a typical player however far the game has moved on.
+const playerStats = db.prepare(
+  "SELECT strength, intelligence, charisma FROM pets WHERE id IN (SELECT id FROM accounts)",
+);
+const saveBotStats = db.prepare("UPDATE pets SET strength = ?, intelligence = ?, charisma = ? WHERE id = ?");
+const BASE_ATTRIBUTE = 5;
+
+function median(values: number[]): number {
+  if (values.length === 0) return BASE_ATTRIBUTE;
+  values.sort((a, b) => a - b);
+  const mid = values.length >> 1;
+  const middle = values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+  return Math.max(BASE_ATTRIBUTE, Math.floor(middle));
+}
+
+// Brings the bot up (or down) to the players' median. Returns the bot as
+// saved if that changed it, for the caller to broadcast.
+export function matchBot(): Pet | undefined {
+  const pets = playerStats.all() as Record<Attribute, number>[];
+  const [strength, intelligence, charisma] = ATTRIBUTES.map((a) => median(pets.map((p) => p[a])));
+  const bot = getPet(BOT_ID);
+  if (!bot || (bot.strength === strength && bot.intelligence === intelligence && bot.charisma === charisma)) {
+    return undefined;
+  }
+  saveBotStats.run(strength, intelligence, charisma, BOT_ID);
+  return getPet(BOT_ID);
+}
+
 // Logging in with an unknown ID claims a new pet with the base stats.
 export function getOrCreatePet(id: string): { pet: Pet; created: boolean } {
   const { changes } = insert.run(id);

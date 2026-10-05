@@ -5,15 +5,16 @@ import { marked } from "marked";
 import {
   COURSES, ITEMS, LOCATIONS, MAX_CARE, SCHOOLS, SHIFT_MINUTES, STUDY_COST, STUDY_MINUTES, STUDY_NEEDS,
   WORK_COST_PER_HOUR, buy, findCourse, findItem, findLocation, getOrCreatePet, getPet, isShiftLength, isValidId,
-  study, upgrade, use, work, BOT_ID, FIGHT_COOLDOWN_MINUTES, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS, SPOILS,
-  fight, listPets, recentFights, type Outcome,
+  matchBot, study, upgrade, use, work, BOT_ID, FIGHT_COOLDOWN_MINUTES, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS,
+  SPOILS, fight, listPets, recentFights, type Outcome,
 } from "./pets.ts";
 import {
   Busy, PASSWORD, type AuthOutcome, clearedCookie, isValidPassword, playerFor, sessionCookie, sessionToken, signIn,
   signOut, signUp,
 } from "./auth.ts";
 import { TIME_SCALE } from "./clock.ts";
-import { announce, recentFeed } from "./feed.ts";
+import { recentFeed } from "./feed.ts";
+import { followUp } from "./followups.ts";
 import { attachRealtime, broadcast } from "./realtime.ts";
 import { schedule, scheduleAll } from "./scheduler.ts";
 
@@ -71,7 +72,7 @@ async function authenticate(
   }
   // A new pet joins every open arena.
   if (outcome.created) broadcast({ type: "pet:updated", pet: outcome.pet });
-  announce();
+  followUp();
   res.setHeader("Set-Cookie", sessionCookie(outcome.token));
   res.status(okStatus).json(outcome.pet);
 }
@@ -160,14 +161,14 @@ app.get("/api/rules", (_req, res) => {
 function respond(res: express.Response, outcome: Outcome): void {
   if ("error" in outcome) {
     if (outcome.settled) broadcast({ type: "pet:updated", pet: outcome.settled });
-    announce();
+    followUp();
     res.status(outcome.status).json({ error: outcome.error });
     return;
   }
   // A lesson or shift just started: finish it on time.
   if (outcome.pet.busyUntil !== null) schedule(outcome.pet.id, outcome.pet.busyUntil);
   broadcast({ type: "pet:updated", pet: outcome.pet });
-  announce();
+  followUp();
   res.json(outcome.pet);
 }
 
@@ -224,7 +225,7 @@ app.post("/api/pets/:id/fight/:opponent", (req, res) => {
   broadcast({ type: "pet:updated", pet: outcome.attacker });
   broadcast({ type: "pet:updated", pet: outcome.defender });
   broadcast({ type: "fight:finished", fight: outcome.fight });
-  announce();
+  followUp();
   res.json(outcome);
 });
 
@@ -234,6 +235,7 @@ const server = createServer(app);
 attachRealtime(server);
 scheduleAll(); // lessons and shifts that were running when the app last stopped
 getOrCreatePet(BOT_ID);
+matchBot(); // players may have trained since the bot last kept up
 
 const port = Number(process.env.PORT ?? 8080);
 server.listen(port, "0.0.0.0", () => {
