@@ -24,6 +24,9 @@
   --radius: 24px;
   --radius-sm: 16px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Cursors in the pet's colours: an arrow, and a paw over anything clickable. */
+  --cursor: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 32 32"%3E%3Cpath d="M4 3v21l5.6-5.2 3.9 8.4 4.1-1.9-3.9-8.3H21Z" fill="%23fb923c" stroke="%23fff" stroke-width="4" stroke-linejoin="round"/%3E%3Cpath d="M4 3v21l5.6-5.2 3.9 8.4 4.1-1.9-3.9-8.3H21Z" fill="%23fb923c" stroke="%233b2314" stroke-width="2" stroke-linejoin="round"/%3E%3Ccircle cx="8.5" cy="13" r="1.6" fill="%23ffedd5"/%3E%3C/svg%3E') 3 3, auto;
+  --cursor-pointer: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 32 32"%3E%3Cg fill="%23fb923c" stroke="%23fff" stroke-width="4"%3E%3Cellipse cx="16" cy="21.5" rx="7" ry="6"/%3E%3Ccircle cx="7.5" cy="13" r="3"/%3E%3Ccircle cx="12.8" cy="8" r="3.2"/%3E%3Ccircle cx="19.2" cy="8" r="3.2"/%3E%3Ccircle cx="24.5" cy="13" r="3"/%3E%3C/g%3E%3Cg fill="%23fb923c" stroke="%233b2314" stroke-width="1.8"%3E%3Cellipse cx="16" cy="21.5" rx="7" ry="6"/%3E%3Ccircle cx="7.5" cy="13" r="3"/%3E%3Ccircle cx="12.8" cy="8" r="3.2"/%3E%3Ccircle cx="19.2" cy="8" r="3.2"/%3E%3Ccircle cx="24.5" cy="13" r="3"/%3E%3C/g%3E%3C/svg%3E') 14 4, pointer;
   color-scheme: light dark;
 }
 
@@ -54,6 +57,7 @@
 * { box-sizing: border-box; }
 
 body {
+  cursor: var(--cursor);
   margin: 0;
   min-height: 100dvh;
   display: flex;
@@ -140,7 +144,7 @@ main { flex: 1; width: 100%; max-width: 40rem; margin: 0 auto; padding: 1.5rem 1
   background: transparent;
   border: 0;
   border-radius: 999px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   transition: background-color 150ms var(--ease), color 150ms var(--ease);
 }
 .auth-tabs button[aria-selected="true"], .tabs button[aria-selected="true"] { color: var(--fg); background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
@@ -179,7 +183,7 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
   border: 0;
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-inset), 0 4px 12px -4px rgba(194, 65, 12, 0.5);
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   touch-action: manipulation;
   transition: background-color 150ms var(--ease), transform 120ms var(--ease);
 }
@@ -279,7 +283,7 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
   border: 2px solid color-mix(in srgb, var(--tone) 35%, transparent);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-inset);
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   touch-action: manipulation;
   transition: background-color 150ms var(--ease), border-color 150ms var(--ease), transform 120ms var(--ease);
 }
@@ -366,7 +370,7 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
   border: 2px solid var(--border);
   background: var(--surface);
   font-weight: 700;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   transition: background-color 150ms var(--ease), border-color 150ms var(--ease);
 }
 .shift-options label:hover { border-color: var(--pet); }
@@ -510,12 +514,13 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
   font-size: 0.9rem;
   font-weight: 700;
   border-radius: 12px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   touch-action: manipulation;
   transition: background-color 150ms var(--ease), transform 120ms var(--ease);
 }
 .chip-btn:active { transform: scale(0.96); }
 .chip-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+a[href], summary { cursor: var(--cursor-pointer); }
 .chip-use { color: var(--on-primary); background: var(--primary); border: 0; box-shadow: var(--shadow-inset); }
 .chip-use:hover:not(:disabled) { background: var(--primary-hover); }
 .chip-buy { color: var(--fg); background: var(--surface); border: 2px solid var(--border); }
