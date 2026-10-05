@@ -47,6 +47,13 @@ db.exec(`
     spoils         INTEGER NOT NULL DEFAULT 0,
     fought_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
+  CREATE TABLE IF NOT EXISTS feed (
+    id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind   TEXT    NOT NULL,
+    pet    TEXT    NOT NULL REFERENCES pets (id),
+    detail TEXT    NOT NULL DEFAULT '{}',
+    at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
   CREATE TABLE IF NOT EXISTS accounts (
     id            TEXT PRIMARY KEY REFERENCES pets (id),
     password_hash TEXT NOT NULL,

@@ -13,6 +13,7 @@ import {
   signOut, signUp,
 } from "./auth.ts";
 import { TIME_SCALE } from "./clock.ts";
+import { announce, recentFeed } from "./feed.ts";
 import { attachRealtime, broadcast } from "./realtime.ts";
 import { schedule, scheduleAll } from "./scheduler.ts";
 
@@ -70,6 +71,7 @@ async function authenticate(
   }
   // A new pet joins every open arena.
   if (outcome.created) broadcast({ type: "pet:updated", pet: outcome.pet });
+  announce();
   res.setHeader("Set-Cookie", sessionCookie(outcome.token));
   res.status(okStatus).json(outcome.pet);
 }
@@ -115,6 +117,12 @@ app.get("/api/pets", (req, res) => {
   res.json(listPets(limit));
 });
 
+// What's been happening across the game, newest first.
+app.get("/api/feed", (req, res) => {
+  const limit = Math.min(Math.max(Math.trunc(Number(req.query.limit)) || 20, 1), 50);
+  res.json(recentFeed(limit));
+});
+
 app.get("/api/pets/:id/fights", (req, res) => {
   if (!isValidId(req.params.id) || !getPet(req.params.id)) return notFound(res, "pet");
   res.json(recentFights(req.params.id, 10));
@@ -152,12 +160,14 @@ app.get("/api/rules", (_req, res) => {
 function respond(res: express.Response, outcome: Outcome): void {
   if ("error" in outcome) {
     if (outcome.settled) broadcast({ type: "pet:updated", pet: outcome.settled });
+    announce();
     res.status(outcome.status).json({ error: outcome.error });
     return;
   }
   // A lesson or shift just started: finish it on time.
   if (outcome.pet.busyUntil !== null) schedule(outcome.pet.id, outcome.pet.busyUntil);
   broadcast({ type: "pet:updated", pet: outcome.pet });
+  announce();
   res.json(outcome.pet);
 }
 
@@ -214,6 +224,7 @@ app.post("/api/pets/:id/fight/:opponent", (req, res) => {
   broadcast({ type: "pet:updated", pet: outcome.attacker });
   broadcast({ type: "pet:updated", pet: outcome.defender });
   broadcast({ type: "fight:finished", fight: outcome.fight });
+  announce();
   res.json(outcome);
 });
 

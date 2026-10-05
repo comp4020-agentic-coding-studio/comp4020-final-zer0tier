@@ -1,12 +1,15 @@
 import type { Server } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
+import type { FeedEntry } from "./feed.ts";
 import type { Fight, Pet } from "./pets.ts";
 
 // Server -> client events. Clients act over HTTP; the socket only carries news.
 export type ServerEvent =
   | { type: "pet:updated"; pet: Pet }
   // Sent after both fighters' pet:updated, so clients can tell the story.
-  | { type: "fight:finished"; fight: Fight };
+  | { type: "fight:finished"; fight: Fight }
+  // Sent last, after the change it describes, for the Arena's "Happening now".
+  | { type: "feed:added"; entry: FeedEntry };
 
 let wss: WebSocketServer | undefined;
 

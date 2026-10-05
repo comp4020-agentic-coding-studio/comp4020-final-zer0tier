@@ -1,3 +1,4 @@
+import { announce } from "./feed.ts";
 import { busyUntilById, settle } from "./pets.ts";
 import { broadcast } from "./realtime.ts";
 
@@ -12,7 +13,10 @@ export function schedule(id: string, busyUntil: number): void {
     timers.delete(id);
     // The timer has waited out the activity, whatever the wall clock now says.
     const result = settle(id, busyUntil);
-    if (result?.finished) broadcast({ type: "pet:updated", pet: result.pet });
+    if (result?.finished) {
+      broadcast({ type: "pet:updated", pet: result.pet });
+      announce();
+    }
     // A newer activity is running (an hourglass skipped the old one, then a
     // new one began): wait for that one instead.
     else if (result?.pet.busyUntil) schedule(id, result.pet.busyUntil);

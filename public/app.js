@@ -301,6 +301,7 @@ let fighting = false; // a fight request is in flight
 let arenaBlock = ""; // why this pet can't fight right now, or ""
 let avenging = null; // the pet that last attacked this one, for the Revenge button
 const fightLog = [];
+let feed = new Map(); // "Happening now" entries, by ID
 
 const powerOf = (pet) =>
   Object.entries(rules.fight.powerWeights).reduce((sum, [attribute, weight]) => sum + weight * pet[attribute], 0);
@@ -309,9 +310,10 @@ async function loadArena() {
   if (!current || !rules) return;
   const { id } = current;
   try {
-    const [list, fights] = await Promise.all([
+    const [list, fights, news] = await Promise.all([
       fetch("/api/pets?limit=20").then((res) => res.json()),
       fetch(`/api/pets/${encodeURIComponent(id)}/fights`).then((res) => res.json()),
+      fetch(`/api/feed?limit=${FEED_SIZE}`).then((res) => res.json()),
     ]);
     if (current?.id !== id) return; // switched pets meanwhile
     const pin = pinned && rivals.get(pinned);
@@ -324,6 +326,8 @@ async function loadArena() {
     fightLog.length = 0;
     fightLog.push(...fights);
     renderFightLog();
+    feed = new Map(news.map((entry) => [entry.id, entry]));
+    renderFeed();
   } catch {
     $("arena-error").textContent = "Couldn't load the other pets. They'll show up when the connection is back.";
   }
@@ -445,6 +449,56 @@ function onFight(fight) {
   fightLog.length = Math.min(fightLog.length, 10);
   renderFightLog();
   if (fight.defender === current.id) showAttacked(fight, text, won);
+}
+
+// "Happening now": what everyone's pets have been up to, newest first.
+const FEED_SIZE = 15;
+
+function feedText(entry) {
+  switch (entry.kind) {
+    case "joined":
+      return [entry.pet, " joined the game."];
+    case "fight": {
+      const loser = entry.winner === entry.pet ? entry.other : entry.pet;
+      return [entry.winner, " beat ", loser, entry.spoils ? ` and took $${entry.spoils}.` : "."];
+    }
+    case "school": {
+      const school = rules.schools.find((s) => s.id === entry.school)?.name ?? entry.school;
+      return [entry.pet, ` moved up to ${school.toLowerCase()}.`];
+    }
+    case "promoted": {
+      const place = rules.locations.find((l) => l.id === entry.location);
+      return [entry.pet, ` became ${place?.ranks[entry.rank]?.title ?? "promoted"} at the ${place?.name.toLowerCase()}.`];
+    }
+    default:
+      return null; // a kind this page doesn't know yet
+  }
+}
+
+function renderFeed() {
+  const entries = [...feed.values()].sort((a, b) => b.id - a.id).slice(0, FEED_SIZE);
+  feed = new Map(entries.map((entry) => [entry.id, entry]));
+  $("feed").replaceChildren(
+    ...entries.flatMap((entry) => {
+      const parts = feedText(entry);
+      if (!parts) return [];
+      const li = document.createElement("li");
+      // Odd parts are plain text, even ones pet IDs, which go in bold.
+      const text = document.createElement("span");
+      parts.forEach((part, i) => {
+        if (i % 2) return void text.append(part);
+        const b = document.createElement("b");
+        b.textContent = part !== current?.id ? part : i === 0 ? "You" : "you";
+        text.append(b);
+      });
+      li.toggleAttribute("data-mine", entry.pet === current?.id || entry.other === current?.id);
+      const time = document.createElement("time");
+      time.dateTime = entry.at;
+      time.textContent = new Date(entry.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      li.append(text, time);
+      return [li];
+    }),
+  );
 }
 
 // Being attacked is news wherever the player is on the page, with a way to
@@ -653,6 +707,9 @@ function connect() {
       renderRivals();
     } else if (event.type === "fight:finished") {
       onFight(event.fight);
+    } else if (event.type === "feed:added" && current && rules) {
+      feed.set(event.entry.id, event.entry);
+      renderFeed();
     }
   });
   ws.addEventListener("close", () => {

@@ -1,5 +1,6 @@
 import { TIME_SCALE, realMs } from "./clock.ts";
 import { db } from "./db.ts";
+import { record } from "./feed.ts";
 
 export interface Pet {
   id: string;
@@ -185,6 +186,7 @@ export const listPets = (limit: number): Pet[] =>
 // Logging in with an unknown ID claims a new pet with the base stats.
 export function getOrCreatePet(id: string): { pet: Pet; created: boolean } {
   const { changes } = insert.run(id);
+  if (changes > 0 && id !== BOT_ID) record({ kind: "joined", pet: id });
   return { pet: getPet(id)!, created: changes > 0 };
 }
 
@@ -216,7 +218,9 @@ function finishIfDue(pet: Pet, now: number): boolean {
   return true;
 }
 
+// Saves the pet, and tells the feed if it just moved up a school or a job.
 function write(pet: Pet): void {
+  const before = getPet(pet.id)!;
   save.run(
     pet.strength, pet.intelligence, pet.charisma, pet.money, pet.school, pet.credits,
     pet.stamina, pet.hygiene, pet.food, pet.soap, pet.hourglass,
@@ -224,6 +228,12 @@ function write(pet: Pet): void {
     pet.activity, pet.task, pet.busySince, pet.busyUntil, pet.reward === null ? null : JSON.stringify(pet.reward),
     pet.wins, pet.losses, pet.id,
   );
+  if (pet.school !== before.school) record({ kind: "school", pet: pet.id, school: pet.school });
+  for (const location of LOCATIONS) {
+    if (pet.jobs[location.id] > before.jobs[location.id]) {
+      record({ kind: "promoted", pet: pet.id, location: location.id, rank: pet.jobs[location.id] });
+    }
+  }
 }
 
 // Finishes the pet's activity if it's due. The scheduler calls this when one
@@ -479,6 +489,7 @@ export function fight(attackerId: string, defenderId: string): FightOutcome {
     const { lastInsertRowid } = insertFight.run(
       attacker.id, defender.id, winner.id, attackerPower, defenderPower, tenths(attackerRoll), tenths(defenderRoll), spoils,
     );
+    record({ kind: "fight", pet: attacker.id, other: defender.id, winner: winner.id, spoils });
     commit.run();
     return {
       fight: selectFight.get(lastInsertRowid) as unknown as Fight,

@@ -230,3 +230,65 @@ it("fight:finished — the money the winner took reaches both windows within 1s"
     for (const ws of windows) ws.close();
   }
 });
+
+// Resolves with the first feed:added event that `matches`; fails past the 1 s budget.
+function nextFeed(ws: WebSocket, matches: (entry: any) => boolean): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("no feed:added within 1s")), 1000);
+    ws.addEventListener("message", (msg) => {
+      const event = JSON.parse(String(msg.data));
+      if (event.type === "feed:added" && matches(event.entry)) {
+        clearTimeout(timer);
+        resolve(event);
+      }
+    });
+  });
+}
+
+it("feed:added — a player joining reaches every open window within 1s", async () => {
+  const id = freshId();
+  const windows = [await open(), await open()];
+  try {
+    const news = windows.map((ws) => nextFeed(ws, (entry) => entry.pet === id));
+    expect((await signUp(id)).status).toBe(201);
+    for (const { entry } of await Promise.all(news)) expect(entry).toMatchObject({ kind: "joined", pet: id });
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});
+
+it("feed:added — a fight reaches every open window within 1s, after fight:finished", async () => {
+  const attacker = freshId();
+  const defender = freshId();
+  await signUp(attacker);
+  await signUp(defender);
+  const windows = [await open(), await open()];
+  try {
+    const order: string[] = [];
+    windows[0].addEventListener("message", (msg) => order.push(JSON.parse(String(msg.data)).type));
+    const news = windows.map((ws) => nextFeed(ws, (entry) => entry.kind === "fight" && entry.pet === attacker));
+    const res = await post(`/api/pets/${attacker}/fight/${defender}`);
+    const { fight } = await res.json();
+    for (const { entry } of await Promise.all(news)) {
+      expect(entry).toMatchObject({ pet: attacker, other: defender, winner: fight.winner, spoils: fight.spoils });
+    }
+    expect(order.indexOf("fight:finished")).toBeLessThan(order.indexOf("feed:added"));
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});
+
+it("feed:added — moving up a school, when the lesson ends on its own, reaches every open window within 1s", async () => {
+  const id = freshId();
+  await signUp(id);
+  await studyTimes(id, "math", 4);
+  await readyToStudy(id);
+  const windows = [await open(), await open()];
+  try {
+    const news = windows.map((ws) => nextFeed(ws, (entry) => entry.pet === id && entry.kind === "school"));
+    expect((await post(`/api/pets/${id}/study/math`)).status).toBe(200);
+    for (const { entry } of await Promise.all(news)) expect(entry).toMatchObject({ school: "middle" });
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});

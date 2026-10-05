@@ -21,9 +21,11 @@ the point of the game rather than boxes to tick:
   401/403), `spec/fight.test.ts` (new pets listed after the bot).
 - **You see each other act (real-time).** Every change to a pet, and every fight,
   reaches every open window within a second, with no reload: your rival's shift
-  ending, their level-up, the fight they just started against you. *Enforced:*
-  `spec/realtime.test.ts` opens real WebSockets and fails if any event takes
-  longer than a second.
+  ending, their level-up, the fight they just started against you. The Arena's
+  **Happening now** list shows the whole room what everyone else is doing.
+  *Enforced:* `spec/realtime.test.ts` opens real WebSockets and fails if any
+  event takes longer than a second; `spec/feed.test.ts` checks what the feed
+  records.
 - **Nothing you did is lost (persists).** Pets, accounts, fights and unfinished
   lessons and shifts live in SQLite on the Fly volume, and a shift that was
   running when the server restarted still finishes and pays. *Enforced:* signing
@@ -181,6 +183,14 @@ that same pet again. The pet it attacked doesn't wait: if someone attacks you, a
 message pops up wherever you are on the page, saying who it was, how it went and
 what money changed hands, with a **Revenge** button to fight them straight back.
 
+### Happening now
+
+Below your fights, the Arena shows the 15 newest things that happened anywhere
+in the game, live: a player joining, every fight (who won, and any money
+taken), a pet moving up a school, and a pet being promoted at work. Ordinary
+lessons and shifts stay out of it, so it isn't flooded. Entries about your pet
+are highlighted.
+
 Fighting is instant and costs the attacker 10 stamina and 5 hygiene. Like
 studying, it needs enough left for an hour's shift afterwards (20 stamina and 25
 hygiene), and a busy pet can't start a fight. The defender doesn't pay anything,
@@ -213,8 +223,11 @@ the built-in `node:sqlite` for storage.
   `work/:location` (with `{"minutes": 60}`), `upgrade/:location`, `buy/:item`,
   `use/:item` and `fight/:opponent`.
 - **Reading** (anyone): `GET /api/pets` lists pets, `GET /api/pets/:id` shows
-  one, `GET /api/pets/:id/fights` its recent fights, and `GET /api/rules` the
+  one, `GET /api/pets/:id/fights` its recent fights, `GET /api/feed` what's
+  been happening across the game (newest first), and `GET /api/rules` the
   schools, courses, work locations, items and costs.
 - **Real time:** the server broadcasts a `pet:updated` event over the socket
-  after every change, and a `fight:finished` event after each fight (with the
-  `spoils` the winner took).
+  after every change, a `fight:finished` event after each fight (with the
+  `spoils` the winner took), and a `feed:added` event for each new entry in
+  Happening now, sent after the change it describes. The feed keeps its newest
+  500 entries in SQLite.
