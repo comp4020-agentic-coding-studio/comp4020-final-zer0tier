@@ -1,4 +1,4 @@
-import { realMs } from "./clock.ts";
+import { TIME_SCALE, realMs } from "./clock.ts";
 import { db } from "./db.ts";
 
 export interface Pet {
@@ -377,6 +377,16 @@ export const FIGHT_NEEDS: Needs = {
   hygiene: FIGHT_COST.hygiene + WORK_COST_PER_HOUR.hygiene,
 };
 
+// The winner takes a share of the loser's money, so a fight puts something at
+// stake for both sides. The bot is practice: nothing changes hands with it.
+export const SPOILS = { share: 0.1, max: 50 };
+export const spoilsFrom = (loser: Pet): number => Math.min(SPOILS.max, Math.floor(loser.money * SPOILS.share));
+
+// After attacking a pet, the attacker waits this long (game time) before
+// attacking that same pet again, so a strong pet can't drain a weak one. The
+// defender can hit back straight away, and the bot never makes anyone wait.
+export const FIGHT_COOLDOWN_MINUTES = 60;
+
 export interface Fight {
   id: number;
   attacker: string;
@@ -386,19 +396,23 @@ export interface Fight {
   defenderPower: number;
   attackerRoll: number;
   defenderRoll: number;
+  spoils: number; // money the winner took from the loser
   foughtAt: string;
 }
 
 const insertFight = db.prepare(
-  `INSERT INTO fights (attacker, defender, winner, attacker_power, defender_power, attacker_roll, defender_roll)
-   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  `INSERT INTO fights (attacker, defender, winner, attacker_power, defender_power, attacker_roll, defender_roll, spoils)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 );
 const FIGHT_COLUMNS = `id, attacker, defender, winner, attacker_power AS attackerPower,
   defender_power AS defenderPower, attacker_roll AS attackerRoll, defender_roll AS defenderRoll,
-  fought_at AS foughtAt`;
+  spoils, fought_at AS foughtAt`;
 const selectFight = db.prepare(`SELECT ${FIGHT_COLUMNS} FROM fights WHERE id = ?`);
 const fightsFor = db.prepare(
   `SELECT ${FIGHT_COLUMNS} FROM fights WHERE attacker = ? OR defender = ? ORDER BY id DESC LIMIT ?`,
+);
+const lastAttack = db.prepare(
+  "SELECT fought_at AS foughtAt FROM fights WHERE attacker = ? AND defender = ? ORDER BY id DESC LIMIT 1",
 );
 const begin = db.prepare("BEGIN IMMEDIATE");
 const commit = db.prepare("COMMIT");
@@ -413,7 +427,18 @@ const tenths = (n: number): number => Math.round(n * 10) / 10;
 
 export type FightOutcome =
   | { fight: Fight; attacker: Pet; defender: Pet }
-  | { status: 400 | 404 | 409; error: string };
+  | { status: 400 | 404 | 409 | 429; error: string };
+
+// Why the attacker can't attack this defender again yet, if it can't.
+function cooldown(attacker: Pet, defender: Pet, now: number): string | undefined {
+  if (defender.id === BOT_ID) return undefined;
+  const last = lastAttack.get(attacker.id, defender.id) as { foughtAt: string } | undefined;
+  if (!last) return undefined;
+  const left = Date.parse(last.foughtAt) + realMs(FIGHT_COOLDOWN_MINUTES) - now;
+  if (left <= 0) return undefined;
+  const minutes = Math.max(1, Math.ceil((left * TIME_SCALE) / 60_000));
+  return `You attacked ${defender.id} recently; you can attack them again in ${minutes} min.`;
+}
 
 // Both pets and the fight are written in one transaction, then read back.
 export function fight(attackerId: string, defenderId: string): FightOutcome {
@@ -426,8 +451,12 @@ export function fight(attackerId: string, defenderId: string): FightOutcome {
   finishIfDue(attacker, now);
   finishIfDue(defender, now);
 
-  const refusal = busy(attacker) ?? spend(attacker, FIGHT_NEEDS, FIGHT_COST, "fight");
+  const refusal = busy(attacker);
   if (refusal) return { status: 409, error: refusal };
+  const waiting = cooldown(attacker, defender, now);
+  if (waiting) return { status: 429, error: waiting };
+  const unfit = spend(attacker, FIGHT_NEEDS, FIGHT_COST, "fight");
+  if (unfit) return { status: 409, error: unfit };
 
   const attackerPower = powerOf(attacker);
   const defenderPower = powerOf(defender);
@@ -439,13 +468,16 @@ export function fight(attackerId: string, defenderId: string): FightOutcome {
   const loser = won ? defender : attacker;
   winner.wins++;
   loser.losses++;
+  const spoils = attacker.id === BOT_ID || defender.id === BOT_ID ? 0 : spoilsFrom(loser);
+  loser.money -= spoils;
+  winner.money += spoils;
 
   begin.run();
   try {
     write(attacker);
     write(defender);
     const { lastInsertRowid } = insertFight.run(
-      attacker.id, defender.id, winner.id, attackerPower, defenderPower, tenths(attackerRoll), tenths(defenderRoll),
+      attacker.id, defender.id, winner.id, attackerPower, defenderPower, tenths(attackerRoll), tenths(defenderRoll), spoils,
     );
     commit.run();
     return {

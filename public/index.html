@@ -40,6 +40,14 @@
 
     <main>
       <p id="notice" class="notice" role="status"></p>
+      <div id="attacked" class="attacked" role="status" hidden>
+        <p id="attacked-text" class="attacked-text"></p>
+        <p id="attacked-error" class="error"></p>
+        <div class="attacked-actions">
+          <button type="button" id="revenge" class="chip-btn">Revenge</button>
+          <button type="button" id="attacked-close" class="chip-btn chip-buy" aria-label="Dismiss">Dismiss</button>
+        </div>
+      </div>
       <form id="login" class="card login" hidden>
         <h1>Raise a pet worth bragging about</h1>
         <div class="auth-tabs" role="tablist" aria-label="Account">

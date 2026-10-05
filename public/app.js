@@ -83,7 +83,8 @@ loadRules().then((loaded) => {
   }
   $("study-cost").textContent = `${lengthText(rules.study.minutes)} · ${costText(rules.study.cost)}`;
   $("skip").addEventListener("click", () => perform($("skip"), "use/hourglass", "care-error"));
-  $("fight-cost").textContent = costText(rules.fight.cost);
+  $("fight-cost").textContent =
+    `${costText(rules.fight.cost)} · winner takes ${rules.fight.spoils.share * 100}% of the loser's money`;
   for (const minutes of rules.work.shiftMinutes) {
     const input = document.createElement("input");
     input.type = "radio";
@@ -298,6 +299,7 @@ let arrivals = 0;
 let pinned = null; // the pet the player looked up, shown first
 let fighting = false; // a fight request is in flight
 let arenaBlock = ""; // why this pet can't fight right now, or ""
+let avenging = null; // the pet that last attacked this one, for the Revenge button
 const fightLog = [];
 
 const powerOf = (pet) =>
@@ -368,26 +370,37 @@ function renderRivals() {
 
 function renderFightButtons() {
   for (const button of $("rivals").querySelectorAll(".fight-btn")) button.disabled = fighting || arenaBlock !== "";
+  $("revenge").disabled = fighting || arenaBlock !== "";
+  $("revenge").title = arenaBlock;
 }
 
-async function startFight(opponent) {
-  if (!current) return;
+// Resolves true if the fight happened; otherwise says why in `errorId`.
+async function startFight(opponent, errorId = "arena-error") {
+  if (!current) return false;
   fighting = true;
   renderFightButtons();
-  $("arena-error").textContent = "";
+  $(errorId).textContent = "";
   try {
     // No local update: the fight:finished and pet:updated broadcasts tell the story.
     const res = await fetch(`/api/pets/${encodeURIComponent(current.id)}/fight/${encodeURIComponent(opponent)}`, {
       method: "POST",
     });
-    if (res.status === 401) return sessionEnded();
-    if (res.status === 403) return sessionChanged();
+    if (res.status === 401) {
+      sessionEnded();
+      return false;
+    }
+    if (res.status === 403) {
+      sessionChanged();
+      return false;
+    }
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      $("arena-error").textContent = body.error ?? `Something went wrong (server error ${res.status}). Try again.`;
+      $(errorId).textContent = body.error ?? `Something went wrong (server error ${res.status}). Try again.`;
     }
+    return res.ok;
   } catch {
-    $("arena-error").textContent = "Couldn't reach the server, so the fight didn't happen. Try again.";
+    $(errorId).textContent = "Couldn't reach the server, so the fight didn't happen. Try again.";
+    return false;
   } finally {
     fighting = false;
     renderFightButtons();
@@ -399,10 +412,11 @@ function describeFight(fight) {
   const me = current.id;
   const won = fight.winner === me;
   const rolls = `${fight.attackerRoll} vs ${fight.defenderRoll}`;
+  const money = fight.spoils ? (won ? ` You took $${fight.spoils}.` : ` They took $${fight.spoils}.`) : "";
   if (fight.attacker === me) {
-    return { won, rolls, text: won ? `You beat ${fight.defender}!` : `${fight.defender} beat you.` };
+    return { won, rolls, text: (won ? `You beat ${fight.defender}!` : `${fight.defender} beat you.`) + money };
   }
-  return { won, rolls, text: `${fight.attacker} attacked you and ${won ? "lost!" : "won."}` };
+  return { won, rolls, text: `${fight.attacker} attacked you and ${won ? "lost!" : "won."}` + money };
 }
 
 function renderFightLog() {
@@ -430,7 +444,31 @@ function onFight(fight) {
   fightLog.unshift(fight);
   fightLog.length = Math.min(fightLog.length, 10);
   renderFightLog();
+  if (fight.defender === current.id) showAttacked(fight, text, won);
 }
+
+// Being attacked is news wherever the player is on the page, with a way to
+// hit straight back (the attacker's own cooldown doesn't stop the defender).
+function showAttacked(fight, text, won) {
+  avenging = fight.attacker;
+  $("attacked-text").textContent = text;
+  $("attacked-error").textContent = "";
+  $("attacked").dataset.result = won ? "won" : "lost";
+  $("revenge").textContent = won ? `Attack ${fight.attacker}` : "Revenge";
+  $("revenge").setAttribute("aria-label", `Fight ${fight.attacker}`);
+  $("attacked").hidden = false;
+  renderFightButtons();
+}
+
+function hideAttacked() {
+  avenging = null;
+  $("attacked").hidden = true;
+}
+
+$("revenge").addEventListener("click", async () => {
+  if (avenging && (await startFight(avenging, "attacked-error"))) hideAttacked();
+});
+$("attacked-close").addEventListener("click", hideAttacked);
 
 $("lookup").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -473,6 +511,7 @@ function render(pet) {
     if (previous?.id !== pet.id) {
       pinned = null;
       $("fight-news").textContent = "";
+      hideAttacked();
       loadArena();
     }
   }
@@ -511,6 +550,7 @@ $("tab-signup").addEventListener("click", () => setAuthMode("signup"));
 // Back to the sign-in form, e.g. after signing out or when a session ends.
 function showSignIn(message = "") {
   $("notice").textContent = "";
+  hideAttacked();
   current = null;
   rivals = new Map();
   pinned = null;

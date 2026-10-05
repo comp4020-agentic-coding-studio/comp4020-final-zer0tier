@@ -1,5 +1,7 @@
 import { expect, it } from "vitest";
-import { baseUrl, finish, freshId, getPet, post, readyToStudy, studyTimes, signUp } from "./helpers.ts";
+import {
+  baseUrl, finish, freshId, getPet, getRules, post, readyToStudy, studyTimes, signUp, workHour,
+} from "./helpers.ts";
 
 async function newPet(): Promise<string> {
   const id = freshId();
@@ -97,4 +99,64 @@ it("refuses to fight itself, a pet that doesn't exist, while busy, or when too d
   expect(dirty.status).toBe(409);
   expect(dirty.body.error).toMatch(/dirty/i);
   expect(await getPet(id)).toEqual(before);
+});
+
+it("the winner takes 10% of the loser's money (rounded down, at most $50)", async () => {
+  const { fight: rules } = await getRules();
+  expect(rules.spoils).toEqual({ share: 0.1, max: 50 });
+  const strong = await strongPet();
+  const weak = await newPet();
+  const loser = await workHour(weak);
+  const winner = await getPet(strong);
+  const spoils = Math.min(50, Math.floor(loser.money * 0.1));
+  expect(spoils).toBeGreaterThan(0);
+
+  const { body } = await fight(strong, weak);
+  expect(body.fight).toMatchObject({ winner: strong, spoils });
+  expect(body.attacker.money).toBe(winner.money + spoils);
+  expect(body.defender.money).toBe(loser.money - spoils);
+  expect((await getJson(`/api/pets/${weak}/fights`))[0].spoils).toBe(spoils);
+});
+
+it("an attacker who loses pays the defender", async () => {
+  const strong = await strongPet();
+  const weak = await newPet();
+  const loser = await workHour(weak);
+  const winner = await getPet(strong);
+  const spoils = Math.floor(loser.money * 0.1);
+  const { body } = await fight(weak, strong);
+  expect(body.fight).toMatchObject({ winner: strong, spoils });
+  expect(body.attacker.money).toBe(loser.money - spoils);
+  expect(body.defender.money).toBe(winner.money + spoils);
+});
+
+it("nothing changes hands in a fight with the bot", async () => {
+  const id = await newPet();
+  const before = await workHour(id);
+  const bot = await getPet("0");
+  const { body } = await fight(id, "0");
+  expect(body.fight.spoils).toBe(0);
+  expect(body.attacker.money).toBe(before.money);
+  expect(body.defender.money).toBe(bot.money);
+});
+
+it("an attacker waits an hour to attack the same pet again, but the defender can hit back at once", async () => {
+  const { fight: rules, timeScale } = await getRules();
+  expect(rules.cooldownMinutes).toBe(60);
+  const attacker = await newPet();
+  const defender = await newPet();
+  const started = Date.now();
+  expect((await fight(attacker, defender)).status).toBe(200);
+  const again = await fight(attacker, defender);
+  // On the test clock the hour is 0.1 s; only judge the refusal inside it.
+  if (Date.now() - started < (60 * 60_000) / timeScale) {
+    expect(again.status).toBe(429);
+    expect(again.body.error).toMatch(new RegExp(`attacked ${defender} recently`));
+  }
+
+  expect((await fight(defender, attacker)).status).toBe(200); // revenge isn't held up
+  expect((await fight(attacker, "0")).status).toBe(200); // nor is anyone else
+
+  await new Promise((resolve) => setTimeout(resolve, (60 * 60_000) / timeScale + 20));
+  expect((await fight(attacker, defender)).status).toBe(200);
 });

@@ -408,6 +408,28 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .lookup-row { display: flex; gap: 0.5rem; }
 .lookup-row input { flex: 1; min-width: 0; min-height: 44px; }
 .lookup-row .chip-btn { flex: none; padding: 0.4rem 1rem; }
+/* Someone attacked this player's pet: say so wherever they are on the page. */
+.attacked {
+  position: fixed;
+  z-index: 10;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  max-width: 26rem;
+  margin-left: auto;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 2px solid var(--error);
+  box-shadow: var(--shadow);
+}
+.attacked[data-result="won"] { border-color: var(--money); }
+.attacked[hidden] { display: none; }
+.attacked-text { margin: 0; font-weight: 700; }
+.attacked-text:empty, .attacked .error:empty { display: none; }
+.attacked .error { margin: 0.5rem 0 0; }
+.attacked-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+.attacked-actions .chip-btn { padding: 0.4rem 1rem; }
 .fight-news { margin: 0.75rem 0 0; padding: 0.6rem 0.9rem; border-radius: 12px; font-weight: 700; background: var(--bg-glow); }
 .fight-news:empty { display: none; }
 .fight-news[data-result="won"] { color: var(--money); }

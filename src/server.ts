@@ -5,8 +5,8 @@ import { marked } from "marked";
 import {
   COURSES, ITEMS, LOCATIONS, MAX_CARE, SCHOOLS, SHIFT_MINUTES, STUDY_COST, STUDY_MINUTES, STUDY_NEEDS,
   WORK_COST_PER_HOUR, buy, findCourse, findItem, findLocation, getOrCreatePet, getPet, isShiftLength, isValidId,
-  study, upgrade, use, work, BOT_ID, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS, fight, listPets, recentFights,
-  type Outcome,
+  study, upgrade, use, work, BOT_ID, FIGHT_COOLDOWN_MINUTES, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS, SPOILS,
+  fight, listPets, recentFights, type Outcome,
 } from "./pets.ts";
 import {
   Busy, PASSWORD, type AuthOutcome, clearedCookie, isValidPassword, playerFor, sessionCookie, sessionToken, signIn,
@@ -140,7 +140,10 @@ app.get("/api/rules", (_req, res) => {
     study: { cost: STUDY_COST, needs: STUDY_NEEDS, minutes: STUDY_MINUTES },
     work: { costPerHour: WORK_COST_PER_HOUR, shiftMinutes: SHIFT_MINUTES },
     timeScale: TIME_SCALE,
-    fight: { cost: FIGHT_COST, needs: FIGHT_NEEDS, luck: LUCK, powerWeights: POWER_WEIGHTS },
+    fight: {
+      cost: FIGHT_COST, needs: FIGHT_NEEDS, luck: LUCK, powerWeights: POWER_WEIGHTS, spoils: SPOILS,
+      cooldownMinutes: FIGHT_COOLDOWN_MINUTES,
+    },
     botId: BOT_ID,
   });
 });

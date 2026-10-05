@@ -33,9 +33,12 @@ the point of the game rather than boxes to tick:
   finished and paid on time, and the player was still signed in.
 - **Interacting is fair.** Fights are decided by published rules (power is
   2 × Strength + Intelligence + Charisma, with limited luck), so training shows
-  in the results, and the bot `0` is a fair opponent nobody can control.
+  in the results, and the bot `0` is a fair opponent nobody can control. Fights
+  have stakes (the winner takes some of the loser's money), but a strong pet
+  can't drain a weak one: it has to wait an hour before attacking the same pet
+  again, while the pet it attacked can hit back straight away.
   *Enforced:* `spec/fight.test.ts` (a pet with 1.5× the power always wins; the
-  bot can't be signed into).
+  bot can't be signed into; spoils, the cooldown and revenge).
 
 Some of good can only be judged: whether waiting 30 minutes for a lesson feels
 like anticipation or a chore, whether prices (a $150 hourglass) make choices
@@ -169,6 +172,15 @@ luck factor between 0.8 and 1.2, and the higher roll wins (a tie goes to the
 defender). A pet with 1.5× its opponent's power always wins; close fights can go
 either way. The winner gets a win and the loser a loss on their record.
 
+**The winner takes 10% of the loser's money** (rounded down, at most $50),
+whichever side attacked, so an attacker who loses pays the defender. Fights with
+the bot are practice: no money changes hands.
+
+After attacking a pet, the attacker has to wait **an hour** before attacking
+that same pet again. The pet it attacked doesn't wait: if someone attacks you, a
+message pops up wherever you are on the page, saying who it was, how it went and
+what money changed hands, with a **Revenge** button to fight them straight back.
+
 Fighting is instant and costs the attacker 10 stamina and 5 hygiene. Like
 studying, it needs enough left for an hour's shift afterwards (20 stamina and 25
 hygiene), and a busy pet can't start a fight. The defender doesn't pay anything,
@@ -204,4 +216,5 @@ the built-in `node:sqlite` for storage.
   one, `GET /api/pets/:id/fights` its recent fights, and `GET /api/rules` the
   schools, courses, work locations, items and costs.
 - **Real time:** the server broadcasts a `pet:updated` event over the socket
-  after every change, and a `fight:finished` event after each fight.
+  after every change, and a `fight:finished` event after each fight (with the
+  `spoils` the winner took).

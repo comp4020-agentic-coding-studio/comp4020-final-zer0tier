@@ -44,6 +44,7 @@ db.exec(`
     defender_power INTEGER NOT NULL,
     attacker_roll  REAL    NOT NULL,
     defender_roll  REAL    NOT NULL,
+    spoils         INTEGER NOT NULL DEFAULT 0,
     fought_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
   CREATE TABLE IF NOT EXISTS accounts (
@@ -81,3 +82,7 @@ if (!columns.has("reward")) db.exec("ALTER TABLE pets ADD COLUMN reward TEXT");
 if (!columns.has("wins")) db.exec("ALTER TABLE pets ADD COLUMN wins INTEGER NOT NULL DEFAULT 0");
 if (!columns.has("losses")) db.exec("ALTER TABLE pets ADD COLUMN losses INTEGER NOT NULL DEFAULT 0");
 if (!columns.has("theatre_rank")) db.exec("ALTER TABLE pets ADD COLUMN theatre_rank INTEGER NOT NULL DEFAULT 0");
+const fightColumns = new Set(
+  (db.prepare("SELECT name FROM pragma_table_info('fights')").all() as { name: string }[]).map((c) => c.name),
+);
+if (!fightColumns.has("spoils")) db.exec("ALTER TABLE fights ADD COLUMN spoils INTEGER NOT NULL DEFAULT 0");

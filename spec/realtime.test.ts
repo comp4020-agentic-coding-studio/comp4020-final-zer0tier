@@ -206,3 +206,27 @@ it("pet:updated — skipping a shift with an hourglass reaches every open window
     for (const ws of windows) ws.close();
   }
 });
+
+it("fight:finished — the money the winner took reaches both windows within 1s", async () => {
+  const attacker = freshId();
+  const defender = freshId();
+  await signUp(attacker);
+  await signUp(defender);
+  const before = new Map([[attacker, await workHour(attacker)], [defender, await workHour(defender)]]);
+  const windows = [await open(), await open()];
+  try {
+    const fights = windows.map(nextFight);
+    const updates = [nextUpdate(windows[0], attacker), nextUpdate(windows[1], defender)];
+    const res = await post(`/api/pets/${attacker}/fight/${defender}`);
+    expect(res.status).toBe(200);
+    const { fight } = await res.json();
+    expect(fight.spoils).toBeGreaterThan(0);
+    for (const event of await Promise.all(fights)) expect(event.fight.spoils).toBe(fight.spoils);
+    for (const { pet } of await Promise.all(updates)) {
+      const change = pet.id === fight.winner ? fight.spoils : -fight.spoils;
+      expect(pet.money).toBe(before.get(pet.id).money + change);
+    }
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});
