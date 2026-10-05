@@ -174,17 +174,30 @@
 
         <section class="block" aria-labelledby="arena-heading">
           <h3 class="section-label" id="arena-heading">Arena <span class="section-cost" id="fight-cost"></span></h3>
-          <form id="lookup" class="lookup">
-            <label for="lookup-id">Find a pet by player ID</label>
-            <div class="lookup-row">
-              <input id="lookup-id" name="id" required maxlength="32" pattern="[A-Za-z0-9_\-]+" spellcheck="false" autocomplete="off" />
-              <button type="submit" class="chip-btn chip-buy">Look up</button>
-            </div>
-          </form>
+          <div class="tabs arena-tabs" role="tablist" aria-label="Arena">
+            <button type="button" role="tab" id="tab-pets" aria-selected="true" aria-controls="arena-pets">Pets</button>
+            <button type="button" role="tab" id="tab-board" aria-selected="false" aria-controls="arena-board">Leaderboard</button>
+          </div>
           <p id="arena-hint" class="hint"></p>
           <p id="fight-news" class="fight-news" role="status"></p>
           <p id="arena-error" class="error" role="alert"></p>
-          <ul id="rivals" class="rivals" aria-label="Pets you can fight"></ul>
+          <div id="arena-pets" role="tabpanel" aria-labelledby="tab-pets">
+            <form id="lookup" class="lookup">
+              <label for="lookup-id">Find a pet by player ID</label>
+              <div class="lookup-row">
+                <input id="lookup-id" name="id" required maxlength="32" pattern="[A-Za-z0-9_\-]+" spellcheck="false" autocomplete="off" />
+                <button type="submit" class="chip-btn chip-buy">Look up</button>
+              </div>
+            </form>
+            <ul id="rivals" class="rivals" aria-label="Pets you can fight"></ul>
+          </div>
+          <div id="arena-board" role="tabpanel" aria-labelledby="tab-board" hidden>
+            <div class="board-sort" role="group" aria-label="Rank by">
+              <button type="button" class="chip-btn chip-buy" id="board-wins" aria-pressed="true">Most wins</button>
+              <button type="button" class="chip-btn chip-buy" id="board-power" aria-pressed="false">Most power</button>
+            </div>
+            <ol id="board" class="board" aria-label="Top players"></ol>
+          </div>
           <h4 class="subhead">Your recent fights</h4>
           <ul id="fight-log" class="fight-log"></ul>
           <h4 class="subhead" id="feed-heading">Happening now</h4>

@@ -6,7 +6,8 @@ import {
   COURSES, ITEMS, LOCATIONS, MAX_CARE, SCHOOLS, SHIFT_MINUTES, STUDY_COST, STUDY_MINUTES, STUDY_NEEDS,
   WORK_COST_PER_HOUR, buy, findCourse, findItem, findLocation, getOrCreatePet, getPet, isShiftLength, isValidId,
   matchBot, study, upgrade, use, work, BOT_ID, FIGHT_COOLDOWN_MINUTES, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS,
-  SPOILS, fight, listPets, recentFights, type Outcome,
+  SPOILS, LEADERBOARD_ORDERS, LEADERBOARD_SIZE, fight, isLeaderboardOrder, leaderboard, listPets, recentFights,
+  type Outcome,
 } from "./pets.ts";
 import {
   Busy, PASSWORD, type AuthOutcome, clearedCookie, isValidPassword, playerFor, sessionCookie, sessionToken, signIn,
@@ -118,6 +119,16 @@ app.get("/api/pets", (req, res) => {
   res.json(listPets(limit));
 });
 
+// The top players, by fights won (the default) or by power.
+app.get("/api/leaderboard", (req, res) => {
+  const by = req.query.by ?? "wins";
+  if (!isLeaderboardOrder(by)) {
+    res.status(400).json({ error: `Sort the leaderboard by ${LEADERBOARD_ORDERS.join(" or ")}.` });
+    return;
+  }
+  res.json(leaderboard(by));
+});
+
 // What's been happening across the game, newest first.
 app.get("/api/feed", (req, res) => {
   const limit = Math.min(Math.max(Math.trunc(Number(req.query.limit)) || 20, 1), 50);
@@ -154,6 +165,7 @@ app.get("/api/rules", (_req, res) => {
       cooldownMinutes: FIGHT_COOLDOWN_MINUTES,
     },
     botId: BOT_ID,
+    leaderboardSize: LEADERBOARD_SIZE,
   });
 });
 

@@ -328,6 +328,8 @@ async function loadArena() {
     renderFightLog();
     feed = new Map(news.map((entry) => [entry.id, entry]));
     renderFeed();
+    if (boardOpen()) loadBoard();
+    else boardLoaded = false;
   } catch {
     $("arena-error").textContent = "Couldn't load the other pets. They'll show up when the connection is back.";
   }
@@ -499,6 +501,91 @@ function renderFeed() {
       return [li];
     }),
   );
+}
+
+// Leaderboard ---------------------------------------------------------------
+
+let boardBy = "wins"; // or "power"
+let board = []; // the top pets, as the server last ranked them
+let boardLoaded = false; // false: fetch it when the tab is next shown
+let boardTimer = null;
+const boardOpen = () => !$("arena-board").hidden;
+
+// Positive if `a` ranks above `b` on the current board (ties broken by the server).
+const outranks = (a, b) =>
+  boardBy === "wins" ? a.wins - b.wins || b.losses - a.losses : powerOf(a) - powerOf(b);
+
+async function loadBoard() {
+  const by = boardBy;
+  clearTimeout(boardTimer);
+  try {
+    const res = await fetch(`/api/leaderboard?by=${by}`);
+    if (!res.ok) throw new Error(`server error ${res.status}`);
+    const pets = await res.json();
+    if (by !== boardBy) return; // switched order meanwhile
+    board = pets;
+    boardLoaded = true;
+    renderBoard();
+  } catch {
+    $("arena-error").textContent = "Couldn't load the leaderboard. It'll catch up when the connection is back.";
+  }
+}
+
+function renderBoard() {
+  $("board").replaceChildren(
+    ...board.map((pet) => {
+      const li = document.createElement("li");
+      const mine = pet.id === current?.id;
+      li.toggleAttribute("data-mine", mine);
+      li.innerHTML = '<span class="board-name"></span><span class="board-score"><b></b> <span></span></span>';
+      li.querySelector(".board-name").textContent = mine ? `${pet.id} (you)` : pet.id;
+      const [headline, rest] =
+        boardBy === "wins"
+          ? [`${pet.wins} ${pet.wins === 1 ? "win" : "wins"}`, `· ${pet.losses}L · power ${powerOf(pet)}`]
+          : [`Power ${powerOf(pet)}`, `· ${pet.wins}W ${pet.losses}L`];
+      li.querySelector(".board-score b").textContent = headline;
+      li.querySelector(".board-score span").textContent = rest;
+      return li;
+    }),
+  );
+}
+
+// A pet changed. If that could change the board, ask the server to re-rank it
+// (in one fetch for a burst of changes); a row whose score didn't move just
+// shows the pet as broadcast.
+function boardSaw(pet) {
+  if (!boardLoaded || pet.id === rules.botId) return;
+  const shown = board.findIndex((p) => p.id === pet.id);
+  if (shown >= 0 && outranks(pet, board[shown]) === 0) {
+    board[shown] = pet;
+    return renderBoard();
+  }
+  const last = board[board.length - 1];
+  if (shown < 0 && board.length >= rules.leaderboardSize && outranks(pet, last) < 0) return;
+  if (!boardOpen()) return void (boardLoaded = false);
+  clearTimeout(boardTimer);
+  boardTimer = setTimeout(loadBoard, 250);
+}
+
+function showArenaTab(tab) {
+  for (const name of ["pets", "board"]) {
+    $(`tab-${name}`).setAttribute("aria-selected", String(name === tab));
+    $(`arena-${name}`).hidden = name !== tab;
+  }
+  if (tab === "board" && !boardLoaded) loadBoard();
+}
+$("tab-pets").addEventListener("click", () => showArenaTab("pets"));
+$("tab-board").addEventListener("click", () => showArenaTab("board"));
+
+for (const by of ["wins", "power"]) {
+  $(`board-${by}`).addEventListener("click", () => {
+    if (boardBy === by) return;
+    boardBy = by;
+    for (const other of ["wins", "power"]) $(`board-${other}`).setAttribute("aria-pressed", String(other === by));
+    board = [];
+    renderBoard();
+    loadBoard();
+  });
 }
 
 // Being attacked is news wherever the player is on the page, with a way to
@@ -695,6 +782,7 @@ function connect() {
   });
   ws.addEventListener("message", (msg) => {
     const event = JSON.parse(msg.data);
+    if (event.type === "pet:updated" && rules) boardSaw(event.pet);
     if (event.type === "pet:updated" && event.pet.id === current?.id) {
       broadcasts++;
       render(event.pet);

@@ -52,10 +52,10 @@ interesting, and whether the Arena is more fun with a room full of people, which
 is the capstone showcase this is designed for. Those are tested by playing it
 with others, not by `spec/`.
 
-**What I chose not to build (yet):** chat, trading or gifting between pets,
-recruiting other players' pets, and leaderboards. Each adds interaction, but the
-first version proves the core loop (train, work, fight, see others do the same)
-before widening it.
+**What I chose not to build (yet):** chat, trading or gifting between pets, and
+recruiting other players' pets. Each adds interaction, but the first version
+proves the core loop (train, work, fight, see others do the same) before
+widening it.
 
 **What I read or looked at:**
 
@@ -191,6 +191,13 @@ that same pet again. The pet it attacked doesn't wait: if someone attacks you, a
 message pops up wherever you are on the page, saying who it was, how it went and
 what money changed hands, with a **Revenge** button to fight them straight back.
 
+### Leaderboard
+
+The Arena's **Leaderboard** tab ranks the top 10 players by **most wins** (fewer
+losses breaks a tie) or by **most power**; on a tie the player who joined first
+stays ahead. The bot isn't on it. It re-ranks live as pets fight and train, and
+your own pet is highlighted when it makes the board.
+
 ### Happening now
 
 Below your fights, the Arena shows the 15 newest things that happened anywhere
@@ -232,7 +239,8 @@ the built-in `node:sqlite` for storage.
   `use/:item` and `fight/:opponent`.
 - **Reading** (anyone): `GET /api/pets` lists pets, `GET /api/pets/:id` shows
   one, `GET /api/pets/:id/fights` its recent fights, `GET /api/feed` what's
-  been happening across the game (newest first), and `GET /api/rules` the
+  been happening across the game (newest first), `GET /api/leaderboard?by=wins`
+  (or `power`) the top 10 players, and `GET /api/rules` the
   schools, courses, work locations, items and costs.
 - **Real time:** the server broadcasts a `pet:updated` event over the socket
   after every change, a `fight:finished` event after each fight (with the

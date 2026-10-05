@@ -213,6 +213,31 @@ export function matchBot(): Pet | undefined {
   return getPet(BOT_ID);
 }
 
+// The leaderboard: the top players' pets by fights won (fewer losses breaking
+// ties) or by power, the earliest player first on a tie. The bot isn't competing.
+export const LEADERBOARD_SIZE = 10;
+export const LEADERBOARD_ORDERS = ["wins", "power"] as const;
+export type LeaderboardOrder = (typeof LEADERBOARD_ORDERS)[number];
+const topByWins = db.prepare(
+  `SELECT id FROM pets WHERE id IN (SELECT id FROM accounts)
+    ORDER BY wins DESC, losses ASC, rowid ASC LIMIT ?`,
+);
+const topByPower = db.prepare(
+  `SELECT id FROM pets WHERE id IN (SELECT id FROM accounts)
+    ORDER BY ? * strength + ? * intelligence + ? * charisma DESC, rowid ASC LIMIT ?`,
+);
+
+export const isLeaderboardOrder = (by: unknown): by is LeaderboardOrder =>
+  LEADERBOARD_ORDERS.some((order) => order === by);
+
+export function leaderboard(by: LeaderboardOrder): Pet[] {
+  const rows =
+    by === "wins"
+      ? topByWins.all(LEADERBOARD_SIZE)
+      : topByPower.all(POWER_WEIGHTS.strength, POWER_WEIGHTS.intelligence, POWER_WEIGHTS.charisma, LEADERBOARD_SIZE);
+  return (rows as { id: string }[]).map((r) => getPet(r.id)!);
+}
+
 // Logging in with an unknown ID claims a new pet with the base stats.
 export function getOrCreatePet(id: string): { pet: Pet; created: boolean } {
   const { changes } = insert.run(id);
