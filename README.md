@@ -187,7 +187,8 @@ whichever side attacked, so an attacker who loses pays the defender. Fights with
 the bot are practice: no money changes hands.
 
 After attacking a pet, the attacker has to wait **an hour** before attacking
-that same pet again. The pet it attacked doesn't wait: if someone attacks you, a
+that same pet again. The pet it attacked can hit straight back (unless it
+attacked that pet itself within the last hour): if someone attacks you, a
 message pops up wherever you are on the page, saying who it was, how it went and
 what money changed hands, with a **Revenge** button to fight them straight back.
 

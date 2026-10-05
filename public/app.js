@@ -326,7 +326,8 @@ async function loadArena() {
     fightLog.length = 0;
     fightLog.push(...fights);
     renderFightLog();
-    feed = new Map(news.map((entry) => [entry.id, entry]));
+    // Merge, don't replace: an entry broadcast while this loaded is newer.
+    for (const entry of news) feed.set(entry.id, entry);
     renderFeed();
     if (boardOpen()) loadBoard();
     else boardLoaded = false;
@@ -509,6 +510,7 @@ let boardBy = "wins"; // or "power"
 let board = []; // the top pets, as the server last ranked them
 let boardLoaded = false; // false: fetch it when the tab is next shown
 let boardTimer = null;
+let boardRequests = 0; // only the newest request's answer is shown
 const boardOpen = () => !$("arena-board").hidden;
 
 // Positive if `a` ranks above `b` on the current board (ties broken by the server).
@@ -516,13 +518,13 @@ const outranks = (a, b) =>
   boardBy === "wins" ? a.wins - b.wins || b.losses - a.losses : powerOf(a) - powerOf(b);
 
 async function loadBoard() {
-  const by = boardBy;
+  const request = ++boardRequests;
   clearTimeout(boardTimer);
   try {
-    const res = await fetch(`/api/leaderboard?by=${by}`);
+    const res = await fetch(`/api/leaderboard?by=${boardBy}`);
     if (!res.ok) throw new Error(`server error ${res.status}`);
     const pets = await res.json();
-    if (by !== boardBy) return; // switched order meanwhile
+    if (request !== boardRequests) return; // a newer request (or order) is on its way
     board = pets;
     boardLoaded = true;
     renderBoard();
@@ -550,11 +552,12 @@ function renderBoard() {
   );
 }
 
-// A pet changed. If that could change the board, ask the server to re-rank it
-// (in one fetch for a burst of changes); a row whose score didn't move just
-// shows the pet as broadcast.
+// A pet changed. If that could change the board, ask the server to re-rank it;
+// a row whose score didn't move just shows the pet as broadcast.
 function boardSaw(pet) {
-  if (!boardLoaded || pet.id === rules.botId) return;
+  if (pet.id === rules.botId) return;
+  // Still loading (or failed): this change may be newer than the answer, so ask again.
+  if (!boardLoaded) return void (boardOpen() && reloadBoard());
   const shown = board.findIndex((p) => p.id === pet.id);
   if (shown >= 0 && outranks(pet, board[shown]) === 0) {
     board[shown] = pet;
@@ -563,6 +566,11 @@ function boardSaw(pet) {
   const last = board[board.length - 1];
   if (shown < 0 && board.length >= rules.leaderboardSize && outranks(pet, last) < 0) return;
   if (!boardOpen()) return void (boardLoaded = false);
+  reloadBoard();
+}
+
+// One fetch for a burst of changes.
+function reloadBoard() {
   clearTimeout(boardTimer);
   boardTimer = setTimeout(loadBoard, 250);
 }
@@ -583,6 +591,7 @@ for (const by of ["wins", "power"]) {
     boardBy = by;
     for (const other of ["wins", "power"]) $(`board-${other}`).setAttribute("aria-pressed", String(other === by));
     board = [];
+    boardLoaded = false;
     renderBoard();
     loadBoard();
   });

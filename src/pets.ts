@@ -499,7 +499,8 @@ function cooldown(attacker: Pet, defender: Pet, now: number): string | undefined
   if (defender.id === BOT_ID) return undefined;
   const last = lastAttack.get(attacker.id, defender.id) as { foughtAt: string } | undefined;
   if (!last) return undefined;
-  const left = Date.parse(last.foughtAt) + realMs(FIGHT_COOLDOWN_MINUTES) - now;
+  // Capped, so a wall clock that jumped backwards can't stretch the wait.
+  const left = Math.min(realMs(FIGHT_COOLDOWN_MINUTES), Date.parse(last.foughtAt) + realMs(FIGHT_COOLDOWN_MINUTES) - now);
   if (left <= 0) return undefined;
   const minutes = Math.max(1, Math.ceil((left * TIME_SCALE) / 60_000));
   return `You attacked ${defender.id} recently; you can attack them again in ${minutes} min.`;
