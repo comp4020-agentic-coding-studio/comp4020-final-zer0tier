@@ -123,7 +123,7 @@ function mountDesktop() {
   move($('notice'), activities);
   const activityTabs = element('div', 'tabs desktop-tabs');
   activities.append(activityTabs);
-  const activityEntries = ['school', 'work', 'shop'].map((name) => {
+  const activityEntries = ['school', 'work', 'shop', 'adventure'].map((name) => {
     const button = element('button', '', name[0].toUpperCase() + name.slice(1));
     button.id = `desktop-tab-${name}`;
     activityTabs.append(button);
@@ -136,6 +136,7 @@ function mountDesktop() {
   move($('study-heading').closest('section'), activityEntries[0].panel);
   move($('work-heading').closest('section'), activityEntries[1].panel);
   move($('care-heading').closest('section'), activityEntries[2].panel);
+  move($('adventure-heading').closest('section'), activityEntries[3].panel);
   tabs(activityTabs, 'Activities', activityEntries);
 
   const social = region('Other players and notifications', 'desktop-social');

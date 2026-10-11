@@ -1,6 +1,8 @@
 # Adventure feature plan
 
-Status: requested and broken down; not implemented. This document preserves the
+Status: step 1 exploration foundation implemented (entry, 16 × 16 clearing,
+W/A/S/D and touch movement, walls, saved position). Floor progression, enemies,
+and rewards remain planned. This document preserves the
 owner's requirements for future implementation. Open decisions below are not
 approved mechanics.
 

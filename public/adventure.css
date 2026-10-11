@@ -1,0 +1,25 @@
+#adventure-dialog {
+  width: min(620px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+  box-sizing: border-box; overflow: auto; padding: 20px;
+  color: var(--fg); background: var(--surface); border: 2px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+#adventure-dialog::backdrop { background: rgb(0 0 0 / 65%); }
+#adventure-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#adventure-dialog h2 { margin: 4px 0; }
+#adventure-dialog .help { margin: 10px 0; }
+#adventure-grid {
+  display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); grid-template-rows: repeat(16, minmax(0, 1fr)); aspect-ratio: 1;
+  width: min(100%, max(240px, calc(100dvh - 310px)));
+  margin: 12px auto; border: 2px solid var(--border); background: var(--bg);
+}
+#adventure-grid > span { min-width: 0; min-height: 0; border: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
+.adventure-tree { background: var(--money); border-radius: 40% 40% 15% 15%; box-shadow: inset 0 -3px rgb(0 0 0 / 20%); }
+.adventure-player { background: var(--bg-glow); outline: 2px solid var(--primary); z-index: 1; }
+.adventure-player svg { color: var(--pet-color, #f59e0b); display: block; width: 100%; height: 100%; }
+#adventure-status { text-align: center; min-height: 1.5em; margin: 8px 0; }
+.adventure-controls { display: flex; justify-content: center; gap: 8px; }
+.adventure-controls button { min-width: 48px; min-height: 48px; border: 1px solid var(--border); border-radius: 12px; color: var(--fg); background: var(--bg); font-size: 24px; }
+.adventure-controls button:active { background: var(--bg-glow); }
+#adventure-dialog :focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
+@media (max-width: 480px) { #adventure-dialog { padding: 12px; } #adventure-dialog h2 { font-size: 20px; } }

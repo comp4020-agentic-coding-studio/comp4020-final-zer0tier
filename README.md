@@ -335,3 +335,13 @@ the built-in `node:sqlite` for storage.
   `spoils` the winner took), and a `feed:added` event for each new entry in
   Happening now, sent after the change it describes. The feed keeps its newest
   500 entries in SQLite.
+
+## Adventure exploration
+
+Choose **Adventure** under **Make their day** on desktop, or the Adventure
+section on a phone, then **Explore the clearing**. Move one block per press with
+W/A/S/D, arrow keys, or the on-screen direction buttons. Trees block movement
+on the 16 × 16 woodland grid. Each accepted step is saved to your account;
+Leave or Escape closes the window, and reopening resumes your position.
+This first exploration stage has no entry cost or rewards. Monsters, treasure
+chests, five-floor progression, and coins are planned in `ADVENTURE_PLAN.md`.

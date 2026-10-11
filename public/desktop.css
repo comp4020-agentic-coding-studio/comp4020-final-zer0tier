@@ -52,7 +52,7 @@
   .desktop-heading .desktop-eyebrow { margin-bottom: 6px; }
   .desktop-activities .busy, .desktop-activities .notice { margin: 0; flex-shrink: 0; }
   .desktop-activities .notice { max-height: 100px; overflow-y: auto; }
-  .desktop-tabs { grid-template-columns: repeat(3, 1fr); flex-shrink: 0; margin: 0; }
+  .desktop-tabs { grid-template-columns: repeat(4, 1fr); flex-shrink: 0; margin: 0; }
   .desktop-panel { min-height: 0; overflow-y: auto; padding: 3px 4px 8px; scrollbar-gutter: stable; }
   .desktop-panel .block { margin: 0; padding: 0; border: 0; }
   .desktop-panel .school { margin-bottom: 20px; padding: 16px; border-width: 1px; }

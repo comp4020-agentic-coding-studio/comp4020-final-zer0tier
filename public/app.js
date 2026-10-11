@@ -887,6 +887,7 @@ $("lookup").addEventListener("submit", async (e) => {
 function render(pet) {
   const previous = current;
   current = pet;
+  document.dispatchEvent(new CustomEvent("adventure:pet", { detail: pet }));
   if (previous?.id !== pet.id) {
     clearThefts();
     loadThefts();
@@ -943,6 +944,7 @@ let theftSession = 0; // late actions belong only to the login that started them
 function clearThefts() {
   fighting = false;
   document.dispatchEvent(new CustomEvent("battle:reset"));
+  document.dispatchEvent(new CustomEvent("adventure:reset"));
   theftSession++;
   revengePending = false;
   $("theft-list").setAttribute("aria-busy", "false");

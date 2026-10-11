@@ -1,3 +1,4 @@
+import { adventureFor, moveAdventure } from "./adventure.ts";
 import express from "express";
 import { ABILITIES } from "./combat.ts";
 import { readFileSync } from "node:fs";
@@ -98,6 +99,17 @@ app.get("/api/me", (req, res) => {
     return;
   }
   res.json(pet);
+});
+
+// Exploration is private, and every accepted step is saved before returning it.
+app.post("/api/adventure", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: "Sign in first." });
+  const result = req.body?.direction === undefined
+    ? adventureFor(id) : moveAdventure(id, req.body.direction);
+  if ("error" in result) return void res.status(result.status).json({ error: result.error });
+  res.json(result);
 });
 
 // Theft reports are private to the signed-in victim.
