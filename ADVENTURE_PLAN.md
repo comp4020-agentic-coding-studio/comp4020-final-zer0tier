@@ -1,14 +1,15 @@
 # Adventure feature plan
 
-Status: steps 1 and 2 implemented: exploration controls and saving; five fixed
+Status: steps 1–3 implemented: exploration controls and saving; five fixed
 floors with stairs, slimes/goblins, increasing attributes, a Slime King on floor
-five, chest landmarks, and enemy detection/pursuit. Monster battles and chest
-rewards remain planned. This document preserves the owner's requirements.
+five, chest landmarks, enemy detection/pursuit, and automatic monster battles
+with saved HP/MP and outcomes. Treasure rewards and coins remain planned. This
+document preserves the owner's requirements.
 
 Implementation defaults for step 2: monsters take one cardinal step after an
 accepted player step, detect the eight surrounding cells, and stop chasing when
 the pet leaves that range. Stairs require an explicit Ascend/Descend action.
-Nearby enemies produce encounter warnings; battle resolution is step 3.
+Nearby enemies produce encounter warnings; walking into a monster starts battle.
 Initial stats and scaling are documented in README.md and can be balanced later.
 
 ## 1. Adventure entry and exploration
@@ -40,6 +41,20 @@ Initial stats and scaling are documented in README.md and can be balanced later.
   Intelligence, and Claw Strike costs zero MP.
 - Implementation work: monster combatants, encounter resolution, returning to
   exploration, and preventing duplicate battles or rewards on retry/reload.
+- Owner's confirmed rules: walking into the monster starts battle; HP/MP persist
+  between battles; recover 20%, rounded up each time; one defeat fails the adventure.
+- Implemented recovery: after a victory, restore `ceil(maxHP × 0.2)` and
+  `ceil(maxMP × 0.2)`, capped at the maximums. New runs start full. Stairs, leaving,
+  reloading, playback, and retries grant no extra recovery.
+- Wins remove the monster and move the pet into its tile. Defeat saves a failed
+  run at zero HP; **Start new adventure** explicitly resets the map to floor one.
+  Defeating the Slime King marks completion and also allows a fresh run.
+- The Arena scene plays the saved starting resources and turns, supports skip
+  and replay, and returns to the map. A saved revision protects all actions from
+  stale/concurrent retries; result, removal, recovery, and position are atomic.
+- Phase defaults: no entry/care cost or cooldown, no money/items/stat rewards,
+  and no Arena record changes. Monsters use Claw Strike and Arena's existing
+  initiative/damage rules until ability and coin phases are implemented.
 
 ## 4. Treasure and inventory
 
@@ -95,9 +110,7 @@ authoritative; new real-time events require the existing one-second tests.
 
 ## Decisions to settle before the relevant phase
 
-- Does entering an enemy's block trigger battle, or does adjacency trigger it?
-- What happens on defeat, and does HP/MP persist between encounters or floors?
-- Are adventures limited by energy, entry cost, cooldown, or daily attempts?
+- Should a future phase add energy limits, entry cost, cooldown, or daily attempts?
 - What are the boss abilities and completion rewards? Review the initial enemy
   stat curves after monster battles are playable.
 - Which abilities can drop, what are their MP costs, and how does automatic combat

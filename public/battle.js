@@ -26,7 +26,7 @@ function buildDialog() {
         <label for="battle-mp-1">MP <span id="battle-mp-text-1"></span></label><meter id="battle-mp-1" min="0" aria-label="Defender MP"></meter></article>
     </div>
     <div class="battle-ability"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 4-5 24M18 4l-5 24M27 4l-5 24"/></svg>
-      <div><strong>Claw Strike</strong><span>0 MP · Both pets attack automatically</span></div></div>
+      <div><strong>Claw Strike</strong><span>0 MP · Both fighters attack automatically</span></div></div>
     <p id="battle-status" role="status" aria-live="polite"></p>
     <details class="battle-log"><summary>Attack log</summary><ol id="battle-log"></ol></details>
     <footer class="battle-actions"><button type="button" id="battle-skip" class="chip-btn chip-buy">Skip to result</button>
@@ -36,7 +36,11 @@ function buildDialog() {
   $('battle-skip').addEventListener('click', finish);
   $('battle-replay').addEventListener('click', () => play(scene));
   dialog.addEventListener('close', () => {
+    if (dialog.open) return;
     clearTimeout(timer);
+    const closed = scene;
+    scene = null;
+    if (closed) document.dispatchEvent(new CustomEvent('battle:closed', { detail: { key: closed.key } }));
     if (queue.length) play(queue.shift());
   });
 }
@@ -46,7 +50,14 @@ function avatar(fighter, index) {
   svg.setAttribute('aria-hidden', 'true');
   svg.style.color = /^#[0-9a-f]{6}$/i.test(fighter.color) ? fighter.color : '#f59e0b';
   const symbol = ['cat', 'dog', 'bird', 'dragon', 'blob'].includes(fighter.appearance) && document.getElementById(`pet-${fighter.appearance}`);
-  if (symbol) {
+  const monster = ['slime', 'goblin', 'slime-king'].includes(fighter.monster) && document.getElementById(`monster-${fighter.monster}`);
+  if (monster) {
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('class', 'battle-monster');
+    const use = document.createElementNS(svg.namespaceURI, 'use');
+    use.setAttribute('href', `#${monster.id}`);
+    svg.append(use);
+  } else if (symbol) {
     const use = document.createElementNS(svg.namespaceURI, 'use');
     use.setAttribute('href', `#${symbol.id}`);
     svg.append(use);
@@ -65,10 +76,11 @@ function meters(hp, mp) {
   });
 }
 function describe(step) {
-  const actor = scene.battle.fighters[step.actor].id;
-  const target = scene.battle.fighters[step.target].id;
+  const actor = fighterName(scene.battle.fighters[step.actor]);
+  const target = fighterName(scene.battle.fighters[step.target]);
   return `${actor} used Claw Strike${step.hits > 1 ? ` ×${step.hits}` : ''}: ${step.damage} damage to ${target}.`;
 }
+const fighterName = fighter => fighter.name || fighter.id;
 function addLog(step) {
   const li = document.createElement('li');
   li.textContent = describe(step);
@@ -94,7 +106,7 @@ function finish() {
   if (!scene) return;
   while (turn < scene.battle.turns.length) addLog(scene.battle.turns[turn++]);
   const last = scene.battle.turns.at(-1);
-  meters(last.hp, last.mp);
+  meters(scene.resultResources?.hp ?? last.hp, scene.resultResources?.mp ?? last.mp);
   $('battle-status').textContent = `${scene.battle.winner === scene.viewer ? 'Victory!' : 'Defeat.'} ${scene.result}`;
   const skipped = document.activeElement === $('battle-skip');
   $('battle-skip').hidden = true;
@@ -108,15 +120,17 @@ function play(next) {
   turn = 0;
   if (!dialog) buildDialog();
   $('battle-title').textContent = next.title || 'Arena battle';
+  $('battle-close').textContent = next.returnLabel || 'Close';
+  $('battle-close').setAttribute('aria-label', next.returnLabel || 'Close battle');
   $('battle-log').replaceChildren();
   $('battle-skip').hidden = false;
   $('battle-replay').hidden = true;
   $('battle-status').textContent = 'Claw Strike ready. Let the battle begin!';
   next.battle.fighters.forEach((fighter, i) => {
-    $(`battle-name-${i}`).textContent = fighter.id === next.viewer ? `${fighter.id} (you)` : fighter.id;
+    $(`battle-name-${i}`).textContent = fighter.id === next.viewer ? `${fighterName(fighter)} (you)` : fighterName(fighter);
     avatar(fighter, i);
   });
-  meters(next.battle.fighters.map(f => f.maxHp), next.battle.fighters.map(f => f.maxMp));
+  meters(next.battle.initialHp ?? next.battle.fighters.map(f => f.maxHp), next.battle.initialMp ?? next.battle.fighters.map(f => f.maxMp));
   if (!dialog.open) dialog.showModal();
   timer = setTimeout(advance, reducedMotion.matches ? 350 : 750);
 }

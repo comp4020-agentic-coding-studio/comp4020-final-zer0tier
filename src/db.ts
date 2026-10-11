@@ -128,3 +128,7 @@ const adventureColumns = new Set(
 );
 if (!adventureColumns.has("floor")) db.exec("ALTER TABLE adventures ADD COLUMN floor INTEGER NOT NULL DEFAULT 1");
 if (!adventureColumns.has("world_json")) db.exec("ALTER TABLE adventures ADD COLUMN world_json TEXT");
+if (!adventureColumns.has("revision")) db.exec("ALTER TABLE adventures ADD COLUMN revision TEXT");
+if (!adventureColumns.has("battle_json")) db.exec("ALTER TABLE adventures ADD COLUMN battle_json TEXT");
+if (!adventureColumns.has("hp")) db.exec("ALTER TABLE adventures ADD COLUMN hp INTEGER");
+if (!adventureColumns.has("mp")) db.exec("ALTER TABLE adventures ADD COLUMN mp INTEGER");

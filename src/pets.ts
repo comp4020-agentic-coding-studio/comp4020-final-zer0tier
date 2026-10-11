@@ -448,7 +448,7 @@ export function use(id: string, itemId: ItemId): Outcome {
 
 // Strength counts double; brains and charm help too.
 export const POWER_WEIGHTS: Record<Attribute, number> = { strength: 2, intelligence: 1, charisma: 1 };
-export const powerOf = (pet: Pet): number =>
+export const powerOf = (pet: Pick<Pet, 'strength' | 'intelligence' | 'charisma'>): number =>
   ATTRIBUTES.reduce((power, attribute) => power + POWER_WEIGHTS[attribute] * pet[attribute], 0);
 
 // Initiative and Claw Strike damage share a luck factor in [0.8, 1.2].

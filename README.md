@@ -199,9 +199,10 @@ moment any pet's change moves the median. So the bot is always an even match for
 a typical player: beating it reliably means your pet is ahead of the pack.
 
 Press **Fight** to open an automatic battle in a small window. Every pet initially
-knows only **Claw Strike**, which costs **0 MP**. Each fight starts with full
+knows only **Claw Strike**, which costs **0 MP**. Each Arena fight starts with full
 **HP = Strength + Intelligence + Charisma** and **MP = Intelligence**. These are
-battle resources; they do not replace stamina or hygiene, and reset each fight.
+battle resources; they do not replace stamina or hygiene, and reset each Arena
+fight. Adventure keeps its own HP/MP between encounters, as described below.
 
 Power remains 2 × Strength + Intelligence + Charisma. Each pet rolls a luck
 factor between 0.8 and 1.2: power × luck decides who strikes first (defender
@@ -341,34 +342,77 @@ the built-in `node:sqlite` for storage.
 Choose **Adventure** under **Make their day** on desktop, or the Adventure
 section on a phone, then **Explore the woodland**. Move one block per press with
 W/A/S/D, arrow keys, or the on-screen direction buttons. Each of the five fixed
-floors has a 16 × 16 grid, four regular enemies (slimes and goblins), and at least
+floors starts with a 16 × 16 grid, four regular enemies (slimes and goblins), and at least
 one marked treasure chest. Floor five also contains the **Slime King**. The map
 uses your pet's saved shape and colour as soon as you sign in.
 
 Stand on the down stairs at column 14, row 14 and choose **Descend**. You arrive
 at the next floor's up stairs at column 3, row 3; **Ascend** returns to the
 previous floor's down stairs. Floor one has no up stairs and floor five has no
-down stairs. Leave or Escape closes the window. Your floor, position, and each
-floor's enemies are saved privately to your account, including across server
+down stairs. Leave or Escape closes the window. Your floor, position, HP/MP, and
+each floor's remaining enemies are saved privately to your account, including across server
 restarts. Older clearing saves retain their positions during migration.
 
 Monsters detect the pet in any of their eight surrounding blocks, including
 diagonals. After each accepted player step, each nearby monster tries to move
 one cardinal block closer. They stop next to the pet, cannot cross trees, chests,
 stairs, or other monsters, and stop pursuing when the pet leaves detection range.
-Blocked player moves, opening the map, and using stairs do not advance monsters.
-An exclamation mark and a message warn about nearby monsters. The player cannot
-walk onto a monster. Enemy attributes and positions are listed under **Monster
+Blocked player moves, opening the map, using stairs, and battles do not advance
+other monsters. An exclamation mark and a message warn about nearby monsters.
+Walk into a monster's tile to start a battle; adjacency alone does not start one.
+Enemy attributes and positions are listed under **Monster
 attributes**, and every stair and chest is reachable through the map's paths.
 
 For initial balancing, floor-one slimes have STR/INT/CHA **3/1/2**, and goblins
 have **5/3/2**. Each deeper floor adds **2/1/1**, respectively. The floor-five Slime
-King has **18/10/12**. HP is the sum of attributes; MP is Intelligence.
+King has **18/10/12**. Maximum HP is the sum of attributes; maximum MP is
+Intelligence. A new run starts with full resources. Current HP/MP carry between
+battles and floors, and leaving, signing out, or restarting the server does not
+refill them. Existing exploration saves receive full HP/MP on their first visit
+after this update. Training increases the maximums without refilling current HP/MP.
 
-This stage has no entry cost, damage, or rewards. Chests are map landmarks;
-monster battle resolution and chest rewards are the next planned features in
-`ADVENTURE_PLAN.md`. The private `POST /api/adventure` accepts an empty body to
-resume, `{ "direction": "w" | "a" | "s" | "d" }` to move, or
-`{ "action": "ascend" | "descend" }` to use the stairs. The server validates and
-saves each move before returning the map. Clients cannot choose a floor or
-supply enemy positions.
+### Monster battles
+
+Encounters use the Arena's automatic **Claw Strike** scene, with the monster's
+own appearance, name, and attributes. Claw Strike costs **0 MP**. For now, damage
+and initiative use the same power and luck rolls as Arena; coin tosses and unfair
+coins are a later phase. The scene starts at the pet's saved HP/MP, and each
+monster starts at full HP/MP.
+
+On victory, the monster stays defeated and the pet occupies its tile. Recover
+**20% of maximum HP and MP, rounded up separately**, capped at their maximums.
+For example, maximums of 31 HP and 7 MP restore up to 7 HP and 2 MP after a win.
+The server applies this recovery once, alongside the outcome. Defeating the
+Slime King marks the woodland complete; you can explore remaining paths or
+choose **Start new adventure**.
+
+**Defeat fails the adventure.** HP stays at zero and movement and stairs are
+disabled. Return to the map to see the result, then choose **Start new adventure**
+to reset to floor one with full HP/MP and a fresh set of monsters. Leaving or
+reloading keeps the failed run; it does not restart automatically.
+
+**Skip to result**, **Replay battle**, and **Watch last battle** only play the
+saved turns. **Return to map** (or Escape from the battle window) acknowledges
+the saved result and resumes exploration after a win. If that request fails,
+**Continue exploring** lets you retry it. A reload before returning to the map
+opens the same pending battle. Replays cannot reroll a result, grant more recovery,
+or resurrect a monster.
+
+Adventure currently has no entry cost, care cost, cooldown, or item/money/stat
+rewards, and does not alter Arena wins/losses. Chests remain landmarks. Treasure,
+abilities, and coins are the next phases in `ADVENTURE_PLAN.md`.
+
+The private `POST /api/adventure` accepts an empty body to resume. Its response
+includes an opaque `revision`; supply that revision with every action:
+
+- `{ "direction": "w" | "a" | "s" | "d", "revision": "…" }` moves one tile.
+- `{ "action": "ascend" | "descend", "revision": "…" }` uses matching stairs.
+- `{ "action": "continue", "battleId": "…", "revision": "…" }` acknowledges a battle.
+- `{ "action": "restart", "revision": "…" }` starts fresh after failure or completion.
+
+Stale revisions return the current saved state without applying the action,
+including retries after a battle or a new run. Movement is paused while a battle
+awaits acknowledgement. The server saves position, enemy removal, HP/MP, recovery,
+and the exact playback in one atomic update. Clients cannot choose stats, battle
+outcomes, rewards, enemy positions, or floors. Adventure results stay private and
+do not use the public Arena feed or WebSocket battle broadcast.

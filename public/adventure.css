@@ -18,6 +18,9 @@
 .adventure-player { background: var(--bg-glow); outline: 2px solid var(--primary); z-index: 1; }
 .adventure-player svg { color: var(--pet-color, #f59e0b); display: block; width: 100%; height: 100%; }
 #adventure-status { text-align: center; min-height: 1.5em; margin: 8px 0; }
+#adventure-resources { text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; margin: 8px 0 12px; }
+#adventure-failure { color: var(--error); text-align: center; }
+#adventure-restart { display: block; margin: 12px auto; min-height: 44px; }
 .adventure-controls { display: flex; justify-content: center; gap: 8px; }
 .adventure-controls button { min-width: 48px; min-height: 48px; border: 1px solid var(--border); border-radius: 12px; color: var(--fg); background: var(--bg); font-size: 24px; }
 .adventure-controls button:active { background: var(--bg-glow); }
@@ -28,6 +31,10 @@
 .adventure-map-area { min-width: 0; }
 .adventure-stairs { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
 .adventure-stairs button { min-height: 44px; }
+#adventure-battle-summary { margin: 12px 0; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
+#adventure-result { margin: 0 0 10px; font-size: .85rem; }
+.adventure-battle-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.adventure-battle-actions button { min-height: 44px; }
 #adventure-notice { min-height: 2.6em; margin: 10px 0 0; font-size: .85rem; text-align: center; }
 .adventure-guide { border-left: 1px solid var(--border); padding-left: 16px; }
 .adventure-guide h3 { margin: 10px 0; font-size: 1rem; }

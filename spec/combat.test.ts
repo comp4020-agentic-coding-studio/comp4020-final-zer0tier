@@ -36,3 +36,13 @@ it('groups extremely long fights without changing the knockout or using MP', () 
   expect(battle.turns.at(-1)!.hp).toEqual([0, 1]);
   expect(battle.turns.at(-1)!.mp).toEqual([1000000, 1000000]);
 });
+
+it('starts an Adventure battle at its carried HP/MP and saves those values for replay', () => {
+  const resources: { hp: [number, number]; mp: [number, number] } = { hp: [8, 15], mp: [2, 5] };
+  const battle = simulateBattle(a, b, [24, 16], resources);
+  expect(battle.initialHp).toEqual([8, 15]);
+  expect(battle.initialMp).toEqual([2, 5]);
+  expect(battle.turns[0].hp).toEqual([8, 9]);
+  expect(battle.turns.every(t => t.mp[0] === 2)).toBe(true);
+  expect(resources).toEqual({ hp: [8, 15], mp: [2, 5] });
+});

@@ -1,4 +1,4 @@
-import { adventureFor, changeFloor, moveAdventure } from "./adventure.ts";
+import { adventureFor, changeFloor, continueAdventure, moveAdventure, restartAdventure } from "./adventure.ts";
 import express from "express";
 import { ABILITIES } from "./combat.ts";
 import { readFileSync } from "node:fs";
@@ -109,8 +109,10 @@ app.post("/api/adventure", (req, res) => {
   if (req.body?.direction !== undefined && req.body?.action !== undefined) {
     return void res.status(400).json({ error: "Choose one adventure action at a time." });
   }
-  const result = req.body?.action !== undefined ? changeFloor(id, req.body.action)
-    : req.body?.direction !== undefined ? moveAdventure(id, req.body.direction) : adventureFor(id);
+  const result = req.body?.action === 'continue' ? continueAdventure(id, req.body.battleId, req.body.revision)
+    : req.body?.action === 'restart' ? restartAdventure(id, req.body.revision)
+    : req.body?.action !== undefined ? changeFloor(id, req.body.action, req.body.revision)
+    : req.body?.direction !== undefined ? moveAdventure(id, req.body.direction, req.body.revision) : adventureFor(id);
   if ("error" in result) return void res.status(result.status).json({ error: result.error });
   res.json(result);
 });

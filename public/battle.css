@@ -12,6 +12,8 @@
 .battle-fighter h3 { font-size: 1rem; text-align: center; margin: 0; overflow-wrap: anywhere; }
 .battle-avatar { width: 116px; max-width: 100%; margin: 12px auto; }
 .battle-avatar svg { width: 100%; display: block; }
+.battle-monster { fill: none; stroke: var(--fg); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+#battle-close { min-height: 44px; }
 .battle-versus { text-align: center; font-weight: 800; font-size: .8rem; color: var(--muted); }
 .battle-fighter label { display: flex; justify-content: space-between; gap: 6px; font-size: .78rem; font-variant-numeric: tabular-nums; }
 .battle-fighter meter { width: 100%; display: block; height: 16px; margin-bottom: 6px; accent-color: var(--money); }
