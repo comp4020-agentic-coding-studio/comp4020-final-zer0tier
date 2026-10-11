@@ -28,6 +28,8 @@ adventure.innerHTML = `
     <button type="button" id="adventure-ascend" class="chip-btn" disabled>↑ Ascend</button>
     <button type="button" id="adventure-descend" class="chip-btn" disabled>↓ Descend</button>
   </div>
+  <button type="button" id="adventure-open-chest" class="chip-btn" disabled>Open chest</button>
+  <p id="adventure-treasure" role="status"></p>
   <p id="adventure-notice" role="status"></p>
   </div><aside class="adventure-guide" aria-label="Floor guide">
     <h3>On this floor</h3>
@@ -37,7 +39,17 @@ adventure.innerHTML = `
     <p class="help">Monsters notice the eight blocks around them and move after you. Go around them to avoid battle.</p>
     <p class="help">HP and MP carry between battles. Each victory restores 20% of their maximums, rounded up. Defeat ends the adventure.</p>
     <p id="adventure-completion" class="help" role="status" hidden>Slime King defeated! The woodland is complete. You can keep exploring.</p>
-    <p class="help">Chest rewards are coming next.</p>
+    <p class="help">Stand on a chest and choose Open chest. Each chest holds one reward per adventure.</p>
+    <details><summary>Treasure chances</summary><p class="help">Food 30% · Soap 30% · Ability 20% · Hourglass 15% · Unfair coin 5%. Abilities and coin types have equal chances within their category.</p></details>
+    <details class="adventure-backpack">
+      <summary id="adventure-backpack-title">Your backpack</summary>
+      <p class="help" id="adventure-care"></p>
+      <ul id="adventure-items"></ul>
+      <h4>Learned abilities</h4><ul id="adventure-abilities"></ul>
+      <p class="help">Your pet uses its strongest affordable attack automatically. Items and learned abilities stay with your pet.</p>
+      <h4>Unfair coins</h4><ul id="adventure-coins"></ul>
+      <p class="help">Keep these for the upcoming coin toss update.</p>
+    </details>
   </aside></div>`;
 document.body.append(adventure);
 const grid = adventure.querySelector('#adventure-grid');
@@ -48,6 +60,7 @@ const icons = {
   goblin: '<use href="#monster-goblin"/>',
   'slime-king': '<use href="#monster-slime-king"/>',
   chest: '<rect x="3" y="7" width="18" height="14" rx="2" fill="currentColor"/><path d="M3 13h18m-11-3h4v6h-4Z"/>',
+  'open-chest': '<path d="M3 13h18v8H3Z" fill="currentColor"/><path d="M3 10 6 3h15v7Zm7 3h4v4h-4Z"/>',
   up: '<path d="M3 21h6v-6h6V9h6M5 10V2m-3 3 3-3 3 3"/>',
   down: '<path d="M3 21h6v-6h6V9h6M5 2v8m-3-3 3 3 3-3"/>',
 };
@@ -76,6 +89,12 @@ function syncControls() {
   disable(adventure.querySelector('#adventure-continue'), pending);
   disable(adventure.querySelector('#adventure-replay'), pending);
   disable(adventure.querySelector('#adventure-restart'), pending || Boolean(state?.battle?.pending));
+  const chest = state?.chests.find(at);
+  const open = adventure.querySelector('#adventure-open-chest');
+  open.textContent = chest?.reward ? 'Chest opened' : 'Open chest';
+  disable(open, blocked || !chest || Boolean(chest.reward));
+  adventure.querySelectorAll('[data-use-item]').forEach(button => disable(button,
+    pending || Boolean(state?.battle?.pending) || !state?.inventory?.items.find(item => item.id === button.dataset.useItem)?.usable));
 }
 function clearMap() {
   state = null; shownBattle = null;
@@ -94,6 +113,9 @@ function clearMap() {
   adventure.querySelector('#adventure-failure').hidden = true;
   adventure.querySelector('#adventure-restart').hidden = true;
   adventure.querySelector('#adventure-resources').textContent = '';
+  for (const id of ['adventure-treasure', 'adventure-care', 'adventure-items', 'adventure-abilities', 'adventure-coins']) {
+    adventure.querySelector(`#${id}`).replaceChildren();
+  }
   status.textContent = 'Opening the woodland…';
   syncControls();
 }
@@ -113,6 +135,9 @@ function renderMap() {
   adventure.querySelector('#adventure-battle-summary').hidden = !state.battle;
   adventure.querySelector('#adventure-result').textContent = state.battle ? battleResult(state.battle) : '';
   adventure.querySelector('#adventure-continue').hidden = !state.battle?.pending;
+  const opened = state.chests.find(chest => chest.reward);
+  adventure.querySelector('#adventure-treasure').textContent = opened ? rewardText(opened.reward) : '';
+  renderInventory();
   const roster = adventure.querySelector('#adventure-enemies');
   roster.replaceChildren();
   for (const enemy of state.enemies) {
@@ -129,8 +154,9 @@ function renderMap() {
     const kind = enemy?.kind || (chest ? 'chest' : stair?.kind);
     if (kind) {
       cell.classList.add(`adventure-marker-${kind}`);
-      cell.innerHTML = mapIcon(kind);
-      cell.title = enemy ? `${enemy.name} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence}` : chest ? 'Treasure chest (rewards coming later)' : `Stairs ${stair.kind}`;
+      cell.innerHTML = mapIcon(chest?.reward ? 'open-chest' : kind);
+      if (chest?.reward) cell.classList.add('adventure-chest-opened');
+      cell.title = enemy ? `${enemy.name} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence}` : chest ? (chest.reward ? `Opened chest · ${chest.reward.name}` : 'Unopened treasure chest') : `Stairs ${stair.kind}`;
       if (enemy?.alerted) cell.classList.add('adventure-alerted');
     }
     if (x === state.x && y === state.y) {
@@ -146,10 +172,47 @@ function renderMap() {
   const nearby = state.enemies.filter(e => state.encounters.includes(e.id));
   adventure.querySelector('#adventure-notice').textContent = nearby.length
     ? `${nearby.map(e => e.name).join(', ')} nearby! Step into their tile to battle, or move away.`
-    : state.chests.some(at) ? 'You found a treasure chest. Rewards arrive in the treasure update.'
+    : state.chests.some(at) ? (state.chests.find(at).reward ? 'This chest is empty. Your reward is saved.' : 'You found a treasure chest. Choose Open chest to collect its reward.')
     : at(state.up) ? 'Stairs up: choose Ascend to return to the previous floor.'
     : at(state.down) ? 'Stairs down: choose Descend to explore deeper.' : '';
   syncControls();
+}
+function rewardText(reward) {
+  return reward.category === 'ability'
+    ? (reward.learned ? `Learned ${reward.name}!` : `${reward.name} found — already learned.`)
+    : `Found ${reward.quantity} ${reward.name}. Added to your backpack.`;
+}
+function renderInventory() {
+  const inventory = state?.inventory;
+  if (!inventory) return;
+  const focused = document.activeElement?.dataset.useItem;
+  adventure.querySelector('#adventure-care').textContent = `Stamina ${inventory.stamina} / 100 · Hygiene ${inventory.hygiene} / 100`;
+  const items = adventure.querySelector('#adventure-items');
+  items.replaceChildren();
+  for (const item of inventory.items) {
+    const row = document.createElement('li'), label = document.createElement('strong'), effect = document.createElement('span'), button = document.createElement('button');
+    label.textContent = `${item.name} × ${item.quantity}`;
+    effect.textContent = item.effect === 'skip' ? 'Finish the current lesson or shift.' : `Restore ${item.amount} ${item.restores}.`;
+    button.type = 'button'; button.className = 'chip-btn'; button.dataset.useItem = item.id;
+    button.textContent = { food: 'Feed', soap: 'Clean', hourglass: 'Skip activity' }[item.id];
+    button.setAttribute('aria-label', `Use ${item.name}`);
+    button.disabled = pending || Boolean(state.battle?.pending) || !item.usable;
+    button.addEventListener('click', () => request({ action: 'use-item', item: item.id }));
+    row.append(label, effect, button); items.append(row);
+    if (focused === item.id) (button.disabled ? grid : button).focus({ preventScroll: true });
+  }
+  const abilities = adventure.querySelector('#adventure-abilities');
+  abilities.replaceChildren();
+  for (const ability of inventory.abilities.filter(a => a.learned)) {
+    const row = document.createElement('li');
+    row.textContent = `${ability.name} · ${ability.mpCost} MP. ${ability.description}`;
+    abilities.append(row);
+  }
+  const coins = adventure.querySelector('#adventure-coins');
+  coins.replaceChildren();
+  for (const coin of inventory.coins) {
+    const row = document.createElement('li'); row.textContent = `${coin.name} × ${coin.quantity}`; coins.append(row);
+  }
 }
 function battleResult(battle) {
   return battle.won
@@ -223,6 +286,7 @@ for (const action of ['ascend', 'descend']) {
   adventure.querySelector(`#adventure-${action}`).addEventListener('click', () => request({ action }));
 }
 adventure.querySelector('#adventure-replay').addEventListener('click', () => showBattle(true));
+adventure.querySelector('#adventure-open-chest').addEventListener('click', () => request({ action: 'open-chest' }));
 adventure.querySelector('#adventure-restart').addEventListener('click', async () => {
   await request({ action: 'restart' });
   if (adventure.open) grid.focus({ preventScroll: true });
@@ -238,7 +302,20 @@ adventure.querySelector('#adventure-continue').addEventListener('click', continu
 document.addEventListener('battle:closed', ({ detail }) => {
   if (adventure.open && detail.key === `adventure:${state?.battle?.id}`) continueExploring();
 });
-document.addEventListener('adventure:pet', event => { pet = event.detail; if (adventure.open) renderMap(); });
+document.addEventListener('adventure:pet', event => {
+  pet = event.detail;
+  const inventory = state?.inventory;
+  if (inventory) {
+    inventory.stamina = pet.stamina; inventory.hygiene = pet.hygiene;
+    for (const item of inventory.items) {
+      item.quantity = pet[item.id];
+      item.usable = item.quantity > 0 && (item.effect === 'skip' ? pet.activity !== 'idle' : pet[item.restores] < 100);
+    }
+    for (const ability of inventory.abilities) ability.learned = pet.abilities?.includes(ability.id) ?? ability.id === 'claw-strike';
+    for (const coin of inventory.coins) coin.quantity = pet.coins?.[coin.id] ?? 0;
+  }
+  if (adventure.open) renderMap();
+});
 document.addEventListener('adventure:reset', () => {
   generation++; pending = false; state = null; pet = null;
   if (adventure.open) adventure.close();

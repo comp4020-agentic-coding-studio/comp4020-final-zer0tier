@@ -11,7 +11,7 @@ it('plays saved HP/MP, skips and replays without posting actions, and clears on 
   const $=(id:string)=>window.document.getElementById(id)!;
   try {
     window.eval(readFileSync('public/battle.js','utf8'));
-    const a={id:'a',strength:5,intelligence:5,charisma:5};
+    const a={id:'a',strength:5,intelligence:5,charisma:5, abilities: ['firebolt'] as const};
     const battle=simulateBattle(a,{...a,id:'b'},[24,16]);
     const detail={key:'fight:1',battle,viewer:'a',result:'You won $10.'};
     window.document.dispatchEvent(new window.CustomEvent('battle:show',{detail}));
@@ -19,10 +19,13 @@ it('plays saved HP/MP, skips and replays without posting actions, and clears on 
     expect($('battle-hp-text-0').textContent).toBe('15 / 15');
     $('battle-skip').click();
     expect($('battle-hp-text-1').textContent).toBe('0 / 15');
-    expect($('battle-mp-text-0').textContent).toBe('5 / 5');
+    expect($('battle-mp-text-0').textContent).toBe('2 / 5');
+    expect($('battle-log').textContent).toContain('Firebolt');
+    expect($('battle-log').textContent).toContain('(3 MP)');
     expect($('battle-status').textContent).toContain('Victory!');
     expect($('battle-log').children).toHaveLength(battle.turns.length);
     $('battle-replay').click();
+    expect($('battle-mp-text-0').textContent).toBe('5 / 5');
     expect($('battle-hp-text-1').textContent).toBe('15 / 15');
     window.document.dispatchEvent(new window.CustomEvent('battle:reset'));
     expect(($('battle-dialog') as HTMLDialogElement).open).toBe(false);

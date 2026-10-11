@@ -1,4 +1,5 @@
 // Pure map and movement rules, shared by persistence and focused rule tests.
+import type { TreasureReward } from './treasure.ts';
 export const SIZE = 16;
 export const FLOOR_COUNT = 5;
 export type Point = { x: number; y: number };
@@ -16,7 +17,7 @@ export type Floor = {
   name: string;
   tiles: string[];
   enemies: Enemy[];
-  chests: (Point & { id: string })[];
+  chests: (Point & { id: string; reward?: TreasureReward })[];
   up: Point | null;
   down: Point | null;
 };

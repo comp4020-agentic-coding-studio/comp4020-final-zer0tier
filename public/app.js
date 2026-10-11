@@ -921,6 +921,9 @@ function render(pet) {
   }
   renderMeters(pet);
   if (rules) {
+    $("learned-abilities").textContent = rules.fight.abilities.filter(a => (pet.abilities || ['claw-strike']).includes(a.id))
+      .map(a => `${a.name} (${a.mpCost} MP)`).join(' · ');
+    $("saved-coins").textContent = (rules.treasure?.coins || []).map(c => `${c.name} × ${pet.coins?.[c.id] || 0}`).join(' · ');
     renderBusy(pet);
     renderSchool(pet, previous);
     renderControls(pet);

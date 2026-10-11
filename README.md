@@ -208,7 +208,8 @@ Power remains 2 × Strength + Intelligence + Charisma. Each pet rolls a luck
 factor between 0.8 and 1.2: power × luck decides who strikes first (defender
 first on a tie), and Strength × luck, rounded to at least 1, is that pet's
 Claw Strike damage for the battle. Pets alternate attacks until one reaches
-0 HP. MP stays unchanged. The surviving pet wins; higher initiative alone no
+0 HP, using the strongest affordable learned ability (lower MP cost breaks a
+damage tie). Claw Strike remains free; learned attacks spend MP. The surviving pet wins; higher initiative alone no
 longer guarantees victory. The winner gets a win and the loser a loss.
 
 The window shows saved HP/MP changes, attack effects, and an expandable log.
@@ -239,7 +240,7 @@ failed attempts do not consume it. You cannot steal from yourself or the bot.
 Thefts are saved separately from the public feed. When you sign in, unresolved
 reports show who stole from you, when, and how much, with a **Take revenge** button.
 They also appear live and survive server restarts and public-feed pruning.
-Each theft allows one completed revenge attempt using the same automatic Claw Strike battle
+Each theft allows one completed revenge attempt using the same automatic battle
 and combat energy requirements. You must be idle; ordinary fight cooldowns do not
 block theft revenge. On a win, the thief pays **twice the stolen amount**, and you
 gain **+1 Strength, +1 Intelligence and +1 Charisma**. If the thief cannot afford
@@ -373,8 +374,9 @@ after this update. Training increases the maximums without refilling current HP/
 
 ### Monster battles
 
-Encounters use the Arena's automatic **Claw Strike** scene, with the monster's
-own appearance, name, and attributes. Claw Strike costs **0 MP**. For now, damage
+Encounters use the Arena's automatic battle scene, with the monster's
+own appearance, name, and attributes. Monsters use **Claw Strike**, which costs **0 MP**;
+pets also use their learned abilities. For now, damage
 and initiative use the same power and luck rolls as Arena; coin tosses and unfair
 coins are a later phase. The scene starts at the pet's saved HP/MP, and each
 monster starts at full HP/MP.
@@ -398,9 +400,40 @@ the saved result and resumes exploration after a win. If that request fails,
 opens the same pending battle. Replays cannot reroll a result, grant more recovery,
 or resurrect a monster.
 
-Adventure currently has no entry cost, care cost, cooldown, or item/money/stat
-rewards, and does not alter Arena wins/losses. Chests remain landmarks. Treasure,
-abilities, and coins are the next phases in `ADVENTURE_PLAN.md`.
+Adventure has no entry cost, care cost, or cooldown, and does not alter Arena
+wins/losses. Monster victories grant recovery; chests grant the items below.
+
+### Treasure and inventory
+
+Stand on a treasure chest and choose **Open chest**. Each chest awards one reward
+per run: **Food 30%, Soap 30%, Ability 20%, Hourglass 15%, Unfair coin 5%**.
+The two ability types have equal chances within the ability category; Copper,
+Silver, and Gold Coins have equal chances within the coin category. Opened chests
+stay on the map, retain their reward, and cannot be looted again. New adventures
+have fresh chests. Defeat, restarting, and signing out do not remove inventory.
+
+The map's **Your backpack** shows items, learned abilities, and coin counts.
+Food restores 40 stamina; soap restores 50 hygiene, capped at 100. Hourglasses
+finish the current lesson or shift. These are the same items used in **Care &
+shop**, with a shared count; they do not restore Adventure HP/MP or revive a failed
+run. The Adventure section's **Abilities & coins** also shows permanent discoveries.
+Coins accumulate in inventory; selecting them and their battle effects arrive
+in phase 5 of `ADVENTURE_PLAN.md`.
+
+Ability rewards are learned immediately and permanently, and work in Adventure,
+Arena, and revenge. Duplicate drops say **already learned**, without stacking
+the ability or rerolling the reward.
+
+| Ability | MP cost | Damage |
+| --- | ---: | --- |
+| Claw Strike | 0 | Strength × battle luck, rounded, at least 1 |
+| Firebolt | 3 | Intelligence × 1.5 × battle luck, rounded, at least 1 |
+| Heavy Strike | 2 | Claw Strike damage × 1.5, rounded up |
+
+Each turn uses the learned attack with the greatest damage that the fighter can
+afford, preferring lower MP cost when damage ties. At low MP the pet falls back
+to Claw Strike. Saved playback includes each ability, MP spent, and remaining
+resources; replaying does not spend MP again.
 
 The private `POST /api/adventure` accepts an empty body to resume. Its response
 includes an opaque `revision`; supply that revision with every action:
@@ -409,10 +442,15 @@ includes an opaque `revision`; supply that revision with every action:
 - `{ "action": "ascend" | "descend", "revision": "…" }` uses matching stairs.
 - `{ "action": "continue", "battleId": "…", "revision": "…" }` acknowledges a battle.
 - `{ "action": "restart", "revision": "…" }` starts fresh after failure or completion.
+- `{ "action": "open-chest", "revision": "…" }` opens the chest under the pet.
+- `{ "action": "use-item", "item": "food" | "soap" | "hourglass", "revision": "…" }` uses one backpack item.
 
 Stale revisions return the current saved state without applying the action,
 including retries after a battle or a new run. Movement is paused while a battle
 awaits acknowledgement. The server saves position, enemy removal, HP/MP, recovery,
 and the exact playback in one atomic update. Clients cannot choose stats, battle
-outcomes, rewards, enemy positions, or floors. Adventure results stay private and
-do not use the public Arena feed or WebSocket battle broadcast.
+outcomes, rewards, enemy positions, or floors. Chest opening and its inventory
+grant commit in one database transaction; item use and its new revision do too.
+These actions cannot award or consume twice when retried. Adventure battle
+results stay private. Inventory changes use the existing `pet:updated` WebSocket
+event so Care & shop and other open windows stay current.

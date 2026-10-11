@@ -3,10 +3,18 @@ import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import { createWorld } from '../src/adventure-world.ts';
 import { simulateBattle } from '../src/combat.ts';
+import { ABILITIES } from '../src/combat.ts';
+import { COINS } from '../src/treasure.ts';
 import { baseUrl, freshId, getRules, signUp } from './helpers.ts';
 
 function map(floor = 1) {
-  return { ...createWorld()[floor - 1], floor, floorCount: 5, size: 16, x: 2, y: 2, encounters: [], revision: 'saved-map', battle: null, completed: false, failed: false, hp: 15, mp: 5, maxHp: 15, maxMp: 5 };
+  return { ...createWorld()[floor - 1], floor, floorCount: 5, size: 16, x: 2, y: 2, encounters: [], revision: 'saved-map', battle: null, completed: false, failed: false, hp: 15, mp: 5, maxHp: 15, maxMp: 5,
+    inventory: { stamina: 30, hygiene: 40,
+      items: [{ id: 'food', name: 'Food', effect: 'restore', restores: 'stamina', amount: 40, quantity: 0, usable: false }],
+      abilities: ABILITIES.map(a => ({ ...a, learned: a.id === 'claw-strike' })),
+      coins: COINS.map(c => ({ ...c, quantity: 0 })),
+    },
+  };
 }
 
 function page() {
@@ -186,5 +194,69 @@ it('keeps keyboard movement focused on the map when using stairs disables the se
     expect(requests[2].body).toEqual({ direction: 'd', revision: 'saved-map' });
     requests[2].finish(Response.json({ ...map(2), x: 3 }));
     await vi.waitFor(() => expect($('adventure-status').textContent).toBe('Column 4 · Row 3'));
+  } finally { dom.window.close(); }
+});
+
+it('opens chests and uses backpack items only after the server saves them, retaining keyboard focus and clearing on logout', async () => {
+  const { dom, window, $ } = page();
+  const requests: { body: any; finish: (response: Response) => void }[] = [];
+  window.fetch = vi.fn((_url: string, options: RequestInit) => new Promise<Response>(finish => {
+    requests.push({ body: JSON.parse(options.body as string), finish });
+  })) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    const before = { ...map(), x: 11, y: 3 };
+    requests[0].finish(Response.json(before));
+    const open = $('adventure-open-chest') as HTMLButtonElement;
+    await vi.waitFor(() => expect(open.disabled).toBe(false));
+    open.focus(); open.click(); open.click();
+    expect(requests).toHaveLength(2);
+    expect(requests[1].body).toEqual({ action: 'open-chest', revision: 'saved-map' });
+    expect($('adventure-items').textContent).toContain('Food × 0');
+    expect($('adventure-treasure').textContent).toBe('');
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+    const saved = { ...before, revision: 'opened-map', chests: before.chests.map(c => ({ ...c, reward: { category: 'food', id: 'food', name: 'Food', quantity: 1 } })),
+      inventory: { ...before.inventory, items: before.inventory.items.map(item => ({ ...item, quantity: 1, usable: true })) } };
+    requests[1].finish(Response.json(saved));
+    await vi.waitFor(() => expect($('adventure-items').textContent).toContain('Food × 1'));
+    expect(open.textContent).toBe('Chest opened'); expect(open.disabled).toBe(true);
+    expect($('adventure-treasure').textContent).toContain('Found 1 Food');
+    const use = $('adventure-items').querySelector('button')!;
+    use.focus(); use.click();
+    expect(requests[2].body).toEqual({ action: 'use-item', item: 'food', revision: 'opened-map' });
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+    requests[2].finish(Response.json({ ...saved, revision: 'used-map', inventory: { ...before.inventory, stamina: 70 } }));
+    await vi.waitFor(() => expect($('adventure-care').textContent).toContain('Stamina 70'));
+    expect($('adventure-items').textContent).toContain('Food × 0');
+    $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'w', bubbles: true }));
+    expect(requests[3].body).toEqual({ direction: 'w', revision: 'used-map' });
+    window.document.dispatchEvent(new window.CustomEvent('adventure:reset'));
+    requests[3].finish(Response.json(saved));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect($('adventure-treasure').textContent).toBe('');
+    expect($('adventure-items').children).toHaveLength(0);
+  } finally { dom.window.close(); }
+});
+
+it('refreshes backpack discoveries from live pet updates and keeps focus when another window consumes the selected item', async () => {
+  const { dom, window, $ } = page();
+  const state = map();
+  state.inventory.items[0] = { ...state.inventory.items[0], quantity: 1, usable: true };
+  window.fetch = (async () => Response.json(state)) as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-items').children).toHaveLength(1));
+    $('adventure-backpack-title').click();
+    $('adventure-items').querySelector('button')!.focus();
+    window.document.dispatchEvent(new window.CustomEvent('adventure:pet', { detail: {
+      id: 'explorer', stamina: 70, hygiene: 40, food: 0, activity: 'idle',
+      abilities: ['claw-strike', 'firebolt'], coins: { 'copper-coin': 0, 'silver-coin': 1, 'gold-coin': 0 },
+    } }));
+    expect($('adventure-items').querySelector('button')!.disabled).toBe(true);
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+    expect($('adventure-abilities').textContent).toContain('Firebolt');
+    expect($('adventure-coins').textContent).toContain('Silver Coin × 1');
   } finally { dom.window.close(); }
 });

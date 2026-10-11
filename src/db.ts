@@ -43,6 +43,12 @@ db.exec(`
     x INTEGER NOT NULL,
     y INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS inventory (
+    player_id TEXT NOT NULL REFERENCES pets (id),
+    item_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    PRIMARY KEY (player_id, item_id)
+  );
   CREATE TABLE IF NOT EXISTS fights (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     attacker       TEXT    NOT NULL REFERENCES pets (id),

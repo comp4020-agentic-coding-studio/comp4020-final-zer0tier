@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { freshId, getPet, post, signUp, signIn } from './helpers.ts';
+import { baseUrl, freshId, getPet, post, signUp, signIn } from './helpers.ts';
 
 async function sendAction(id: string, body = {}) {
   const state = await (await post('/api/adventure', {}, id)).json();
@@ -109,4 +109,46 @@ it('requires a saved map revision and cannot move another account using a previo
   expect((await post('/api/adventure', { direction: 'd', revision: before.revision }, null)).status).toBe(401);
   expect(await (await post('/api/adventure', { direction: 'd', revision: before.revision, player_id: id }, other)).json()).toEqual(otherBefore);
   expect(await (await post('/api/adventure', {}, id)).json()).toEqual(before);
+});
+
+it('pet:updated — opening a chest grants exactly one reward under concurrent retries and reaches both windows within 1s', async () => {
+  const id = freshId(), other = freshId(); await signUp(id); await signUp(other);
+  expect((await sendAction(id, { action: 'open-chest' })).status).toBe(409);
+  for (const direction of ['w', ...Array(9).fill('d'), 's', 's']) await sendAction(id, { direction });
+  const before = await (await post('/api/adventure', {}, id)).json();
+  expect(before).toMatchObject({ x: 11, y: 3, battle: null });
+  const windows = await Promise.all([0, 1].map(() => new Promise<WebSocket>((resolve, reject) => {
+    const ws = new WebSocket(new URL('/ws', baseUrl).href.replace(/^http/, 'ws'));
+    ws.addEventListener('open', () => resolve(ws)); ws.addEventListener('error', reject);
+  })));
+  try {
+    const updates = windows.map(ws => new Promise<any>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('no pet:updated within 1s')), 1000);
+      ws.addEventListener('message', ({ data }) => {
+        const event = JSON.parse(String(data));
+        if (event.type === 'pet:updated' && event.pet.id === id) { clearTimeout(timer); resolve(event.pet); }
+      });
+    }));
+    const request = { action: 'open-chest', revision: before.revision, reward: { id: 'gold-coin', quantity: 9999 }, player_id: other };
+    const results = await Promise.all(Array.from({ length: 6 }, async () => {
+      const response = await post('/api/adventure', request, id);
+      expect(response.status).toBe(200); return response.json();
+    }));
+    for (const result of results) expect(result).toEqual(results[0]);
+    const result = results[0], reward = result.chests[0].reward, pet = await getPet(id);
+    for (const update of await Promise.all(updates)) expect(update).toEqual(pet);
+    expect(reward.quantity).toBe(1);
+    expect(pet.food + pet.soap + pet.hourglass + pet.abilities.length - 1 + Object.values<number>(pet.coins).reduce((sum, value) => sum + value, 0)).toBe(1);
+    expect(await (await sendAction(id, { action: 'open-chest' })).json()).toEqual(result);
+    const moved = await (await sendAction(id, { direction: 'w' })).json();
+    expect(await (await post('/api/adventure', request, id)).json()).toEqual(moved);
+    const otherBefore = await (await post('/api/adventure', {}, other)).json();
+    expect(await (await post('/api/adventure', request, other)).json()).toEqual(otherBefore);
+    expect((await post('/api/adventure', request, null)).status).toBe(401);
+    expect((await post('/api/adventure', { action: 'open-chest' }, id)).status).toBe(400);
+    expect((await sendAction(id, { action: 'use-item', item: 'gold-coin' })).status).toBe(400);
+    await post('/api/signout', {}, id); await signIn(id);
+    expect(await getPet(id)).toEqual(pet);
+    expect(await (await post('/api/adventure', {}, id)).json()).toEqual(moved);
+  } finally { windows.forEach(ws => ws.close()); }
 });

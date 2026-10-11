@@ -26,7 +26,7 @@ function buildDialog() {
         <label for="battle-mp-1">MP <span id="battle-mp-text-1"></span></label><meter id="battle-mp-1" min="0" aria-label="Defender MP"></meter></article>
     </div>
     <div class="battle-ability"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 4-5 24M18 4l-5 24M27 4l-5 24"/></svg>
-      <div><strong>Claw Strike</strong><span>0 MP · Both fighters attack automatically</span></div></div>
+      <div><strong id="battle-ability-name">Automatic attacks</strong><span id="battle-ability-cost">Strongest affordable attack each turn</span></div></div>
     <p id="battle-status" role="status" aria-live="polite"></p>
     <details class="battle-log"><summary>Attack log</summary><ol id="battle-log"></ol></details>
     <footer class="battle-actions"><button type="button" id="battle-skip" class="chip-btn chip-buy">Skip to result</button>
@@ -78,7 +78,11 @@ function meters(hp, mp) {
 function describe(step) {
   const actor = fighterName(scene.battle.fighters[step.actor]);
   const target = fighterName(scene.battle.fighters[step.target]);
-  return `${actor} used Claw Strike${step.hits > 1 ? ` ×${step.hits}` : ''}: ${step.damage} damage to ${target}.`;
+  return `${actor} used ${step.name || 'Claw Strike'}${step.hits > 1 ? ` ×${step.hits}` : ''}: ${step.damage} damage to ${target}${step.mpCost ? ` (${step.mpCost} MP)` : ''}.`;
+}
+function abilityLabel(step) {
+  $('battle-ability-name').textContent = step.name || 'Claw Strike';
+  $('battle-ability-cost').textContent = `${step.mpCost || 0} MP · Both fighters attack automatically`;
 }
 const fighterName = fighter => fighter.name || fighter.id;
 function addLog(step) {
@@ -90,6 +94,7 @@ function advance() {
   if (!dialog.open || !scene) return;
   if (turn === scene.battle.turns.length) return finish();
   const step = scene.battle.turns[turn++];
+  abilityLabel(step);
   meters(step.hp, step.mp);
   addLog(step);
   $('battle-status').textContent = describe(step);
@@ -106,6 +111,7 @@ function finish() {
   if (!scene) return;
   while (turn < scene.battle.turns.length) addLog(scene.battle.turns[turn++]);
   const last = scene.battle.turns.at(-1);
+  abilityLabel(last);
   meters(scene.resultResources?.hp ?? last.hp, scene.resultResources?.mp ?? last.mp);
   $('battle-status').textContent = `${scene.battle.winner === scene.viewer ? 'Victory!' : 'Defeat.'} ${scene.result}`;
   const skipped = document.activeElement === $('battle-skip');
@@ -125,7 +131,9 @@ function play(next) {
   $('battle-log').replaceChildren();
   $('battle-skip').hidden = false;
   $('battle-replay').hidden = true;
-  $('battle-status').textContent = 'Claw Strike ready. Let the battle begin!';
+  $('battle-status').textContent = 'Ready. Let the battle begin!';
+  $('battle-ability-name').textContent = 'Automatic attacks';
+  $('battle-ability-cost').textContent = 'Strongest affordable attack each turn';
   next.battle.fighters.forEach((fighter, i) => {
     $(`battle-name-${i}`).textContent = fighter.id === next.viewer ? `${fighterName(fighter)} (you)` : fighterName(fighter);
     avatar(fighter, i);

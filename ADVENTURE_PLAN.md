@@ -1,9 +1,10 @@
 # Adventure feature plan
 
-Status: steps 1–3 implemented: exploration controls and saving; five fixed
+Status: steps 1–4 implemented: exploration controls and saving; five fixed
 floors with stairs, slimes/goblins, increasing attributes, a Slime King on floor
 five, chest landmarks, enemy detection/pursuit, and automatic monster battles
-with saved HP/MP and outcomes. Treasure rewards and coins remain planned. This
+with saved HP/MP and outcomes; atomic chest rewards, persistent inventory, item
+use, and learned abilities. Coin selection and battle effects remain planned. This
 document preserves the owner's requirements.
 
 Implementation defaults for step 2: monsters take one cardinal step after an
@@ -52,9 +53,9 @@ Initial stats and scaling are documented in README.md and can be balanced later.
 - The Arena scene plays the saved starting resources and turns, supports skip
   and replay, and returns to the map. A saved revision protects all actions from
   stale/concurrent retries; result, removal, recovery, and position are atomic.
-- Phase defaults: no entry/care cost or cooldown, no money/items/stat rewards,
-  and no Arena record changes. Monsters use Claw Strike and Arena's existing
-  initiative/damage rules until ability and coin phases are implemented.
+- Phase defaults: no entry/care cost or cooldown, no monster money/items/stat
+  rewards, and no Arena record changes. Monsters use Claw Strike and Arena's
+  existing initiative/damage rules until coin effects are implemented.
 
 ## 4. Treasure and inventory
 
@@ -68,12 +69,20 @@ Each treasure reward is drawn from these category probabilities:
 | Hourglass | 15% |
 | Unfair coin | 5% |
 
-- Implementation work: persistent inventory, atomic chest opening and reward
-  grants, reward display, and item usage.
-- Abilities found during exploration need definitions, learning rules, and
-  integration with automatic combat.
-- Category probabilities total 100%; probabilities within a category are not
-  specified yet.
+- Implemented: stand on a chest and choose Open chest. One reward per chest per
+  run; the reward and opened state commit together. Retrying cannot duplicate it.
+- Owner approved one item per chest, existing food/soap/hourglass effects, equal
+  choices within ability/coin categories, and saving coins for phase 5.
+- Food/soap/hourglasses share Care & shop counts. The backpack can use them, with
+  saved revisions preventing duplicate consumption. They affect care and current
+  activities, not Adventure HP/MP. Inventory persists through defeat and new runs.
+- Owner approved Firebolt (3 MP, Intelligence-based damage), Heavy Strike (2 MP,
+  50% stronger than Claw Strike), permanent learning, and automatically choosing
+  the strongest affordable attack. Implementation: Firebolt deals 1.5 × INT ×
+  battle luck, rounded; Heavy Strike deals ceil(Claw Strike damage × 1.5).
+  Lower MP cost breaks damage ties. Applies to Adventure, Arena, and revenge.
+- Duplicate ability drops remain in the saved chest result as already learned;
+  they do not stack or reroll. Coins accumulate without applying battle effects.
 
 ## 5. Coin toss and unfair coins
 
@@ -113,12 +122,8 @@ authoritative; new real-time events require the existing one-second tests.
 - Should a future phase add energy limits, entry cost, cooldown, or daily attempts?
 - What are the boss abilities and completion rewards? Review the initial enemy
   stat curves after monster battles are playable.
-- Which abilities can drop, what are their MP costs, and how does automatic combat
-  choose between learned abilities and Claw Strike?
-- What do food, soap, and hourglasses do, and how many items does a chest award?
 - Are coins consumable or equipped? Is Copper's attribute bonus battle-only or
   permanent, and does it also increase derived HP/MP?
-- How are the three coin types distributed within the 5% coin reward category?
 - Does the new initiative system apply to Arena and revenge as well as Adventure?
   In PvP, who is the "player" for the toss, and which coin wins if effects conflict?
 - Keep the existing touch direction buttons and phone layout during later steps.

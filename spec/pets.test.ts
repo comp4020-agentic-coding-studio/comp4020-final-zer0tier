@@ -26,6 +26,8 @@ it("signing up creates a pet with base stats and starts a session", async () => 
     food: 0,
     soap: 0,
     hourglass: 0,
+    abilities: ['claw-strike'],
+    coins: { 'copper-coin': 0, 'silver-coin': 0, 'gold-coin': 0 },
     jobs: { construction: 0, office: 0, theatre: 0 },
     task: null,
     busySince: null,

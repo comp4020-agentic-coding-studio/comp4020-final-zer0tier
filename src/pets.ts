@@ -2,6 +2,7 @@ import { TIME_SCALE, realMs } from "./clock.ts";
 import { db } from "./db.ts";
 import { record } from "./feed.ts";
 import { simulateBattle, type Battle } from "./combat.ts";
+import { inventoryFor } from "./inventory.ts";
 
 // Keep this literal list identical to public/app.js: the unbundled browser
 // cannot import this server module (which opens SQLite).
@@ -9,7 +10,7 @@ export const APPEARANCES = ["cat", "dog", "bird", "dragon", "blob"] as const;
 export type Appearance = (typeof APPEARANCES)[number];
 export const isAppearance = (value: unknown): value is Appearance => APPEARANCES.some((a) => a === value);
 
-export interface Pet {
+export interface Pet extends ReturnType<typeof inventoryFor> {
   id: string;
   color: string;
   appearance: Appearance;
@@ -166,7 +167,7 @@ const save = db.prepare(
    WHERE id = ?`,
 );
 
-type Row = Omit<Pet, "jobs" | "busySince" | "busyUntil" | "reward"> & {
+type Row = Omit<Pet, "jobs" | "busySince" | "busyUntil" | "reward" | "abilities" | "coins"> & {
   construction_rank: number;
   office_rank: number;
   theatre_rank: number;
@@ -181,6 +182,7 @@ export function getPet(id: string): Pet | undefined {
   const { construction_rank, office_rank, theatre_rank, busy_since, busy_until, reward, ...pet } = row;
   return {
     ...pet,
+    ...inventoryFor(id),
     busySince: busy_since,
     busyUntil: busy_until,
     reward: reward === null ? null : (JSON.parse(reward) as Reward),

@@ -21,6 +21,15 @@
 #adventure-resources { text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; margin: 8px 0 12px; }
 #adventure-failure { color: var(--error); text-align: center; }
 #adventure-restart { display: block; margin: 12px auto; min-height: 44px; }
+#adventure-open-chest { display: block; margin: 12px auto 0; min-height: 44px; }
+#adventure-treasure { text-align: center; font-weight: 700; font-size: .9rem; }
+.adventure-chest-opened { opacity: .65; }
+.adventure-backpack { border-top: 1px solid var(--border); margin-top: 16px; }
+.adventure-backpack h4 { font-size: .9rem; margin: 16px 0 8px; }
+.adventure-backpack ul { list-style: none; padding: 0; margin: 0; font-size: .8rem; }
+.adventure-backpack li { margin-bottom: 12px; overflow-wrap: anywhere; }
+#adventure-items li { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+#adventure-items button { min-height: 44px; }
 .adventure-controls { display: flex; justify-content: center; gap: 8px; }
 .adventure-controls button { min-width: 48px; min-height: 48px; border: 1px solid var(--border); border-radius: 12px; color: var(--fg); background: var(--bg); font-size: 24px; }
 .adventure-controls button:active { background: var(--bg-glow); }

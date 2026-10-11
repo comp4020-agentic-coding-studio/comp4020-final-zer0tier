@@ -26,6 +26,7 @@ it('migrates a legacy clearing without moving its pet or overlapping a new enemy
   expect(state).toMatchObject({ x: 5, y: 3, floor: 1 });
   expect(state.enemies.some(e => e.x === 5 && e.y === 3)).toBe(false);
   expect(adventure.adventureFor('legacy')).toEqual(state);
+  expect(pets.getPet('legacy')).toMatchObject({ abilities: ['claw-strike'], coins: { 'copper-coin': 0, 'silver-coin': 0, 'gold-coin': 0 } });
 });
 it('preserves floor, player position, and enemy positions across a process restart', () => {
   for (const direction of ['a', 'a', 'a', 'a', ...Array(11).fill('s'), ...Array(12).fill('d'), 'w']) {
@@ -66,6 +67,113 @@ function afterRestart(id: string) {
     "import { adventureFor } from './src/adventure.ts'; console.log(JSON.stringify(adventureFor(process.argv[1])));", id],
   { env: { ...process.env, DATA_DIR: directory }, encoding: 'utf8' }));
 }
+
+function standOnChest(id: string, floor = 1) {
+  pets.getOrCreatePet(id);
+  adventure.adventureFor(id);
+  db.prepare('UPDATE adventures SET x = ?, y = ?, floor = ? WHERE player_id = ?').run(11, 3, floor, id);
+  return adventure.adventureFor(id);
+}
+function openChest(id: string, roll: number, within = 0) {
+  const before = adventure.adventureFor(id);
+  const random = vi.spyOn(Math, 'random').mockReturnValueOnce(roll).mockReturnValue(within);
+  try {
+    const result = adventure.openAdventureChest(id, before.revision);
+    if ('error' in result) throw new Error(result.error);
+    return result;
+  } finally { random.mockRestore(); }
+}
+
+it.each([
+  [0, 0, 'food'], [0.3, 0, 'soap'], [0.6, 0, 'firebolt'], [0.6, 0.9, 'heavy-strike'],
+  [0.8, 0, 'hourglass'], [0.95, 0, 'copper-coin'], [0.95, 0.5, 'silver-coin'], [0.95, 0.9, 'gold-coin'],
+] as const)('saves reward %s/%s (%s) once, preserving it and inventory across a process restart', (roll, within, item) => {
+  const id = `treasure-${item}`, before = standOnChest(id);
+  const result = openChest(id, roll, within);
+  expect(result.chests[0].reward).toMatchObject({ id: item, quantity: 1 });
+  expect(result.revision).not.toBe(before.revision);
+  expect(result.enemies).toEqual(before.enemies);
+  if (item === 'food' || item === 'soap' || item === 'hourglass') {
+    expect(pets.getPet(id)![item]).toBe(1);
+  } else if (item === 'firebolt' || item === 'heavy-strike') {
+    expect(pets.getPet(id)!.abilities).toContain(item);
+    expect(result.chests[0].reward!.learned).toBe(true);
+  } else expect(pets.getPet(id)!.coins[item]).toBe(1);
+  expect(adventure.openAdventureChest(id, before.revision)).toEqual(result);
+  expect(adventure.openAdventureChest(id, result.revision)).toEqual(result);
+  expect(afterRestart(id)).toEqual(result);
+  expect(pets.getPet('legacy')!.abilities).toEqual(['claw-strike']);
+});
+
+it('keeps learned abilities and coins through defeat/new runs; duplicate ability drops do not stack', () => {
+  const id = 'persistent-treasure'; standOnChest(id);
+  openChest(id, 0.6);
+  standOnChest(id, 2); openChest(id, 0.95, 0.9);
+  standOnChest(id, 3);
+  expect(openChest(id, 0.6).chests[0].reward).toMatchObject({ id: 'firebolt', learned: false });
+  const pet = pets.getPet(id)!;
+  expect(pet.abilities).toEqual(['claw-strike', 'firebolt']);
+  db.prepare('UPDATE adventures SET hp = ? WHERE player_id = ?').run(0, id);
+  const failed = adventure.adventureFor(id);
+  expect(adventure.openAdventureChest(id, failed.revision)).toEqual(failed);
+  const next = adventure.restartAdventure(id, failed.revision);
+  expect(next).toMatchObject({ floor: 1, hp: 15 });
+  expect(pets.getPet(id)).toEqual(pet);
+  expect(adventure.openAdventureChest(id, failed.revision)).toEqual(next);
+  standOnChest(id); expect(openChest(id, 0.6).chests[0].reward!.learned).toBe(false);
+});
+
+it('refuses remote chests and rolls back the reward if saving the opened chest fails', () => {
+  const id = 'atomic-chest'; pets.getOrCreatePet(id);
+  const start = adventure.adventureFor(id);
+  expect(adventure.openAdventureChest(id, start.revision)).toMatchObject({ status: 409 });
+  const before = standOnChest(id), pet = pets.getPet(id);
+  db.exec("CREATE TRIGGER reject_chest_save BEFORE UPDATE OF world_json ON adventures BEGIN SELECT RAISE(ABORT, 'test disk failure'); END");
+  try { expect(() => openChest(id, 0.6)).toThrow('test disk failure'); }
+  finally { db.exec('DROP TRIGGER reject_chest_save'); }
+  expect(pets.getPet(id)).toEqual(pet);
+  expect(adventure.adventureFor(id)).toEqual(before);
+  expect(openChest(id, 0.6).chests[0].reward!.learned).toBe(true);
+});
+
+it('uses chest food, soap, and hourglasses with existing effects and cannot consume twice on retry', () => {
+  const id = 'use-treasure'; standOnChest(id); openChest(id, 0);
+  standOnChest(id, 2); openChest(id, 0.3);
+  standOnChest(id, 3); openChest(id, 0.8);
+  db.prepare('UPDATE pets SET stamina = ?, hygiene = ? WHERE id = ?').run(30, 40, id);
+  for (const item of ['food', 'soap'] as const) {
+    const before = adventure.adventureFor(id);
+    const result = adventure.useAdventureItem(id, item, before.revision);
+    expect(result).not.toHaveProperty('error');
+    expect(pets.getPet(id)![item]).toBe(0);
+    expect(adventure.useAdventureItem(id, item, before.revision)).toEqual(result);
+  }
+  expect(pets.getPet(id)).toMatchObject({ stamina: 70, hygiene: 90 });
+  expect(pets.study(id, 'math')).not.toHaveProperty('error');
+  const before = adventure.adventureFor(id), result = adventure.useAdventureItem(id, 'hourglass', before.revision);
+  expect(pets.getPet(id)).toMatchObject({ hourglass: 0, activity: 'idle', intelligence: 6 });
+  expect(adventure.useAdventureItem(id, 'hourglass', before.revision)).toEqual(result);
+  const current = adventure.adventureFor(id);
+  expect(adventure.useAdventureItem(id, 'copper-coin', current.revision)).toMatchObject({ status: 400 });
+  expect(adventure.useAdventureItem(id, 'food', current.revision)).toMatchObject({ status: 409 });
+  expect(afterRestart(id)).toEqual(current);
+});
+
+it('loads learned abilities into both monster and Arena battles, spending carried MP only once', () => {
+  const id = 'learned-fighter'; standOnChest(id); openChest(id, 0.6);
+  const before = setupBattle(id, 'goblin', [5, 10, 12]);
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  try {
+    const result = step(id, 'd');
+    expect(result.battle!.playback.turns.find(turn => turn.actor === 0)).toMatchObject({ ability: 'firebolt', mpCost: 3 });
+    expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(result);
+    expect(result.battle!.playback.initialMp![0]).toBe(before.mp);
+    pets.getOrCreatePet('learned-opponent');
+    const arena = pets.fight(id, 'learned-opponent');
+    if ('error' in arena) throw new Error(arena.error);
+    expect(arena.fight.battle!.turns.find(turn => turn.actor === 0)).toMatchObject({ ability: 'firebolt', mpCost: 3 });
+  } finally { random.mockRestore(); }
+});
 
 it.each(['slime', 'goblin', 'slime-king'] as const)('saves a %s victory, removes only that monster, and persists the exact replay', kind => {
   // A player may use a monster's ordinary ID; combat uses a separate namespace.
