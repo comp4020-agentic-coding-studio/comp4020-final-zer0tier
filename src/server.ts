@@ -241,6 +241,15 @@ app.post("/api/pets/:id/fight/:opponent", (req, res) => {
   res.json(outcome);
 });
 
+// Each fresh game-page visit ends the browser's previous login.
+app.get(["/", "/index.html"], (req, res, next) => {
+  const token = sessionToken(req.headers.cookie);
+  if (token) signOut(token);
+  res.setHeader("Set-Cookie", clearedCookie());
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
 app.use(express.static("public"));
 
 const server = createServer(app);
