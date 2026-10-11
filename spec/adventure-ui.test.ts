@@ -260,3 +260,27 @@ it('refreshes backpack discoveries from live pet updates and keeps focus when an
     expect($('adventure-coins').textContent).toContain('Silver Coin × 1');
   } finally { dom.window.close(); }
 });
+
+it('re-enables a coin button instead of leaving it stuck disabled when equip-coin fails', async () => {
+  const { dom, window, $ } = page();
+  const state = map();
+  let resolveEquip: (response: Response) => void;
+  window.fetch = vi.fn((url: string) => url.includes('/equip-coin/')
+    ? new Promise<Response>(resolve => { resolveEquip = resolve; })
+    : Promise.resolve(Response.json(state))) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-coins').children).toHaveLength(3));
+    window.document.dispatchEvent(new window.CustomEvent('adventure:pet', { detail: {
+      id: 'explorer', coins: { 'copper-coin': 0, 'silver-coin': 1, 'gold-coin': 0 },
+    } }));
+    const row = [...$('adventure-coins').children].find(li => li.textContent?.includes('Silver Coin')) as HTMLElement;
+    const button = row.querySelector('button')!;
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect(button.disabled).toBe(true);
+    resolveEquip!(Response.json({ error: "You don't have that coin to equip." }, { status: 409 }));
+    await vi.waitFor(() => expect(button.disabled).toBe(false));
+  } finally { dom.window.close(); }
+});

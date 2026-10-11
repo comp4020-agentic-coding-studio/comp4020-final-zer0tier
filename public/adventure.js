@@ -217,13 +217,18 @@ function renderInventory() {
     button.type = 'button'; button.className = 'chip-btn'; button.setAttribute('aria-pressed', String(Boolean(coin.equipped)));
     button.textContent = coin.equipped ? 'Unequip' : 'Equip';
     button.disabled = coin.quantity < 1 && !coin.equipped;
-    button.addEventListener('click', () => { button.disabled = true; equipCoin(coin.equipped ? null : coin.id); });
+    button.addEventListener('click', () => { button.disabled = true; equipCoin(button, coin.equipped ? null : coin.id); });
     row.append(label, effect, button); coins.append(row);
   }
 }
-async function equipCoin(coinId) {
+async function equipCoin(button, coinId) {
   if (!pet) return;
-  await fetch(`/api/pets/${encodeURIComponent(pet.id)}/equip-coin/${encodeURIComponent(coinId ?? 'none')}`, { method: 'POST' });
+  try {
+    const res = await fetch(`/api/pets/${encodeURIComponent(pet.id)}/equip-coin/${encodeURIComponent(coinId ?? 'none')}`, { method: 'POST' });
+    if (!res.ok) button.disabled = false;
+  } catch {
+    button.disabled = false;
+  }
 }
 function battleResult(battle) {
   return battle.won
