@@ -121,3 +121,10 @@ const theftColumns = new Set(
   (db.prepare("SELECT name FROM pragma_table_info('thefts')").all() as { name: string }[]).map((c) => c.name),
 );
 if (!theftColumns.has("battle_json")) db.exec("ALTER TABLE thefts ADD COLUMN battle_json TEXT");
+
+// Preserve existing clearing coordinates while adding the saved five-floor map.
+const adventureColumns = new Set(
+  (db.prepare("SELECT name FROM pragma_table_info('adventures')").all() as { name: string }[]).map(c => c.name),
+);
+if (!adventureColumns.has("floor")) db.exec("ALTER TABLE adventures ADD COLUMN floor INTEGER NOT NULL DEFAULT 1");
+if (!adventureColumns.has("world_json")) db.exec("ALTER TABLE adventures ADD COLUMN world_json TEXT");

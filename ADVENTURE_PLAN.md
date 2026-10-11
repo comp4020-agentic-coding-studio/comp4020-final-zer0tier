@@ -1,10 +1,15 @@
 # Adventure feature plan
 
-Status: step 1 exploration foundation implemented (entry, 16 × 16 clearing,
-W/A/S/D and touch movement, walls, saved position). Floor progression, enemies,
-and rewards remain planned. This document preserves the
-owner's requirements for future implementation. Open decisions below are not
-approved mechanics.
+Status: steps 1 and 2 implemented: exploration controls and saving; five fixed
+floors with stairs, slimes/goblins, increasing attributes, a Slime King on floor
+five, chest landmarks, and enemy detection/pursuit. Monster battles and chest
+rewards remain planned. This document preserves the owner's requirements.
+
+Implementation defaults for step 2: monsters take one cardinal step after an
+accepted player step, detect the eight surrounding cells, and stop chasing when
+the pet leaves that range. Stairs require an explicit Ascend/Descend action.
+Nearby enemies produce encounter warnings; battle resolution is step 3.
+Initial stats and scaling are documented in README.md and can be balanced later.
 
 ## 1. Adventure entry and exploration
 
@@ -90,13 +95,11 @@ authoritative; new real-time events require the existing one-second tests.
 
 ## Decisions to settle before the relevant phase
 
-- Are layouts fixed or generated? How does the player descend, leave, or resume?
-- Do monsters move once per player step, or in real time? Can they move diagonally?
-  How long do they pursue after the pet leaves detection range?
 - Does entering an enemy's block trigger battle, or does adjacency trigger it?
 - What happens on defeat, and does HP/MP persist between encounters or floors?
 - Are adventures limited by energy, entry cost, cooldown, or daily attempts?
-- What are the floor stat curves, enemy counts, boss abilities, and completion rewards?
+- What are the boss abilities and completion rewards? Review the initial enemy
+  stat curves after monster battles are playable.
 - Which abilities can drop, what are their MP costs, and how does automatic combat
   choose between learned abilities and Claw Strike?
 - What do food, soap, and hourglasses do, and how many items does a chest award?
@@ -105,4 +108,4 @@ authoritative; new real-time events require the existing one-second tests.
 - How are the three coin types distributed within the 5% coin reward category?
 - Does the new initiative system apply to Arena and revenge as well as Adventure?
   In PvP, who is the "player" for the toss, and which coin wins if effects conflict?
-- What touch controls should mobile Adventure use? Preserve existing phone layout.
+- Keep the existing touch direction buttons and phone layout during later steps.

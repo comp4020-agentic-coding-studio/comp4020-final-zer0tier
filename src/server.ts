@@ -1,4 +1,4 @@
-import { adventureFor, moveAdventure } from "./adventure.ts";
+import { adventureFor, changeFloor, moveAdventure } from "./adventure.ts";
 import express from "express";
 import { ABILITIES } from "./combat.ts";
 import { readFileSync } from "node:fs";
@@ -106,8 +106,11 @@ app.post("/api/adventure", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const id = playerFor(req.headers.cookie);
   if (!id) return void res.status(401).json({ error: "Sign in first." });
-  const result = req.body?.direction === undefined
-    ? adventureFor(id) : moveAdventure(id, req.body.direction);
+  if (req.body?.direction !== undefined && req.body?.action !== undefined) {
+    return void res.status(400).json({ error: "Choose one adventure action at a time." });
+  }
+  const result = req.body?.action !== undefined ? changeFloor(id, req.body.action)
+    : req.body?.direction !== undefined ? moveAdventure(id, req.body.direction) : adventureFor(id);
   if ("error" in result) return void res.status(result.status).json({ error: result.error });
   res.json(result);
 });

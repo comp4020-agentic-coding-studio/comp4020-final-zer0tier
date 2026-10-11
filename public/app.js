@@ -887,11 +887,11 @@ $("lookup").addEventListener("submit", async (e) => {
 function render(pet) {
   const previous = current;
   current = pet;
-  document.dispatchEvent(new CustomEvent("adventure:pet", { detail: pet }));
   if (previous?.id !== pet.id) {
     clearThefts();
     loadThefts();
   }
+  document.dispatchEvent(new CustomEvent("adventure:pet", { detail: pet }));
   renderPetAvatar($("pet-avatar"), pet);
   const confirmed = pendingAppearance?.id === pet.id && pendingAppearance.appearance === pet.appearance &&
     pendingAppearance.color.toLowerCase() === pet.color.toLowerCase();

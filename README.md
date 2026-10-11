@@ -339,9 +339,36 @@ the built-in `node:sqlite` for storage.
 ## Adventure exploration
 
 Choose **Adventure** under **Make their day** on desktop, or the Adventure
-section on a phone, then **Explore the clearing**. Move one block per press with
-W/A/S/D, arrow keys, or the on-screen direction buttons. Trees block movement
-on the 16 × 16 woodland grid. Each accepted step is saved to your account;
-Leave or Escape closes the window, and reopening resumes your position.
-This first exploration stage has no entry cost or rewards. Monsters, treasure
-chests, five-floor progression, and coins are planned in `ADVENTURE_PLAN.md`.
+section on a phone, then **Explore the woodland**. Move one block per press with
+W/A/S/D, arrow keys, or the on-screen direction buttons. Each of the five fixed
+floors has a 16 × 16 grid, four regular enemies (slimes and goblins), and at least
+one marked treasure chest. Floor five also contains the **Slime King**. The map
+uses your pet's saved shape and colour as soon as you sign in.
+
+Stand on the down stairs at column 14, row 14 and choose **Descend**. You arrive
+at the next floor's up stairs at column 3, row 3; **Ascend** returns to the
+previous floor's down stairs. Floor one has no up stairs and floor five has no
+down stairs. Leave or Escape closes the window. Your floor, position, and each
+floor's enemies are saved privately to your account, including across server
+restarts. Older clearing saves retain their positions during migration.
+
+Monsters detect the pet in any of their eight surrounding blocks, including
+diagonals. After each accepted player step, each nearby monster tries to move
+one cardinal block closer. They stop next to the pet, cannot cross trees, chests,
+stairs, or other monsters, and stop pursuing when the pet leaves detection range.
+Blocked player moves, opening the map, and using stairs do not advance monsters.
+An exclamation mark and a message warn about nearby monsters. The player cannot
+walk onto a monster. Enemy attributes and positions are listed under **Monster
+attributes**, and every stair and chest is reachable through the map's paths.
+
+For initial balancing, floor-one slimes have STR/INT/CHA **3/1/2**, and goblins
+have **5/3/2**. Each deeper floor adds **2/1/1**, respectively. The floor-five Slime
+King has **18/10/12**. HP is the sum of attributes; MP is Intelligence.
+
+This stage has no entry cost, damage, or rewards. Chests are map landmarks;
+monster battle resolution and chest rewards are the next planned features in
+`ADVENTURE_PLAN.md`. The private `POST /api/adventure` accepts an empty body to
+resume, `{ "direction": "w" | "a" | "s" | "d" }` to move, or
+`{ "action": "ascend" | "descend" }` to use the stairs. The server validates and
+saves each move before returning the map. Clients cannot choose a floor or
+supply enemy positions.
