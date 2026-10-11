@@ -8,6 +8,7 @@ export interface Pet {
   intelligence: number;
   charisma: number;
   money: number;
+  stealAvailableAt: number | null; // next UTC midnight after a successful theft
   activity: "idle" | "studying" | "working";
   task: string | null; // the course or location, while busy
   busySince: number | null; // epoch ms (real time) the activity started
@@ -138,7 +139,8 @@ export const isValidId = (id: unknown): id is string =>
 
 const select = db.prepare(
   `SELECT id, strength, intelligence, charisma, money, activity, school, credits, stamina, hygiene, food, soap,
-          hourglass, construction_rank, office_rank, theatre_rank, task, busy_since, busy_until, reward, wins, losses
+          hourglass, construction_rank, office_rank, theatre_rank, task, busy_since, busy_until, reward, wins, losses,
+          steal_available_at AS stealAvailableAt
      FROM pets WHERE id = ?`,
 );
 // The bot first, then the newest pets, so a player who just joined is easy to
@@ -555,5 +557,116 @@ export function fight(attackerId: string, defenderId: string): FightOutcome {
   } catch (err) {
     rollback.run();
     throw err;
+  }
+}
+
+// Visits and stealing --------------------------------------------------------
+
+// Calendar days use real UTC time, even on the accelerated activity clock.
+export const STEAL = { min: 10, max: 30, resetTimezone: "UTC" } as const;
+const protectFromTheft = db.prepare("UPDATE pets SET steal_available_at = ? WHERE id = ?");
+
+export type StealOutcome =
+  | { thief: Pet; victim: Pet; amount: number }
+  | { status: 400 | 404 | 409 | 429; error: string };
+
+export function steal(thiefId: string, victimId: string): StealOutcome {
+  if (thiefId === victimId) return { status: 400, error: "You can't steal from your own pet." };
+  if (thiefId === BOT_ID || victimId === BOT_ID) {
+    return { status: 400, error: "The bot doesn't take part in stealing." };
+  }
+  // Lock before checking the target. The two balances, daily protection and
+  // feed entry all commit together; a competing visitor must check again.
+  begin.run();
+  let committed = false;
+  try {
+    const thief = getPet(thiefId);
+    const victim = getPet(victimId);
+    if (!thief) return { status: 404, error: "no such pet" };
+    if (!victim) return { status: 404, error: `There's no pet called ${victimId}.` };
+    const now = Date.now();
+    if (victim.stealAvailableAt !== null && now < victim.stealAvailableAt) {
+      return { status: 429, error: "Someone already stole from this pet today. Try after midnight UTC." };
+    }
+    finishIfDue(thief, now);
+    finishIfDue(victim, now);
+    if (victim.money < STEAL.min) {
+      return { status: 409, error: `This pet needs at least $${STEAL.min} before you can steal.` };
+    }
+    const amount = STEAL.min + Math.floor(Math.random() * (Math.min(STEAL.max, victim.money) - STEAL.min + 1));
+    thief.money += amount;
+    victim.money -= amount;
+    const nextDay = new Date(now);
+    nextDay.setUTCHours(24, 0, 0, 0);
+    write(thief);
+    write(victim);
+    protectFromTheft.run(nextDay.getTime(), victimId);
+    insertTheft.run(thiefId, victimId, amount);
+    record({ kind: "stole", pet: thiefId, other: victimId, amount });
+    commit.run();
+    committed = true;
+    return { thief: getPet(thiefId)!, victim: getPet(victimId)!, amount };
+  } finally {
+    if (!committed) rollback.run();
+  }
+}
+
+
+// Theft reports survive feed pruning and are consumed only by a completed revenge.
+export interface Theft {
+  id: number;
+  thief: string;
+  victim: string;
+  amount: number;
+  stolenAt: string;
+  result: "won" | "lost" | null;
+}
+const insertTheft = db.prepare("INSERT INTO thefts (thief, victim, amount) VALUES (?, ?, ?)");
+const theftColumns = "id, thief, victim, amount, stolen_at AS stolenAt, result";
+const selectTheft = db.prepare(`SELECT ${theftColumns} FROM thefts WHERE id = ? AND victim = ?`);
+const pendingThefts = db.prepare(`SELECT ${theftColumns} FROM thefts WHERE victim = ? AND result IS NULL ORDER BY id DESC`);
+const resolveTheft = db.prepare("UPDATE thefts SET result = ?, resolved_at = ? WHERE id = ?");
+export const theftsFor = (id: string): Theft[] => pendingThefts.all(id) as unknown as Theft[];
+
+export type RevengeOutcome =
+  | { theft: Theft; victim: Pet; thief: Pet; won: boolean; reward: number }
+  | { status: 404 | 409; error: string };
+
+export function revenge(victimId: string, theftId: number): RevengeOutcome {
+  begin.run();
+  let committed = false;
+  try {
+    const theft = selectTheft.get(theftId, victimId) as unknown as Theft | undefined;
+    if (!theft) return { status: 404, error: "No such theft against your pet." };
+    if (theft.result) return { status: 409, error: "You already attempted revenge for this theft." };
+    const victim = getPet(victimId)!;
+    const thief = getPet(theft.thief)!;
+    const now = Date.now();
+    finishIfDue(victim, now);
+    finishIfDue(thief, now);
+    const refusal = busy(victim);
+    if (refusal) return { status: 409, error: refusal };
+    const reward = theft.amount * 2;
+    if (thief.money < reward) return { status: 409, error: `The thief needs $${reward} to pay the full reward. Try again later.` };
+    const unfit = spend(victim, FIGHT_NEEDS, FIGHT_COST, "take revenge");
+    if (unfit) return { status: 409, error: unfit };
+    const won = roll(powerOf(victim)) > roll(powerOf(thief));
+    if (won) {
+      thief.money -= reward;
+      victim.money += reward;
+      victim.strength++;
+      victim.intelligence++;
+      victim.charisma++;
+    }
+    // A loss costs the attempt and normal combat energy, but no extra money.
+    write(victim);
+    write(thief);
+    resolveTheft.run(won ? "won" : "lost", new Date(now).toISOString(), theft.id);
+    record({ kind: "revenge", pet: victimId, other: thief.id, won, amount: won ? reward : 0 });
+    commit.run();
+    committed = true;
+    return { theft: { ...theft, result: won ? "won" : "lost" }, victim: getPet(victimId)!, thief: getPet(thief.id)!, won, reward: won ? reward : 0 };
+  } finally {
+    if (!committed) rollback.run();
   }
 }

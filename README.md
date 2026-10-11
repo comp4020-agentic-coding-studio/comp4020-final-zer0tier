@@ -193,6 +193,25 @@ attacked that pet itself within the last hour): if someone attacks you, a
 message pops up wherever you are on the page, saying who it was, how it went and
 what money changed hands, with a **Revenge** button to fight them straight back.
 
+### Theft notifications and revenge
+
+The theft API (`POST /api/pets/:id/steal/:opponent`) transfers $10–$30,
+limited by the victim's balance. A pet can be robbed at most once per UTC
+calendar day across all players. Protection persists and resets at midnight UTC;
+failed attempts do not consume it. You cannot steal from yourself or the bot.
+
+Thefts are saved separately from the public feed. When you sign in, unresolved
+reports show who stole from you, when, and how much, with a **Take revenge** button.
+They also appear live and survive server restarts and public-feed pruning.
+Each theft allows one completed revenge attempt using the normal power/luck rolls
+and combat energy requirements. You must be idle; ordinary fight cooldowns do not
+block theft revenge. On a win, the thief pays **twice the stolen amount**, and you
+gain **+1 Strength, +1 Intelligence and +1 Charisma**. If the thief cannot afford
+the full reward, no attempt or energy is spent; try later. A loss spends the attempt
+and combat energy but takes no extra money. Revenge never removes daily theft protection.
+`GET /api/thefts` returns only your pending reports; `POST /api/pets/:id/revenge/:theft`
+accepts only a theft against your own pet. Completed attempts cannot pay out twice.
+
 ### Leaderboard
 
 The Arena's **Leaderboard** tab ranks the top 10 players by **most wins** (fewer

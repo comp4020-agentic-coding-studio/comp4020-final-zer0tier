@@ -7,7 +7,7 @@ import {
   WORK_COST_PER_HOUR, buy, findCourse, findItem, findLocation, getOrCreatePet, getPet, isShiftLength, isValidId,
   matchBot, study, upgrade, use, work, BOT_ID, FIGHT_COOLDOWN_MINUTES, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS,
   SPOILS, LEADERBOARD_ORDERS, LEADERBOARD_SIZE, fight, isLeaderboardOrder, leaderboard, listPets, recentFights,
-  type Outcome,
+  STEAL, steal, theftsFor, revenge, type Outcome,
 } from "./pets.ts";
 import {
   Busy, PASSWORD, type AuthOutcome, clearedCookie, isValidPassword, playerFor, sessionCookie, sessionToken, signIn,
@@ -99,8 +99,17 @@ app.get("/api/me", (req, res) => {
   res.json(pet);
 });
 
+// Theft reports are private to the signed-in victim.
+app.get("/api/thefts", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: "Sign in first." });
+  res.json(theftsFor(id));
+});
+
 // Anyone can look at any pet, but only its owner can act for it.
 app.post("/api/pets/:id/*action", (req, res, next) => {
+  if (!isValidId(req.params.id)) return notFound(res, "pet");
   const player = playerFor(req.headers.cookie);
   if (!player) {
     res.status(401).json({ error: "Sign in first." });
@@ -165,6 +174,7 @@ app.get("/api/rules", (_req, res) => {
       cooldownMinutes: FIGHT_COOLDOWN_MINUTES,
     },
     botId: BOT_ID,
+    steal: STEAL,
     leaderboardSize: LEADERBOARD_SIZE,
   });
 });
@@ -237,6 +247,32 @@ app.post("/api/pets/:id/fight/:opponent", (req, res) => {
   broadcast({ type: "pet:updated", pet: outcome.attacker });
   broadcast({ type: "pet:updated", pet: outcome.defender });
   broadcast({ type: "fight:finished", fight: outcome.fight });
+  followUp();
+  res.json(outcome);
+});
+
+app.post("/api/pets/:id/steal/:opponent", (req, res) => {
+  if (!isValidId(req.params.id)) return notFound(res, "pet");
+  if (!isValidId(req.params.opponent)) return notFound(res, "opponent");
+  const outcome = steal(req.params.id, req.params.opponent);
+  if ("error" in outcome) {
+    res.status(outcome.status).json({ error: outcome.error });
+    return;
+  }
+  broadcast({ type: "pet:updated", pet: outcome.thief });
+  broadcast({ type: "pet:updated", pet: outcome.victim });
+  followUp();
+  res.json(outcome);
+});
+
+app.post("/api/pets/:id/revenge/:theft", (req, res) => {
+  if (!/^[1-9][0-9]*$/.test(req.params.theft) || !Number.isSafeInteger(Number(req.params.theft))) {
+    return notFound(res, "theft");
+  }
+  const outcome = revenge(req.params.id, Number(req.params.theft));
+  if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
+  broadcast({ type: "pet:updated", pet: outcome.victim });
+  broadcast({ type: "pet:updated", pet: outcome.thief });
   followUp();
   res.json(outcome);
 });

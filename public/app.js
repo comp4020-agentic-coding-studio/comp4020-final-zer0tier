@@ -465,6 +465,14 @@ function feedText(entry) {
       const loser = entry.winner === entry.pet ? entry.other : entry.pet;
       return [entry.winner, " beat ", loser, entry.spoils ? ` and took $${entry.spoils}.` : "."];
     }
+    case "revenge":
+      return [entry.pet, entry.won ? ` won revenge and recovered $${entry.amount} from ` : " failed revenge against ", entry.other, "."];
+    case "stole":
+      return [entry.pet, ` stole $${entry.amount} from `, entry.other, "."];
+    case "fight": {
+      const loser = entry.winner === entry.pet ? entry.other : entry.pet;
+      return [entry.winner, " beat ", loser, entry.spoils ? ` and took $${entry.spoils}.` : "."];
+    }
     case "school": {
       const school = rules.schools.find((s) => s.id === entry.school)?.name ?? entry.school;
       return [entry.pet, ` moved up to ${school.toLowerCase()}.`];
@@ -641,6 +649,10 @@ $("lookup").addEventListener("submit", async (e) => {
 function render(pet) {
   const previous = current;
   current = pet;
+  if (previous?.id !== pet.id) {
+    clearThefts();
+    loadThefts();
+  }
   $("pet-name").textContent = pet.id;
   $("activity").textContent = pet.activity;
   for (const stat of ["strength", "intelligence", "charisma", "money"]) {
@@ -669,6 +681,92 @@ function render(pet) {
   $("dashboard").hidden = false;
   $("signout").hidden = false;
 }
+
+// Saved theft reports are separate from the short public activity feed.
+let theftRequest = 0;
+let revengePending = false;
+function clearThefts() {
+  theftRequest++;
+  $("theft-notifications").hidden = true;
+  $("theft-list").replaceChildren();
+  $("theft-status").textContent = "";
+  $("theft-error").textContent = "";
+  $("theft-retry").hidden = true;
+}
+
+async function loadThefts() {
+  if (!current) return;
+  const owner = current.id;
+  const request = ++theftRequest;
+  try {
+    const res = await fetch("/api/thefts", { cache: "no-store" });
+    if (current?.id !== owner || request !== theftRequest) return;
+    if (res.status === 401) return sessionEnded();
+    if (!res.ok) throw new Error("Could not load thefts");
+    const thefts = await res.json();
+    if (current?.id !== owner || request !== theftRequest) return;
+    $("theft-list").replaceChildren();
+    $("theft-error").textContent = "";
+    $("theft-retry").hidden = true;
+    for (const theft of thefts) {
+      const row = document.createElement("div");
+      row.className = "theft-report";
+      const text = document.createElement("p");
+      text.textContent = `${theft.thief} stole $${theft.amount} from you on ${new Date(theft.stolenAt).toLocaleString()}. Win revenge for $${theft.amount * 2}.`;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "chip-btn chip-fight";
+      button.textContent = `Take revenge on ${theft.thief}`;
+      button.disabled = revengePending;
+      button.addEventListener("click", () => takeRevenge(theft.id, owner));
+      row.append(text, button);
+      $("theft-list").append(row);
+    }
+    $("theft-notifications").hidden = !thefts.length && !$("theft-status").textContent;
+  } catch {
+    if (current?.id !== owner || request !== theftRequest) return;
+    $("theft-notifications").hidden = false;
+    $("theft-error").textContent = "Couldn't load theft notifications. Try again.";
+    $("theft-retry").hidden = false;
+  }
+}
+
+async function takeRevenge(id, owner) {
+  if (revengePending || current?.id !== owner) return;
+  revengePending = true;
+  $("theft-list").setAttribute("aria-busy", "true");
+  for (const button of $("theft-list").querySelectorAll("button")) button.disabled = true;
+  $("theft-error").textContent = "";
+  $("theft-status").textContent = "Taking revenge…";
+  try {
+    const res = await fetch(`/api/pets/${encodeURIComponent(owner)}/revenge/${id}`, { method: "POST" });
+    if (current?.id !== owner) return;
+    if (res.status === 401) return sessionEnded();
+    if (res.status === 403) return sessionChanged();
+    const body = await res.json();
+    if (current?.id !== owner) return;
+    if (!res.ok) {
+      $("theft-status").textContent = "";
+      $("theft-error").textContent = body.error ?? "Couldn't take revenge. Try again.";
+      return;
+    }
+    $("theft-status").textContent = body.won
+      ? `Revenge succeeded! You recovered $${body.reward} and gained +1 Strength, Intelligence and Charisma.`
+      : "Revenge failed. No extra money was lost. This theft's revenge attempt is used.";
+    await loadThefts();
+  } catch {
+    if (current?.id === owner) {
+      $("theft-status").textContent = "";
+      $("theft-error").textContent = "Couldn't confirm revenge. Reload notifications before retrying.";
+      $("theft-retry").hidden = false;
+    }
+  } finally {
+    revengePending = false;
+    $("theft-list").setAttribute("aria-busy", "false");
+    for (const button of $("theft-list").querySelectorAll("button")) button.disabled = false;
+  }
+}
+$("theft-retry").addEventListener("click", loadThefts);
 
 // Accounts --------------------------------------------------------------------
 
@@ -699,6 +797,7 @@ $("tab-signup").addEventListener("click", () => setAuthMode("signup"));
 
 // Back to the sign-in form, e.g. after signing out or when a session ends.
 function showSignIn(message = "") {
+  clearThefts();
   $("notice").textContent = "";
   hideAttacked();
   current = null;
@@ -776,6 +875,7 @@ function connect() {
     $("live").textContent = "Live";
     $("live").dataset.state = "live";
     if (!current) return;
+    loadThefts();
     const { id } = current;
     const seen = broadcasts;
     try {
@@ -807,6 +907,11 @@ function connect() {
     } else if (event.type === "feed:added" && current && rules) {
       feed.set(event.entry.id, event.entry);
       renderFeed();
+      if (event.entry.kind === "revenge" && event.entry.pet === current.id) loadThefts();
+      if (event.entry.kind === "stole" && event.entry.other === current.id) {
+        loadThefts();
+        $("notice").textContent = `${event.entry.pet} stole $${event.entry.amount} from your pet. Your pet is protected from theft until midnight UTC.`;
+      }
     }
   });
   ws.addEventListener("close", () => {

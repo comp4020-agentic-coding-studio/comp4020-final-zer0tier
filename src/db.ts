@@ -16,6 +16,7 @@ db.exec(`
     intelligence INTEGER NOT NULL DEFAULT 5,
     charisma     INTEGER NOT NULL DEFAULT 5,
     money        INTEGER NOT NULL DEFAULT 0,
+    steal_available_at INTEGER,
     activity     TEXT    NOT NULL DEFAULT 'idle',
     school       TEXT    NOT NULL DEFAULT 'primary',
     credits      INTEGER NOT NULL DEFAULT 0,
@@ -54,6 +55,16 @@ db.exec(`
     detail TEXT    NOT NULL DEFAULT '{}',
     at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
+  CREATE TABLE IF NOT EXISTS thefts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    thief TEXT NOT NULL REFERENCES pets (id),
+    victim TEXT NOT NULL REFERENCES pets (id),
+    amount INTEGER NOT NULL,
+    stolen_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    result TEXT CHECK (result IN ('won', 'lost')),
+    resolved_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS thefts_by_victim ON thefts (victim, id);
   CREATE TABLE IF NOT EXISTS accounts (
     id            TEXT PRIMARY KEY REFERENCES pets (id),
     password_hash TEXT NOT NULL,
@@ -93,3 +104,5 @@ const fightColumns = new Set(
   (db.prepare("SELECT name FROM pragma_table_info('fights')").all() as { name: string }[]).map((c) => c.name),
 );
 if (!fightColumns.has("spoils")) db.exec("ALTER TABLE fights ADD COLUMN spoils INTEGER NOT NULL DEFAULT 0");
+
+if (!columns.has("steal_available_at")) db.exec("ALTER TABLE pets ADD COLUMN steal_available_at INTEGER");

@@ -537,3 +537,10 @@ a[href], summary { cursor: var(--cursor-pointer); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+.theft-notifications { margin-bottom: 1rem; }
+.theft-notifications[hidden] { display: none; }
+.theft-report { padding-block: 0.75rem; border-top: 1px solid var(--muted); overflow-wrap: anywhere; }
+.theft-report p { margin: 0 0 0.5rem; }
+.theft-report button, #theft-retry { min-height: 44px; white-space: normal; }
+#theft-status:empty, #theft-error:empty { display: none; }
