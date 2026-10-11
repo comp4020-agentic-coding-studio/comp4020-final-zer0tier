@@ -27,6 +27,40 @@
       <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></symbol>
       <symbol id="i-swords" viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M9.5 6.5 14 2h3v3l-4.5 4.5M5 14l-2 2 3 3 2-2M7 17l-3 3" /></symbol>
       <symbol id="i-school" viewBox="0 0 24 24"><path d="M22 9 12 4 2 9l10 5 10-5ZM6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5M22 9v6" /></symbol>
+      <symbol id="pet-face" viewBox="0 0 120 110">
+        <ellipse class="pet-belly" cx="60" cy="76" rx="24" ry="17" />
+        <ellipse class="pet-eye-white" cx="45" cy="53" rx="8" ry="10" /><ellipse class="pet-eye-white" cx="75" cy="53" rx="8" ry="10" />
+        <circle class="pet-eye" cx="46" cy="54" r="4" /><circle class="pet-eye" cx="74" cy="54" r="4" />
+        <path class="pet-mouth" d="M53 72q7 6 14 0" />
+      </symbol>
+      <symbol id="pet-blob" viewBox="0 0 120 110">
+        <path class="pet-shape" d="M20 62C20 39 35 20 56 24c22-12 43 5 43 28 0 13 12 23 4 35-7 12-26 7-43 10C26 102 9 88 20 62Z" />
+        <use href="#pet-face" />
+      </symbol>
+      <symbol id="pet-cat" viewBox="0 0 120 110">
+        <path class="pet-shape" d="M23 49 23 13 46 30Q60 25 74 30L97 13 97 49C112 80 93 98 60 98S8 80 23 49Z" />
+        <use href="#pet-face" />
+        <path class="pet-mouth" d="m26 63-16-3m16 11-16 3m84-11 16-3m-16 11 16 3M56 64l4 4 4-4" />
+      </symbol>
+      <symbol id="pet-dog" viewBox="0 0 120 110">
+        <ellipse class="pet-shape" cx="60" cy="62" rx="38" ry="36" />
+        <path class="pet-shape pet-shade" d="M30 29C12 24 6 49 12 69q6 11 15-1L39 36Zm60 0c18-5 24 20 18 40q-6 11-15-1L81 36Z" />
+        <use href="#pet-face" />
+        <ellipse class="pet-eye" cx="60" cy="67" rx="7" ry="4" />
+      </symbol>
+      <symbol id="pet-bird" viewBox="0 0 120 110">
+        <path class="pet-mouth" d="m47 92-4 11m30-11 4 11" />
+        <path class="pet-shape" d="M60 24 51 12 68 17 74 26C95 33 103 61 94 83q-34 28-68 0C17 61 25 30 60 24Z" />
+        <path class="pet-shape pet-shade" d="M29 47Q9 54 13 81q15-1 23-14m55-20q20 7 16 34-15-1-23-14" />
+        <use href="#pet-face" />
+        <path class="pet-beak" d="m51 64 9 10 9-10-9-4Z" />
+      </symbol>
+      <symbol id="pet-dragon" viewBox="0 0 120 110">
+        <path class="pet-shape pet-shade" d="M33 48 5 31 9 74 28 65m59-17 28-17-4 43-19-9" />
+        <path class="pet-shape" d="m31 38-4-25 22 18q11-6 22 0l22-18-4 25c22 27 16 60-29 60S9 65 31 38Z" />
+        <use href="#pet-face" />
+        <path class="pet-belly" d="m52 79 5 8 3-8m2 0 5 8 3-8" />
+      </symbol>
     </svg>
 
     <header class="topbar">
@@ -77,22 +111,7 @@
 
       <section id="dashboard" class="card dashboard" hidden aria-labelledby="pet-heading">
         <div class="pet-hero">
-          <svg class="pet" viewBox="0 0 120 110" aria-hidden="true">
-            <ellipse class="pet-shadow" cx="60" cy="102" rx="34" ry="6" />
-            <g class="pet-body">
-              <circle class="ear" cx="30" cy="30" r="14" />
-              <circle class="ear" cx="90" cy="30" r="14" />
-              <ellipse class="body" cx="60" cy="62" rx="42" ry="38" />
-              <ellipse class="belly" cx="60" cy="74" rx="22" ry="17" />
-              <circle class="eye" cx="45" cy="55" r="5" />
-              <circle class="eye" cx="75" cy="55" r="5" />
-              <circle class="shine" cx="46.5" cy="53" r="1.6" />
-              <circle class="shine" cx="76.5" cy="53" r="1.6" />
-              <ellipse class="cheek" cx="35" cy="66" rx="6" ry="3.5" />
-              <ellipse class="cheek" cx="85" cy="66" rx="6" ry="3.5" />
-              <path class="mouth" d="M53 66q7 6 14 0" />
-            </g>
-          </svg>
+          <svg id="pet-avatar" class="pet" viewBox="0 0 120 110" role="img"></svg>
           <div>
             <h2 id="pet-heading"><span id="pet-name"></span>'s pet</h2>
             <p class="activity">Currently <small id="activity"></small></p>
@@ -114,6 +133,17 @@
             </div>
           </div>
         </div>
+
+        <form id="appearance-settings" class="appearance-settings" aria-labelledby="appearance-heading">
+          <h3 id="appearance-heading" class="section-label">Pet appearance</h3>
+          <div class="appearance-fields">
+            <label for="pet-color">Color <input id="pet-color" name="color" type="color" value="#f59e0b" /></label>
+            <label for="pet-appearance">Shape <select id="pet-appearance" name="appearance"></select></label>
+            <button id="appearance-save" class="chip-btn chip-buy" type="submit">Save appearance</button>
+          </div>
+          <p id="appearance-status" class="help" role="status"></p>
+          <p id="appearance-error" class="error" role="alert"></p>
+        </form>
 
         <div id="busy" class="busy" hidden>
           <svg class="icon busy-icon" aria-hidden="true"><use href="#i-clock" /></svg>
@@ -199,7 +229,22 @@
                 <button type="submit" class="chip-btn chip-buy">Look up</button>
               </div>
             </form>
-            <ul id="rivals" class="rivals" aria-label="Pets you can fight"></ul>
+            <p id="visit-rules" class="hint"></p>
+            <section id="visit" class="visit" aria-labelledby="visit-heading" hidden>
+              <div class="visit-head">
+                <h4 id="visit-heading" tabindex="-1"></h4>
+                <button type="button" id="visit-close" class="chip-btn chip-buy">Leave visit</button>
+              </div>
+              <div class="visit-pet">
+                <svg id="visit-avatar" class="pet" viewBox="0 0 120 110"></svg>
+                <div><p id="visit-activity"></p><p id="visit-money" class="visit-money"></p></div>
+              </div>
+              <p id="steal-hint" class="hint"></p>
+              <button type="button" id="steal" class="chip-btn chip-buy" aria-describedby="steal-hint"></button>
+              <p id="steal-news" class="hint" role="status"></p>
+              <p id="steal-error" class="error" role="alert"></p>
+            </section>
+            <ul id="rivals" class="rivals" aria-label="Pets you can visit or fight"></ul>
           </div>
           <div id="arena-board" role="tabpanel" aria-labelledby="tab-board" hidden>
             <div class="board-sort" role="group" aria-label="Rank by">

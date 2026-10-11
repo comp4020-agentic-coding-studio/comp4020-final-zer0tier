@@ -1,7 +1,7 @@
 # VirtuePets
 
 A multiplayer virtual pet game inspired by QQ Pets. Create an account to claim
-a pet, train it, send it to work, fight other players' pets, and watch every
+a pet, train it, send it to work, fight or visit other players' pets, and watch every
 change land live in every open window.
 
 ## What good means
@@ -15,7 +15,7 @@ the point of the game rather than boxes to tick:
 
 - **Other people are really there (multi-user).** Each player has their own
   account and exactly one pet. Anyone can look at any pet in the Arena, but only
-  its owner can act for it, so a stranger can't train, spend or fight with
+  its owner can act for it, so a stranger can't train, shop or fight with
   yours. A player who joins while you're playing appears in your Arena straight
   away. *Enforced:* `spec/pets.test.ts` (one pet per ID, owner-only actions,
   401/403), `spec/fight.test.ts` (new pets listed after the bot).
@@ -93,9 +93,22 @@ requires a fresh login, including opening it in another tab (tabs share a
 session). Your pet and progress are saved. After 5 wrong passwords for an ID, sign-ins to
 it from that address wait 15 minutes.
 
-Anyone can look at any pet, but only its owner can study, work, shop or fight
+Anyone can look at any pet, but only its owner can study, work, shop, steal or fight
 with it. The bot's ID, `0`, can't be signed up or signed into. A pet from before
 accounts existed is claimed by the first person to sign up with its ID.
+
+### Pet appearance
+
+Use **Pet appearance** below your pet's header to choose a color and a shape:
+**cat, dog, bird, dragon or blob**, then press **Save appearance**. New and
+existing pets start as an amber (`#f59e0b`) blob until customized. Changing
+appearance is free and works while studying or working. Only the owner can
+change it, and it stays saved when you sign out or the server restarts.
+
+The saved color and shape appear in the dashboard header, Arena pets,
+leaderboard and **Happening now** feed, including older feed entries. Every open
+window updates from the server's broadcast; picking or saving a setting never
+previews an unsaved change on the pet.
 
 ### School
 
@@ -236,6 +249,23 @@ accepts only a theft against your own pet. Completed attempts cannot pay out twi
 Signing out clears pending revenge controls; late responses from an earlier
 login cannot change the new login’s notifications or buttons.
 
+### Visit and steal
+
+Press **Visit** beside a pet in the Arena (or look it up by player ID) to see
+its appearance, activity and balance. **Steal $10–$30** takes a random whole
+dollar amount from that pet and adds it to yours. The amount never exceeds
+its balance; a pet with less than $10 cannot be robbed. Visiting and stealing
+are instant, cost no stamina or hygiene, and work while either pet is busy.
+You cannot steal from yourself or the bot.
+
+**Each pet can be robbed once per UTC calendar day, across all players.**
+After a successful theft, everyone must wait until midnight UTC to rob that
+pet again. The visit shows when its protection ends in your local time.
+You can still steal from other eligible pets. Failed attempts do not use up
+the target's daily protection, and protection survives signing out and server
+restarts. Both balances update live; the owner gets a notification and the
+theft appears in **Happening now**.
+
 ### Leaderboard
 
 The Arena's **Leaderboard** tab ranks the top 10 players by **most wins** (fewer
@@ -246,7 +276,7 @@ your own pet is highlighted when it makes the board.
 ### Happening now
 
 Below your fights, the Arena shows the 15 newest things that happened anywhere
-in the game, live: a player joining, every fight (who won, and any money
+in the game, live: a player joining, every theft, every fight (who won, and any money
 taken), a pet moving up a school, and a pet being promoted at work. Ordinary
 lessons and shifts stay out of it, so it isn't flooded. Entries about your pet
 are highlighted.
@@ -281,7 +311,20 @@ the built-in `node:sqlite` for storage.
   in an HttpOnly cookie, stored only as a hash.
 - **Actions** (owner only): `POST /api/pets/:id/study/:course`,
   `work/:location` (with `{"minutes": 60}`), `upgrade/:location`, `buy/:item`,
-  `use/:item` and `fight/:opponent`.
+  `use/:item`, `fight/:opponent` and `steal/:opponent`. Stealing returns
+  `{ thief, victim, amount }`; both pets include `stealAvailableAt` (epoch
+  milliseconds, or `null` before any theft). The server locks and checks the
+  target before transferring money, saving protection and recording the feed
+  entry in one transaction. Repeated thefts return 429; insufficient funds
+  return 409; self/bot targets return 400. The daily limit uses real UTC days,
+  independent of `TIME_SCALE`.
+- **Appearance** (owner only): `POST /api/pets/:id/appearance` with both
+  fields, e.g. `{"color":"#12abef","appearance":"dragon"}`. Color must match
+  `/^#[0-9a-f]{6}$/i`; appearance must be `cat`, `dog`, `bird`, `dragon` or
+  `blob`. Invalid fields return 400; invalid player IDs return 404, as on other
+  pet routes. The response and existing `pet:updated` broadcast contain the
+  complete saved pet, including `color` and `appearance`. Clients wait for
+  that broadcast to display a change. Both columns migrate in place on startup.
 - **Reading** (anyone): `GET /api/pets` lists pets, `GET /api/pets/:id` shows
   one, `GET /api/pets/:id/fights` its recent fights, `GET /api/feed` what's
   been happening across the game (newest first), `GET /api/leaderboard?by=wins`

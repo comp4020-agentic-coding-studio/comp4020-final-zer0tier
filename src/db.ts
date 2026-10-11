@@ -28,6 +28,8 @@ db.exec(`
     construction_rank INTEGER NOT NULL DEFAULT 0,
     office_rank       INTEGER NOT NULL DEFAULT 0,
     theatre_rank      INTEGER NOT NULL DEFAULT 0,
+    color        TEXT    NOT NULL DEFAULT '#f59e0b',
+    appearance   TEXT    NOT NULL DEFAULT 'blob',
     task         TEXT,
     busy_since   INTEGER,
     busy_until   INTEGER,
@@ -100,12 +102,13 @@ if (!columns.has("reward")) db.exec("ALTER TABLE pets ADD COLUMN reward TEXT");
 if (!columns.has("wins")) db.exec("ALTER TABLE pets ADD COLUMN wins INTEGER NOT NULL DEFAULT 0");
 if (!columns.has("losses")) db.exec("ALTER TABLE pets ADD COLUMN losses INTEGER NOT NULL DEFAULT 0");
 if (!columns.has("theatre_rank")) db.exec("ALTER TABLE pets ADD COLUMN theatre_rank INTEGER NOT NULL DEFAULT 0");
+if (!columns.has("color")) db.exec("ALTER TABLE pets ADD COLUMN color TEXT NOT NULL DEFAULT '#f59e0b'");
+if (!columns.has("appearance")) db.exec("ALTER TABLE pets ADD COLUMN appearance TEXT NOT NULL DEFAULT 'blob'");
+if (!columns.has("steal_available_at")) db.exec("ALTER TABLE pets ADD COLUMN steal_available_at INTEGER");
 const fightColumns = new Set(
   (db.prepare("SELECT name FROM pragma_table_info('fights')").all() as { name: string }[]).map((c) => c.name),
 );
 if (!fightColumns.has("spoils")) db.exec("ALTER TABLE fights ADD COLUMN spoils INTEGER NOT NULL DEFAULT 0");
-
-if (!columns.has("steal_available_at")) db.exec("ALTER TABLE pets ADD COLUMN steal_available_at INTEGER");
 
 // Older fights remain readable without a battle replay.
 if (!fightColumns.has("battle_json")) db.exec("ALTER TABLE fights ADD COLUMN battle_json TEXT");

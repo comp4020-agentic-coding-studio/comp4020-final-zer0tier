@@ -5,6 +5,55 @@ let rules = null; // schools, courses, items and costs, as the server publishes 
 const busy = new Set(); // buttons whose request is still in flight
 const LABELS = { strength: "Strength", intelligence: "Intelligence", charisma: "Charisma", stamina: "stamina", hygiene: "hygiene" };
 const VERBS = { food: "Feed", soap: "Clean", hourglass: "Skip" };
+// Keep this literal list identical to src/pets.ts: this unbundled browser
+// cannot import the server module (which opens SQLite).
+const APPEARANCES = ["cat", "dog", "bird", "dragon", "blob"];
+const SVG_NS = "http://www.w3.org/2000/svg";
+let pendingAppearance = null;
+
+// One renderer for the dashboard, rivals, leaderboard and feed. Only saved
+// pet rows reach here; form drafts never change an avatar.
+function renderPetAvatar(svg, pet) {
+  const appearance = APPEARANCES.includes(pet.appearance) ? pet.appearance : "blob";
+  const color = /^#[0-9a-f]{6}$/i.test(pet.color) ? pet.color : "#f59e0b";
+  svg.setAttribute("viewBox", "0 0 120 110");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `${pet.id}'s ${appearance}, color ${color}`);
+  svg.dataset.appearance = appearance;
+  svg.style.setProperty("--pet-color", color);
+  svg.innerHTML = '<ellipse class="pet-shadow" cx="60" cy="102" rx="34" ry="6" /><g class="pet-body"><use /></g>';
+  svg.querySelector("use").setAttribute("href", `#pet-${appearance}`);
+}
+
+function petAvatar(pet, inline = false) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", `pet pet-small${inline ? " pet-inline" : ""}`);
+  renderPetAvatar(svg, pet);
+  return svg;
+}
+
+for (const appearance of APPEARANCES) {
+  const option = document.createElement("option");
+  option.value = appearance;
+  option.textContent = appearance[0].toUpperCase() + appearance.slice(1);
+  $("pet-appearance").append(option);
+}
+
+$("appearance-settings").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!current || busy.has($("appearance-save"))) return;
+  const change = { color: $("pet-color").value, appearance: $("pet-appearance").value };
+  const pending = { id: current.id, ...change };
+  pendingAppearance = pending;
+  $("appearance-status").textContent = "Saving…";
+  const saved = await perform($("appearance-save"), "appearance", "appearance-error", change);
+  if (pendingAppearance !== pending) return; // already broadcast, or signed out
+  if (saved) $("appearance-status").textContent = "Waiting for live update…";
+  else {
+    pendingAppearance = null;
+    $("appearance-status").textContent = "";
+  }
+});
 const effectText = (item) =>
   item.effect === "skip" ? "Finishes a lesson or shift now" : `+${item.amount} ${LABELS[item.restores]}`;
 // Whether using the item right now would do anything.
@@ -85,6 +134,8 @@ loadRules().then((loaded) => {
   $("skip").addEventListener("click", () => perform($("skip"), "use/hourglass", "care-error"));
   $("fight-cost").textContent =
     `${costText(rules.fight.cost)} · winner takes ${rules.fight.spoils.share * 100}% of the loser's money`;
+  $("visit-rules").textContent =
+    `Visit a pet to steal $${rules.steal.min}–$${rules.steal.max}. Each pet can be robbed once per day across all players; resets at midnight ${rules.steal.resetTimezone}.`;
   for (const minutes of rules.work.shiftMinutes) {
     const input = document.createElement("input");
     input.type = "radio";
@@ -157,12 +208,13 @@ async function perform(button, path, errorId, body) {
       const body = await res.json().catch(() => ({}));
       $(errorId).textContent = body.error ?? `Something went wrong (server error ${res.status}). Try again.`;
     }
+    return res.ok;
   } catch {
     $(errorId).textContent = "Couldn't reach the server, so nothing happened. Try again.";
   } finally {
     busy.delete(button);
-    if (current && rules) {
-      renderBusy(current);
+    if (current) {
+      if (rules) renderBusy(current);
       renderControls(current);
     }
   }
@@ -237,9 +289,11 @@ function renderBusyClock(pet) {
 // The clock ticks locally; the finish itself arrives as a broadcast.
 setInterval(() => {
   if (rules && current?.busyUntil) renderBusyClock(current);
+  if (rules && current && visiting) renderStealControls();
 }, 1000);
 
 function renderControls(pet) {
+  $("appearance-save").disabled = busy.has($("appearance-save"));
   if (!rules) return;
   const occupied = pet.activity === "idle" ? "" : `${busyText(pet)}. Wait until it's done.`;
   const studyBlock = occupied || blocker(pet, rules.study.needs, "study");
@@ -297,11 +351,17 @@ let rivals = new Map(); // pets shown in the arena, by ID
 const arrival = new Map(); // when this page first saw each pet, newest highest
 let arrivals = 0;
 let pinned = null; // the pet the player looked up, shown first
+let visiting = null; // the opponent whose pet is open in the visit panel
+let visitLoads = 0;
+let visitLoading = false;
+let visitReady = false;
+let stealing = false;
 let fighting = false; // a fight request is in flight
 let arenaBlock = ""; // why this pet can't fight right now, or ""
 let avenging = null; // the pet that last attacked this one, for the Revenge button
 const fightLog = [];
 let feed = new Map(); // "Happening now" entries, by ID
+let feedPets = new Map(); // only pets mentioned in the visible feed; null while loading
 
 const powerOf = (pet) =>
   Object.entries(rules.fight.powerWeights).reduce((sum, [attribute, weight]) => sum + weight * pet[attribute], 0);
@@ -309,6 +369,8 @@ const powerOf = (pet) =>
 async function loadArena() {
   if (!current || !rules) return;
   const { id } = current;
+  const previousRivals = new Map(rivals);
+  feedPets = new Map(); // reconnects must refresh older pets outside the arena list
   try {
     const [list, fights, news] = await Promise.all([
       fetch("/api/pets?limit=20").then((res) => res.json()),
@@ -317,12 +379,18 @@ async function loadArena() {
     ]);
     if (current?.id !== id) return; // switched pets meanwhile
     const pin = pinned && rivals.get(pinned);
+    const updated = [...rivals.values()].filter((pet) => previousRivals.get(pet.id) !== pet);
     rivals = new Map(list.filter((pet) => pet.id !== id).map((pet) => [pet.id, pet]));
     // The server lists newest first, so the first pet arrived last.
     arrival.clear();
     list.forEach((pet, i) => arrival.set(pet.id, -i));
-    if (pin) rivals.set(pin.id, pin);
+    if (pin && !rivals.has(pin.id)) rivals.set(pin.id, pin);
+    // Broadcasts are newer than the request, including newly joined players.
+    for (const pet of updated) rivals.set(pet.id, pet);
+    for (const pet of rivals.values()) if (!arrival.has(pet.id)) arrival.set(pet.id, ++arrivals);
+    trimRivals();
     renderRivals();
+    if (visiting) openVisit(visiting, false); // refresh a pinned pet after reconnecting
     fightLog.length = 0;
     fightLog.push(...fights);
     renderFightLog();
@@ -342,11 +410,15 @@ function rivalRow(pet) {
   li.toggleAttribute("data-pinned", pet.id === pinned);
   const school = rules.schools.find((s) => s.id === pet.school)?.name ?? pet.school;
   const doing = pet.activity === "idle" ? "Idle" : pet.activity === "studying" ? "Studying" : "Working";
-  li.innerHTML = `<div><span class="rival-name"></span></div>
+  li.innerHTML = `<div class="rival-identity"><span class="rival-name"></span></div>
     <div class="rival-meta"></div>
     <div class="rival-stats"></div>
-    <button type="button" class="chip-btn fight-btn">Fight</button>`;
+    <div class="rival-actions">
+      <button type="button" class="chip-btn chip-buy visit-btn">Visit</button>
+      <button type="button" class="chip-btn fight-btn">Fight</button>
+    </div>`;
   li.querySelector(".rival-name").textContent = pet.id;
+  li.querySelector(".rival-identity").prepend(petAvatar(pet));
   if (pet.id === rules.botId) li.querySelector(".rival-name").insertAdjacentHTML("afterend", '<span class="tag">bot</span>');
   li.querySelector(".rival-meta").textContent = `${school} · ${doing} · ${pet.wins}W ${pet.losses}L`;
   li.querySelector(".rival-stats").innerHTML =
@@ -355,6 +427,11 @@ function rivalRow(pet) {
   const button = li.querySelector(".fight-btn");
   button.setAttribute("aria-label", `Fight ${pet.id}`);
   button.addEventListener("click", () => startFight(pet.id));
+  const visit = li.querySelector(".visit-btn");
+  visit.dataset.pet = pet.id;
+  visit.setAttribute("aria-label", `Visit ${pet.id}`);
+  visit.setAttribute("aria-controls", "visit");
+  visit.addEventListener("click", () => openVisit(pet.id));
   return li;
 }
 
@@ -373,7 +450,111 @@ function renderRivals() {
   const order = [...rivals.values()].sort((a, b) => rank(b) - rank(a) || arrival.get(b.id) - arrival.get(a.id));
   $("rivals").replaceChildren(...order.map(rivalRow));
   renderFightButtons();
+  renderVisit();
 }
+
+function renderVisit() {
+  const pet = rivals.get(visiting);
+  $("visit").hidden = !pet || !current;
+  if (!pet || !current) return;
+  $("visit-heading").textContent = `Visiting ${pet.id}`;
+  renderPetAvatar($("visit-avatar"), pet);
+  $("visit-activity").textContent = pet.activity === "idle" ? "At home" : busyText(pet);
+  $("visit-money").textContent = `$${pet.money} saved`;
+  renderStealControls();
+}
+
+function renderStealControls() {
+  const pet = rivals.get(visiting);
+  if (!pet || !rules) return;
+  let reason = "";
+  if (visitLoading) reason = "Loading pet…";
+  else if (!visitReady) reason = "Couldn't load this pet. Leave and visit again to retry.";
+  else if (pet.id === rules.botId) reason = "The bot doesn't take part in stealing.";
+  else if (pet.stealAvailableAt > Date.now()) {
+    reason = `Already robbed today. Protected until ${new Date(pet.stealAvailableAt).toLocaleString()} (midnight UTC).`;
+  } else if (pet.money < rules.steal.min) reason = `This pet needs at least $${rules.steal.min} before you can steal.`;
+  $("steal-hint").textContent = reason || "Take some money, then this pet is protected from everyone until midnight UTC.";
+  $("steal").disabled = stealing || Boolean(reason);
+  $("steal").textContent = stealing ? "Stealing…" : `Steal $${rules.steal.min}–$${Math.max(rules.steal.min, Math.min(rules.steal.max, pet.money))}`;
+  $("steal").setAttribute("aria-busy", String(stealing));
+}
+
+async function openVisit(id, focus = true) {
+  if (!current || id === current.id) return;
+  const owner = current.id;
+  const request = ++visitLoads;
+  visiting = pinned = id;
+  visitLoading = true;
+  visitReady = false;
+  $("steal-news").textContent = "";
+  $("steal-error").textContent = "";
+  renderVisit();
+  if (focus) $("visit-heading").focus();
+  const before = rivals.get(id);
+  try {
+    const res = await fetch(`/api/pets/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error("pet unavailable");
+    const pet = await res.json();
+    if (request !== visitLoads || current?.id !== owner) return;
+    // A broadcast received during this fetch already has fresher data.
+    if (rivals.get(id) === before) rivals.set(id, pet);
+    visitReady = true;
+  } catch {
+    if (request === visitLoads && current?.id === owner) {
+      $("steal-error").textContent = "Couldn't load this pet. Leave and visit again to retry.";
+    }
+  } finally {
+    if (request === visitLoads && current?.id === owner) {
+      visitLoading = false;
+      renderVisit();
+    }
+  }
+}
+
+function closeVisit() {
+  visiting = null;
+  visitLoads++;
+  visitReady = false;
+  $("visit").hidden = true;
+  $("steal-news").textContent = "";
+  $("steal-error").textContent = "";
+}
+
+$("visit-close").addEventListener("click", () => {
+  const id = visiting;
+  closeVisit();
+  [...$("rivals").querySelectorAll(".visit-btn")].find((button) => button.dataset.pet === id)?.focus();
+});
+
+$("steal").addEventListener("click", async () => {
+  if (!current || !visiting || $("steal").disabled || stealing) return;
+  const owner = current.id;
+  const target = visiting;
+  const visit = visitLoads;
+  stealing = true;
+  $("steal-error").textContent = "";
+  $("steal-news").textContent = "";
+  renderStealControls();
+  try {
+    const res = await fetch(`/api/pets/${encodeURIComponent(owner)}/steal/${encodeURIComponent(target)}`, { method: "POST" });
+    if (current?.id !== owner) return;
+    if (res.status === 401) return sessionEnded();
+    if (res.status === 403) return sessionChanged();
+    const body = await res.json();
+    if (current?.id !== owner || visit !== visitLoads) return;
+    if (!res.ok) $("steal-error").textContent = body.error ?? "Couldn't steal. Try again.";
+    else $("steal-news").textContent = `You stole $${body.amount} from ${target}!`;
+    // Balances and protection arrive through pet:updated in every window.
+  } catch {
+    if (current?.id === owner && visit === visitLoads) {
+      $("steal-error").textContent = "Couldn't confirm the theft. Check your balance before trying again.";
+    }
+  } finally {
+    stealing = false;
+    renderStealControls();
+  }
+});
 
 function renderFightButtons() {
   for (const button of $("rivals").querySelectorAll(".fight-btn")) button.disabled = fighting || arenaBlock !== "";
@@ -491,10 +672,6 @@ function feedText(entry) {
   switch (entry.kind) {
     case "joined":
       return [entry.pet, " joined the game."];
-    case "fight": {
-      const loser = entry.winner === entry.pet ? entry.other : entry.pet;
-      return [entry.winner, " beat ", loser, entry.spoils ? ` and took $${entry.spoils}.` : "."];
-    }
     case "revenge":
       return [entry.pet, entry.won ? ` won revenge and recovered $${entry.amount} from ` : " failed revenge against ", entry.other, "."];
     case "stole":
@@ -519,6 +696,8 @@ function feedText(entry) {
 function renderFeed() {
   const entries = [...feed.values()].sort((a, b) => b.id - a.id).slice(0, FEED_SIZE);
   feed = new Map(entries.map((entry) => [entry.id, entry]));
+  const ids = new Set(entries.flatMap((entry) => (feedText(entry) ?? []).filter((_, i) => i % 2 === 0)));
+  for (const id of feedPets.keys()) if (!ids.has(id)) feedPets.delete(id);
   $("feed").replaceChildren(
     ...entries.flatMap((entry) => {
       const parts = feedText(entry);
@@ -530,7 +709,13 @@ function renderFeed() {
         if (i % 2) return void text.append(part);
         const b = document.createElement("b");
         b.textContent = part !== current?.id ? part : i === 0 ? "You" : "you";
-        text.append(b);
+        const identity = document.createElement("span");
+        identity.className = "feed-pet";
+        const pet = part === current?.id ? current : rivals.get(part) ?? feedPets.get(part);
+        if (pet) identity.append(petAvatar(pet, true));
+        else loadFeedPet(part);
+        identity.append(b);
+        text.append(identity);
       });
       li.toggleAttribute("data-mine", entry.pet === current?.id || entry.other === current?.id);
       const time = document.createElement("time");
@@ -540,6 +725,25 @@ function renderFeed() {
       return [li];
     }),
   );
+}
+
+// Feed entries store IDs, including older players outside /api/pets' limit.
+// Load those rows once, and let broadcasts win if one arrives during the fetch.
+async function loadFeedPet(id) {
+  if (feedPets.has(id)) return;
+  const cache = feedPets;
+  cache.set(id, null);
+  try {
+    const res = await fetch(`/api/pets/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error(`server error ${res.status}`);
+    const pet = await res.json();
+    if (feedPets !== cache || cache.get(id) !== null) return;
+    cache.set(id, pet);
+    renderFeed();
+  } catch {
+    // Keep the name visible; another feed render or reconnect can retry.
+    if (cache.get(id) === null) cache.delete(id);
+  }
 }
 
 // Leaderboard ---------------------------------------------------------------
@@ -557,12 +761,14 @@ const outranks = (a, b) =>
 
 async function loadBoard() {
   const request = ++boardRequests;
+  const seen = broadcasts;
   clearTimeout(boardTimer);
   try {
     const res = await fetch(`/api/leaderboard?by=${boardBy}`);
     if (!res.ok) throw new Error(`server error ${res.status}`);
     const pets = await res.json();
     if (request !== boardRequests) return; // a newer request (or order) is on its way
+    if (seen !== broadcasts) return reloadBoard(); // keep newer broadcast appearances
     board = pets;
     boardLoaded = true;
     renderBoard();
@@ -577,8 +783,9 @@ function renderBoard() {
       const li = document.createElement("li");
       const mine = pet.id === current?.id;
       li.toggleAttribute("data-mine", mine);
-      li.innerHTML = '<span class="board-name"></span><span class="board-score"><b></b> <span></span></span>';
+      li.innerHTML = '<span class="board-identity"><span class="board-name"></span></span><span class="board-score"><b></b> <span></span></span>';
       li.querySelector(".board-name").textContent = mine ? `${pet.id} (you)` : pet.id;
+      li.querySelector(".board-identity").prepend(petAvatar(pet));
       const [headline, rest] =
         boardBy === "wins"
           ? [`${pet.wins} ${pet.wins === 1 ? "win" : "wins"}`, `· ${pet.losses}L · power ${powerOf(pet)}`]
@@ -671,6 +878,7 @@ $("lookup").addEventListener("submit", async (e) => {
     if (!arrival.has(pet.id)) arrival.set(pet.id, ++arrivals);
     rivals.set(pet.id, pet);
     renderRivals();
+    openVisit(pet.id);
   } catch {
     $("arena-error").textContent = "Couldn't reach the server. Try again.";
   }
@@ -682,6 +890,21 @@ function render(pet) {
   if (previous?.id !== pet.id) {
     clearThefts();
     loadThefts();
+  }
+  renderPetAvatar($("pet-avatar"), pet);
+  const confirmed = pendingAppearance?.id === pet.id && pendingAppearance.appearance === pet.appearance &&
+    pendingAppearance.color.toLowerCase() === pet.color.toLowerCase();
+  if (previous?.id !== pet.id || previous.color !== pet.color || previous.appearance !== pet.appearance || confirmed) {
+    $("pet-color").value = pet.color;
+    $("pet-appearance").value = pet.appearance;
+  }
+  if (previous?.id !== pet.id) {
+    pendingAppearance = null;
+    $("appearance-status").textContent = "";
+    $("appearance-error").textContent = "";
+  } else if (confirmed) {
+    pendingAppearance = null;
+    $("appearance-status").textContent = "Appearance saved.";
   }
   $("pet-name").textContent = pet.id;
   $("activity").textContent = pet.activity;
@@ -701,6 +924,7 @@ function render(pet) {
     renderSchool(pet, previous);
     renderControls(pet);
     if (previous?.id !== pet.id) {
+      closeVisit();
       pinned = null;
       $("fight-news").textContent = "";
       hideAttacked();
@@ -844,7 +1068,10 @@ function showSignIn(message = "") {
   clearThefts();
   $("notice").textContent = "";
   hideAttacked();
+  closeVisit();
   current = null;
+  pendingAppearance = null;
+  feedPets = new Map();
   rivals = new Map();
   pinned = null;
   $("dashboard").hidden = true;
@@ -935,9 +1162,12 @@ function connect() {
   });
   ws.addEventListener("message", (msg) => {
     const event = JSON.parse(msg.data);
+    if (event.type === "pet:updated") {
+      broadcasts++;
+      if (feedPets.has(event.pet.id)) feedPets.set(event.pet.id, event.pet);
+    }
     if (event.type === "pet:updated" && rules) boardSaw(event.pet);
     if (event.type === "pet:updated" && event.pet.id === current?.id) {
-      broadcasts++;
       render(event.pet);
     } else if (event.type === "pet:updated" && current && rules) {
       // Known rivals update in place; a pet we haven't seen (a new player)
@@ -957,6 +1187,7 @@ function connect() {
         $("notice").textContent = `${event.entry.pet} stole $${event.entry.amount} from your pet. Your pet is protected from theft until midnight UTC.`;
       }
     }
+    if (event.type === "pet:updated" && current && rules) renderFeed();
   });
   ws.addEventListener("close", () => {
     $("live").textContent = "Reconnecting…";

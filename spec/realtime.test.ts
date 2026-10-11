@@ -27,15 +27,24 @@ function nextUpdate(ws: WebSocket, id: string, matches: (pet: any) => boolean = 
   });
 }
 
-it("pet:updated — starting Study Math reaches every open window within 1s", async () => {
+it("pet:updated — changing appearance/color and starting Study Math reach every open window within 1s", async () => {
   const id = freshId();
   await signUp(id);
   const windows = [await open(), await open()];
   try {
+    const appearance = { color: "#12abEF", appearance: "dragon" };
+    const changed = windows.map((ws) => nextUpdate(ws, id, (pet) => pet.appearance === "dragon"));
+    const res = await post(`/api/pets/${id}/appearance`, appearance);
+    expect(res.status).toBe(200);
+    const saved = await res.json();
+    for (const event of await Promise.all(changed)) {
+      expect(event.pet).toEqual(saved);
+      expect(event.pet).toMatchObject({ id, ...appearance });
+    }
     const updates = windows.map((ws) => nextUpdate(ws, id));
     expect((await post(`/api/pets/${id}/study/math`)).status).toBe(200);
     for (const event of await Promise.all(updates)) {
-      expect(event.pet).toMatchObject({ id, activity: "studying", task: "Math" });
+      expect(event.pet).toMatchObject({ id, activity: "studying", task: "Math", ...appearance });
     }
   } finally {
     for (const ws of windows) ws.close();
@@ -244,6 +253,42 @@ function nextFeed(ws: WebSocket, matches: (entry: any) => boolean): Promise<any>
     });
   });
 }
+
+it("stealing updates both balances and daily protection in every window before announcing the theft", async () => {
+  const thief = freshId();
+  const victim = freshId();
+  await signUp(thief);
+  await signUp(victim);
+  const before = await workHour(victim);
+  const windows = [await open(), await open()];
+  try {
+    const orders: string[][] = windows.map(() => []);
+    windows.forEach((ws, i) => ws.addEventListener("message", (msg) => {
+      const event = JSON.parse(String(msg.data));
+      if (event.type === "pet:updated") orders[i].push(event.pet.id);
+      if (event.type === "feed:added" && event.entry.kind === "stole") orders[i].push("theft");
+    }));
+    const updates = windows.map((ws) => Promise.all([
+      nextUpdate(ws, thief), nextUpdate(ws, victim), nextFeed(ws, (entry) => entry.kind === "stole" && entry.pet === thief),
+    ]));
+    const res = await post(`/api/pets/${thief}/steal/${victim}`);
+    expect(res.status).toBe(200);
+    const result = await res.json();
+    for (const [a, b, news] of await Promise.all(updates)) {
+      expect(a.pet).toEqual(result.thief);
+      expect(b.pet).toEqual(result.victim);
+      expect(a.pet.money + b.pet.money).toBe(before.money);
+      expect(b.pet.stealAvailableAt).toBeGreaterThan(Date.now());
+      expect(news.entry).toMatchObject({ pet: thief, other: victim, amount: result.amount });
+    }
+    for (const order of orders) {
+      expect(order.indexOf(thief)).toBeLessThan(order.indexOf("theft"));
+      expect(order.indexOf(victim)).toBeLessThan(order.indexOf("theft"));
+    }
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});
 
 it("feed:added — a player joining reaches every open window within 1s", async () => {
   const id = freshId();

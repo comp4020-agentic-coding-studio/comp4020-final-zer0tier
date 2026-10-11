@@ -150,7 +150,7 @@ main { flex: 1; width: 100%; max-width: 40rem; margin: 0 auto; padding: 1.5rem 1
 .auth-tabs button[aria-selected="true"], .tabs button[aria-selected="true"] { color: var(--fg); background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
 .lede { margin: 0 0 1rem; color: var(--muted); }
 label { font-weight: 700; }
-input {
+input, select {
   font: inherit;
   min-height: 48px;
   padding: 0.5rem 1rem;
@@ -160,8 +160,8 @@ input {
   border-radius: var(--radius-sm);
   transition: border-color 150ms var(--ease);
 }
-input:hover { border-color: var(--pet); }
-input:focus-visible { outline-offset: 1px; border-color: var(--ring); }
+input:hover, select:hover { border-color: var(--pet); }
+input:focus-visible, select:focus-visible { outline-offset: 1px; border-color: var(--ring); }
 .help { margin: 0; color: var(--muted); font-size: 0.875rem; }
 .error { margin: 0; color: var(--error); font-weight: 600; }
 .error:empty { display: none; }
@@ -194,16 +194,26 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 
 /* Dashboard */
 .pet-hero { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.5rem; }
-.pet { width: clamp(88px, 25vw, 120px); flex: none; }
+.pet { width: clamp(88px, 25vw, 120px); flex: none; color: var(--pet-color, #f59e0b); }
 .pet-hero > div { flex: 1; min-width: 0; }
-.pet-body { animation: bob 3s ease-in-out infinite; transform-origin: 60px 100px; }
-.pet .body, .pet .ear { fill: var(--pet); }
-.pet .belly { fill: var(--pet-belly); }
-.pet .eye { fill: var(--pet-ink); }
-.pet .shine { fill: #fff; }
-.pet .cheek { fill: #f472b6; opacity: 0.55; }
-.pet .mouth { fill: none; stroke: var(--pet-ink); stroke-width: 3; stroke-linecap: round; }
+.pet-hero .pet-body { animation: bob 3s ease-in-out infinite; transform-origin: 60px 100px; }
+.pet-shape { fill: currentColor; stroke: var(--pet-ink); stroke-width: 2; stroke-linejoin: round; }
+.pet-shade { fill: color-mix(in srgb, currentColor 75%, var(--pet-ink)); }
+.pet-belly { fill: #ffedd5; }
+.pet-eye-white { fill: #fff; }
+.pet-eye { fill: var(--pet-ink); }
+.pet-mouth { fill: none; stroke: var(--pet-ink); stroke-width: 3; stroke-linecap: round; }
+.pet-beak { fill: #fbbf24; stroke: var(--pet-ink); stroke-width: 2; }
 .pet-shadow { fill: var(--fg); opacity: 0.08; }
+.pet-small { width: 2rem; height: 2rem; vertical-align: middle; }
+.pet-inline { width: 1.5rem; height: 1.5rem; margin-right: 0.15rem; }
+.appearance-settings { margin-bottom: 1.5rem; padding: 0.75rem 1rem; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); }
+.appearance-settings h3 { margin: 0 0 0.5rem; }
+.appearance-fields { display: flex; align-items: end; flex-wrap: wrap; gap: 0.75rem; }
+.appearance-fields label { display: grid; gap: 0.25rem; font-size: 0.875rem; }
+.appearance-fields input, .appearance-fields select { min-height: 44px; background: var(--surface); }
+.appearance-fields input[type="color"] { width: 3.5rem; padding: 0.25rem; cursor: var(--cursor-pointer); }
+.appearance-settings .help:not(:empty), .appearance-settings .error:not(:empty) { margin-top: 0.5rem; }
 .activity { margin: 0.25rem 0 0; color: var(--muted); }
 #activity {
   display: inline-block;
@@ -451,12 +461,23 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 }
 .rival[data-pinned] { border-color: var(--pet); }
 .rival-name { font-weight: 700; overflow-wrap: anywhere; }
+.rival-identity { display: flex; align-items: center; gap: 0.4rem; }
 .tag { display: inline-block; margin-left: 0.35rem; padding: 0 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: var(--bg-glow); color: var(--muted); vertical-align: 0.1em; }
 .rival-meta, .rival-stats { font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rival-stats b { color: var(--fg); }
 .rival > div { grid-column: 1; min-width: 0; }
-.rival .fight-btn { grid-column: 2; grid-row: 1 / span 3; align-self: center; min-width: 5.5rem; color: var(--on-primary); background: var(--primary); border: 0; box-shadow: var(--shadow-inset); }
+.rival > .rival-actions { grid-column: 2; grid-row: 1 / span 3; display: grid; gap: 0.4rem; min-width: 5.5rem; }
+.rival .fight-btn { color: var(--on-primary); background: var(--primary); border: 0; box-shadow: var(--shadow-inset); }
 .rival .fight-btn:hover:not(:disabled) { background: var(--primary-hover); }
+.visit { margin-top: 1rem; padding: 1rem; border: 2px solid var(--pet); border-radius: var(--radius-sm); background: var(--surface); }
+.visit-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.visit-head h4 { margin: 0; overflow-wrap: anywhere; min-width: 0; flex: 1 1 12rem; }
+.visit-head .chip-btn { padding-inline: 0.75rem; }
+.visit-pet { display: flex; align-items: center; gap: 1rem; margin-block: 1rem; }
+.visit-pet .pet { width: 100px; height: 92px; flex: none; }
+.visit-pet p { margin: 0.25rem 0; }
+.visit-money { color: var(--money); font-weight: 700; }
+.visit #steal { margin-top: 0.75rem; padding-inline: 1rem; }
 .subhead { margin: 1.25rem 0 0; font-size: 0.875rem; color: var(--muted); }
 .fight-log li { font-size: 0.9rem; padding: 0.5rem 0.75rem; border-radius: 12px; background: var(--bg); border-left: 4px solid var(--border); }
 .fight-log li[data-result="won"] { border-left-color: var(--money); }
@@ -480,6 +501,7 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .board li::before { content: counter(rank); font-weight: 800; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
 .board li:nth-child(1)::before { color: var(--primary); }
 .board li[data-mine] { background: var(--bg-glow); outline: 2px solid var(--pet); }
+.board .board-identity { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
 .board .board-name { font-weight: 700; overflow-wrap: anywhere; }
 .board .board-score { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; text-align: right; }
 .board .board-score b { color: var(--fg); }
@@ -487,6 +509,8 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .feed { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.35rem; }
 .feed li { display: flex; justify-content: space-between; gap: 0.75rem; font-size: 0.9rem; padding: 0.4rem 0.75rem; border-radius: 12px; background: var(--bg); }
 .feed li[data-mine] { background: var(--bg-glow); }
+.feed li > span { min-width: 0; overflow-wrap: anywhere; }
+.feed-pet { display: inline; }
 .feed time { flex: none; color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
 .feed:empty::after { content: "Nothing yet. Go make some news."; color: var(--muted); font-size: 0.9rem; }
 .fight-log:empty::after { content: "No fights yet."; color: var(--muted); font-size: 0.9rem; }

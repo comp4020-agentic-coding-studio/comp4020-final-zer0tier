@@ -3,8 +3,16 @@ import { db } from "./db.ts";
 import { record } from "./feed.ts";
 import { simulateBattle, type Battle } from "./combat.ts";
 
+// Keep this literal list identical to public/app.js: the unbundled browser
+// cannot import this server module (which opens SQLite).
+export const APPEARANCES = ["cat", "dog", "bird", "dragon", "blob"] as const;
+export type Appearance = (typeof APPEARANCES)[number];
+export const isAppearance = (value: unknown): value is Appearance => APPEARANCES.some((a) => a === value);
+
 export interface Pet {
   id: string;
+  color: string;
+  appearance: Appearance;
   strength: number;
   intelligence: number;
   charisma: number;
@@ -139,7 +147,7 @@ export const isValidId = (id: unknown): id is string =>
   typeof id === "string" && /^[A-Za-z0-9_-]{1,32}$/.test(id);
 
 const select = db.prepare(
-  `SELECT id, strength, intelligence, charisma, money, activity, school, credits, stamina, hygiene, food, soap,
+  `SELECT id, color, appearance, strength, intelligence, charisma, money, activity, school, credits, stamina, hygiene, food, soap,
           hourglass, construction_rank, office_rank, theatre_rank, task, busy_since, busy_until, reward, wins, losses,
           steal_available_at AS stealAvailableAt
      FROM pets WHERE id = ?`,
@@ -151,9 +159,10 @@ const listIds = db.prepare("SELECT id FROM pets ORDER BY id = ? DESC, rowid DESC
 const busyPets = db.prepare("SELECT id, busy_until FROM pets WHERE busy_until IS NOT NULL");
 const insert = db.prepare("INSERT OR IGNORE INTO pets (id) VALUES (?)");
 const save = db.prepare(
+  // Only stealing changes steal_available_at; ordinary actions preserve it.
   `UPDATE pets SET strength = ?, intelligence = ?, charisma = ?, money = ?, school = ?, credits = ?,
      stamina = ?, hygiene = ?, food = ?, soap = ?, hourglass = ?, construction_rank = ?, office_rank = ?, theatre_rank = ?,
-     activity = ?, task = ?, busy_since = ?, busy_until = ?, reward = ?, wins = ?, losses = ?
+     activity = ?, task = ?, busy_since = ?, busy_until = ?, reward = ?, wins = ?, losses = ?, color = ?, appearance = ?
    WHERE id = ?`,
 );
 
@@ -284,7 +293,7 @@ function write(pet: Pet): void {
     pet.stamina, pet.hygiene, pet.food, pet.soap, pet.hourglass,
     pet.jobs.construction, pet.jobs.office, pet.jobs.theatre,
     pet.activity, pet.task, pet.busySince, pet.busyUntil, pet.reward === null ? null : JSON.stringify(pet.reward),
-    pet.wins, pet.losses, pet.id,
+    pet.wins, pet.losses, pet.color, pet.appearance, pet.id,
   );
   if (pet.school !== before.school) record({ kind: "school", pet: pet.id, school: pet.school });
   for (const location of LOCATIONS) {
@@ -329,6 +338,14 @@ function busy(pet: Pet): string | undefined {
   if (pet.activity === "idle") return undefined;
   const doing = pet.activity === "studying" ? `studying ${pet.task}` : `working at the ${pet.task}`;
   return `Your pet is busy ${doing}. Wait until it's done.`;
+}
+
+export function setAppearance(id: string, color: string, appearance: Appearance): Outcome {
+  return act(id, (pet) => {
+    pet.color = color;
+    pet.appearance = appearance;
+    return undefined;
+  });
 }
 
 function start(pet: Pet, activity: Pet["activity"], task: string, minutes: number, reward: Reward): void {

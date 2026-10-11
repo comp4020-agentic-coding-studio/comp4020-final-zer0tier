@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { PASSWORD, baseUrl, finish, freshId, post, sessionFor, signIn, signUp } from "./helpers.ts";
+import { PASSWORD, baseUrl, finish, freshId, getPet, post, sessionFor, signIn, signUp } from "./helpers.ts";
 
 const me = (cookie?: string): Promise<Response> =>
   fetch(new URL("/api/me", baseUrl), { headers: cookie ? { cookie } : {} });
@@ -11,6 +11,8 @@ it("signing up creates a pet with base stats and starts a session", async () => 
   expect(res.headers.getSetCookie()[0]).toMatch(/^session=[^;]+;.*HttpOnly.*SameSite=Lax/i);
   expect(await res.json()).toEqual({
     id,
+    color: "#f59e0b",
+    appearance: "blob",
     strength: 5,
     intelligence: 5,
     charisma: 5,
@@ -118,4 +120,58 @@ it("signing out ends the session", async () => {
 
 it("404s when looking up a pet that doesn't exist", async () => {
   expect((await fetch(new URL(`/api/pets/${freshId()}`, baseUrl))).status).toBe(404);
+});
+
+it("saves every allowed appearance and hex color, preserving them through actions and sign-in", async () => {
+  const id = freshId();
+  const before = await (await signUp(id)).json();
+  for (const appearance of ["cat", "dog", "bird", "dragon", "blob"]) {
+    const change = { color: "#Ab12Ef", appearance };
+    const res = await post(`/api/pets/${id}/appearance`, change);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ...before, ...change });
+    expect(await getPet(id)).toEqual({ ...before, ...change });
+  }
+  await post(`/api/pets/${id}/study/math`);
+  await finish(id);
+  expect(await (await signIn(id)).json()).toMatchObject({ color: "#Ab12Ef", appearance: "blob", intelligence: 6 });
+});
+
+it("rejects invalid appearance IDs at the edge, before checking ownership", async () => {
+  const id = freshId();
+  await signUp(id);
+  for (const invalid of ["a".repeat(33), "bad id", "x'; DROP TABLE pets;--"]) {
+    const res = await post(`/api/pets/${encodeURIComponent(invalid)}/appearance`, { color: "#123456", appearance: "cat" }, id);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "no such pet" });
+  }
+});
+
+it("rejects invalid colors or appearances without changing the pet", async () => {
+  const id = freshId();
+  const before = await (await signUp(id)).json();
+  for (const color of ["red", "#abc", "#12345678", "123456", "#gggggg", "#123456\n", "#123456;--", null, 123456, ["#123456"], undefined]) {
+    const res = await post(`/api/pets/${id}/appearance`, { color, appearance: "cat" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/color/i);
+    expect(await getPet(id)).toEqual(before);
+  }
+  for (const appearance of ["unicorn", "Cat", "", "blob'; DROP TABLE pets;--", null, 1, ["cat"], undefined]) {
+    const res = await post(`/api/pets/${id}/appearance`, { color: "#123456", appearance });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/appearance/i);
+    expect(await getPet(id)).toEqual(before);
+  }
+  expect((await post(`/api/pets/${id}/appearance`)).status).toBe(400);
+});
+
+it("only the owner can customize a pet", async () => {
+  const id = freshId();
+  const other = freshId();
+  const before = await (await signUp(id)).json();
+  await signUp(other);
+  const change = { color: "#123456", appearance: "dragon" };
+  expect((await post(`/api/pets/${id}/appearance`, change, null)).status).toBe(401);
+  expect((await post(`/api/pets/${id}/appearance`, change, other)).status).toBe(403);
+  expect(await getPet(id)).toEqual(before);
 });

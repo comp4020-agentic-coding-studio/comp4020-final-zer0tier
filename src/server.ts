@@ -8,7 +8,7 @@ import {
   WORK_COST_PER_HOUR, buy, findCourse, findItem, findLocation, getOrCreatePet, getPet, isShiftLength, isValidId,
   matchBot, study, upgrade, use, work, BOT_ID, FIGHT_COOLDOWN_MINUTES, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS,
   SPOILS, LEADERBOARD_ORDERS, LEADERBOARD_SIZE, fight, isLeaderboardOrder, leaderboard, listPets, recentFights,
-  STEAL, steal, theftsFor, revenge, type Outcome,
+  APPEARANCES, isAppearance, setAppearance, STEAL, steal, theftsFor, revenge, type Outcome,
 } from "./pets.ts";
 import {
   Busy, PASSWORD, type AuthOutcome, clearedCookie, isValidPassword, playerFor, sessionCookie, sessionToken, signIn,
@@ -197,6 +197,20 @@ function respond(res: express.Response, outcome: Outcome): void {
 }
 
 const notFound = (res: express.Response, what: string): void => void res.status(404).json({ error: `no such ${what}` });
+
+app.post("/api/pets/:id/appearance", (req, res) => {
+  if (!isValidId(req.params.id)) return notFound(res, "pet");
+  const { color, appearance } = req.body ?? {};
+  if (typeof color !== "string" || color.length !== 7 || !/^#[0-9a-f]{6}$/i.test(color)) {
+    res.status(400).json({ error: "Color must be a six-digit hex string, e.g. #f59e0b." });
+    return;
+  }
+  if (!isAppearance(appearance)) {
+    res.status(400).json({ error: `Appearance must be one of ${APPEARANCES.join(", ")}.` });
+    return;
+  }
+  respond(res, setAppearance(req.params.id, color, appearance));
+});
 
 app.post("/api/pets/:id/study/:course", (req, res) => {
   const course = findCourse(req.params.course);
