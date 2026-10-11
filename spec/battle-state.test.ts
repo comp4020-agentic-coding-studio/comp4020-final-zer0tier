@@ -1,0 +1,20 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, beforeAll, expect, it, vi } from 'vitest';
+const directory=mkdtempSync(join(tmpdir(),'virtuepets-battle-'));
+let pets: typeof import('../src/pets.ts');
+let db: typeof import('../src/db.ts').db;
+beforeAll(async()=>{vi.stubEnv('DATA_DIR',directory);pets=await import('../src/pets.ts');({db}=await import('../src/db.ts'));});
+afterAll(()=>{db.close();vi.unstubAllEnvs();rmSync(directory,{recursive:true,force:true});});
+it('keeps a saved battle and its result across a server restart',()=>{
+  pets.getOrCreatePet('attacker');pets.getOrCreatePet('defender');
+  const result=pets.fight('attacker','defender');
+  expect(result).toHaveProperty('fight');
+  if('error' in result) throw new Error(result.error);
+  const output=execFileSync(process.execPath,['--input-type=module','-e',"import { recentFights } from './src/pets.ts'; console.log(JSON.stringify(recentFights('attacker',10)));"],{env:{...process.env,DATA_DIR:directory},encoding:'utf8'});
+  expect(JSON.parse(output)[0]).toEqual(result.fight);
+  db.prepare('UPDATE fights SET battle_json = NULL WHERE id = ?').run(result.fight.id);
+  expect(pets.recentFights('attacker',10)[0].battle).toBeNull();
+});

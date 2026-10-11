@@ -106,3 +106,10 @@ const fightColumns = new Set(
 if (!fightColumns.has("spoils")) db.exec("ALTER TABLE fights ADD COLUMN spoils INTEGER NOT NULL DEFAULT 0");
 
 if (!columns.has("steal_available_at")) db.exec("ALTER TABLE pets ADD COLUMN steal_available_at INTEGER");
+
+// Older fights remain readable without a battle replay.
+if (!fightColumns.has("battle_json")) db.exec("ALTER TABLE fights ADD COLUMN battle_json TEXT");
+const theftColumns = new Set(
+  (db.prepare("SELECT name FROM pragma_table_info('thefts')").all() as { name: string }[]).map((c) => c.name),
+);
+if (!theftColumns.has("battle_json")) db.exec("ALTER TABLE thefts ADD COLUMN battle_json TEXT");

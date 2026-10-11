@@ -1,6 +1,7 @@
 import { TIME_SCALE, realMs } from "./clock.ts";
 import { db } from "./db.ts";
 import { record } from "./feed.ts";
+import { simulateBattle, type Battle } from "./combat.ts";
 
 export interface Pet {
   id: string;
@@ -433,8 +434,7 @@ export const POWER_WEIGHTS: Record<Attribute, number> = { strength: 2, intellige
 export const powerOf = (pet: Pet): number =>
   ATTRIBUTES.reduce((power, attribute) => power + POWER_WEIGHTS[attribute] * pet[attribute], 0);
 
-// Each side rolls its power times a luck factor in [0.8, 1.2], so a pet with
-// 1.5× its opponent's power always wins and close fights can go either way.
+// Initiative and Claw Strike damage share a luck factor in [0.8, 1.2].
 export const LUCK = { min: 0.8, max: 1.2 };
 
 // Fighting is tiring, and like studying it leaves enough for an hour's work.
@@ -465,15 +465,16 @@ export interface Fight {
   defenderRoll: number;
   spoils: number; // money the winner took from the loser
   foughtAt: string;
+  battle: Battle | null; // legacy fights have no replay
 }
 
 const insertFight = db.prepare(
-  `INSERT INTO fights (attacker, defender, winner, attacker_power, defender_power, attacker_roll, defender_roll, spoils)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  `INSERT INTO fights (attacker, defender, winner, attacker_power, defender_power, attacker_roll, defender_roll, spoils, battle_json)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 );
 const FIGHT_COLUMNS = `id, attacker, defender, winner, attacker_power AS attackerPower,
   defender_power AS defenderPower, attacker_roll AS attackerRoll, defender_roll AS defenderRoll,
-  spoils, fought_at AS foughtAt`;
+  spoils, fought_at AS foughtAt, battle_json AS battleJson`;
 const selectFight = db.prepare(`SELECT ${FIGHT_COLUMNS} FROM fights WHERE id = ?`);
 const fightsFor = db.prepare(
   `SELECT ${FIGHT_COLUMNS} FROM fights WHERE attacker = ? OR defender = ? ORDER BY id DESC LIMIT ?`,
@@ -485,7 +486,12 @@ const begin = db.prepare("BEGIN IMMEDIATE");
 const commit = db.prepare("COMMIT");
 const rollback = db.prepare("ROLLBACK");
 
-export const recentFights = (id: string, limit: number): Fight[] => fightsFor.all(id, id, limit) as unknown as Fight[];
+type FightRow = Omit<Fight, "battle"> & { battleJson: string | null };
+function readFight(row: unknown): Fight {
+  const { battleJson, ...fight } = row as FightRow;
+  return { ...fight, battle: battleJson ? JSON.parse(battleJson) as Battle : null };
+}
+export const recentFights = (id: string, limit: number): Fight[] => fightsFor.all(id, id, limit).map(readFight);
 
 const roll = (power: number): number => power * (LUCK.min + Math.random() * (LUCK.max - LUCK.min));
 // Rolls are compared exactly and only rounded for the record, so rounding
@@ -530,8 +536,8 @@ export function fight(attackerId: string, defenderId: string): FightOutcome {
   const defenderPower = powerOf(defender);
   const attackerRoll = roll(attackerPower);
   const defenderRoll = roll(defenderPower);
-  // A dead heat goes to the defender.
-  const won = attackerRoll > defenderRoll;
+  const battle = simulateBattle(attacker, defender, [attackerRoll, defenderRoll]);
+  const won = battle.winner === attacker.id;
   const winner = won ? attacker : defender;
   const loser = won ? defender : attacker;
   winner.wins++;
@@ -545,12 +551,12 @@ export function fight(attackerId: string, defenderId: string): FightOutcome {
     write(attacker);
     write(defender);
     const { lastInsertRowid } = insertFight.run(
-      attacker.id, defender.id, winner.id, attackerPower, defenderPower, tenths(attackerRoll), tenths(defenderRoll), spoils,
+      attacker.id, defender.id, winner.id, attackerPower, defenderPower, tenths(attackerRoll), tenths(defenderRoll), spoils, JSON.stringify(battle),
     );
     record({ kind: "fight", pet: attacker.id, other: defender.id, winner: winner.id, spoils });
     commit.run();
     return {
-      fight: selectFight.get(lastInsertRowid) as unknown as Fight,
+      fight: readFight(selectFight.get(lastInsertRowid)),
       attacker: getPet(attacker.id)!,
       defender: getPet(defender.id)!,
     };
@@ -625,11 +631,11 @@ const insertTheft = db.prepare("INSERT INTO thefts (thief, victim, amount) VALUE
 const theftColumns = "id, thief, victim, amount, stolen_at AS stolenAt, result";
 const selectTheft = db.prepare(`SELECT ${theftColumns} FROM thefts WHERE id = ? AND victim = ?`);
 const pendingThefts = db.prepare(`SELECT ${theftColumns} FROM thefts WHERE victim = ? AND result IS NULL ORDER BY id DESC`);
-const resolveTheft = db.prepare("UPDATE thefts SET result = ?, resolved_at = ? WHERE id = ?");
+const resolveTheft = db.prepare("UPDATE thefts SET result = ?, resolved_at = ?, battle_json = ? WHERE id = ?");
 export const theftsFor = (id: string): Theft[] => pendingThefts.all(id) as unknown as Theft[];
 
 export type RevengeOutcome =
-  | { theft: Theft; victim: Pet; thief: Pet; won: boolean; reward: number }
+  | { theft: Theft; victim: Pet; thief: Pet; won: boolean; reward: number; battle: Battle }
   | { status: 404 | 409; error: string };
 
 export function revenge(victimId: string, theftId: number): RevengeOutcome {
@@ -650,7 +656,8 @@ export function revenge(victimId: string, theftId: number): RevengeOutcome {
     if (thief.money < reward) return { status: 409, error: `The thief needs $${reward} to pay the full reward. Try again later.` };
     const unfit = spend(victim, FIGHT_NEEDS, FIGHT_COST, "take revenge");
     if (unfit) return { status: 409, error: unfit };
-    const won = roll(powerOf(victim)) > roll(powerOf(thief));
+    const battle = simulateBattle(victim, thief, [roll(powerOf(victim)), roll(powerOf(thief))]);
+    const won = battle.winner === victim.id;
     if (won) {
       thief.money -= reward;
       victim.money += reward;
@@ -661,11 +668,11 @@ export function revenge(victimId: string, theftId: number): RevengeOutcome {
     // A loss costs the attempt and normal combat energy, but no extra money.
     write(victim);
     write(thief);
-    resolveTheft.run(won ? "won" : "lost", new Date(now).toISOString(), theft.id);
+    resolveTheft.run(won ? "won" : "lost", new Date(now).toISOString(), JSON.stringify(battle), theft.id);
     record({ kind: "revenge", pet: victimId, other: thief.id, won, amount: won ? reward : 0 });
     commit.run();
     committed = true;
-    return { theft: { ...theft, result: won ? "won" : "lost" }, victim: getPet(victimId)!, thief: getPet(thief.id)!, won, reward: won ? reward : 0 };
+    return { theft: { ...theft, result: won ? "won" : "lost" }, victim: getPet(victimId)!, thief: getPet(thief.id)!, won, reward: won ? reward : 0, battle };
   } finally {
     if (!committed) rollback.run();
   }

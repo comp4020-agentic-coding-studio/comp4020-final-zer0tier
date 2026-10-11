@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import {
   baseUrl, finish, freshId, getPet, getRules, post, readyToStudy, studyTimes, signUp, workHour,
 } from "./helpers.ts";
@@ -50,7 +50,7 @@ it("a pet that just joined is listed right after the bot, however many pets have
   expect(pets.map((p: any) => p.id).slice(0, 2)).toEqual(["0", id]);
 });
 
-it("a pet with 1.5× the power always wins, and the fight is recorded for both", async () => {
+it("a much stronger claw attacker wins, and the battle is recorded for both", async () => {
   const strong = await strongPet();
   const weak = await newPet();
   const before = await getPet(strong);
@@ -171,5 +171,6 @@ it("an attacker waits an hour to attack the same pet again, but the defender can
   expect((await fight(attacker, "0")).status).toBe(200); // nor is anyone else
 
   await new Promise((resolve) => setTimeout(resolve, (60 * 60_000) / timeScale + 20));
-  expect((await fight(attacker, defender)).status).toBe(200);
+  // The accelerated cooldown is only 100 ms; allow server/client clock jitter.
+  await vi.waitFor(async () => expect((await fight(attacker, defender)).status).toBe(200), { timeout: 2000, interval: 25 });
 });

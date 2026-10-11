@@ -1,4 +1,5 @@
 import express from "express";
+import { ABILITIES } from "./combat.ts";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { marked } from "marked";
@@ -172,6 +173,7 @@ app.get("/api/rules", (_req, res) => {
     fight: {
       cost: FIGHT_COST, needs: FIGHT_NEEDS, luck: LUCK, powerWeights: POWER_WEIGHTS, spoils: SPOILS,
       cooldownMinutes: FIGHT_COOLDOWN_MINUTES,
+      abilities: ABILITIES,
     },
     botId: BOT_ID,
     steal: STEAL,

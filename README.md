@@ -40,7 +40,7 @@ the point of the game rather than boxes to tick:
   have stakes (the winner takes some of the loser's money), but a strong pet
   can't drain a weak one: it has to wait an hour before attacking the same pet
   again, while the pet it attacked can hit back straight away.
-  *Enforced:* `spec/fight.test.ts` (a pet with 1.5× the power always wins; the
+  *Enforced:* `spec/fight.test.ts` (stronger claws win the tested matchups; the
   bot can't be signed into; spoils, the cooldown and revenge). *Checked by
   hand:* the bot tracking the median, which the shared spec database can't pin
   down. On a fresh database with pets at 7/5/5, 6/6/5 and 5/5/5 (Strength /
@@ -185,11 +185,25 @@ every player's pet (rounded down, and never below a new pet's 5), updated the
 moment any pet's change moves the median. So the bot is always an even match for
 a typical player: beating it reliably means your pet is ahead of the pack.
 
-Press **Fight** to attack another pet. Each pet's **power** is
-2 × Strength + Intelligence + Charisma. Both sides roll their power times a
-luck factor between 0.8 and 1.2, and the higher roll wins (a tie goes to the
-defender). A pet with 1.5× its opponent's power always wins; close fights can go
-either way. The winner gets a win and the loser a loss on their record.
+Press **Fight** to open an automatic battle in a small window. Every pet initially
+knows only **Claw Strike**, which costs **0 MP**. Each fight starts with full
+**HP = Strength + Intelligence + Charisma** and **MP = Intelligence**. These are
+battle resources; they do not replace stamina or hygiene, and reset each fight.
+
+Power remains 2 × Strength + Intelligence + Charisma. Each pet rolls a luck
+factor between 0.8 and 1.2: power × luck decides who strikes first (defender
+first on a tie), and Strength × luck, rounded to at least 1, is that pet's
+Claw Strike damage for the battle. Pets alternate attacks until one reaches
+0 HP. MP stays unchanged. The surviving pet wins; higher initiative alone no
+longer guarantees victory. The winner gets a win and the loser a loss.
+
+The window shows saved HP/MP changes, attack effects, and an expandable log.
+**Skip to result**, **Replay battle**, and **Watch battle** in recent fights
+only control playback; they never charge energy or award money again. Closing
+the window does not cancel the saved result. Both online players can watch,
+and recent fights retain their replay after a restart. Very long battles group
+identical middle rounds without changing the outcome. Older fights remain
+readable but have no replay. Motion effects respect reduced-motion settings.
 
 **The winner takes 10% of the loser's money** (rounded down, at most $50),
 whichever side attacked, so an attacker who loses pays the defender. Fights with
@@ -211,7 +225,7 @@ failed attempts do not consume it. You cannot steal from yourself or the bot.
 Thefts are saved separately from the public feed. When you sign in, unresolved
 reports show who stole from you, when, and how much, with a **Take revenge** button.
 They also appear live and survive server restarts and public-feed pruning.
-Each theft allows one completed revenge attempt using the normal power/luck rolls
+Each theft allows one completed revenge attempt using the same automatic Claw Strike battle
 and combat energy requirements. You must be idle; ordinary fight cooldowns do not
 block theft revenge. On a win, the thief pays **twice the stolen amount**, and you
 gain **+1 Strength, +1 Intelligence and +1 Charisma**. If the thief cannot afford

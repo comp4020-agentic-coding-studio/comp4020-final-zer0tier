@@ -383,7 +383,10 @@ function renderFightButtons() {
 
 // Resolves true if the fight happened; otherwise says why in `errorId`.
 async function startFight(opponent, errorId = "arena-error") {
-  if (!current) return false;
+  if (!current || fighting) return false;
+  const owner = current.id;
+  const session = theftSession;
+  const active = () => current?.id === owner && theftSession === session;
   fighting = true;
   renderFightButtons();
   $(errorId).textContent = "";
@@ -392,6 +395,7 @@ async function startFight(opponent, errorId = "arena-error") {
     const res = await fetch(`/api/pets/${encodeURIComponent(current.id)}/fight/${encodeURIComponent(opponent)}`, {
       method: "POST",
     });
+    if (!active()) return false;
     if (res.status === 401) {
       sessionEnded();
       return false;
@@ -404,13 +408,19 @@ async function startFight(opponent, errorId = "arena-error") {
       const body = await res.json().catch(() => ({}));
       $(errorId).textContent = body.error ?? `Something went wrong (server error ${res.status}). Try again.`;
     }
+    if (res.ok) {
+      const body = await res.json();
+      if (active()) onFight(body.fight);
+    }
     return res.ok;
   } catch {
-    $(errorId).textContent = "Couldn't reach the server, so the fight didn't happen. Try again.";
+    if (active()) $(errorId).textContent = "Couldn't confirm the fight. Check recent fights before trying again.";
     return false;
   } finally {
-    fighting = false;
-    renderFightButtons();
+    if (active()) {
+      fighting = false;
+      renderFightButtons();
+    }
   }
 }
 
@@ -418,7 +428,9 @@ async function startFight(opponent, errorId = "arena-error") {
 function describeFight(fight) {
   const me = current.id;
   const won = fight.winner === me;
-  const rolls = `${fight.attackerRoll} vs ${fight.defenderRoll}`;
+  const rolls = fight.battle
+    ? `${fight.battle.turns.reduce((count, step) => count + step.hits, 0)} claw strikes`
+    : `${fight.attackerRoll} vs ${fight.defenderRoll}`;
   const money = fight.spoils ? (won ? ` You took $${fight.spoils}.` : ` They took $${fight.spoils}.`) : "";
   if (fight.attacker === me) {
     return { won, rolls, text: (won ? `You beat ${fight.defender}!` : `${fight.defender} beat you.`) + money };
@@ -438,13 +450,31 @@ function renderFightLog() {
       li.querySelector(".rolls").textContent = `(${rolls})`;
       li.querySelector("time").textContent = at;
       li.querySelector("time").dateTime = fight.foughtAt;
+      if (fight.battle) {
+        const replay = document.createElement("button");
+        replay.type = "button";
+        replay.className = "chip-btn chip-buy";
+        replay.textContent = "Watch battle";
+        replay.addEventListener("click", () => showFightScene(fight, true));
+        li.append(replay);
+      }
       return li;
     }),
   );
 }
 
+function showFightScene(fight, replay = false) {
+  if (!current || !fight.battle) return;
+  document.dispatchEvent(new CustomEvent("battle:show", { detail: {
+    key: `fight:${fight.id}`, battle: fight.battle, viewer: current.id,
+    title: "Arena battle", result: describeFight(fight).text, replay,
+  } }));
+}
+
 function onFight(fight) {
   if (!current || (fight.attacker !== current.id && fight.defender !== current.id)) return;
+  showFightScene(fight);
+  if (fightLog.some((entry) => entry.id === fight.id)) return;
   const { won, text, rolls } = describeFight(fight);
   $("fight-news").textContent = `${text} (${rolls})`;
   $("fight-news").dataset.result = won ? "won" : "lost";
@@ -687,6 +717,8 @@ let theftRequest = 0;
 let revengePending = false;
 let theftSession = 0; // late actions belong only to the login that started them
 function clearThefts() {
+  fighting = false;
+  document.dispatchEvent(new CustomEvent("battle:reset"));
   theftSession++;
   revengePending = false;
   $("theft-list").setAttribute("aria-busy", "false");
@@ -759,6 +791,10 @@ async function takeRevenge(id, owner) {
     $("theft-status").textContent = body.won
       ? `Revenge succeeded! You recovered $${body.reward} and gained +1 Strength, Intelligence and Charisma.`
       : "Revenge failed. No extra money was lost. This theft's revenge attempt is used.";
+    document.dispatchEvent(new CustomEvent("battle:show", { detail: {
+      key: `revenge:${body.theft?.id}`, battle: body.battle, viewer: owner,
+      title: "Theft revenge", result: $("theft-status").textContent,
+    } }));
     await loadThefts();
   } catch {
     if (active()) {
