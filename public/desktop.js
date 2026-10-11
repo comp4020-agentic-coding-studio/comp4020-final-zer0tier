@@ -27,7 +27,7 @@ function mountDesktop() {
     dashboard.append(node);
     return node;
   }
-  function tabs(container, label, entries) {
+  function tabs(container, label, entries, initial = entries[0].name) {
     container.setAttribute('role', 'tablist');
     container.setAttribute('aria-label', label);
     function select(name) {
@@ -68,7 +68,7 @@ function mountDesktop() {
     };
     container.addEventListener('keydown', keydown);
     cleanups.push(() => container.removeEventListener('keydown', keydown));
-    select(entries[0].name);
+    select(initial);
     return select;
   }
 
@@ -143,7 +143,7 @@ function mountDesktop() {
   const arena = $('arena-heading').closest('section');
   const arenaTabs = arena.querySelector('.arena-tabs');
   const entries = ['pets', 'board'].map((name) => ({ name, button: $(`tab-${name}`), panel: $(`arena-${name}`) }));
-  const originalArenaTab = $('tab-board').getAttribute('aria-selected') === 'true' ? 'board' : 'pets';
+  let mobileArenaTab = $('tab-board').getAttribute('aria-selected') === 'true' ? 'board' : 'pets';
   for (const [name, label] of [['events', 'Activity'], ['alerts', 'Alerts']]) {
     const button = element('button', '', label);
     button.id = `desktop-tab-${name}`;
@@ -159,7 +159,12 @@ function mountDesktop() {
   const emptyAlerts = element('p', 'help', 'All quiet. Saved theft reports and revenge options appear here.');
   alerts.append(emptyAlerts);
   move($('theft-notifications'), alerts);
-  const selectSocial = tabs(arenaTabs, 'Arena', entries);
+  const selectSocial = tabs(arenaTabs, 'Arena', entries, mobileArenaTab);
+  for (const { name, button } of entries.slice(0, 2)) {
+    const remember = () => { mobileArenaTab = name; };
+    button.addEventListener('click', remember);
+    cleanups.push(() => button.removeEventListener('click', remember));
+  }
   let previousReports = '';
   const syncAlerts = () => {
     const notification = $('theft-notifications');
@@ -184,9 +189,11 @@ function mountDesktop() {
     for (const [node, anchor] of anchors.reverse()) anchor.replaceWith(node);
     entries.slice(2).forEach(({ button, panel }) => { button.remove(); panel.remove(); });
     for (const name of ['pets', 'board']) {
-      $(`tab-${name}`).setAttribute('aria-selected', String(name === originalArenaTab));
-      $(`arena-${name}`).hidden = name !== originalArenaTab;
+      $(`tab-${name}`).setAttribute('aria-selected', String(name === mobileArenaTab));
+      $(`arena-${name}`).hidden = name !== mobileArenaTab;
     }
+    // Use the existing handler too: a hidden leaderboard may need fresh data.
+    $(`tab-${mobileArenaTab}`).click();
     activityEntries.forEach(({ panel }) => { panel.hidden = false; });
     pet.remove(); activities.remove(); social.remove();
     document.body.classList.remove('desktop-game');

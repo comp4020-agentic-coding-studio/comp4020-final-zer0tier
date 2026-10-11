@@ -685,7 +685,11 @@ function render(pet) {
 // Saved theft reports are separate from the short public activity feed.
 let theftRequest = 0;
 let revengePending = false;
+let theftSession = 0; // late actions belong only to the login that started them
 function clearThefts() {
+  theftSession++;
+  revengePending = false;
+  $("theft-list").setAttribute("aria-busy", "false");
   theftRequest++;
   $("theft-notifications").hidden = true;
   $("theft-list").replaceChildren();
@@ -733,6 +737,8 @@ async function loadThefts() {
 
 async function takeRevenge(id, owner) {
   if (revengePending || current?.id !== owner) return;
+  const session = theftSession;
+  const active = () => current?.id === owner && theftSession === session;
   revengePending = true;
   $("theft-list").setAttribute("aria-busy", "true");
   for (const button of $("theft-list").querySelectorAll("button")) button.disabled = true;
@@ -740,11 +746,11 @@ async function takeRevenge(id, owner) {
   $("theft-status").textContent = "Taking revenge…";
   try {
     const res = await fetch(`/api/pets/${encodeURIComponent(owner)}/revenge/${id}`, { method: "POST" });
-    if (current?.id !== owner) return;
+    if (!active()) return;
     if (res.status === 401) return sessionEnded();
     if (res.status === 403) return sessionChanged();
     const body = await res.json();
-    if (current?.id !== owner) return;
+    if (!active()) return;
     if (!res.ok) {
       $("theft-status").textContent = "";
       $("theft-error").textContent = body.error ?? "Couldn't take revenge. Try again.";
@@ -755,15 +761,17 @@ async function takeRevenge(id, owner) {
       : "Revenge failed. No extra money was lost. This theft's revenge attempt is used.";
     await loadThefts();
   } catch {
-    if (current?.id === owner) {
+    if (active()) {
       $("theft-status").textContent = "";
       $("theft-error").textContent = "Couldn't confirm revenge. Reload notifications before retrying.";
       $("theft-retry").hidden = false;
     }
   } finally {
-    revengePending = false;
-    $("theft-list").setAttribute("aria-busy", "false");
-    for (const button of $("theft-list").querySelectorAll("button")) button.disabled = false;
+    if (active()) {
+      revengePending = false;
+      $("theft-list").setAttribute("aria-busy", "false");
+      for (const button of $("theft-list").querySelectorAll("button")) button.disabled = false;
+    }
   }
 }
 $("theft-retry").addEventListener("click", loadThefts);

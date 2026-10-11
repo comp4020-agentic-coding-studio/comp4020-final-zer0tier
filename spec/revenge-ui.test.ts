@@ -51,3 +51,43 @@ it("shows saved thefts on login, prevents duplicate clicks, and waits for broadc
     expect($("theft-list").textContent).toBe("");
   } finally { window.close(); }
 });
+
+it('isolates pending revenge requests across sign-out and a new login', async () => {
+  const pet = await (await signUp(freshId())).json();
+  const rules = await getRules();
+  const dom = new JSDOM(readFileSync('public/index.html', 'utf8'), { url: baseUrl, runScripts: 'outside-only' });
+  const { window } = dom;
+  const $ = (id: string) => window.document.getElementById(id)!;
+  window.WebSocket = function () { return new window.EventTarget(); } as unknown as typeof window.WebSocket;
+  const finishes: ((response: Response) => void)[] = [];
+  window.fetch = (async (url: string) => {
+    if (url.includes('/revenge/')) return new Promise<Response>((resolve) => finishes.push(resolve));
+    if (url === '/api/thefts') return Response.json([{ id: 1, thief: 'sneaky', victim: pet.id, amount: 20, stolenAt: new Date().toISOString() }]);
+    if (url === '/api/me' || url === '/api/signin') return Response.json(pet);
+    if (url === '/api/rules') return Response.json(rules);
+    if (url === '/api/signout') return new Response(null, { status: 204 });
+    return Response.json([]);
+  }) as typeof fetch;
+  try {
+    window.eval(readFileSync('public/app.js', 'utf8'));
+    await vi.waitFor(() => expect($('theft-list').querySelector('button')).not.toBeNull());
+    $('theft-list').querySelector('button')!.click();
+    expect(finishes).toHaveLength(1);
+    $('signout').click();
+    await vi.waitFor(() => expect($('login').hidden).toBe(false));
+    $('login').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await vi.waitFor(() => expect($('theft-list').querySelector('button')).not.toBeNull());
+    const next = $('theft-list').querySelector('button')!;
+    expect(next.disabled).toBe(false);
+    next.click();
+    expect(finishes).toHaveLength(2);
+    finishes[0](Response.json({ won: true, reward: 40 }));
+    // Let the old request's continuation and finally block finish.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(next.disabled).toBe(true);
+    expect($('theft-status').textContent).toBe('Taking revenge…');
+    finishes[1](Response.json({ error: 'The thief cannot pay yet.' }, { status: 409 }));
+    await vi.waitFor(() => expect(next.disabled).toBe(false));
+    expect($('theft-error').textContent).toBe('The thief cannot pay yet.');
+  } finally { window.close(); }
+});

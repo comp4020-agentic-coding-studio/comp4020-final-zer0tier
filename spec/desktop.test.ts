@@ -58,3 +58,20 @@ it('supports keyboard tabs, forwards quick care to existing actions, and shows s
     expect(p.$('theft-notifications').parentElement?.tagName).toBe('MAIN');
   } finally { p.dom.window.close(); }
 });
+
+it('keeps the selected Arena tab when crossing the desktop breakpoint', () => {
+  const p = page();
+  try {
+    p.$('tab-pets').setAttribute('aria-selected', 'false');
+    p.$('arena-pets').hidden = true;
+    p.$('tab-board').setAttribute('aria-selected', 'true');
+    p.$('arena-board').hidden = false;
+    p.resize(true);
+    expect(p.$('tab-board').getAttribute('aria-selected')).toBe('true');
+    expect(p.$('arena-board').hidden).toBe(false);
+    p.$('tab-pets').click();
+    p.resize(false);
+    expect(p.$('tab-pets').getAttribute('aria-selected')).toBe('true');
+    expect(p.$('arena-pets').hidden).toBe(false);
+  } finally { p.dom.window.close(); }
+});

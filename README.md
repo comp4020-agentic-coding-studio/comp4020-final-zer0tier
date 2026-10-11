@@ -81,7 +81,8 @@ panels: your pet and quick care, School/Work/Shop tabs, and the Arena with
 Pets/Leaderboard/Activity/Alerts tabs. Long lists scroll within their panels;
 short windows can still scroll the page. Theft reports appear in Alerts.
 Arrow keys switch tabs; Home/End select the first/last tab. Narrower windows
-and phones retain the original stacked layout and controls.
+and phones retain the original stacked layout and controls. The selected Pets
+or Leaderboard tab is preserved when resizing.
 
 **Create an account** with a player ID (letters, digits, `-` or `_`, up to 32
 characters) and a password of at least 8 characters. Each ID has one account
@@ -218,6 +219,8 @@ the full reward, no attempt or energy is spent; try later. A loss spends the att
 and combat energy but takes no extra money. Revenge never removes daily theft protection.
 `GET /api/thefts` returns only your pending reports; `POST /api/pets/:id/revenge/:theft`
 accepts only a theft against your own pet. Completed attempts cannot pay out twice.
+Signing out clears pending revenge controls; late responses from an earlier
+login cannot change the new login’s notifications or buttons.
 
 ### Leaderboard
 
