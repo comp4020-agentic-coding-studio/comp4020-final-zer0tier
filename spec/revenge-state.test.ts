@@ -27,7 +27,8 @@ it("pays double and increases all attributes once, without removing daily protec
   const { victim, thief, theft } = setup();
   const before = pets.getPet(victim)!;
   const balance = pets.getPet(thief)!.money;
-  vi.spyOn(Math, "random").mockReturnValueOnce(0.99).mockReturnValueOnce(0);
+  // Coin toss sends the victim first, then a high/low luck split in its favor.
+  vi.spyOn(Math, "random").mockReturnValueOnce(0).mockReturnValueOnce(0.99).mockReturnValueOnce(0);
   expect(pets.revenge(victim, theft.id)).toMatchObject({ won: true, reward: theft.amount * 2,
     victim: { money: before.money + theft.amount * 2, strength: 6, intelligence: 6, charisma: 6,
       stealAvailableAt: before.stealAvailableAt, stamina: 90, hygiene: 95 },
@@ -74,7 +75,7 @@ it("persists private reports through feed pruning and process restart", () => {
 it("rolls back rewards and the attempt when recording the result fails", () => {
   const { victim, thief, theft } = setup();
   const before = [pets.getPet(victim), pets.getPet(thief)];
-  vi.spyOn(Math, "random").mockReturnValueOnce(0.99).mockReturnValueOnce(0);
+  vi.spyOn(Math, "random").mockReturnValueOnce(0).mockReturnValueOnce(0.99).mockReturnValueOnce(0);
   db.exec("CREATE TRIGGER fail_revenge BEFORE INSERT ON feed WHEN NEW.kind = 'revenge' BEGIN SELECT RAISE(ABORT, 'test failure'); END");
   try {
     expect(() => pets.revenge(victim, theft.id)).toThrow("test failure");

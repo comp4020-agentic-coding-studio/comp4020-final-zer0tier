@@ -129,6 +129,19 @@ it("pet:updated — starting a shift, shopping and feeding reach every open wind
   }
 });
 
+it("pet:updated — equipping (and unequipping) a coin reaches every open window within 1s", async () => {
+  const id = freshId();
+  await signUp(id);
+  const windows = [await open(), await open()];
+  try {
+    const updates = windows.map((ws) => nextUpdate(ws, id, (pet) => pet.equippedCoin === null));
+    expect((await post(`/api/pets/${id}/equip-coin/none`)).status).toBe(200);
+    for (const event of await Promise.all(updates)) expect(event.pet).toMatchObject({ id, equippedCoin: null });
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});
+
 it("pet:updated — a job upgrade reaches every open window within 1s", async () => {
   const id = freshId();
   await signUp(id);

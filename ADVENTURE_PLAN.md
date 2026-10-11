@@ -1,11 +1,11 @@
 # Adventure feature plan
 
-Status: steps 1–4 implemented: exploration controls and saving; five fixed
+Status: all five steps implemented: exploration controls and saving; five fixed
 floors with stairs, slimes/goblins, increasing attributes, a Slime King on floor
 five, chest landmarks, enemy detection/pursuit, and automatic monster battles
 with saved HP/MP and outcomes; atomic chest rewards, persistent inventory, item
-use, and learned abilities. Coin selection and battle effects remain planned. This
-document preserves the owner's requirements.
+use, and learned abilities; and a coin-toss initiative with reusable, equippable
+Copper/Silver/Gold coins. This document preserves the owner's requirements.
 
 Implementation defaults for step 2: monsters take one cardinal step after an
 accepted player step, detect the eight surrounding cells, and stop chasing when
@@ -86,21 +86,27 @@ Each treasure reward is drawn from these category probabilities:
 
 ## 5. Coin toss and unfair coins
 
-- Before battle, the system automatically tosses a coin to determine initiative:
-  **heads = player attacks first; tails = opponent attacks first**.
-- Normal toss fairness is the proposed default; confirm if another weighting is
-  intended.
+- Before battle, the system automatically tosses a fair coin to determine
+  initiative: **heads = acting pet attacks first; tails = opponent attacks
+  first**. This replaces the old power × luck comparison everywhere it was
+  used (Adventure, Arena, and revenge).
 
-| Coin | Requested effect |
+| Coin | Effect |
 | --- | --- |
-| Copper Coin | Before battle, add 1 to every attribute; initiative probability stays unchanged. |
+| Copper Coin | Before battle, add 1 to every attribute (and that fight's HP/MP), battle-only; initiative probability stays unchanged. |
 | Silver Coin | The player's pet always attacks first. |
 | Gold Coin | The player's pet always attacks second, but its first attack deals double damage. |
 
-- Implementation work: coin selection/use, server-resolved initiative, first-
-  attack damage modifier, and coin/toss presentation in the battle scene.
-- Coin selection, consumption, bonus duration, and conflicting PvP effects need
-  explicit rules before implementation.
+- Owner's confirmed rules: the coin toss and unfair coins apply to Adventure,
+  Arena, and revenge alike, not just Adventure. Coins are reusable equipment —
+  equip one (or none) per pet, never consumed. Copper's bonus is battle-only:
+  it never changes the pet's real attributes or its saved maximum HP/MP. In a
+  PvP fight or revenge, only the acting side's equipped coin applies (the
+  attacker, or the revenge victim); the opponent's equipped coin is ignored.
+- Implemented: a new global, per-pet `equip-coin` action (`POST
+  /api/pets/:id/equip-coin/:coin`, `:coin` one of the three coin IDs or
+  `none`), used identically by Adventure, Arena, and revenge. Equipping
+  requires owning at least one of that coin; unequipping always succeeds.
 
 ## Suggested implementation order
 
@@ -122,8 +128,9 @@ authoritative; new real-time events require the existing one-second tests.
 - Should a future phase add energy limits, entry cost, cooldown, or daily attempts?
 - What are the boss abilities and completion rewards? Review the initial enemy
   stat curves after monster battles are playable.
-- Are coins consumable or equipped? Is Copper's attribute bonus battle-only or
-  permanent, and does it also increase derived HP/MP?
-- Does the new initiative system apply to Arena and revenge as well as Adventure?
-  In PvP, who is the "player" for the toss, and which coin wins if effects conflict?
 - Keep the existing touch direction buttons and phone layout during later steps.
+
+Resolved for phase 5: coins are reusable equipment (never consumed); Copper's
+bonus is battle-only and never raises derived HP/MP afterward; the coin toss
+and unfair coins apply to Arena and revenge as well as Adventure, with only
+the acting side's (attacker's, or revenge victim's) equipped coin ever applying.

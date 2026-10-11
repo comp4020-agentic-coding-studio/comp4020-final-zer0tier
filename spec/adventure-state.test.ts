@@ -202,24 +202,25 @@ it('carries HP/MP across battles and floors, restoring 20% of maximum rounded up
     const result = step(id, 'd');
     expect(result.battle!.playback.initialHp).toEqual([17, 6]);
     expect(result.battle!.playback.initialMp).toEqual([0, 1]);
-    expect(result).toMatchObject({ hp: 24, mp: 2, maxHp: 31, maxMp: 7, battle: { recovery: { hp: 7, mp: 2 } } });
+    expect(result).toMatchObject({ hp: 21, mp: 2, maxHp: 31, maxMp: 7, battle: { recovery: { hp: 7, mp: 2 } } });
     expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(result);
     expect(adventure.adventureFor(id)).toEqual(result);
     const continued = continueRun(id);
     expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(continued);
-    expect(random).toHaveBeenCalledTimes(2);
+    // One coin toss plus a luck roll for each fighter.
+    expect(random).toHaveBeenCalledTimes(3);
     db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(13, 13, id);
-    expect(adventure.changeFloor(id, 'descend', continued.revision)).toMatchObject({ floor: 2, hp: 24, mp: 2 });
+    expect(adventure.changeFloor(id, 'descend', continued.revision)).toMatchObject({ floor: 2, hp: 21, mp: 2 });
     adventure.changeFloor(id, 'ascend', adventure.adventureFor(id).revision);
     db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(9, 5, id);
     const next = step(id, 'd');
-    expect(next.battle!.playback.initialHp![0]).toBe(24);
+    expect(next.battle!.playback.initialHp![0]).toBe(21);
     expect(next.battle!.playback.initialMp![0]).toBe(2);
-    expect(next).toMatchObject({ hp: 31, mp: 4 });
+    expect(next).toMatchObject({ hp: 23, mp: 4 });
     continueRun(id);
     db.prepare('UPDATE adventures SET x = ?, y = ?, hp = ?, mp = ? WHERE player_id = ?').run(3, 11, 30, 6, id);
     const capped = step(id, 'd');
-    expect(capped).toMatchObject({ hp: 31, mp: 7, battle: { recovery: { hp: 1, mp: 1 } } });
+    expect(capped).toMatchObject({ hp: 31, mp: 7, battle: { recovery: { hp: 4, mp: 1 } } });
     expect(afterRestart(id)).toEqual(capped);
   } finally { random.mockRestore(); }
 });
@@ -241,4 +242,94 @@ it('ends the adventure on defeat and requires an explicit fresh run; old retries
   expect(adventure.continueAdventure(id, result.battle!.id, result.revision)).toEqual(restarted);
   expect(adventure.restartAdventure(id, adventure.adventureFor(id).revision)).toMatchObject({ status: 409 });
   expect(afterRestart(id)).toEqual(restarted);
+});
+
+function grantCoin(id: string, coin: string) {
+  db.prepare('INSERT INTO inventory (player_id, item_id, quantity) VALUES (?, ?, 1)').run(id, coin);
+}
+
+it('rejects unknown coins and coins the pet does not own; equipping is reusable, not consumed', () => {
+  const id = 'coin-validate'; pets.getOrCreatePet(id);
+  expect(pets.equipCoin(id, 'bogus-coin')).toMatchObject({ status: 409 });
+  expect(pets.equipCoin(id, 'silver-coin')).toMatchObject({ status: 409 }); // not owned yet
+  grantCoin(id, 'silver-coin');
+  const equipped = pets.equipCoin(id, 'silver-coin');
+  if ('error' in equipped) throw new Error(equipped.error);
+  expect(equipped.pet.equippedCoin).toBe('silver-coin');
+  expect(pets.getPet(id)!.coins['silver-coin']).toBe(1); // not spent
+  const unequipped = pets.equipCoin(id, null);
+  if ('error' in unequipped) throw new Error(unequipped.error);
+  expect(unequipped.pet.equippedCoin).toBe(null);
+});
+
+it("a Silver coin forces the pet to attack first against a much stronger goblin", () => {
+  const id = 'coin-silver';
+  setupBattle(id, 'goblin', [1, 1, 1]); // power 4, far below floor-1 goblin's 15
+  grantCoin(id, 'silver-coin');
+  expect(pets.equipCoin(id, 'silver-coin')).not.toHaveProperty('error');
+  const result = step(id, 'd');
+  expect(result.battle!.playback.turns[0].actor).toBe(0);
+});
+
+it("a Gold coin makes the pet attack second but doubles its own first hit", () => {
+  const id = 'coin-gold';
+  setupBattle(id, 'goblin', [3, 1, 5]); // maxHp 9, per-hit damage scales with luck
+  grantCoin(id, 'gold-coin');
+  expect(pets.equipCoin(id, 'gold-coin')).not.toHaveProperty('error');
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5); // luck factor exactly 1.0
+  try {
+    const result = step(id, 'd');
+    const turns = result.battle!.playback.turns;
+    expect(turns[0].actor).toBe(1); // the goblin, not the pet, strikes first
+    const petTurns = turns.filter(t => t.actor === 0);
+    expect(result.battle!.playback.fighters[0].damage).toBe(3);
+    expect(petTurns[0].damage).toBe(6); // double the base 3
+  } finally { random.mockRestore(); }
+});
+
+it("a Copper coin boosts HP/MP/damage for one monster battle only, without changing real attributes or the saved max", () => {
+  const id = 'coin-copper';
+  const before = setupBattle(id, 'slime', [12, 7, 12]); // maxHp 31, maxMp 7
+  grantCoin(id, 'copper-coin');
+  expect(pets.equipCoin(id, 'copper-coin')).not.toHaveProperty('error');
+  expect(before).toMatchObject({ maxHp: 31, maxMp: 7 });
+  const realStats = pets.getPet(id)!;
+  const result = step(id, 'd');
+  expect(result.battle!.playback.fighters[0]).toMatchObject({ maxHp: 34, maxMp: 8 });
+  // The saved/displayed max, and the pet's real attributes, never carry the bonus.
+  expect(result).toMatchObject({ maxHp: 31, maxMp: 7 });
+  expect(pets.getPet(id)).toMatchObject({
+    strength: realStats.strength, intelligence: realStats.intelligence, charisma: realStats.charisma,
+  });
+});
+
+it("an Arena fight applies only the attacker's equipped coin; the defender's is ignored", () => {
+  const attacker = 'coin-attacker', defender = 'coin-defender';
+  pets.getOrCreatePet(attacker); pets.getOrCreatePet(defender);
+  db.prepare('UPDATE pets SET strength = 1, intelligence = 1, charisma = 1 WHERE id = ?').run(attacker);
+  db.prepare('UPDATE pets SET strength = 20, intelligence = 1, charisma = 1 WHERE id = ?').run(defender);
+  grantCoin(attacker, 'silver-coin'); grantCoin(defender, 'gold-coin');
+  expect(pets.equipCoin(attacker, 'silver-coin')).not.toHaveProperty('error');
+  expect(pets.equipCoin(defender, 'gold-coin')).not.toHaveProperty('error');
+  const outcome = pets.fight(attacker, defender);
+  if ('error' in outcome) throw new Error(outcome.error);
+  // Silver forces the far weaker attacker first; the defender's Gold never applies.
+  expect(outcome.fight.battle!.turns[0].actor).toBe(0);
+});
+
+it("a revenge battle applies only the victim's equipped coin; the thief's is ignored", () => {
+  const victim = 'coin-victim', thief = 'coin-thief';
+  pets.getOrCreatePet(victim); pets.getOrCreatePet(thief);
+  db.prepare('UPDATE pets SET strength = 1, intelligence = 1, charisma = 1, money = 20 WHERE id = ?').run(victim);
+  db.prepare('UPDATE pets SET strength = 20, intelligence = 1, charisma = 1, money = 1000 WHERE id = ?').run(thief);
+  const stolen = pets.steal(thief, victim);
+  if ('error' in stolen) throw new Error(stolen.error);
+  grantCoin(victim, 'silver-coin'); grantCoin(thief, 'gold-coin');
+  expect(pets.equipCoin(victim, 'silver-coin')).not.toHaveProperty('error');
+  expect(pets.equipCoin(thief, 'gold-coin')).not.toHaveProperty('error');
+  const [theft] = pets.theftsFor(victim);
+  const outcome = pets.revenge(victim, theft.id);
+  if ('error' in outcome) throw new Error(outcome.error);
+  // Silver forces the far weaker victim first; the thief's Gold never applies.
+  expect(outcome.battle.turns[0].actor).toBe(0);
 });

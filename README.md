@@ -205,12 +205,20 @@ battle resources; they do not replace stamina or hygiene, and reset each Arena
 fight. Adventure keeps its own HP/MP between encounters, as described below.
 
 Power remains 2 × Strength + Intelligence + Charisma. Each pet rolls a luck
-factor between 0.8 and 1.2: power × luck decides who strikes first (defender
-first on a tie), and Strength × luck, rounded to at least 1, is that pet's
-Claw Strike damage for the battle. Pets alternate attacks until one reaches
-0 HP, using the strongest affordable learned ability (lower MP cost breaks a
-damage tie). Claw Strike remains free; learned attacks spend MP. The surviving pet wins; higher initiative alone no
-longer guarantees victory. The winner gets a win and the loser a loss.
+factor between 0.8 and 1.2, and Strength × luck, rounded to at least 1, is
+that pet's Claw Strike damage for the battle. Before the fight, a coin toss
+decides who strikes first — a fair 50/50 by default, unless the acting
+side's equipped Unfair Coin overrides it (see below). Pets alternate attacks
+until one reaches 0 HP, using the strongest affordable learned ability (lower
+MP cost breaks a damage tie). Claw Strike remains free; learned attacks spend
+MP. The surviving pet wins; going first alone no longer guarantees victory.
+The winner gets a win and the loser a loss.
+
+The coin toss, and any equipped coin's effect, apply to Arena fights and
+revenge the same way they apply to Adventure monster battles: in a fight, the
+**attacker's** equipped coin applies; in revenge, the **victim's** does. The
+opponent's equipped coin is always ignored, so only one side's coin ever
+affects a given battle.
 
 The window shows saved HP/MP changes, attack effects, and an expandable log.
 **Skip to result**, **Replay battle**, and **Watch battle** in recent fights
@@ -313,7 +321,11 @@ the built-in `node:sqlite` for storage.
   in an HttpOnly cookie, stored only as a hash.
 - **Actions** (owner only): `POST /api/pets/:id/study/:course`,
   `work/:location` (with `{"minutes": 60}`), `upgrade/:location`, `buy/:item`,
-  `use/:item`, `fight/:opponent` and `steal/:opponent`. Stealing returns
+  `use/:item`, `fight/:opponent`, `steal/:opponent` and `equip-coin/:coin`
+  (`:coin` is `copper-coin`, `silver-coin`, `gold-coin`, or `none` to unequip).
+  Equipping is global to the pet and reusable — never consumed — and applies
+  to Adventure, Arena, and revenge alike; equipping a coin the pet doesn't own,
+  or an unknown coin, returns 409. Stealing returns
   `{ thief, victim, amount }`; both pets include `stealAvailableAt` (epoch
   milliseconds, or `null` before any theft). The server locks and checks the
   target before transferring money, saving protection and recording the feed
@@ -376,10 +388,10 @@ after this update. Training increases the maximums without refilling current HP/
 
 Encounters use the Arena's automatic battle scene, with the monster's
 own appearance, name, and attributes. Monsters use **Claw Strike**, which costs **0 MP**;
-pets also use their learned abilities. For now, damage
-and initiative use the same power and luck rolls as Arena; coin tosses and unfair
-coins are a later phase. The scene starts at the pet's saved HP/MP, and each
-monster starts at full HP/MP.
+pets also use their learned abilities, and damage uses the same power and luck
+rolls as Arena. Initiative is the same coin toss as Arena: a fair 50/50 unless
+the pet's own equipped Unfair Coin overrides it — monsters never carry coins.
+The scene starts at the pet's saved HP/MP, and each monster starts at full HP/MP.
 
 On victory, the monster stays defeated and the pet occupies its tile. Recover
 **20% of maximum HP and MP, rounded up separately**, capped at their maximums.
@@ -412,13 +424,13 @@ Silver, and Gold Coins have equal chances within the coin category. Opened chest
 stay on the map, retain their reward, and cannot be looted again. New adventures
 have fresh chests. Defeat, restarting, and signing out do not remove inventory.
 
-The map's **Your backpack** shows items, learned abilities, and coin counts.
-Food restores 40 stamina; soap restores 50 hygiene, capped at 100. Hourglasses
-finish the current lesson or shift. These are the same items used in **Care &
-shop**, with a shared count; they do not restore Adventure HP/MP or revive a failed
-run. The Adventure section's **Abilities & coins** also shows permanent discoveries.
-Coins accumulate in inventory; selecting them and their battle effects arrive
-in phase 5 of `ADVENTURE_PLAN.md`.
+The map's **Your backpack** shows items, learned abilities, and coins, each with
+an **Equip**/**Unequip** button. Food restores 40 stamina; soap restores 50
+hygiene, capped at 100. Hourglasses finish the current lesson or shift. These
+are the same items used in **Care & shop**, with a shared count; they do not
+restore Adventure HP/MP or revive a failed run. The Adventure section's
+**Abilities & coins** also shows permanent discoveries and the same equip
+controls, since equipping is global to the pet.
 
 Ability rewards are learned immediately and permanently, and work in Adventure,
 Arena, and revenge. Duplicate drops say **already learned**, without stacking
@@ -434,6 +446,26 @@ Each turn uses the learned attack with the greatest damage that the fighter can
 afford, preferring lower MP cost when damage ties. At low MP the pet falls back
 to Claw Strike. Saved playback includes each ability, MP spent, and remaining
 resources; replaying does not spend MP again.
+
+### Unfair coins
+
+A coin toss decides initiative before every monster battle, Arena fight, and
+revenge attempt: a fair 50/50 by default. Equipping an Unfair Coin can change
+that for the pet wearing it:
+
+| Coin | Effect |
+| --- | --- |
+| Copper Coin | +1 to every attribute, for that battle's HP/MP/damage only. The toss stays a fair 50/50. |
+| Silver Coin | The pet always attacks first. |
+| Gold Coin | The pet always attacks second, but its first attack deals double damage. |
+
+Coins are **reusable equipment, never consumed**: equip one (or none) from
+the backpack, and it stays equipped — in Adventure, Arena, and revenge alike —
+until changed. In Arena and revenge, only the **acting side's** equipped coin
+applies (the attacker in a fight, the victim in revenge); the opponent's
+equipped coin, if any, is ignored. Copper's bonus never persists: the pet's
+real attributes, and its saved maximum HP/MP, are unchanged once the battle
+ends.
 
 The private `POST /api/adventure` accepts an empty body to resume. Its response
 includes an opaque `revision`; supply that revision with every action:

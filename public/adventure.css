@@ -28,8 +28,8 @@
 .adventure-backpack h4 { font-size: .9rem; margin: 16px 0 8px; }
 .adventure-backpack ul { list-style: none; padding: 0; margin: 0; font-size: .8rem; }
 .adventure-backpack li { margin-bottom: 12px; overflow-wrap: anywhere; }
-#adventure-items li { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-#adventure-items button { min-height: 44px; }
+#adventure-items li, #adventure-coins li { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+#adventure-items button, #adventure-coins button { min-height: 44px; }
 .adventure-controls { display: flex; justify-content: center; gap: 8px; }
 .adventure-controls button { min-width: 48px; min-height: 48px; border: 1px solid var(--border); border-radius: 12px; color: var(--fg); background: var(--bg); font-size: 24px; }
 .adventure-controls button:active { background: var(--bg-glow); }

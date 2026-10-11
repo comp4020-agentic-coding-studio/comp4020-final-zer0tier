@@ -1,8 +1,9 @@
 import { TIME_SCALE, realMs } from "./clock.ts";
 import { db } from "./db.ts";
 import { record } from "./feed.ts";
-import { simulateBattle, type Battle } from "./combat.ts";
+import { coinEffect, simulateBattle, withAttributeBonus, type Battle } from "./combat.ts";
 import { inventoryFor } from "./inventory.ts";
+import { isCoinId, type CoinId } from "./treasure.ts";
 
 // Keep this literal list identical to public/app.js: the unbundled browser
 // cannot import this server module (which opens SQLite).
@@ -34,6 +35,7 @@ export interface Pet extends ReturnType<typeof inventoryFor> {
   jobs: Record<LocationId, number>; // index into that location's ranks
   wins: number;
   losses: number;
+  equippedCoin: CoinId | null; // global to the pet; applies in Adventure, Arena, and revenge
 }
 
 // Always there to fight, so a new player has someone to test themselves on.
@@ -150,7 +152,7 @@ export const isValidId = (id: unknown): id is string =>
 const select = db.prepare(
   `SELECT id, color, appearance, strength, intelligence, charisma, money, activity, school, credits, stamina, hygiene, food, soap,
           hourglass, construction_rank, office_rank, theatre_rank, task, busy_since, busy_until, reward, wins, losses,
-          steal_available_at AS stealAvailableAt
+          steal_available_at AS stealAvailableAt, equipped_coin AS equippedCoin
      FROM pets WHERE id = ?`,
 );
 // The bot first, then the newest pets, so a player who just joined is easy to
@@ -163,7 +165,8 @@ const save = db.prepare(
   // Only stealing changes steal_available_at; ordinary actions preserve it.
   `UPDATE pets SET strength = ?, intelligence = ?, charisma = ?, money = ?, school = ?, credits = ?,
      stamina = ?, hygiene = ?, food = ?, soap = ?, hourglass = ?, construction_rank = ?, office_rank = ?, theatre_rank = ?,
-     activity = ?, task = ?, busy_since = ?, busy_until = ?, reward = ?, wins = ?, losses = ?, color = ?, appearance = ?
+     activity = ?, task = ?, busy_since = ?, busy_until = ?, reward = ?, wins = ?, losses = ?, color = ?, appearance = ?,
+     equipped_coin = ?
    WHERE id = ?`,
 );
 
@@ -295,7 +298,7 @@ function write(pet: Pet): void {
     pet.stamina, pet.hygiene, pet.food, pet.soap, pet.hourglass,
     pet.jobs.construction, pet.jobs.office, pet.jobs.theatre,
     pet.activity, pet.task, pet.busySince, pet.busyUntil, pet.reward === null ? null : JSON.stringify(pet.reward),
-    pet.wins, pet.losses, pet.color, pet.appearance, pet.id,
+    pet.wins, pet.losses, pet.color, pet.appearance, pet.equippedCoin, pet.id,
   );
   if (pet.school !== before.school) record({ kind: "school", pet: pet.id, school: pet.school });
   for (const location of LOCATIONS) {
@@ -346,6 +349,18 @@ export function setAppearance(id: string, color: string, appearance: Appearance)
   return act(id, (pet) => {
     pet.color = color;
     pet.appearance = appearance;
+    return undefined;
+  });
+}
+
+// Reusable equipment, not consumed: one coin (or none) applies to every fight
+// this pet takes part in, in Adventure, Arena, and revenge alike.
+export function equipCoin(id: string, coin: unknown): Outcome {
+  return act(id, (pet) => {
+    if (coin === null) { pet.equippedCoin = null; return undefined; }
+    if (!isCoinId(coin)) return "Unknown coin.";
+    if (pet.coins[coin] < 1) return "You don't have that coin to equip.";
+    pet.equippedCoin = coin;
     return undefined;
   });
 }
@@ -551,11 +566,16 @@ export function fight(attackerId: string, defenderId: string): FightOutcome {
   const unfit = spend(attacker, FIGHT_NEEDS, FIGHT_COST, "fight");
   if (unfit) return { status: 409, error: unfit };
 
-  const attackerPower = powerOf(attacker);
+  // Only the attacker's equipped coin counts; the defender's is ignored.
+  const coin = coinEffect(attacker.equippedCoin);
+  const boostedAttacker = withAttributeBonus(attacker, coin.attributeBonus);
+  const attackerPower = powerOf(boostedAttacker);
   const defenderPower = powerOf(defender);
   const attackerRoll = roll(attackerPower);
   const defenderRoll = roll(defenderPower);
-  const battle = simulateBattle(attacker, defender, [attackerRoll, defenderRoll]);
+  const battle = simulateBattle(boostedAttacker, defender, [attackerRoll, defenderRoll], {
+    first: coin.first, doubleFirstStrike: coin.doubleFirstStrike,
+  });
   const won = battle.winner === attacker.id;
   const winner = won ? attacker : defender;
   const loser = won ? defender : attacker;
@@ -675,7 +695,12 @@ export function revenge(victimId: string, theftId: number): RevengeOutcome {
     if (thief.money < reward) return { status: 409, error: `The thief needs $${reward} to pay the full reward. Try again later.` };
     const unfit = spend(victim, FIGHT_NEEDS, FIGHT_COST, "take revenge");
     if (unfit) return { status: 409, error: unfit };
-    const battle = simulateBattle(victim, thief, [roll(powerOf(victim)), roll(powerOf(thief))]);
+    // Only the victim's (acting side's) equipped coin counts; the thief's is ignored.
+    const coin = coinEffect(victim.equippedCoin);
+    const boostedVictim = withAttributeBonus(victim, coin.attributeBonus);
+    const battle = simulateBattle(boostedVictim, thief, [roll(powerOf(boostedVictim)), roll(powerOf(thief))], {
+      first: coin.first, doubleFirstStrike: coin.doubleFirstStrike,
+    });
     const won = battle.winner === victim.id;
     if (won) {
       thief.money -= reward;

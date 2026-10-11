@@ -48,7 +48,7 @@ adventure.innerHTML = `
       <h4>Learned abilities</h4><ul id="adventure-abilities"></ul>
       <p class="help">Your pet uses its strongest affordable attack automatically. Items and learned abilities stay with your pet.</p>
       <h4>Unfair coins</h4><ul id="adventure-coins"></ul>
-      <p class="help">Keep these for the upcoming coin toss update.</p>
+      <p class="help">A coin toss decides who attacks first; an equipped coin applies in Adventure, Arena, and revenge.</p>
     </details>
   </aside></div>`;
 document.body.append(adventure);
@@ -211,8 +211,19 @@ function renderInventory() {
   const coins = adventure.querySelector('#adventure-coins');
   coins.replaceChildren();
   for (const coin of inventory.coins) {
-    const row = document.createElement('li'); row.textContent = `${coin.name} × ${coin.quantity}`; coins.append(row);
+    const row = document.createElement('li'), label = document.createElement('strong'), effect = document.createElement('span'), button = document.createElement('button');
+    label.textContent = `${coin.name} × ${coin.quantity}`;
+    effect.textContent = coin.effect;
+    button.type = 'button'; button.className = 'chip-btn'; button.setAttribute('aria-pressed', String(Boolean(coin.equipped)));
+    button.textContent = coin.equipped ? 'Unequip' : 'Equip';
+    button.disabled = coin.quantity < 1 && !coin.equipped;
+    button.addEventListener('click', () => { button.disabled = true; equipCoin(coin.equipped ? null : coin.id); });
+    row.append(label, effect, button); coins.append(row);
   }
+}
+async function equipCoin(coinId) {
+  if (!pet) return;
+  await fetch(`/api/pets/${encodeURIComponent(pet.id)}/equip-coin/${encodeURIComponent(coinId ?? 'none')}`, { method: 'POST' });
 }
 function battleResult(battle) {
   return battle.won
@@ -312,7 +323,10 @@ document.addEventListener('adventure:pet', event => {
       item.usable = item.quantity > 0 && (item.effect === 'skip' ? pet.activity !== 'idle' : pet[item.restores] < 100);
     }
     for (const ability of inventory.abilities) ability.learned = pet.abilities?.includes(ability.id) ?? ability.id === 'claw-strike';
-    for (const coin of inventory.coins) coin.quantity = pet.coins?.[coin.id] ?? 0;
+    for (const coin of inventory.coins) {
+      coin.quantity = pet.coins?.[coin.id] ?? 0;
+      coin.equipped = pet.equippedCoin === coin.id;
+    }
   }
   if (adventure.open) renderMap();
 });

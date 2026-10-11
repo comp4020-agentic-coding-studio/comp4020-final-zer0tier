@@ -10,7 +10,7 @@ import {
   WORK_COST_PER_HOUR, buy, findCourse, findItem, findLocation, getOrCreatePet, getPet, isShiftLength, isValidId,
   matchBot, study, upgrade, use, work, BOT_ID, FIGHT_COOLDOWN_MINUTES, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS,
   SPOILS, LEADERBOARD_ORDERS, LEADERBOARD_SIZE, fight, isLeaderboardOrder, leaderboard, listPets, recentFights,
-  APPEARANCES, isAppearance, setAppearance, STEAL, steal, theftsFor, revenge, type Outcome,
+  APPEARANCES, isAppearance, setAppearance, STEAL, steal, theftsFor, revenge, equipCoin, type Outcome,
 } from "./pets.ts";
 import {
   Busy, PASSWORD, type AuthOutcome, clearedCookie, isValidPassword, playerFor, sessionCookie, sessionToken, signIn,
@@ -281,6 +281,11 @@ app.post("/api/pets/:id/use/:item", (req, res) => {
   if (!item) return notFound(res, "item");
   if (!isValidId(req.params.id)) return notFound(res, "pet");
   respond(res, use(req.params.id, item.id));
+});
+
+app.post("/api/pets/:id/equip-coin/:coin", (req, res) => {
+  if (!isValidId(req.params.id)) return notFound(res, "pet");
+  respond(res, equipCoin(req.params.id, req.params.coin === "none" ? null : req.params.coin));
 });
 
 app.post("/api/pets/:id/fight/:opponent", (req, res) => {

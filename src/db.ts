@@ -116,6 +116,7 @@ if (!columns.has("theatre_rank")) db.exec("ALTER TABLE pets ADD COLUMN theatre_r
 if (!columns.has("color")) db.exec("ALTER TABLE pets ADD COLUMN color TEXT NOT NULL DEFAULT '#f59e0b'");
 if (!columns.has("appearance")) db.exec("ALTER TABLE pets ADD COLUMN appearance TEXT NOT NULL DEFAULT 'blob'");
 if (!columns.has("steal_available_at")) db.exec("ALTER TABLE pets ADD COLUMN steal_available_at INTEGER");
+if (!columns.has("equipped_coin")) db.exec("ALTER TABLE pets ADD COLUMN equipped_coin TEXT");
 const fightColumns = new Set(
   (db.prepare("SELECT name FROM pragma_table_info('fights')").all() as { name: string }[]).map((c) => c.name),
 );

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { db } from './db.ts';
-import { ABILITIES, simulateBattle, type Battle } from './combat.ts';
+import { ABILITIES, coinEffect, simulateBattle, withAttributeBonus, type Battle } from './combat.ts';
 import { findItem, getPet, ITEMS, LUCK, MAX_CARE, powerOf, use, type Pet } from './pets.ts';
 import { grantTreasure } from './inventory.ts';
 import { COINS, rollTreasure } from './treasure.ts';
@@ -29,7 +29,7 @@ function inventoryView(pet: Pet) {
       usable: pet[item.id] > 0 && (item.effect === 'skip' ? pet.activity !== 'idle' : pet[item.restores] < MAX_CARE),
     })),
     abilities: ABILITIES.map(a => ({ ...a, learned: pet.abilities.includes(a.id) })),
-    coins: COINS.map(coin => ({ ...coin, quantity: pet.coins[coin.id] })),
+    coins: COINS.map(coin => ({ ...coin, quantity: pet.coins[coin.id], equipped: coin.id === pet.equippedCoin })),
     stamina: pet.stamina, hygiene: pet.hygiene,
   };
 }
@@ -92,13 +92,18 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy) {
   const monster = { ...enemy, id: `monster:${enemy.id}`, monster: enemy.kind,
     color: { slime: '#0891b2', goblin: '#15803d', 'slime-king': '#c026d3' }[enemy.kind] };
   const roll = (stats: Parameters<typeof powerOf>[0]) => powerOf(stats) * (LUCK.min + Math.random() * (LUCK.max - LUCK.min));
-  const playback = simulateBattle(pet, monster, [roll(pet), roll(monster)], {
+  // Only the pet's own equipped coin applies; monsters never carry coins.
+  const coin = coinEffect(pet.equippedCoin);
+  const boostedPet = withAttributeBonus(pet, coin.attributeBonus);
+  const playback = simulateBattle(boostedPet, monster, [roll(boostedPet), roll(monster)], {
     hp: [saved.hp, monster.strength + monster.intelligence + monster.charisma], mp: [saved.mp, monster.intelligence],
+    first: coin.first, doubleFirstStrike: coin.doubleFirstStrike,
   });
   const won = playback.winner === pet.id;
   const floor = saved.world[saved.floor - 1];
   const last = playback.turns.at(-1)!;
-  saved.hp = last.hp[0]; saved.mp = last.mp[0];
+  // Copper's bonus is battle-only: never save HP/MP above the pet's real max.
+  saved.hp = Math.min(last.hp[0], saved.maxHp); saved.mp = Math.min(last.mp[0], saved.maxMp);
   const recovery = {
     hp: won ? Math.min(Math.ceil(saved.maxHp * 0.2), saved.maxHp - saved.hp) : 0,
     mp: won ? Math.min(Math.ceil(saved.maxMp * 0.2), saved.maxMp - saved.mp) : 0,

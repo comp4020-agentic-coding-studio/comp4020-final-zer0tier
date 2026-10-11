@@ -130,6 +130,20 @@ loadRules().then((loaded) => {
     buy.addEventListener("click", () => perform(buy, `buy/${item.id}`, "care-error"));
     $("items").append(card);
   }
+  for (const coin of rules.treasure?.coins ?? []) {
+    const card = document.createElement("div");
+    card.className = "item item-coin";
+    card.dataset.coin = coin.id;
+    card.innerHTML = `<span><span class="coin-name"></span> × <span class="coin-count"></span></span>
+      <span class="item-effect"></span>
+      <button type="button" class="chip-btn coin-equip"></button>`;
+    card.querySelector(".coin-name").textContent = coin.name;
+    card.querySelector(".item-effect").textContent = coin.effect;
+    const equip = card.querySelector(".coin-equip");
+    equip.addEventListener("click", () =>
+      perform(equip, `equip-coin/${current?.equippedCoin === coin.id ? "none" : coin.id}`, "care-error"));
+    $("coins").append(card);
+  }
   $("study-cost").textContent = `${lengthText(rules.study.minutes)} · ${costText(rules.study.cost)}`;
   $("skip").addEventListener("click", () => perform($("skip"), "use/hourglass", "care-error"));
   $("fight-cost").textContent =
@@ -342,6 +356,16 @@ function renderControls(pet) {
     card.querySelector(".item-count").textContent = pet[item.id];
     use.disabled = busy.has(use) || pet[item.id] < 1 || !usable(item, pet);
     buy.disabled = busy.has(buy) || pet.money < item.price;
+  }
+  for (const card of $("coins").children) {
+    const coin = rules.treasure.coins.find((c) => c.id === card.dataset.coin);
+    const quantity = pet.coins?.[coin.id] ?? 0;
+    const equipped = pet.equippedCoin === coin.id;
+    card.querySelector(".coin-count").textContent = quantity;
+    const equip = card.querySelector(".coin-equip");
+    equip.textContent = equipped ? "Unequip" : "Equip";
+    equip.setAttribute("aria-pressed", String(equipped));
+    equip.disabled = busy.has(equip) || (quantity < 1 && !equipped);
   }
 }
 
@@ -923,7 +947,6 @@ function render(pet) {
   if (rules) {
     $("learned-abilities").textContent = rules.fight.abilities.filter(a => (pet.abilities || ['claw-strike']).includes(a.id))
       .map(a => `${a.name} (${a.mpCost} MP)`).join(' · ');
-    $("saved-coins").textContent = (rules.treasure?.coins || []).map(c => `${c.name} × ${pet.coins?.[c.id] || 0}`).join(' · ');
     renderBusy(pet);
     renderSchool(pet, previous);
     renderControls(pet);

@@ -35,6 +35,7 @@ it("signing up creates a pet with base stats and starts a session", async () => 
     reward: null,
     wins: 0,
     losses: 0,
+    equippedCoin: null,
   });
   expect(await (await me(sessionFor(id))).json()).toMatchObject({ id });
 });
@@ -176,4 +177,24 @@ it("only the owner can customize a pet", async () => {
   expect((await post(`/api/pets/${id}/appearance`, change, null)).status).toBe(401);
   expect((await post(`/api/pets/${id}/appearance`, change, other)).status).toBe(403);
   expect(await getPet(id)).toEqual(before);
+});
+
+it("equips and unequips coins, reusably; rejects unknown or unowned coins; requires the owner", async () => {
+  const id = freshId();
+  const other = freshId();
+  await signUp(id);
+  await signUp(other);
+  expect((await post(`/api/pets/${id}/equip-coin/none`, undefined, null)).status).toBe(401);
+  expect((await post(`/api/pets/${id}/equip-coin/none`, undefined, other)).status).toBe(403);
+  expect((await post(`/api/pets/${encodeURIComponent("bad id")}/equip-coin/none`)).status).toBe(404);
+  // Unequipping never requires owning the coin, and starts out a no-op.
+  const unequipped = await post(`/api/pets/${id}/equip-coin/none`);
+  expect(unequipped.status).toBe(200);
+  expect(await unequipped.json()).toMatchObject({ equippedCoin: null });
+  const unknown = await post(`/api/pets/${id}/equip-coin/bogus-coin`);
+  expect(unknown.status).toBe(409);
+  expect((await unknown.json()).error).toMatch(/unknown coin/i);
+  const notOwned = await post(`/api/pets/${id}/equip-coin/silver-coin`);
+  expect(notOwned.status).toBe(409);
+  expect(await getPet(id)).toMatchObject({ equippedCoin: null });
 });

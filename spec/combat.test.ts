@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { ABILITIES, simulateBattle } from '../src/combat.ts';
+import { ABILITIES, coinEffect, simulateBattle } from '../src/combat.ts';
 
 const a = { id: 'a', strength: 5, intelligence: 7, charisma: 3 };
 const b = { id: 'b', strength: 5, intelligence: 5, charisma: 5 };
@@ -66,6 +66,35 @@ it('breaks equal-damage ability ties in favor of lower MP cost', () => {
   expect(battle.turns[0]).toMatchObject({ ability: 'heavy-strike', damage: 9, mp: [4, 1] });
 });
 
+it('tosses a fair coin for initiative with no coin equipped, and leaves damage unboosted', () => {
+  expect(coinEffect(null, () => 0.49)).toEqual({ first: 0, doubleFirstStrike: false, attributeBonus: 0 });
+  expect(coinEffect(undefined, () => 0.5)).toEqual({ first: 1, doubleFirstStrike: false, attributeBonus: 0 });
+});
+it('Copper adds an attribute bonus without changing the coin toss odds', () => {
+  expect(coinEffect('copper-coin', () => 0.49)).toEqual({ first: 0, doubleFirstStrike: false, attributeBonus: 1 });
+  expect(coinEffect('copper-coin', () => 0.5)).toEqual({ first: 1, doubleFirstStrike: false, attributeBonus: 1 });
+});
+it('Silver always goes first and Gold always goes second, regardless of the toss', () => {
+  for (const random of [() => 0, () => 0.999999]) {
+    expect(coinEffect('silver-coin', random)).toEqual({ first: 0, doubleFirstStrike: false, attributeBonus: 0 });
+    expect(coinEffect('gold-coin', random)).toEqual({ first: 1, doubleFirstStrike: true, attributeBonus: 0 });
+  }
+});
+it('an explicit first option overrides the rolls comparison (Silver-style: fighter 0 always first)', () => {
+  // Rolls alone would put b first (16 < 24 is false... use a losing roll for a).
+  const battle = simulateBattle(a, b, [10, 24], { first: 0 });
+  expect(battle.turns[0].actor).toBe(0);
+});
+it("doubleFirstStrike doubles only fighter 0's own first hit, even when it goes second (Gold-style)", () => {
+  const battle = simulateBattle(a, b, [24, 16], { first: 1, doubleFirstStrike: true });
+  expect(battle.turns[0].actor).toBe(1);
+  const zeroTurns = battle.turns.filter(t => t.actor === 0);
+  expect(battle.fighters[0].damage).toBe(6);
+  expect(zeroTurns[0].damage).toBe(12);
+  // A later hit (uncapped by the target's remaining HP) is not doubled.
+  const plainTurns = simulateBattle(a, b, [24, 16], { first: 0 }).turns.filter(t => t.actor === 0);
+  expect(plainTurns[1].damage).toBe(6);
+});
 it('groups long learned-ability battles only while the same attacks remain affordable', () => {
   const tank = { id: 'a', strength: 10, intelligence: 1000, charisma: 100000, abilities: ['heavy-strike'] as const };
   const battle = simulateBattle(tank, { ...tank, id: 'b' }, [101020, 101020]);
