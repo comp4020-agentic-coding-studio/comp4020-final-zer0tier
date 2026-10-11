@@ -76,6 +76,13 @@ widening it.
 
 ## Playing
 
+On desktop windows at least 1120px wide, the game fills the browser with three
+panels: your pet and quick care, School/Work/Shop tabs, and the Arena with
+Pets/Leaderboard/Activity/Alerts tabs. Long lists scroll within their panels;
+short windows can still scroll the page. Theft reports appear in Alerts.
+Arrow keys switch tabs; Home/End select the first/last tab. Narrower windows
+and phones retain the original stacked layout and controls.
+
 **Create an account** with a player ID (letters, digits, `-` or `_`, up to 32
 characters) and a password of at least 8 characters. Each ID has one account
 and one pet, so an ID someone else has signed up with is taken. A new pet starts
