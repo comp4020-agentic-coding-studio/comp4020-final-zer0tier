@@ -3,6 +3,18 @@
 A multiplayer virtual pet game (see README.md). It runs on one Fly.io machine
 with 256 MB of memory and one volume at `/data`. Every rule here follows from that.
 
+## Working with the owner
+
+- Read this file before starting each task or changing direction. Apply its
+  rules before making changes, and record new standing preferences here when
+  the owner supplies them.
+- Finish the requested work and relevant checks, then commit each completed
+  feature, fix or writing task. Keep unrelated existing changes out of the commit.
+- For desktop-only layout requests, preserve the phone layout and interactions.
+  Check desktop and phone sizes, keyboard access, and overflow before committing.
+- Keep the rules concise and specific to this project. Do not turn a one-off
+  implementation choice into a permanent rule without the owner's direction.
+
 ## Stack (don't add to it without asking)
 
 - **Node 24, TypeScript run directly** (`node src/server.ts`, type stripping).
