@@ -9,6 +9,7 @@ import { baseUrl, freshId, getRules, signUp } from './helpers.ts';
 
 function map(floor = 1) {
   return { ...createWorld()[floor - 1], floor, floorCount: 5, size: 16, x: 2, y: 2, encounters: [], revision: 'saved-map', battle: null, completed: false, failed: false, hp: 15, mp: 5, maxHp: 15, maxMp: 5,
+    cooldownUntil: null as number | null, timeScale: 1, restartCost: { stamina: 40, hygiene: 20 }, cooldownMinutes: 240,
     inventory: { stamina: 30, hygiene: 40,
       items: [{ id: 'food', name: 'Food', effect: 'restore', restores: 'stamina', amount: 40, quantity: 0, usable: false }],
       abilities: ABILITIES.map(a => ({ ...a, learned: a.id === 'claw-strike' })),
@@ -169,6 +170,34 @@ it('shows a failed run with disabled movement and starts a fresh adventure only 
     expect($('adventure-resources').textContent).toBe('HP 15 / 15 · MP 5 / 5');
     expect($('adventure-battle-summary').hidden).toBe(true);
     expect($('adventure-grid').querySelectorAll('.adventure-marker-slime')).toHaveLength(2);
+  } finally { dom.window.close(); }
+});
+
+it('shows Abandon run while exploring, and switches to a cooldown message with a skip button once one is set', async () => {
+  const { dom, window, $ } = page();
+  window.confirm = () => true;
+  let state: ReturnType<typeof map> = map();
+  const requests = vi.fn(async (_url: string, options: RequestInit) => {
+    const body = JSON.parse(options.body as string);
+    if (body.action === 'restart') {
+      state = { ...state, revision: 'restarted-map', cooldownUntil: Date.now() + 4 * 60 * 60 * 1000 };
+    }
+    return Response.json(state);
+  });
+  window.fetch = requests as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    expect(($('adventure-abandon') as HTMLButtonElement).hidden).toBe(false);
+    expect(($('adventure-restart') as HTMLButtonElement).hidden).toBe(true);
+    expect(($('adventure-cooldown') as HTMLButtonElement).hidden).toBe(true);
+    $('adventure-abandon').click();
+    await vi.waitFor(() => expect(($('adventure-cooldown') as HTMLElement).hidden).toBe(false));
+    expect(($('adventure-abandon') as HTMLButtonElement).hidden).toBe(true);
+    expect(($('adventure-restart') as HTMLButtonElement).hidden).toBe(true);
+    expect($('adventure-cooldown').textContent).toMatch(/rest/i);
+    expect(($('adventure-skip-cooldown') as HTMLButtonElement).hidden).toBe(false);
   } finally { dom.window.close(); }
 });
 

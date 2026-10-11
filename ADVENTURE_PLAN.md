@@ -4,8 +4,9 @@ Status: all five steps implemented: exploration controls and saving; five fixed
 floors with stairs, slimes/goblins, increasing attributes, a Slime King on floor
 five, chest landmarks, enemy detection/pursuit, and automatic monster battles
 with saved HP/MP and outcomes; atomic chest rewards, persistent inventory, item
-use, and learned abilities; and a coin-toss initiative with reusable, equippable
-Copper/Silver/Gold coins. This document preserves the owner's requirements.
+use, and learned abilities; a coin-toss initiative with reusable, equippable
+Copper/Silver/Gold coins; and an entry cost and cooldown on starting fresh.
+This document preserves the owner's requirements.
 
 Implementation defaults for step 2: monsters take one cardinal step after an
 accepted player step, detect the eight surrounding cells, and stop chasing when
@@ -125,7 +126,6 @@ authoritative; new real-time events require the existing one-second tests.
 
 ## Decisions to settle before the relevant phase
 
-- Should a future phase add energy limits, entry cost, cooldown, or daily attempts?
 - What are the boss abilities and completion rewards? Review the initial enemy
   stat curves after monster battles are playable.
 - Keep the existing touch direction buttons and phone layout during later steps.
@@ -134,3 +134,10 @@ Resolved for phase 5: coins are reusable equipment (never consumed); Copper's
 bonus is battle-only and never raises derived HP/MP afterward; the coin toss
 and unfair coins apply to Arena and revenge as well as Adventure, with only
 the acting side's (attacker's, or revenge victim's) equipped coin ever applying.
+
+Resolved for the entry cost/cooldown: starting a fresh run (after a win, a
+failure, or voluntarily abandoning one in progress) costs 40 stamina/20
+hygiene and opens a 4-hour cooldown, skippable with an Hourglass from the
+shared Care & shop count. Reopening the map to continue an unfinished run
+stays free — the cost and cooldown only gate starting over, not Adventure
+HP/MP or ongoing exploration.

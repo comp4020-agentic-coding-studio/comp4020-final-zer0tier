@@ -1,4 +1,7 @@
-import { adventureFor, changeFloor, continueAdventure, moveAdventure, openAdventureChest, restartAdventure, useAdventureItem } from "./adventure.ts";
+import {
+  adventureFor, changeFloor, continueAdventure, moveAdventure, openAdventureChest, restartAdventure,
+  skipAdventureCooldown, useAdventureItem,
+} from "./adventure.ts";
 import express from "express";
 import { ABILITIES } from "./combat.ts";
 import { COINS, TREASURE_RATES } from './treasure.ts';
@@ -10,7 +13,8 @@ import {
   WORK_COST_PER_HOUR, buy, findCourse, findItem, findLocation, getOrCreatePet, getPet, isShiftLength, isValidId,
   matchBot, study, upgrade, use, work, BOT_ID, FIGHT_COOLDOWN_MINUTES, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS,
   SPOILS, LEADERBOARD_ORDERS, LEADERBOARD_SIZE, fight, isLeaderboardOrder, leaderboard, listPets, recentFights,
-  APPEARANCES, isAppearance, setAppearance, STEAL, steal, theftsFor, revenge, equipCoin, type Outcome,
+  APPEARANCES, isAppearance, setAppearance, STEAL, steal, theftsFor, revenge, equipCoin,
+  ADVENTURE_COST, ADVENTURE_COOLDOWN_MINUTES, type Outcome,
 } from "./pets.ts";
 import {
   Busy, PASSWORD, type AuthOutcome, clearedCookie, isValidPassword, playerFor, sessionCookie, sessionToken, signIn,
@@ -110,12 +114,13 @@ app.post("/api/adventure", (req, res) => {
   if (req.body?.direction !== undefined && req.body?.action !== undefined) {
     return void res.status(400).json({ error: "Choose one adventure action at a time." });
   }
-  const inventoryAction = req.body?.action === 'open-chest' || req.body?.action === 'use-item';
+  const inventoryAction = ['open-chest', 'use-item', 'restart', 'skip-cooldown'].includes(req.body?.action);
   const before = inventoryAction ? getPet(id) : undefined;
   const result = req.body?.action === 'open-chest' ? openAdventureChest(id, req.body.revision)
     : req.body?.action === 'use-item' ? useAdventureItem(id, req.body.item, req.body.revision)
     : req.body?.action === 'continue' ? continueAdventure(id, req.body.battleId, req.body.revision)
     : req.body?.action === 'restart' ? restartAdventure(id, req.body.revision)
+    : req.body?.action === 'skip-cooldown' ? skipAdventureCooldown(id, req.body.revision)
     : req.body?.action !== undefined ? changeFloor(id, req.body.action, req.body.revision)
     : req.body?.direction !== undefined ? moveAdventure(id, req.body.direction, req.body.revision) : adventureFor(id);
   if (before) {
@@ -206,6 +211,7 @@ app.get("/api/rules", (_req, res) => {
       cooldownMinutes: FIGHT_COOLDOWN_MINUTES,
       abilities: ABILITIES,
     },
+    adventure: { cost: ADVENTURE_COST, cooldownMinutes: ADVENTURE_COOLDOWN_MINUTES },
     botId: BOT_ID,
     steal: STEAL,
     leaderboardSize: LEADERBOARD_SIZE,

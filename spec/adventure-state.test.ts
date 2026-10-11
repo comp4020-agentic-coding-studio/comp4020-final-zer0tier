@@ -118,7 +118,8 @@ it('keeps learned abilities and coins through defeat/new runs; duplicate ability
   expect(adventure.openAdventureChest(id, failed.revision)).toEqual(failed);
   const next = adventure.restartAdventure(id, failed.revision);
   expect(next).toMatchObject({ floor: 1, hp: 15 });
-  expect(pets.getPet(id)).toEqual(pet);
+  // Restarting after a defeat now costs the flat adventure fee.
+  expect(pets.getPet(id)).toEqual({ ...pet, stamina: pet.stamina - 40, hygiene: pet.hygiene - 20 });
   expect(adventure.openAdventureChest(id, failed.revision)).toEqual(next);
   standOnChest(id); expect(openChest(id, 0.6).chests[0].reward!.learned).toBe(false);
 });
@@ -240,7 +241,8 @@ it('ends the adventure on defeat and requires an explicit fresh run; old retries
   expect(adventure.restartAdventure(id, failed.revision)).toEqual(restarted);
   expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(restarted);
   expect(adventure.continueAdventure(id, result.battle!.id, result.revision)).toEqual(restarted);
-  expect(adventure.restartAdventure(id, adventure.adventureFor(id).revision)).toMatchObject({ status: 409 });
+  // Restarting again immediately now hits the fresh adventure cooldown, not the old "still in progress" refusal.
+  expect(adventure.restartAdventure(id, adventure.adventureFor(id).revision)).toMatchObject({ status: 429 });
   expect(afterRestart(id)).toEqual(restarted);
 });
 
@@ -332,4 +334,53 @@ it("a revenge battle applies only the victim's equipped coin; the thief's is ign
   if ('error' in outcome) throw new Error(outcome.error);
   // Silver forces the far weaker victim first; the thief's Gold never applies.
   expect(outcome.battle.turns[0].actor).toBe(0);
+});
+
+it('refuses to restart when stamina or hygiene is too low, spending nothing; charges the flat cost on success', () => {
+  const id = 'restart-cost'; pets.getOrCreatePet(id);
+  const saved = adventure.adventureFor(id);
+  db.prepare('UPDATE pets SET stamina = ?, hygiene = ? WHERE id = ?').run(39, 100, id);
+  expect(adventure.restartAdventure(id, saved.revision)).toMatchObject({ status: 409 });
+  expect(pets.getPet(id)).toMatchObject({ stamina: 39, hygiene: 100 });
+  db.prepare('UPDATE pets SET stamina = ?, hygiene = ? WHERE id = ?').run(100, 19, id);
+  expect(adventure.restartAdventure(id, saved.revision)).toMatchObject({ status: 409 });
+  expect(pets.getPet(id)).toMatchObject({ stamina: 100, hygiene: 19 });
+  db.prepare('UPDATE pets SET stamina = ?, hygiene = ? WHERE id = ?').run(100, 100, id);
+  expect(adventure.restartAdventure(id, saved.revision)).toMatchObject({ floor: 1 });
+  expect(pets.getPet(id)).toMatchObject({ stamina: 60, hygiene: 80 });
+});
+
+it('allows abandoning a run still in progress, not just a failed or completed one, at the same cost', () => {
+  const id = 'abandon-run';
+  const before = setupBattle(id, 'slime');
+  expect(before).toMatchObject({ failed: false, completed: false });
+  const result = adventure.restartAdventure(id, before.revision);
+  if ('error' in result) throw new Error(result.error);
+  expect(result).toMatchObject({ floor: 1, x: 2, y: 2, failed: false, completed: false });
+  expect(result.cooldownUntil).toBeGreaterThan(Date.now());
+  expect(pets.getPet(id)).toMatchObject({ stamina: 60, hygiene: 80 });
+});
+
+it('opens a cooldown after restarting, refuses another restart until it expires, and can be skipped with an Hourglass', () => {
+  const id = 'adventure-cooldown'; pets.getOrCreatePet(id);
+  const started = adventure.restartAdventure(id, adventure.adventureFor(id).revision);
+  if ('error' in started) throw new Error(started.error);
+  expect(started.cooldownUntil).toBeGreaterThan(Date.now());
+  const blocked = adventure.restartAdventure(id, started.revision);
+  expect(blocked).toMatchObject({ status: 429 });
+  expect((blocked as { error: string }).error).toMatch(/rest/i);
+  expect(adventure.skipAdventureCooldown(id, started.revision)).toMatchObject({ status: 409 }); // no hourglass yet
+  db.prepare('UPDATE pets SET hourglass = 1 WHERE id = ?').run(id);
+  const skipped = adventure.skipAdventureCooldown(id, adventure.adventureFor(id).revision);
+  if ('error' in skipped) throw new Error(skipped.error);
+  expect(skipped.cooldownUntil).toBe(null);
+  expect(pets.getPet(id)).toMatchObject({ hourglass: 0 });
+  expect(adventure.restartAdventure(id, skipped.revision)).not.toHaveProperty('error');
+});
+
+it('treats skipping the cooldown as a harmless no-op when none is active', () => {
+  const id = 'no-cooldown-to-skip'; pets.getOrCreatePet(id);
+  const saved = adventure.adventureFor(id);
+  expect(saved.cooldownUntil).toBe(null);
+  expect(adventure.skipAdventureCooldown(id, saved.revision)).toEqual(saved);
 });

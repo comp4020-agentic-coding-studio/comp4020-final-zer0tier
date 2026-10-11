@@ -10,7 +10,10 @@ adventure.innerHTML = `
   <p id="adventure-status" role="status">Opening the clearing…</p>
   <p id="adventure-resources" aria-live="polite"></p>
   <p id="adventure-failure" role="status" hidden>Adventure failed. Start a new adventure to try again.</p>
+  <p id="adventure-cooldown" role="status" hidden></p>
+  <button type="button" id="adventure-skip-cooldown" class="chip-btn" hidden>Skip wait (use Hourglass)</button>
   <button type="button" id="adventure-restart" class="chip-btn" hidden>Start new adventure</button>
+  <button type="button" id="adventure-abandon" class="chip-btn" hidden>Abandon run</button>
   <section id="adventure-battle-summary" aria-label="Last monster battle" hidden>
     <p id="adventure-result" role="status"></p>
     <div class="adventure-battle-actions">
@@ -38,6 +41,7 @@ adventure.innerHTML = `
     <details><summary>Monster attributes</summary><ul id="adventure-enemies"></ul></details>
     <p class="help">Monsters notice the eight blocks around them and move after you. Go around them to avoid battle.</p>
     <p class="help">HP and MP carry between battles. Each victory restores 20% of their maximums, rounded up. Defeat ends the adventure.</p>
+    <p class="help" id="adventure-restart-cost"></p>
     <p id="adventure-completion" class="help" role="status" hidden>Slime King defeated! The woodland is complete. You can keep exploring.</p>
     <p class="help">Stand on a chest and choose Open chest. Each chest holds one reward per adventure.</p>
     <details><summary>Treasure chances</summary><p class="help">Food 30% · Soap 30% · Ability 20% · Hourglass 15% · Unfair coin 5%. Abilities and coin types have equal chances within their category.</p></details>
@@ -89,6 +93,9 @@ function syncControls() {
   disable(adventure.querySelector('#adventure-continue'), pending);
   disable(adventure.querySelector('#adventure-replay'), pending);
   disable(adventure.querySelector('#adventure-restart'), pending || Boolean(state?.battle?.pending));
+  disable(adventure.querySelector('#adventure-abandon'), pending || Boolean(state?.battle?.pending));
+  const hourglasses = state?.inventory?.items.find(item => item.id === 'hourglass')?.quantity ?? 0;
+  disable(adventure.querySelector('#adventure-skip-cooldown'), pending || hourglasses < 1);
   const chest = state?.chests.find(at);
   const open = adventure.querySelector('#adventure-open-chest');
   open.textContent = chest?.reward ? 'Chest opened' : 'Open chest';
@@ -112,6 +119,10 @@ function clearMap() {
   adventure.querySelector('#adventure-completion').hidden = true;
   adventure.querySelector('#adventure-failure').hidden = true;
   adventure.querySelector('#adventure-restart').hidden = true;
+  adventure.querySelector('#adventure-abandon').hidden = true;
+  adventure.querySelector('#adventure-cooldown').hidden = true;
+  adventure.querySelector('#adventure-skip-cooldown').hidden = true;
+  adventure.querySelector('#adventure-restart-cost').textContent = '';
   adventure.querySelector('#adventure-resources').textContent = '';
   for (const id of ['adventure-treasure', 'adventure-care', 'adventure-items', 'adventure-abilities', 'adventure-coins']) {
     adventure.querySelector(`#${id}`).replaceChildren();
@@ -119,6 +130,27 @@ function clearMap() {
   status.textContent = 'Opening the woodland…';
   syncControls();
 }
+
+function cooldownActive() {
+  return Boolean(state?.cooldownUntil) && state.cooldownUntil > Date.now();
+}
+function cooldownText() {
+  const minutes = Math.max(1, Math.ceil(((state.cooldownUntil - Date.now()) * state.timeScale) / 60_000));
+  const h = Math.floor(minutes / 60), m = minutes % 60;
+  return `Your pet needs to rest. Next adventure in ${h ? `${h} h ` : ''}${m || !h ? `${m} min` : ''}.`;
+}
+// Only the cooldown message/buttons, so the 1 s tick doesn't rebuild the map.
+function renderCooldown() {
+  if (!state) return;
+  const active = cooldownActive();
+  adventure.querySelector('#adventure-cooldown').hidden = !active;
+  if (active) adventure.querySelector('#adventure-cooldown').textContent = cooldownText();
+  adventure.querySelector('#adventure-skip-cooldown').hidden = !active;
+  adventure.querySelector('#adventure-restart').hidden = active || (!state.failed && !state.completed);
+  adventure.querySelector('#adventure-abandon').hidden = active || state.failed || state.completed || Boolean(state.battle?.pending);
+  syncControls();
+}
+setInterval(() => { if (adventure.open) renderCooldown(); }, 1000);
 
 function renderMap() {
   if (!state) return;
@@ -130,7 +162,9 @@ function renderMap() {
     : state.completed ? 'Final floor. The Slime King has been defeated.' : 'Final floor. The Slime King guards this grove.';
   adventure.querySelector('#adventure-completion').hidden = !state.completed;
   adventure.querySelector('#adventure-failure').hidden = !state.failed;
-  adventure.querySelector('#adventure-restart').hidden = !state.failed && !state.completed;
+  adventure.querySelector('#adventure-restart-cost').textContent =
+    `Starting a fresh adventure — after winning, failing, or abandoning one — costs ${state.restartCost.stamina} stamina and ${state.restartCost.hygiene} hygiene and opens a ${state.cooldownMinutes / 60}-hour wait, skippable with an Hourglass.`;
+  renderCooldown();
   adventure.querySelector('#adventure-resources').textContent = `HP ${state.hp} / ${state.maxHp} · MP ${state.mp} / ${state.maxMp}`;
   adventure.querySelector('#adventure-battle-summary').hidden = !state.battle;
   adventure.querySelector('#adventure-result').textContent = state.battle ? battleResult(state.battle) : '';
@@ -307,6 +341,13 @@ adventure.querySelector('#adventure-restart').addEventListener('click', async ()
   await request({ action: 'restart' });
   if (adventure.open) grid.focus({ preventScroll: true });
 });
+adventure.querySelector('#adventure-abandon').addEventListener('click', async () => {
+  const cost = state?.restartCost;
+  if (!window.confirm(`Abandon this run and start a new adventure? This resets your floor${cost ? ` and costs ${cost.stamina} stamina and ${cost.hygiene} hygiene` : ''}.`)) return;
+  await request({ action: 'restart' });
+  if (adventure.open) grid.focus({ preventScroll: true });
+});
+adventure.querySelector('#adventure-skip-cooldown').addEventListener('click', () => request({ action: 'skip-cooldown' }));
 async function continueExploring() {
   if (!state?.battle?.pending) return;
   await request({ action: 'continue', battleId: state.battle.id });

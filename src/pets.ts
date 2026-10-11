@@ -461,6 +461,22 @@ export function use(id: string, itemId: ItemId): Outcome {
   });
 }
 
+// Charges the flat cost of starting a fresh adventure, refusing if the pet
+// doesn't have enough stamina/hygiene to spare.
+export function spendForAdventure(id: string): Outcome {
+  return act(id, (pet) => spend(pet, ADVENTURE_COST, ADVENTURE_COST, "start another adventure"));
+}
+
+// Skips the adventure cooldown; unlike `use`, this isn't tied to a busy
+// activity, so it only ever spends the hourglass.
+export function consumeHourglass(id: string): Outcome {
+  return act(id, (pet) => {
+    if (pet.hourglass < 1) return "No hourglass left. Buy one at the shop.";
+    pet.hourglass--;
+    return undefined;
+  });
+}
+
 // Fights ---------------------------------------------------------------------
 
 // Strength counts double; brains and charm help too.
@@ -487,6 +503,12 @@ export const spoilsFrom = (loser: Pet): number => Math.min(SPOILS.max, Math.floo
 // attacking that same pet again, so a strong pet can't drain a weak one. The
 // defender can hit back straight away, and the bot never makes anyone wait.
 export const FIGHT_COOLDOWN_MINUTES = 60;
+
+// Starting a fresh adventure (after winning, failing, or abandoning one in
+// progress) costs this outright, with no extra buffer: an adventure doesn't
+// keep running after you leave, unlike a lesson or shift.
+export const ADVENTURE_COST: Needs = { stamina: 40, hygiene: 20 };
+export const ADVENTURE_COOLDOWN_MINUTES = 240;
 
 export interface Fight {
   id: number;

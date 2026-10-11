@@ -142,6 +142,24 @@ it("pet:updated — equipping (and unequipping) a coin reaches every open window
   }
 });
 
+it("pet:updated — abandoning an adventure (which spends stamina/hygiene) reaches every open window within 1s", async () => {
+  const id = freshId();
+  await signUp(id);
+  const opened = await post("/api/adventure", {}, id);
+  const { revision } = await opened.json();
+  const windows = [await open(), await open()];
+  try {
+    const updates = windows.map((ws) => nextUpdate(ws, id, (pet) => pet.stamina === 60));
+    const res = await post("/api/adventure", { action: "restart", revision }, id);
+    expect(res.status).toBe(200);
+    for (const event of await Promise.all(updates)) {
+      expect(event.pet).toMatchObject({ id, stamina: 60, hygiene: 80 });
+    }
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});
+
 it("pet:updated — a job upgrade reaches every open window within 1s", async () => {
   const id = freshId();
   await signUp(id);

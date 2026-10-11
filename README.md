@@ -414,8 +414,16 @@ the saved result and resumes exploration after a win. If that request fails,
 opens the same pending battle. Replays cannot reroll a result, grant more recovery,
 or resurrect a monster.
 
-Adventure has no entry cost, care cost, or cooldown, and does not alter Arena
-wins/losses. Monster victories grant recovery; chests grant the items below.
+**Starting a fresh adventure costs 40 stamina and 20 hygiene** and opens a
+**4-hour cooldown**, whether that fresh start follows a win, a defeat, or
+choosing **Abandon run** to give up on one still in progress (shown instead of
+Start new adventure while exploring; reopening the map to continue an
+unfinished run is still free). Starting is refused if the pet doesn't have
+enough stamina/hygiene to spare, or while a cooldown is active — an Hourglass
+clears the wait early, from the same shared count used elsewhere. None of this
+touches Adventure HP/MP, which still carry over normally; it only gates
+*starting again*. Adventure still doesn't alter Arena wins/losses. Monster
+victories grant recovery; chests grant the items below.
 
 ### Treasure and inventory
 
@@ -475,7 +483,8 @@ includes an opaque `revision`; supply that revision with every action:
 - `{ "direction": "w" | "a" | "s" | "d", "revision": "…" }` moves one tile.
 - `{ "action": "ascend" | "descend", "revision": "…" }` uses matching stairs.
 - `{ "action": "continue", "battleId": "…", "revision": "…" }` acknowledges a battle.
-- `{ "action": "restart", "revision": "…" }` starts fresh after failure or completion.
+- `{ "action": "restart", "revision": "…" }` starts fresh after failure, completion, or (while still exploring) abandoning the current run; refused with 409 if stamina/hygiene are too low, or 429 while the 4-hour cooldown is active.
+- `{ "action": "skip-cooldown", "revision": "…" }` spends one Hourglass to clear an active cooldown early; refused with 409 if there's no Hourglass to spend. A no-op, returning the current state, if no cooldown is active.
 - `{ "action": "open-chest", "revision": "…" }` opens the chest under the pet.
 - `{ "action": "use-item", "item": "food" | "soap" | "hourglass", "revision": "…" }` uses one backpack item.
 
