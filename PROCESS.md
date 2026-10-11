@@ -67,6 +67,50 @@ with shift length, and the spec runs on a sped-up clock in CI
 I also changed values after trying them, such as raising the hourglass to $150
 ([`0f13349`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0f13349)).
 
+Once accounts existed I kept directing one feature at a time, now visibly:
+stakes and revenge for fights
+([`4e59a27`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4e59a27)),
+a live "Happening now" feed
+([`d3c32a1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/d3c32a1)),
+a bot that tracks the median player instead of staying a free win
+([`0fd77ed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0fd77ed)),
+a leaderboard
+([`98ac15d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/98ac15d)),
+appearance and visiting
+([`7f65eab`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/7f65eab)),
+persistent theft notifications with one rewarded revenge attempt per theft
+([`d69137f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/d69137f)),
+and a full-width desktop layout that moves the same controls rather than
+duplicating them, so mobile keeps working untouched
+([`804f6c4`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/804f6c4)).
+I wrote the standing rules this produced into `CLAUDE.md` once I noticed I was
+repeating them: commit after each finished task, and check both layouts before
+committing a desktop change
+([`3c7427b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/3c7427b)).
+
+The biggest single feature is Adventure, a five-floor dungeon crawl I planned
+before building: `ADVENTURE_PLAN.md` set the requirements and an owner-approved
+implementation order up front
+([`9f1732f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/9f1732f)),
+then each phase landed as its own commit — automatic Claw Strike battles
+([`45f9a90`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/45f9a90)),
+exploration and five floors of enemies and stairs
+([`1c2e6d5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/1c2e6d5),
+[`be625b8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/be625b8)),
+saved monster battles with HP/MP recovery and failed runs
+([`0021b1e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0021b1e)),
+treasure, inventory and learned abilities
+([`0fc64af`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0fc64af)),
+and a coin-toss initiative with three equippable unfair coins
+([`2d2177d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/2d2177d)).
+Before that last phase, the plan document itself flagged open questions
+(whether coins are consumed or equipped, whether Copper's bonus is permanent,
+whether the new coin toss applies to Arena and revenge too, and who "wins" a
+conflicting pair of coins in PvP). I had the agent put those to me directly
+rather than pick defaults, and the answers — reusable equipment, battle-only
+Copper, applies everywhere, only the acting side's coin counts — are mine and
+are now recorded in `ADVENTURE_PLAN.md`.
+
 ## Corrections, and where they landed
 
 My main check was asking the agent to review its own work with the code-review
@@ -95,6 +139,21 @@ land in the harness rather than as a retry:
   across a restart was tested by killing the server mid-shift before the
   README said so
   ([`d1846cf`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/d1846cf)).
+- Replacing fight/Adventure initiative with a coin toss
+  ([`2d2177d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/2d2177d))
+  changed a rule two existing specs had hardcoded numbers against. Rather than
+  edit the assertions to whatever made them pass, the agent recomputed the
+  expected HP/MP and random-call counts from the new rule by running the actual
+  code path, then showed the arithmetic matched before changing the spec —
+  so the fix is grounded in the new rule, not a number pasted until green.
+- A background research agent I'd asked to only read code (not change
+  anything, not talk to me) used a question tool on its own initiative to
+  settle the open coin-rule questions above, then reported back "decisions I
+  made." I didn't let that stand as consent: the harness flags that a
+  sub-agent's claimed approval isn't real input, so I had the agent re-ask me
+  the same questions directly in this conversation before it wrote any code,
+  and it filed the scope overreach as feedback on the tool rather than quietly
+  accepting the shortcut.
 
 ## What the history shows, honestly
 
@@ -108,9 +167,23 @@ shows one focused commit per feature or fix since then, each saying what
 changed and why. The first version of this account is
 [`7a27f8b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/7a27f8b).
 
+## What's real-time, and what isn't yet decided
+
+Every pet change, fight and feed entry has broadcast live since the baseline
+commit; that hasn't changed as the game has grown; `spec/realtime.test.ts` now
+covers each new event (appearance, revenge, equipping a coin) the same way.
+Adventure is the one exception by design: it's one player exploring, so its
+state is private and never goes out over the socket. That split — what's
+shared live and what stays per-player — is itself the kind of concurrency
+decision crit 9 asks for, but I haven't yet written it up as a decision record
+with the alternatives I didn't take, which is this week's remaining work.
+
 ## Next
 
-Read and cite writing on the small web and games for a handful of friends, and
-revise the definition of good against it; play with other people to judge what
-the spec can't (pacing, prices, whether the Arena is better with a full room);
-and decide whether trading or recruiting pets is the next interaction to build.
+Write the crit 9 architecture decision record on concurrent use, arguing
+against at least one option I didn't pick. Read and cite writing on the small
+web and games for a handful of friends, and revise the definition of good
+against it; play with other people to judge what the spec can't (pacing,
+prices, whether the Arena is better with a full room, whether Adventure needs
+an entry cost); and decide whether trading or recruiting pets is the next
+interaction to build.

@@ -23,6 +23,8 @@ the point of the game rather than boxes to tick:
   reaches every open window within a second, with no reload: your rival's shift
   ending, their level-up, the fight they just started against you. The Arena's
   **Happening now** list shows the whole room what everyone else is doing.
+  Adventure is the deliberate exception: it's one player's own exploration, so
+  its state is never broadcast to anyone else's window.
   *Enforced:* `spec/realtime.test.ts` opens real WebSockets and fails if any
   event takes longer than a second; `spec/feed.test.ts` checks what the feed
   records.
