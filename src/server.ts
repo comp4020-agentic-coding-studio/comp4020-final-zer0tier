@@ -1,5 +1,5 @@
 import {
-  adventureFor, changeFloor, continueAdventure, moveAdventure, openAdventureChest, restartAdventure,
+  abandonAdventure, adventureFor, changeFloor, continueAdventure, moveAdventure, openAdventureChest, restartAdventure,
   skipAdventureCooldown, useAdventureItem,
 } from "./adventure.ts";
 import express from "express";
@@ -119,6 +119,7 @@ app.post("/api/adventure", (req, res) => {
   const result = req.body?.action === 'open-chest' ? openAdventureChest(id, req.body.revision)
     : req.body?.action === 'use-item' ? useAdventureItem(id, req.body.item, req.body.revision)
     : req.body?.action === 'continue' ? continueAdventure(id, req.body.battleId, req.body.revision)
+    : req.body?.action === 'abandon' ? abandonAdventure(id, req.body.revision)
     : req.body?.action === 'restart' ? restartAdventure(id, req.body.revision)
     : req.body?.action === 'skip-cooldown' ? skipAdventureCooldown(id, req.body.revision)
     : req.body?.action !== undefined ? changeFloor(id, req.body.action, req.body.revision)

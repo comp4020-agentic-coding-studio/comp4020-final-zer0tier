@@ -258,8 +258,9 @@ it('ends the adventure on defeat and requires an explicit fresh run; old retries
   expect(adventure.restartAdventure(id, failed.revision)).toEqual(restarted);
   expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(restarted);
   expect(adventure.continueAdventure(id, result.battle!.id, result.revision)).toEqual(restarted);
-  // Restarting again immediately now hits the fresh adventure cooldown, not the old "still in progress" refusal.
-  expect(adventure.restartAdventure(id, adventure.adventureFor(id).revision)).toMatchObject({ status: 429 });
+  // A run in progress has to be abandoned (ending it) before another can start.
+  expect(adventure.restartAdventure(id, adventure.adventureFor(id).revision))
+    .toEqual({ status: 409, error: 'Abandon this adventure before starting a new one.' });
   expect(afterRestart(id)).toEqual(restarted);
 });
 
@@ -404,7 +405,8 @@ it('a studying pet cannot move, use stairs, open chests, or start over, but can 
 
 it('refuses to restart when stamina or hygiene is too low, spending nothing; charges the flat cost on success', () => {
   const id = 'restart-cost'; pets.getOrCreatePet(id);
-  const saved = adventure.adventureFor(id);
+  const saved = adventure.abandonAdventure(id, adventure.adventureFor(id).revision);
+  if ('error' in saved) throw new Error(saved.error);
   db.prepare('UPDATE pets SET stamina = ?, hygiene = ? WHERE id = ?').run(39, 100, id);
   expect(adventure.restartAdventure(id, saved.revision)).toMatchObject({ status: 409 });
   expect(pets.getPet(id)).toMatchObject({ stamina: 39, hygiene: 100 });
@@ -416,22 +418,56 @@ it('refuses to restart when stamina or hygiene is too low, spending nothing; cha
   expect(pets.getPet(id)).toMatchObject({ stamina: 60, hygiene: 80 });
 });
 
-it('allows abandoning a run still in progress, not just a failed or completed one, at the same cost', () => {
+it('abandoning ends a run in progress at once and for free; the next fresh run pays the flat cost', () => {
   const id = 'abandon-run';
   const before = setupBattle(id, 'slime');
-  expect(before).toMatchObject({ failed: false, completed: false });
-  const result = adventure.restartAdventure(id, before.revision);
-  if ('error' in result) throw new Error(result.error);
-  expect(result).toMatchObject({ floor: 1, x: 2, y: 2, failed: false, completed: false });
-  expect(result.cooldownUntil).toBeGreaterThan(Date.now());
-  expect(pets.getPet(id)).toMatchObject({ stamina: 60, hygiene: 80 });
+  db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(11, 3, id); // on the chest
+  const pet = pets.getPet(id)!;
+  expect(adventure.adventureFor(id)).toMatchObject({ failed: false, completed: false, abandoned: false });
+  const abandoned = adventure.abandonAdventure(id, before.revision);
+  if ('error' in abandoned) throw new Error(abandoned.error);
+  expect(abandoned).toMatchObject({ abandoned: true, failed: false, completed: false, floor: 1, x: 11, y: 3, cooldownUntil: null });
+  expect(pets.getPet(id)).toEqual(pet); // nothing charged
+  // The ended run can't be played on, and retries or a second abandon change nothing.
+  expect(adventure.moveAdventure(id, 'a', abandoned.revision)).toEqual(abandoned);
+  expect(adventure.openAdventureChest(id, abandoned.revision)).toEqual(abandoned);
+  expect(adventure.abandonAdventure(id, before.revision)).toEqual(abandoned);
+  expect(adventure.abandonAdventure(id, abandoned.revision)).toEqual(abandoned);
+  expect(afterRestart(id)).toEqual(abandoned);
+  const fresh = adventure.restartAdventure(id, abandoned.revision);
+  if ('error' in fresh) throw new Error(fresh.error);
+  expect(fresh).toMatchObject({ abandoned: false, floor: 1, x: 2, y: 2 });
+  expect(fresh.cooldownUntil).toBeGreaterThan(Date.now());
+  expect(pets.getPet(id)).toMatchObject({ stamina: pet.stamina - 40, hygiene: pet.hygiene - 20 });
+});
+
+it('cannot abandon a run with a pending battle or one already over', () => {
+  const id = 'abandon-ended';
+  setupBattle(id, 'goblin', [1, 1, 1]);
+  const lost = step(id, 'd');
+  expect(lost).toMatchObject({ failed: true, battle: { pending: true } });
+  expect(adventure.abandonAdventure(id, lost.revision)).toEqual(lost);
+  const failed = continueRun(id);
+  expect(adventure.abandonAdventure(id, failed.revision)).toEqual(failed);
+  expect(failed.abandoned).toBe(false);
+  const king = 'abandon-complete';
+  setupBattle(king, 'slime-king', [100, 100, 100]); step(king, 'd');
+  const complete = continueRun(king);
+  expect(complete.completed).toBe(true);
+  expect(adventure.abandonAdventure(king, complete.revision)).toEqual(complete);
 });
 
 it('opens a cooldown after restarting, refuses another restart until it expires, and can be skipped with an Hourglass', () => {
   const id = 'adventure-cooldown'; pets.getOrCreatePet(id);
-  const started = adventure.restartAdventure(id, adventure.adventureFor(id).revision);
+  const first = adventure.abandonAdventure(id, adventure.adventureFor(id).revision);
+  if ('error' in first) throw new Error(first.error);
+  const fresh = adventure.restartAdventure(id, first.revision);
+  if ('error' in fresh) throw new Error(fresh.error);
+  expect(fresh.cooldownUntil).toBeGreaterThan(Date.now());
+  // Abandoning stays free during the cooldown; starting the next run waits for it.
+  const started = adventure.abandonAdventure(id, fresh.revision);
   if ('error' in started) throw new Error(started.error);
-  expect(started.cooldownUntil).toBeGreaterThan(Date.now());
+  expect(started).toMatchObject({ abandoned: true, cooldownUntil: fresh.cooldownUntil });
   const blocked = adventure.restartAdventure(id, started.revision);
   expect(blocked).toMatchObject({ status: 429 });
   expect((blocked as { error: string }).error).toMatch(/rest/i);

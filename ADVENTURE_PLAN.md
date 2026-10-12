@@ -146,8 +146,12 @@ and unfair coins apply to Arena and revenge as well as Adventure, with only
 the acting side's (attacker's, or revenge victim's) equipped coin ever applying.
 
 Resolved for the entry cost/cooldown: starting a fresh run (after a win, a
-failure, or voluntarily abandoning one in progress) costs 40 stamina/20
-hygiene and opens a 4-hour cooldown, skippable with an Hourglass from the
-shared Care & shop count. Reopening the map to continue an unfinished run
-stays free — the cost and cooldown only gate starting over, not Adventure
-HP/MP or ongoing exploration.
+failure, or an abandoned run) costs 40 stamina/20 hygiene and opens a 4-hour
+cooldown, skippable with an Hourglass from the shared Care & shop count.
+Reopening the map to continue an unfinished run stays free — the cost and
+cooldown only gate starting over, not Adventure HP/MP or ongoing exploration.
+
+Owner's confirmed rule for abandoning: Abandon run ends the mini-game
+immediately, like a defeat. The run is saved as abandoned, the map closes,
+and abandoning costs nothing. Only Start new adventure (with the cost and
+cooldown above) continues, and a new run can't start while one is in progress.

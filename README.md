@@ -419,6 +419,14 @@ disabled. Return to the map to see the result, then choose **Start new adventure
 to reset to floor one with full HP/MP and a fresh set of monsters. Leaving or
 reloading keeps the failed run; it does not restart automatically.
 
+**Abandon run ends the mini-game immediately.** While exploring (with no
+battle waiting), **Abandon run** asks for confirmation, then ends the run on
+the spot, like a defeat, and closes the map. Abandoning is free. Reopening
+Adventure shows **Adventure abandoned** with movement, stairs, and chests
+disabled; the only way on is **Start new adventure**. A finished or failed
+run can't be abandoned, and the server refuses to start a new adventure (409)
+while a run is still in progress.
+
 **Skip to result**, **Replay battle**, and **Watch last battle** only play the
 saved turns. **Return to map** (or Escape from the battle window) acknowledges
 the saved result and resumes exploration after a win. If that request fails,
@@ -427,17 +435,17 @@ opens the same pending battle. Replays cannot reroll a result, grant more recove
 or resurrect a monster.
 
 **Starting a fresh adventure costs 40 stamina and 20 hygiene** and opens a
-**4-hour cooldown**, whether that fresh start follows a win, a defeat, or
-choosing **Abandon run** to give up on one still in progress (shown instead of
-Start new adventure while exploring; reopening the map to continue an
-unfinished run is still free). Starting is refused if the pet doesn't have
+**4-hour cooldown**, whether that fresh start follows a win, a defeat, or an
+abandoned run (reopening the map to continue an unfinished run is still free).
+Starting is refused if the pet doesn't have
 enough stamina/hygiene to spare, or while a cooldown is active — an Hourglass
 clears the wait early, from the same shared count used elsewhere. None of this
 touches Adventure HP/MP, which still carry over normally; it only gates
 *starting again*. The cooldown begins when the fresh run does, so that run
-plays normally: while it is in progress the map only says when it can be
-abandoned for another fresh start. Once a run ends during the cooldown, the map
-shows how long the pet needs to rest and offers **Skip wait (use Hourglass)**.
+plays normally, and it can still be abandoned for free: while it is in progress
+the map only says when the next adventure would open. Once a run ends during
+the cooldown, the map shows how long the pet needs to rest and offers **Skip
+wait (use Hourglass)**.
 Adventure still doesn't alter Arena wins/losses. Monster victories grant
 recovery; chests grant the items below.
 
@@ -510,7 +518,8 @@ includes an opaque `revision`; supply that revision with every action:
 - `{ "direction": "w" | "a" | "s" | "d", "revision": "…" }` moves one tile.
 - `{ "action": "ascend" | "descend", "revision": "…" }` uses matching stairs.
 - `{ "action": "continue", "battleId": "…", "revision": "…" }` acknowledges a battle.
-- `{ "action": "restart", "revision": "…" }` starts fresh after failure, completion, or (while still exploring) abandoning the current run; refused with 409 if stamina/hygiene are too low, or 429 while the 4-hour cooldown is active.
+- `{ "action": "abandon", "revision": "…" }` ends the run in progress at once, for free (`abandoned: true` in the response). It changes nothing for a run that is already over or has a battle waiting.
+- `{ "action": "restart", "revision": "…" }` starts fresh after failure, completion, or abandoning; refused with 409 while a run is still in progress or if stamina/hygiene are too low, or 429 while the 4-hour cooldown is active.
 - `{ "action": "skip-cooldown", "revision": "…" }` spends one Hourglass to clear an active cooldown early; refused with 409 if there's no Hourglass to spend. A no-op, returning the current state, if no cooldown is active.
 - `{ "action": "open-chest", "revision": "…" }` opens the chest under the pet.
 - `{ "action": "use-item", "item": "food" | "soap" | "hourglass", "revision": "…" }` uses one backpack item.

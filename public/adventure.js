@@ -83,7 +83,7 @@ const busyText = () => pet?.activity === 'studying' ? `Your pet is busy studying
   : pet?.activity === 'working' ? `Your pet is busy working at the ${pet.task}. Explore once it's done.` : '';
 function syncControls() {
   const busy = Boolean(busyText());
-  const blocked = pending || Boolean(state?.battle?.pending) || Boolean(state?.failed) || busy;
+  const blocked = pending || Boolean(state?.battle?.pending) || Boolean(state?.failed || state?.abandoned) || busy;
   function disable(button, value) {
     // Keep keyboard input inside the map when the active control is disabled.
     if (value && document.activeElement === button) grid.focus({ preventScroll: true });
@@ -142,18 +142,19 @@ function cooldownText(ended) {
   const minutes = Math.max(1, Math.ceil(((state.cooldownUntil - Date.now()) * state.timeScale) / 60_000));
   const h = Math.floor(minutes / 60), m = minutes % 60;
   const wait = [h && `${h} h`, (m || !h) && `${m} min`].filter(Boolean).join(' ');
-  return ended ? `Your pet needs to rest. Next adventure in ${wait}.` : `You can abandon this run and start over in ${wait}.`;
+  return ended ? `Your pet needs to rest. Next adventure in ${wait}.` : `If you abandon this run, the next adventure opens in ${wait}.`;
 }
 // Only the cooldown message/buttons, so the 1 s tick doesn't rebuild the map.
-// The wait only gates starting over, so a run in progress plays on as normal.
+// The wait only gates starting over, so a run in progress plays on as normal,
+// and abandoning (which is free) stays available.
 function renderCooldown() {
   if (!state) return;
-  const active = cooldownActive(), ended = state.failed || state.completed;
+  const active = cooldownActive(), ended = state.failed || state.completed || state.abandoned;
   adventure.querySelector('#adventure-cooldown').hidden = !active;
   if (active) adventure.querySelector('#adventure-cooldown').textContent = cooldownText(ended);
   adventure.querySelector('#adventure-skip-cooldown').hidden = !active || !ended;
   adventure.querySelector('#adventure-restart').hidden = active || !ended;
-  adventure.querySelector('#adventure-abandon').hidden = active || ended || Boolean(state.battle?.pending);
+  adventure.querySelector('#adventure-abandon').hidden = ended || Boolean(state.battle?.pending);
   syncControls();
 }
 setInterval(() => { if (adventure.open) renderCooldown(); }, 1000);
@@ -167,7 +168,9 @@ function renderMap() {
     ? 'Find the ↓ stairs at column 14, row 14. Stand there and choose Descend.'
     : state.completed ? 'Final floor. The Slime King has been defeated.' : 'Final floor. The Slime King guards this grove.';
   adventure.querySelector('#adventure-completion').hidden = !state.completed;
-  adventure.querySelector('#adventure-failure').hidden = !state.failed;
+  adventure.querySelector('#adventure-failure').hidden = !state.failed && !state.abandoned;
+  adventure.querySelector('#adventure-failure').textContent =
+    `Adventure ${state.abandoned ? 'abandoned' : 'failed'}. Start a new adventure to try again.`;
   adventure.querySelector('#adventure-restart-cost').textContent =
     `Starting a fresh adventure — after winning, failing, or abandoning one — costs ${state.restartCost.stamina} stamina and ${state.restartCost.hygiene} hygiene and opens a ${state.cooldownMinutes / 60}-hour wait, skippable with an Hourglass.`;
   renderCooldown();
@@ -338,7 +341,7 @@ adventure.addEventListener('keydown', event => {
   const direction = { arrowup: 'w', arrowleft: 'a', arrowdown: 's', arrowright: 'd' }[key] || key;
   if (!['w', 'a', 's', 'd'].includes(direction)) return;
   event.preventDefault();
-  if (!event.repeat && state && !state.battle?.pending && !state.failed && !busyText()) request({ direction });
+  if (!event.repeat && state && !state.battle?.pending && !state.failed && !state.abandoned && !busyText()) request({ direction });
 });
 for (const action of ['ascend', 'descend']) {
   adventure.querySelector(`#adventure-${action}`).addEventListener('click', () => request({ action }));
@@ -349,11 +352,15 @@ adventure.querySelector('#adventure-restart').addEventListener('click', async ()
   await request({ action: 'restart' });
   if (adventure.open) grid.focus({ preventScroll: true });
 });
+// Abandoning ends the mini-game at once: the run is over and the map closes.
 adventure.querySelector('#adventure-abandon').addEventListener('click', async () => {
   const cost = state?.restartCost;
-  if (!window.confirm(`Abandon this run and start a new adventure? This resets your floor${cost ? ` and costs ${cost.stamina} stamina and ${cost.hygiene} hygiene` : ''}.`)) return;
-  await request({ action: 'restart' });
-  if (adventure.open) grid.focus({ preventScroll: true });
+  if (!window.confirm(`Abandon this adventure? It ends now${cost ? `, and starting a new one costs ${cost.stamina} stamina and ${cost.hygiene} hygiene` : ''}.`)) return;
+  await request({ action: 'abandon' });
+  if (adventure.open && state?.abandoned) {
+    adventure.close();
+    document.getElementById('adventure-open').focus({ preventScroll: true });
+  }
 });
 adventure.querySelector('#adventure-skip-cooldown').addEventListener('click', () => request({ action: 'skip-cooldown' }));
 async function continueExploring() {

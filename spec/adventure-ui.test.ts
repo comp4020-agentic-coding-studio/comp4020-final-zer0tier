@@ -248,41 +248,58 @@ it('shows a failed run with disabled movement and starts a fresh adventure only 
   } finally { dom.window.close(); }
 });
 
-it('shows Abandon run while exploring; the cooldown only gates starting over, offering the Hourglass once the run ends', async () => {
+it('ends the mini-game at once on Abandon run: the map closes, and reopening offers only a new adventure', async () => {
   const { dom, window, $ } = page();
-  window.confirm = () => true;
-  let state: ReturnType<typeof map> | ReturnType<typeof battleProgress> = map();
+  const confirms: string[] = [];
+  let answer = false;
+  window.confirm = (message?: string) => { confirms.push(String(message)); return answer; };
+  let state: ReturnType<typeof map> & { abandoned?: boolean } = map();
   const cooldownUntil = Date.now() + 4 * 60 * 60 * 1000;
   const requests = vi.fn(async (_url: string, options: RequestInit) => {
     const body = JSON.parse(options.body as string);
-    if (body.action === 'restart') state = { ...state, revision: 'restarted-map', cooldownUntil };
-    if (body.direction) {
-      const failed = battleProgress(false);
-      state = { ...failed, cooldownUntil, battle: { ...failed.battle, pending: false } };
-    }
+    if (body.action === 'abandon') state = { ...state, revision: `abandoned-${requests.mock.calls.length}`, abandoned: true };
+    if (body.action === 'restart') state = { ...map(), revision: 'restarted-map', cooldownUntil };
     return Response.json(state);
   });
   window.fetch = requests as unknown as typeof fetch;
   try {
     window.eval(readFileSync('public/adventure.js', 'utf8'));
+    const dialog = $('adventure-dialog') as HTMLDialogElement;
     $('adventure-open').click();
     await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
-    expect(($('adventure-abandon') as HTMLButtonElement).hidden).toBe(false);
-    expect(($('adventure-restart') as HTMLButtonElement).hidden).toBe(true);
-    expect(($('adventure-cooldown') as HTMLButtonElement).hidden).toBe(true);
+    expect($('adventure-abandon').hidden).toBe(false);
+    expect($('adventure-restart').hidden).toBe(true);
+    $('adventure-abandon').click(); // cancelled
+    expect(requests).toHaveBeenCalledTimes(1);
+    expect(dialog.open).toBe(true);
+    answer = true;
     $('adventure-abandon').click();
-    await vi.waitFor(() => expect(($('adventure-cooldown') as HTMLElement).hidden).toBe(false));
-    expect(($('adventure-abandon') as HTMLButtonElement).hidden).toBe(true);
-    expect(($('adventure-restart') as HTMLButtonElement).hidden).toBe(true);
-    // The fresh run is playable, so the map doesn't say the pet must rest or offer to spend an Hourglass.
-    expect($('adventure-cooldown').textContent).toBe('You can abandon this run and start over in 4 h.');
-    expect(($('adventure-skip-cooldown') as HTMLButtonElement).hidden).toBe(true);
-    for (const button of $('adventure-dialog').querySelectorAll<HTMLButtonElement>('[data-direction]')) expect(button.disabled).toBe(false);
-    $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    await vi.waitFor(() => expect(dialog.open).toBe(false));
+    expect(confirms.at(-1)).toBe('Abandon this adventure? It ends now, and starting a new one costs 40 stamina and 20 hygiene.');
+    expect(JSON.parse(requests.mock.calls[1][1].body as string)).toEqual({ action: 'abandon', revision: 'saved-map' });
+    expect(window.document.activeElement?.id).toBe('adventure-open');
+    // Reopening shows the ended run: no more exploring, only a (paid) new adventure.
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-failure').hidden).toBe(false));
+    expect($('adventure-failure').textContent).toBe('Adventure abandoned. Start a new adventure to try again.');
+    expect($('adventure-abandon').hidden).toBe(true);
+    expect($('adventure-restart').hidden).toBe(false);
+    for (const button of dialog.querySelectorAll<HTMLButtonElement>('[data-direction]')) expect(button.disabled).toBe(true);
+    dialog.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    expect(requests).toHaveBeenCalledTimes(3);
+    $('adventure-restart').click();
+    await vi.waitFor(() => expect($('adventure-failure').hidden).toBe(true));
+    // The fresh run plays normally under the cooldown, and abandoning it stays free.
+    expect($('adventure-cooldown').textContent).toBe('If you abandon this run, the next adventure opens in 4 h.');
+    expect($('adventure-skip-cooldown').hidden).toBe(true);
+    expect($('adventure-abandon').hidden).toBe(false);
+    $('adventure-abandon').click();
+    await vi.waitFor(() => expect(dialog.open).toBe(false));
+    $('adventure-open').click();
     await vi.waitFor(() => expect($('adventure-failure').hidden).toBe(false));
     expect($('adventure-cooldown').textContent).toBe('Your pet needs to rest. Next adventure in 4 h.');
-    expect(($('adventure-skip-cooldown') as HTMLButtonElement).hidden).toBe(false);
-    expect(($('adventure-restart') as HTMLButtonElement).hidden).toBe(true);
+    expect($('adventure-skip-cooldown').hidden).toBe(false);
+    expect($('adventure-restart').hidden).toBe(true);
   } finally { dom.window.close(); }
 });
 

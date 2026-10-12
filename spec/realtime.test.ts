@@ -1,6 +1,6 @@
 import { connect } from "node:net";
 import { expect, it } from "vitest";
-import { baseUrl, buyHourglass, freshId, post, readyToStudy, studyTimes, workHour, signUp } from "./helpers.ts";
+import { baseUrl, buyHourglass, freshId, getPet, post, readyToStudy, studyTimes, workHour, signUp } from "./helpers.ts";
 
 const wsUrl = (): string => new URL("/ws", baseUrl).href.replace(/^http/, "ws");
 
@@ -142,11 +142,15 @@ it("pet:updated — equipping (and unequipping) a coin reaches every open window
   }
 });
 
-it("pet:updated — abandoning an adventure (which spends stamina/hygiene) reaches every open window within 1s", async () => {
+it("pet:updated — starting a new adventure after abandoning one (which spends stamina/hygiene) reaches every open window within 1s", async () => {
   const id = freshId();
   await signUp(id);
-  const opened = await post("/api/adventure", {}, id);
-  const { revision } = await opened.json();
+  const opened = await (await post("/api/adventure", {}, id)).json();
+  expect((await post("/api/adventure", { action: "restart", revision: opened.revision }, id)).status).toBe(409); // still in progress
+  const abandoned = await (await post("/api/adventure", { action: "abandon", revision: opened.revision }, id)).json();
+  expect(abandoned).toMatchObject({ abandoned: true });
+  expect(await getPet(id)).toMatchObject({ stamina: 100, hygiene: 100 }); // abandoning is free
+  const { revision } = abandoned;
   const windows = [await open(), await open()];
   try {
     const updates = windows.map((ws) => nextUpdate(ws, id, (pet) => pet.stamina === 60));
