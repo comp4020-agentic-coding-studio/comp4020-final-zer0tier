@@ -1,7 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { simulateBattle } from '../src/combat.ts';
+import { coinEffect, simulateBattle } from '../src/combat.ts';
 it('plays saved HP/MP, skips and replays without posting actions, and clears on logout', () => {
   const dom = new JSDOM('<!doctype html><body><button id="start">Fight</button></body>', { runScripts: 'outside-only' });
   const { window }=dom;
@@ -34,4 +34,41 @@ it('plays saved HP/MP, skips and replays without posting actions, and clears on 
     window.document.dispatchEvent(new window.CustomEvent('battle:show',{detail}));
     expect(($('battle-dialog') as HTMLDialogElement).open).toBe(false); // response + broadcast cannot open twice
   } finally {window.close();}
+});
+
+it('shows the saved coin toss, or the coin that replaced it, for the whole battle', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { runScripts: 'outside-only' });
+  const { window } = dom;
+  window.matchMedia = (() => ({ matches: true })) as unknown as typeof window.matchMedia;
+  window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+  const $ = (id: string) => window.document.getElementById(id)!;
+  const rex = { id: 'rex', strength: 5, intelligence: 5, charisma: 5 };
+  const slime = { id: 'monster:f1-enemy-0', name: 'Slime', monster: 'slime' as const, strength: 3, intelligence: 1, charisma: 2 };
+  const show = (key: string, battle: ReturnType<typeof simulateBattle>) => {
+    window.document.dispatchEvent(new window.CustomEvent('battle:show', { detail: { key, battle, viewer: 'rex', result: '' } }));
+    return $('battle-initiative');
+  };
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    const cases: [string | null, number, string][] = [
+      [null, 0.49, 'Coin toss: Heads. rex attacks first.'],
+      [null, 0.5, 'Coin toss: Tails. Slime attacks first.'],
+      ['copper-coin', 0.49, "Coin toss: Heads. rex attacks first. rex's Copper Coin adds +1 to every attribute."],
+      ['silver-coin', 0.5, "rex's Silver Coin: rex attacks first."],
+      ['gold-coin', 0.49, "rex's Gold Coin: Slime attacks first, but rex's first hit deals double damage."],
+    ];
+    for (const [coin, random, text] of cases) {
+      const line = show(`${coin}-${random}`, simulateBattle(rex, slime, [20, 9], coinEffect(coin as never, () => random)));
+      expect(line.hidden).toBe(false);
+      expect(line.textContent).toBe(text);
+      expect($('battle-dialog').getAttribute('aria-describedby')).toContain('battle-initiative'); // read out on opening
+      $('battle-skip').click();
+      expect(line.textContent).toBe(text); // still shown once the result is in
+      $('battle-close').click();
+    }
+    const older = show('older', simulateBattle(rex, slime, [20, 9]));
+    expect(older.hidden).toBe(true);
+    expect($('battle-status').textContent).toBe('Ready. Let the battle begin!');
+  } finally { window.close(); }
 });

@@ -23,18 +23,26 @@ export interface BattleTurn {
   name?: string; mpCost?: number; // absent in older saved replays
   damage: number; hits: number; hp: [number, number]; mp: [number, number];
 }
+// How the turn order was decided, saved so every replay can show it. `toss`
+// is null when the acting pet's Silver or Gold Coin fixed the order instead.
+export interface Initiative { toss: 'heads' | 'tails' | null; coin: CoinId | null }
 export interface Battle {
   fighters: [Fighter, Fighter]; turns: BattleTurn[]; winner: string;
   initialHp?: [number, number]; initialMp?: [number, number]; // absent in older saved replays
+  initiative?: Initiative; // absent in older saved replays
 }
 // Before battle, a coin toss decides initiative (heads = fighter 0 first), fair
 // unless the acting pet's equipped coin overrides it. Only the acting side's
 // coin ever applies; the opponent's equipped coin (if any) is ignored.
-export interface CoinEffect { first: 0 | 1; doubleFirstStrike: boolean; attributeBonus: number }
+export interface CoinEffect extends Initiative { first: 0 | 1; doubleFirstStrike: boolean; attributeBonus: number }
 export function coinEffect(coin: CoinId | null | undefined, random = Math.random): CoinEffect {
-  if (coin === 'silver-coin') return { first: 0, doubleFirstStrike: false, attributeBonus: 0 };
-  if (coin === 'gold-coin') return { first: 1, doubleFirstStrike: true, attributeBonus: 0 };
-  return { first: random() < 0.5 ? 0 : 1, doubleFirstStrike: false, attributeBonus: coin === 'copper-coin' ? 1 : 0 };
+  if (coin === 'silver-coin') return { first: 0, doubleFirstStrike: false, attributeBonus: 0, toss: null, coin };
+  if (coin === 'gold-coin') return { first: 1, doubleFirstStrike: true, attributeBonus: 0, toss: null, coin };
+  const first = random() < 0.5 ? 0 : 1;
+  return {
+    first, doubleFirstStrike: false, attributeBonus: coin === 'copper-coin' ? 1 : 0,
+    toss: first === 0 ? 'heads' : 'tails', coin: coin ?? null,
+  };
 }
 // Copper's +1/attribute (and the HP/MP it implies) only ever applies for this
 // fight's calculations; nothing is written back to the pet.
@@ -44,7 +52,9 @@ export function withAttributeBonus(pet: PetStats, bonus: number): PetStats {
 }
 export function simulateBattle(
   a: PetStats, b: PetStats, rolls: [number, number],
-  options?: { hp?: [number, number]; mp?: [number, number]; first?: 0 | 1; doubleFirstStrike?: boolean },
+  // A coin's effect can be spread in whole; its attribute bonus must already be
+  // applied to `a` (withAttributeBonus), so it is ignored here.
+  options?: { hp?: [number, number]; mp?: [number, number] } & Partial<CoinEffect>,
 ): Battle {
   const fighters = [a, b].map((pet, i) => ({
     id: pet.id,
@@ -96,5 +106,6 @@ export function simulateBattle(
     strike(first);
     if (hp[second] > 0) strike(second);
   }
-  return { fighters, turns, winner: hp[0] > 0 ? a.id : b.id, initialHp, initialMp };
+  const initiative = options?.toss !== undefined ? { initiative: { toss: options.toss, coin: options.coin ?? null } } : {};
+  return { fighters, turns, winner: hp[0] > 0 ? a.id : b.id, initialHp, initialMp, ...initiative };
 }

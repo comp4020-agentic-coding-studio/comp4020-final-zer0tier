@@ -460,8 +460,12 @@ resources; replaying does not spend MP again.
 ### Unfair coins
 
 A coin toss decides initiative before every monster battle, Arena fight, and
-revenge attempt: a fair 50/50 by default. Equipping an Unfair Coin can change
-that for the pet wearing it:
+revenge attempt: a fair 50/50 by default, where **heads** means the acting pet
+(the attacker, the revenge victim, or the exploring pet) strikes first and
+**tails** means its opponent does. The battle scene shows the result above the
+fighters for the whole battle, and replays show the same saved toss. Equipping
+an Unfair Coin can change that for the pet wearing it, and the scene then names
+the coin instead:
 
 | Coin | Effect |
 | --- | --- |

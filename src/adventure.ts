@@ -109,8 +109,7 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy) {
   const shieldMp = boostedPet.intelligence - saved.maxMp;
   const playback = simulateBattle(boostedPet, monster, [roll(boostedPet), roll(monster)], {
     hp: [saved.hp + shieldHp, monster.strength + monster.intelligence + monster.charisma],
-    mp: [saved.mp + shieldMp, monster.intelligence],
-    first: coin.first, doubleFirstStrike: coin.doubleFirstStrike,
+    mp: [saved.mp + shieldMp, monster.intelligence], ...coin,
   });
   const won = playback.winner === pet.id;
   const floor = saved.world[saved.floor - 1];

@@ -12,10 +12,11 @@ function buildDialog() {
   dialog = document.createElement('dialog');
   dialog.id = 'battle-dialog';
   dialog.setAttribute('aria-labelledby', 'battle-title');
-  dialog.setAttribute('aria-describedby', 'battle-mode');
+  dialog.setAttribute('aria-describedby', 'battle-mode battle-initiative');
   dialog.innerHTML = `
     <header class="battle-heading"><div><p id="battle-mode">Automatic battle</p><h2 id="battle-title">Claws at the ready</h2></div>
       <button type="button" id="battle-close" class="chip-btn chip-buy" aria-label="Close battle">Close</button></header>
+    <p id="battle-initiative" class="battle-initiative" hidden></p>
     <div class="battle-stage">
       <article class="battle-fighter" id="battle-fighter-0"><h3 id="battle-name-0"></h3><div class="battle-avatar" id="battle-avatar-0"></div>
         <label for="battle-hp-0">HP <span id="battle-hp-text-0"></span></label><meter id="battle-hp-0" min="0" aria-label="Attacker HP"></meter>
@@ -85,6 +86,16 @@ function abilityLabel(step) {
   $('battle-ability-cost').textContent = `${step.mpCost || 0} MP · Both fighters attack automatically`;
 }
 const fighterName = fighter => fighter.name || fighter.id;
+// The saved pre-battle coin toss, or the acting pet's coin that replaced it.
+function initiativeText(battle) {
+  const initiative = battle.initiative;
+  if (!initiative) return '';
+  const [pet, other] = battle.fighters.map(fighterName);
+  if (initiative.coin === 'silver-coin') return `${pet}'s Silver Coin: ${pet} attacks first.`;
+  if (initiative.coin === 'gold-coin') return `${pet}'s Gold Coin: ${other} attacks first, but ${pet}'s first hit deals double damage.`;
+  const toss = initiative.toss === 'heads' ? `Coin toss: Heads. ${pet} attacks first.` : `Coin toss: Tails. ${other} attacks first.`;
+  return initiative.coin === 'copper-coin' ? `${toss} ${pet}'s Copper Coin adds +1 to every attribute.` : toss;
+}
 function addLog(step) {
   const li = document.createElement('li');
   li.textContent = describe(step);
@@ -131,6 +142,9 @@ function play(next) {
   $('battle-log').replaceChildren();
   $('battle-skip').hidden = false;
   $('battle-replay').hidden = true;
+  const initiative = initiativeText(next.battle);
+  $('battle-initiative').textContent = initiative;
+  $('battle-initiative').hidden = !initiative;
   $('battle-status').textContent = 'Ready. Let the battle begin!';
   $('battle-ability-name').textContent = 'Automatic attacks';
   $('battle-ability-cost').textContent = 'Strongest affordable attack each turn';

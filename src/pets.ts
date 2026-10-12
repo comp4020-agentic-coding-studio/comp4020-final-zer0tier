@@ -595,9 +595,7 @@ export function fight(attackerId: string, defenderId: string): FightOutcome {
   const defenderPower = powerOf(defender);
   const attackerRoll = roll(attackerPower);
   const defenderRoll = roll(defenderPower);
-  const battle = simulateBattle(boostedAttacker, defender, [attackerRoll, defenderRoll], {
-    first: coin.first, doubleFirstStrike: coin.doubleFirstStrike,
-  });
+  const battle = simulateBattle(boostedAttacker, defender, [attackerRoll, defenderRoll], coin);
   const won = battle.winner === attacker.id;
   const winner = won ? attacker : defender;
   const loser = won ? defender : attacker;
@@ -720,9 +718,7 @@ export function revenge(victimId: string, theftId: number): RevengeOutcome {
     // Only the victim's (acting side's) equipped coin counts; the thief's is ignored.
     const coin = coinEffect(victim.equippedCoin);
     const boostedVictim = withAttributeBonus(victim, coin.attributeBonus);
-    const battle = simulateBattle(boostedVictim, thief, [roll(powerOf(boostedVictim)), roll(powerOf(thief))], {
-      first: coin.first, doubleFirstStrike: coin.doubleFirstStrike,
-    });
+    const battle = simulateBattle(boostedVictim, thief, [roll(powerOf(boostedVictim)), roll(powerOf(thief))], coin);
     const won = battle.winner === victim.id;
     if (won) {
       thief.money -= reward;

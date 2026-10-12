@@ -271,6 +271,7 @@ it("a Silver coin forces the pet to attack first against a much stronger goblin"
   expect(pets.equipCoin(id, 'silver-coin')).not.toHaveProperty('error');
   const result = step(id, 'd');
   expect(result.battle!.playback.turns[0].actor).toBe(0);
+  expect(result.battle!.playback.initiative).toEqual({ toss: null, coin: 'silver-coin' });
 });
 
 it("a Gold coin makes the pet attack second but doubles its own first hit", () => {

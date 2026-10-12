@@ -66,19 +66,28 @@ it('breaks equal-damage ability ties in favor of lower MP cost', () => {
   expect(battle.turns[0]).toMatchObject({ ability: 'heavy-strike', damage: 9, mp: [4, 1] });
 });
 
-it('tosses a fair coin for initiative with no coin equipped, and leaves damage unboosted', () => {
-  expect(coinEffect(null, () => 0.49)).toEqual({ first: 0, doubleFirstStrike: false, attributeBonus: 0 });
-  expect(coinEffect(undefined, () => 0.5)).toEqual({ first: 1, doubleFirstStrike: false, attributeBonus: 0 });
+it('tosses a fair coin for initiative with no coin equipped (heads: fighter 0 first), and leaves damage unboosted', () => {
+  expect(coinEffect(null, () => 0.49)).toEqual({ first: 0, doubleFirstStrike: false, attributeBonus: 0, toss: 'heads', coin: null });
+  expect(coinEffect(undefined, () => 0.5)).toEqual({ first: 1, doubleFirstStrike: false, attributeBonus: 0, toss: 'tails', coin: null });
 });
 it('Copper adds an attribute bonus without changing the coin toss odds', () => {
-  expect(coinEffect('copper-coin', () => 0.49)).toEqual({ first: 0, doubleFirstStrike: false, attributeBonus: 1 });
-  expect(coinEffect('copper-coin', () => 0.5)).toEqual({ first: 1, doubleFirstStrike: false, attributeBonus: 1 });
+  expect(coinEffect('copper-coin', () => 0.49)).toEqual({ first: 0, doubleFirstStrike: false, attributeBonus: 1, toss: 'heads', coin: 'copper-coin' });
+  expect(coinEffect('copper-coin', () => 0.5)).toEqual({ first: 1, doubleFirstStrike: false, attributeBonus: 1, toss: 'tails', coin: 'copper-coin' });
 });
-it('Silver always goes first and Gold always goes second, regardless of the toss', () => {
+it('Silver always goes first and Gold always goes second, replacing the toss', () => {
   for (const random of [() => 0, () => 0.999999]) {
-    expect(coinEffect('silver-coin', random)).toEqual({ first: 0, doubleFirstStrike: false, attributeBonus: 0 });
-    expect(coinEffect('gold-coin', random)).toEqual({ first: 1, doubleFirstStrike: true, attributeBonus: 0 });
+    expect(coinEffect('silver-coin', random)).toEqual({ first: 0, doubleFirstStrike: false, attributeBonus: 0, toss: null, coin: 'silver-coin' });
+    expect(coinEffect('gold-coin', random)).toEqual({ first: 1, doubleFirstStrike: true, attributeBonus: 0, toss: null, coin: 'gold-coin' });
   }
+});
+it('saves how initiative was decided with the battle, so replays can show the toss', () => {
+  const tails = simulateBattle(a, b, [24, 16], coinEffect(null, () => 0.5));
+  expect(tails.initiative).toEqual({ toss: 'tails', coin: null });
+  expect(tails.turns[0].actor).toBe(1);
+  const silver = simulateBattle(a, b, [10, 24], { hp: [8, 15], ...coinEffect('silver-coin') });
+  expect(silver.initiative).toEqual({ toss: null, coin: 'silver-coin' });
+  expect(silver.turns[0].actor).toBe(0);
+  expect(simulateBattle(a, b, [24, 16], { first: 0 })).not.toHaveProperty('initiative');
 });
 it('an explicit first option overrides the rolls comparison (Silver-style: fighter 0 always first)', () => {
   // Rolls alone would put b first (16 < 24 is false... use a losing roll for a).
