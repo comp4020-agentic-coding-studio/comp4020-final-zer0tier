@@ -5,12 +5,15 @@ floors with stairs, slimes/goblins, increasing attributes, a Slime King on floor
 five, chest landmarks, enemy detection/pursuit, and automatic monster battles
 with saved HP/MP and outcomes; atomic chest rewards, persistent inventory, item
 use, and learned abilities; a coin-toss initiative with reusable, equippable
-Copper/Silver/Gold coins; and an entry cost and cooldown on starting fresh.
+Copper/Silver/Gold coins; an entry cost and cooldown on starting fresh; the
+Slime King's Bump; and no adventuring while the pet studies or works. Still
+open: a completion reward for defeating the Slime King.
 This document preserves the owner's requirements.
 
-Implementation defaults for step 2: monsters take one cardinal step after an
-accepted player step, detect the eight surrounding cells, and stop chasing when
-the pet leaves that range. Stairs require an explicit Ascend/Descend action.
+Owner's confirmed rule for monster movement (step 2): monsters take one
+cardinal step after each accepted player step, detect the eight surrounding
+cells, and stop chasing as soon as the pet leaves that range. They never start
+a battle themselves. Stairs require an explicit Ascend/Descend action.
 Nearby enemies produce encounter warnings; walking into a monster starts battle.
 Initial stats and scaling are documented in README.md and can be balanced later.
 
