@@ -187,6 +187,14 @@ straight away and pays its full reward, as if it had run its whole time. It can
 only be used while the pet is studying or working; the busy banner has a Skip
 button for it. Open the same pet in two windows and both update together.
 
+**Free daily supplies.** Once per UTC calendar day, **Collect 1 Food + 1 Soap**
+at the top of Care & shop adds one of each to the pet's stock for free. They
+are ordinary items: they keep until used, and Adventure's backpack shares the
+same count. Missed days don't add up. After collecting, the button reads
+**Collected today** until midnight UTC (shown in your local time), then wakes
+up again without a reload. Like theft protection, the reset uses real UTC days,
+even on the accelerated test clock.
+
 ### Other pets and fights
 
 The **Arena** lists other pets: the bot first, then the newest. A player who
@@ -323,8 +331,11 @@ the built-in `node:sqlite` for storage.
   in an HttpOnly cookie, stored only as a hash.
 - **Actions** (owner only): `POST /api/pets/:id/study/:course`,
   `work/:location` (with `{"minutes": 60}`), `upgrade/:location`, `buy/:item`,
-  `use/:item`, `fight/:opponent`, `steal/:opponent` and `equip-coin/:coin`
+  `use/:item`, `collect-supplies`, `fight/:opponent`, `steal/:opponent` and `equip-coin/:coin`
   (`:coin` is `copper-coin`, `silver-coin`, `gold-coin`, or `none` to unequip).
+  `collect-supplies` adds the free daily Food and Soap and sets the pet's
+  `suppliesAvailableAt` (epoch milliseconds of the next UTC midnight, or `null`
+  before the first collection). A second collection that day returns 429.
   Equipping is global to the pet and reusable — never consumed — and applies
   to Adventure, Arena, and revenge alike; equipping a coin the pet doesn't own,
   or an unknown coin, returns 409. Stealing returns

@@ -164,6 +164,21 @@ it("pet:updated — starting a new adventure after abandoning one (which spends 
   }
 });
 
+it("pet:updated — collecting the free daily supplies reaches every open window within 1s", async () => {
+  const id = freshId();
+  await signUp(id);
+  const windows = [await open(), await open()];
+  try {
+    const updates = windows.map((ws) => nextUpdate(ws, id, (pet) => pet.food === 1));
+    expect((await post(`/api/pets/${id}/collect-supplies`)).status).toBe(200);
+    for (const event of await Promise.all(updates)) {
+      expect(event.pet).toMatchObject({ id, food: 1, soap: 1, suppliesAvailableAt: expect.any(Number) });
+    }
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});
+
 it("pet:updated — a job upgrade reaches every open window within 1s", async () => {
   const id = freshId();
   await signUp(id);

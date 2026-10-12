@@ -20,6 +20,7 @@ export interface Pet extends ReturnType<typeof inventoryFor> {
   charisma: number;
   money: number;
   stealAvailableAt: number | null; // next UTC midnight after a successful theft
+  suppliesAvailableAt: number | null; // next UTC midnight after collecting the free daily supplies
   activity: "idle" | "studying" | "working";
   task: string | null; // the course or location, while busy
   busySince: number | null; // epoch ms (real time) the activity started
@@ -152,7 +153,7 @@ export const isValidId = (id: unknown): id is string =>
 const select = db.prepare(
   `SELECT id, color, appearance, strength, intelligence, charisma, money, activity, school, credits, stamina, hygiene, food, soap,
           hourglass, construction_rank, office_rank, theatre_rank, task, busy_since, busy_until, reward, wins, losses,
-          steal_available_at AS stealAvailableAt, equipped_coin AS equippedCoin
+          steal_available_at AS stealAvailableAt, supplies_available_at AS suppliesAvailableAt, equipped_coin AS equippedCoin
      FROM pets WHERE id = ?`,
 );
 // The bot first, then the newest pets, so a player who just joined is easy to
@@ -162,7 +163,8 @@ const listIds = db.prepare("SELECT id FROM pets ORDER BY id = ? DESC, rowid DESC
 const busyPets = db.prepare("SELECT id, busy_until FROM pets WHERE busy_until IS NOT NULL");
 const insert = db.prepare("INSERT OR IGNORE INTO pets (id) VALUES (?)");
 const save = db.prepare(
-  // Only stealing changes steal_available_at; ordinary actions preserve it.
+  // Only stealing changes steal_available_at, and only collecting the free
+  // supplies changes supplies_available_at; ordinary actions preserve both.
   `UPDATE pets SET strength = ?, intelligence = ?, charisma = ?, money = ?, school = ?, credits = ?,
      stamina = ?, hygiene = ?, food = ?, soap = ?, hourglass = ?, construction_rank = ?, office_rank = ?, theatre_rank = ?,
      activity = ?, task = ?, busy_since = ?, busy_until = ?, reward = ?, wins = ?, losses = ?, color = ?, appearance = ?,
@@ -264,7 +266,7 @@ export function getOrCreatePet(id: string): { pet: Pet; created: boolean } {
 
 // A refusal can still carry `settled`: an activity that ended just before the
 // request, saved on the way, which clients need to hear about.
-export type Outcome = { pet: Pet } | { status: 404 | 409; error: string; settled?: Pet };
+export type Outcome = { pet: Pet } | { status: 404 | 409 | 429; error: string; settled?: Pet };
 
 const schoolOf = (pet: Pet) => SCHOOLS.findIndex((s) => s.id === pet.school);
 
@@ -482,6 +484,29 @@ export function consumeHourglass(id: string): Outcome {
   });
 }
 
+// Calendar days use real UTC time, even on the accelerated activity clock.
+const nextUtcMidnight = (now: number): number => {
+  const next = new Date(now);
+  next.setUTCHours(24, 0, 0, 0);
+  return next.getTime();
+};
+
+// Once per UTC day, a pet can collect free supplies into its normal stock.
+// Missed days don't add up. The check and the grant are one statement, so
+// competing requests can't both collect.
+export const FREE_SUPPLIES = { food: 1, soap: 1, resetTimezone: "UTC" } as const;
+const collectFree = db.prepare(
+  `UPDATE pets SET food = food + ?, soap = soap + ?, supplies_available_at = ?
+    WHERE id = ? AND (supplies_available_at IS NULL OR supplies_available_at <= ?)`,
+);
+export function collectSupplies(id: string): Outcome {
+  if (!getPet(id)) return { status: 404, error: "no such pet" };
+  const now = Date.now();
+  const { changes } = collectFree.run(FREE_SUPPLIES.food, FREE_SUPPLIES.soap, nextUtcMidnight(now), id, now);
+  if (changes === 0) return { status: 429, error: "You've already collected today's free supplies. More at midnight UTC." };
+  return { pet: getPet(id)! };
+}
+
 // Fights ---------------------------------------------------------------------
 
 // Strength counts double; brains and charm help too.
@@ -666,11 +691,9 @@ export function steal(thiefId: string, victimId: string): StealOutcome {
     const amount = STEAL.min + Math.floor(Math.random() * (Math.min(STEAL.max, victim.money) - STEAL.min + 1));
     thief.money += amount;
     victim.money -= amount;
-    const nextDay = new Date(now);
-    nextDay.setUTCHours(24, 0, 0, 0);
     write(thief);
     write(victim);
-    protectFromTheft.run(nextDay.getTime(), victimId);
+    protectFromTheft.run(nextUtcMidnight(now), victimId);
     insertTheft.run(thiefId, victimId, amount);
     record({ kind: "stole", pet: thiefId, other: victimId, amount });
     commit.run();

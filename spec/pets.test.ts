@@ -18,6 +18,7 @@ it("signing up creates a pet with base stats and starts a session", async () => 
     charisma: 5,
     money: 0,
     stealAvailableAt: null,
+    suppliesAvailableAt: null,
     activity: "idle",
     school: "primary",
     credits: 0,

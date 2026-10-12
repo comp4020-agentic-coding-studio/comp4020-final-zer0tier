@@ -146,6 +146,7 @@ loadRules().then((loaded) => {
   }
   $("study-cost").textContent = `${lengthText(rules.study.minutes)} · ${costText(rules.study.cost)}`;
   $("skip").addEventListener("click", () => perform($("skip"), "use/hourglass", "care-error"));
+  $("collect-supplies").addEventListener("click", () => perform($("collect-supplies"), "collect-supplies", "care-error"));
   $("fight-cost").textContent =
     `${costText(rules.fight.cost)} · winner takes ${rules.fight.spoils.share * 100}% of the loser's money`;
   $("visit-rules").textContent =
@@ -300,9 +301,25 @@ function renderBusyClock(pet) {
   $("busy-left").textContent = timeLeftText(pet.busyUntil);
 }
 
+// Free daily supplies, collectable again from the next UTC midnight. Checked
+// each second too, so the button wakes up at midnight without a reload.
+function renderSupplies(pet) {
+  const free = rules.freeSupplies;
+  const button = $("collect-supplies");
+  const waiting = pet.suppliesAvailableAt !== null && Date.now() < pet.suppliesAvailableAt;
+  button.disabled = busy.has(button) || waiting;
+  button.textContent = waiting ? "Collected today" : `Collect ${free.food} Food + ${free.soap} Soap`;
+  const at = waiting && new Date(pet.suppliesAvailableAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const text = waiting
+    ? `More at midnight ${free.resetTimezone} (${at} your time).`
+    : `Free once a day: ${free.food} Food and ${free.soap} Soap for your stock.`;
+  if ($("free-supplies-text").textContent !== text) $("free-supplies-text").textContent = text;
+}
+
 // The clock ticks locally; the finish itself arrives as a broadcast.
 setInterval(() => {
   if (rules && current?.busyUntil) renderBusyClock(current);
+  if (rules && current?.suppliesAvailableAt) renderSupplies(current);
   if (rules && current && visiting) renderStealControls();
 }, 1000);
 
@@ -345,6 +362,7 @@ function renderControls(pet) {
     }
   }
 
+  renderSupplies(pet);
   arenaBlock = occupied || blocker(pet, rules.fight.needs, "fight");
   $("arena-hint").textContent = arenaBlock;
   // A studying or working pet can't go exploring until it's done.

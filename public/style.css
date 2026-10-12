@@ -312,7 +312,7 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .stamina-tone, .meter-stamina, .item-stamina { --tone: var(--stamina); }
 .meter-hygiene, .item-hygiene { --tone: var(--hygiene); }
 .item-skip { --tone: var(--intelligence); }
-.item-coin { --tone: var(--money); }
+.item-coin, .item-free { --tone: var(--money); }
 .meters { display: grid; gap: 0.4rem; margin-top: 0.75rem; }
 .meter { display: grid; grid-template-columns: 6.5rem 1fr 2.25rem; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
 .meter-label { display: flex; align-items: center; gap: 0.3rem; font-weight: 700; color: var(--tone); }
@@ -535,6 +535,8 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .item-effect { font-size: 0.875rem; color: var(--muted); }
 .item-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem; }
 .coin-equip { grid-column: 1 / -1; margin-top: 0.5rem; }
+.item-free { margin-top: 0.5rem; }
+.free-supplies-collect { grid-column: 1 / -1; margin-top: 0.5rem; }
 .coin-equip[aria-pressed="true"] { background: var(--tone); color: var(--surface); border-color: var(--tone); }
 .chip-btn {
   min-height: 44px;
