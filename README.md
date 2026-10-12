@@ -422,8 +422,12 @@ unfinished run is still free). Starting is refused if the pet doesn't have
 enough stamina/hygiene to spare, or while a cooldown is active — an Hourglass
 clears the wait early, from the same shared count used elsewhere. None of this
 touches Adventure HP/MP, which still carry over normally; it only gates
-*starting again*. Adventure still doesn't alter Arena wins/losses. Monster
-victories grant recovery; chests grant the items below.
+*starting again*. The cooldown begins when the fresh run does, so that run
+plays normally: while it is in progress the map only says when it can be
+abandoned for another fresh start. Once a run ends during the cooldown, the map
+shows how long the pet needs to rest and offers **Skip wait (use Hourglass)**.
+Adventure still doesn't alter Arena wins/losses. Monster victories grant
+recovery; chests grant the items below.
 
 ### Treasure and inventory
 

@@ -134,20 +134,22 @@ function clearMap() {
 function cooldownActive() {
   return Boolean(state?.cooldownUntil) && state.cooldownUntil > Date.now();
 }
-function cooldownText() {
+function cooldownText(ended) {
   const minutes = Math.max(1, Math.ceil(((state.cooldownUntil - Date.now()) * state.timeScale) / 60_000));
   const h = Math.floor(minutes / 60), m = minutes % 60;
-  return `Your pet needs to rest. Next adventure in ${h ? `${h} h ` : ''}${m || !h ? `${m} min` : ''}.`;
+  const wait = [h && `${h} h`, (m || !h) && `${m} min`].filter(Boolean).join(' ');
+  return ended ? `Your pet needs to rest. Next adventure in ${wait}.` : `You can abandon this run and start over in ${wait}.`;
 }
 // Only the cooldown message/buttons, so the 1 s tick doesn't rebuild the map.
+// The wait only gates starting over, so a run in progress plays on as normal.
 function renderCooldown() {
   if (!state) return;
-  const active = cooldownActive();
+  const active = cooldownActive(), ended = state.failed || state.completed;
   adventure.querySelector('#adventure-cooldown').hidden = !active;
-  if (active) adventure.querySelector('#adventure-cooldown').textContent = cooldownText();
-  adventure.querySelector('#adventure-skip-cooldown').hidden = !active;
-  adventure.querySelector('#adventure-restart').hidden = active || (!state.failed && !state.completed);
-  adventure.querySelector('#adventure-abandon').hidden = active || state.failed || state.completed || Boolean(state.battle?.pending);
+  if (active) adventure.querySelector('#adventure-cooldown').textContent = cooldownText(ended);
+  adventure.querySelector('#adventure-skip-cooldown').hidden = !active || !ended;
+  adventure.querySelector('#adventure-restart').hidden = active || !ended;
+  adventure.querySelector('#adventure-abandon').hidden = active || ended || Boolean(state.battle?.pending);
   syncControls();
 }
 setInterval(() => { if (adventure.open) renderCooldown(); }, 1000);

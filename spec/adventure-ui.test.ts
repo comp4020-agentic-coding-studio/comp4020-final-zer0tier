@@ -191,14 +191,17 @@ it('shows a failed run with disabled movement and starts a fresh adventure only 
   } finally { dom.window.close(); }
 });
 
-it('shows Abandon run while exploring, and switches to a cooldown message with a skip button once one is set', async () => {
+it('shows Abandon run while exploring; the cooldown only gates starting over, offering the Hourglass once the run ends', async () => {
   const { dom, window, $ } = page();
   window.confirm = () => true;
-  let state: ReturnType<typeof map> = map();
+  let state: ReturnType<typeof map> | ReturnType<typeof battleProgress> = map();
+  const cooldownUntil = Date.now() + 4 * 60 * 60 * 1000;
   const requests = vi.fn(async (_url: string, options: RequestInit) => {
     const body = JSON.parse(options.body as string);
-    if (body.action === 'restart') {
-      state = { ...state, revision: 'restarted-map', cooldownUntil: Date.now() + 4 * 60 * 60 * 1000 };
+    if (body.action === 'restart') state = { ...state, revision: 'restarted-map', cooldownUntil };
+    if (body.direction) {
+      const failed = battleProgress(false);
+      state = { ...failed, cooldownUntil, battle: { ...failed.battle, pending: false } };
     }
     return Response.json(state);
   });
@@ -214,8 +217,15 @@ it('shows Abandon run while exploring, and switches to a cooldown message with a
     await vi.waitFor(() => expect(($('adventure-cooldown') as HTMLElement).hidden).toBe(false));
     expect(($('adventure-abandon') as HTMLButtonElement).hidden).toBe(true);
     expect(($('adventure-restart') as HTMLButtonElement).hidden).toBe(true);
-    expect($('adventure-cooldown').textContent).toMatch(/rest/i);
+    // The fresh run is playable, so the map doesn't say the pet must rest or offer to spend an Hourglass.
+    expect($('adventure-cooldown').textContent).toBe('You can abandon this run and start over in 4 h.');
+    expect(($('adventure-skip-cooldown') as HTMLButtonElement).hidden).toBe(true);
+    for (const button of $('adventure-dialog').querySelectorAll<HTMLButtonElement>('[data-direction]')) expect(button.disabled).toBe(false);
+    $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    await vi.waitFor(() => expect($('adventure-failure').hidden).toBe(false));
+    expect($('adventure-cooldown').textContent).toBe('Your pet needs to rest. Next adventure in 4 h.');
     expect(($('adventure-skip-cooldown') as HTMLButtonElement).hidden).toBe(false);
+    expect(($('adventure-restart') as HTMLButtonElement).hidden).toBe(true);
   } finally { dom.window.close(); }
 });
 
