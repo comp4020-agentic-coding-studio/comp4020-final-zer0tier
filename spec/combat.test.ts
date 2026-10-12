@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { ABILITIES, coinEffect, simulateBattle } from '../src/combat.ts';
+import { ABILITIES, coinEffect, MONSTER_ABILITIES, simulateBattle } from '../src/combat.ts';
 
 const a = { id: 'a', strength: 5, intelligence: 7, charisma: 3 };
 const b = { id: 'b', strength: 5, intelligence: 5, charisma: 5 };
@@ -116,4 +116,29 @@ it('groups long learned-ability battles only while the same attacks remain affor
   }
   expect(battle.turns.at(-1)!.mp).toEqual([0, 0]);
   expect(battle.winner).toBe('b');
+});
+it("Bump deals two-thirds of the target's current HP, rounded up, for 5 MP, and gives way to a harder Claw Strike", () => {
+  expect(MONSTER_ABILITIES).toEqual([expect.objectContaining({ id: 'bump', name: 'Bump', mpCost: 5 })]);
+  const king = { id: 'king', strength: 18, intelligence: 10, charisma: 12, abilities: ['bump'] as const }; // Claw Strike 18
+  // A 102 HP pet: Bump beats Claw Strike twice (68, then ceil(34 × 2/3) = 23); at 0 MP the king falls back to Claw.
+  const tank = simulateBattle({ id: 'tank', strength: 1, intelligence: 1, charisma: 100 }, king, [103, 58], { first: 1 });
+  expect(tank.fighters[1].abilities).toEqual(['claw-strike', 'bump']);
+  expect(tank.turns.filter(t => t.actor === 1).map(t => [t.ability, t.damage, t.mpCost, t.mp[1]])).toEqual([
+    ['bump', 68, 5, 5], ['bump', 23, 5, 0], ['claw-strike', 11, 0, 0],
+  ]);
+  // A 20 HP pet: Claw Strike's 18 beats Bump's 14, so the king keeps its MP.
+  const small = simulateBattle({ id: 'small', strength: 1, intelligence: 1, charisma: 18 }, king, [21, 58], { first: 1 });
+  expect(small.turns.filter(t => t.actor === 1).every(t => t.ability === 'claw-strike' && t.mp[1] === 10)).toBe(true);
+  // Pets never learn it, even if their saved abilities somehow named it.
+  expect(ABILITIES.map(ability => ability.id)).not.toContain('bump');
+});
+it('never groups Bump into multi-hit rounds, even past the turn where long battles start grouping', () => {
+  // ~10^15 HP keeps Bump the stronger attack for over 30 of the king's turns.
+  const king = { id: 'king', strength: 1, intelligence: 1000, charisma: 1, abilities: ['bump'] as const };
+  const tank = { id: 'tank', strength: 1, intelligence: 1, charisma: 1e15 };
+  const battle = simulateBattle(tank, king, [1e15 + 3, 1003], { first: 1 });
+  const bumps = battle.turns.map((turn, i) => ({ turn, i, before: i ? battle.turns[i - 1].hp[0] : 1e15 + 2 }))
+    .filter(({ turn }) => turn.ability === 'bump');
+  expect(bumps.at(-1)!.i).toBeGreaterThanOrEqual(60);
+  for (const { turn, before } of bumps) expect(turn).toMatchObject({ hits: 1, damage: Math.ceil(before * 2 / 3) });
 });

@@ -178,7 +178,8 @@ function renderMap() {
   roster.replaceChildren();
   for (const enemy of state.enemies) {
     const item = document.createElement('li');
-    item.textContent = `${enemy.name} · column ${enemy.x + 1}, row ${enemy.y + 1} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence} · STR ${enemy.strength} / INT ${enemy.intelligence} / CHA ${enemy.charisma}`;
+    const moves = (enemy.moves ?? []).map(move => ` · ${move.name} (${move.mpCost} MP): ${move.description}`).join('');
+    item.textContent = `${enemy.name} · column ${enemy.x + 1}, row ${enemy.y + 1} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence} · STR ${enemy.strength} / INT ${enemy.intelligence} / CHA ${enemy.charisma}${moves}`;
     roster.append(item);
   }
   state.tiles.forEach((row, y) => [...row].forEach((tile, x) => {

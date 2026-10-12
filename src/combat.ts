@@ -5,7 +5,13 @@ export const ABILITIES = [
   { id: 'firebolt', name: 'Firebolt', mpCost: 3, description: 'Intelligence × 1.5, adjusted by battle luck and rounded.' },
   { id: 'heavy-strike', name: 'Heavy Strike', mpCost: 2, description: 'Claw Strike damage × 1.5, rounded up.' },
 ] as const;
-export type AbilityId = (typeof ABILITIES)[number]['id'];
+// Monster-only moves: chests never teach these to pets.
+export const MONSTER_ABILITIES = [
+  { id: 'bump', name: 'Bump', mpCost: 5, description: 'Two-thirds of the target’s current HP, rounded up.' },
+] as const;
+const ALL_ABILITIES = [...ABILITIES, ...MONSTER_ABILITIES];
+export type AbilityId = (typeof ALL_ABILITIES)[number]['id'];
+export type MonsterAbilityId = (typeof MONSTER_ABILITIES)[number]['id'];
 export type MonsterKind = 'slime' | 'goblin' | 'slime-king';
 export interface PetStats {
   id: string; strength: number; intelligence: number; charisma: number;
@@ -64,14 +70,15 @@ export function simulateBattle(
     maxMp: pet.intelligence,
     damage: Math.max(1, Math.round(pet.strength * rolls[i] / (2 * pet.strength + pet.intelligence + pet.charisma))),
     color: pet.color ?? "#f59e0b", appearance: pet.appearance ?? "blob",
-    abilities: ABILITIES.filter(ability => ability.id === 'claw-strike' || pet.abilities?.includes(ability.id)).map(ability => ability.id),
+    abilities: ALL_ABILITIES.filter(ability => ability.id === 'claw-strike' || pet.abilities?.includes(ability.id)).map(ability => ability.id),
   })) as [Fighter, Fighter];
-  const attacks = [a, b].map((pet, i) => ABILITIES.filter(ability => fighters[i].abilities.includes(ability.id)).map(ability => ({
+  // Fixed per-hit damage; Bump's depends on the target's HP, so damageOf works it out per strike.
+  const attacks = [a, b].map((pet, i) => ALL_ABILITIES.filter(ability => fighters[i].abilities.includes(ability.id)).map(ability => ({
     ...ability,
     damage: ability.id === 'firebolt'
       ? Math.max(1, Math.round(1.5 * pet.intelligence * rolls[i] / (2 * pet.strength + pet.intelligence + pet.charisma)))
       : ability.id === 'heavy-strike' ? Math.ceil(fighters[i].damage * 1.5) : fighters[i].damage,
-  })).sort((a, b) => b.damage - a.damage || a.mpCost - b.mpCost));
+  })));
   const initialHp = fighters.map((f, i) => Math.max(0, Math.min(f.maxHp, options?.hp?.[i] ?? f.maxHp))) as [number, number];
   const initialMp = fighters.map((f, i) => Math.max(0, Math.min(f.maxMp, options?.mp?.[i] ?? f.maxMp))) as [number, number];
   const hp: [number, number] = [...initialHp];
@@ -79,7 +86,13 @@ export function simulateBattle(
   const first: 0 | 1 = options?.first ?? (rolls[0] > rolls[1] ? 0 : 1);
   const second = (1 - first) as 0 | 1;
   const turns: BattleTurn[] = [];
-  const choose = (actor: 0 | 1) => attacks[actor].find(attack => attack.mpCost <= mp[actor])!;
+  const damageOf = (actor: 0 | 1, attack: (typeof attacks)[number][number]) =>
+    attack.id === 'bump' ? Math.ceil(hp[1 - actor] * 2 / 3) : attack.damage;
+  // The hardest-hitting attack the fighter can afford right now, the cheaper on a tie.
+  const choose = (actor: 0 | 1) => attacks[actor].filter(attack => attack.mpCost <= mp[actor]).reduce((best, attack) => {
+    const gain = damageOf(actor, attack) - damageOf(actor, best);
+    return gain > 0 || (gain === 0 && attack.mpCost < best.mpCost) ? attack : best;
+  });
   // Gold's "first attack deals double damage" always refers to fighter 0's own
   // first strike, whichever turn order it lands on.
   let zeroHasStruck = false;
@@ -87,7 +100,7 @@ export function simulateBattle(
     const target = (1 - actor) as 0 | 1;
     const boost = options?.doubleFirstStrike && actor === 0 && !zeroHasStruck ? 2 : 1;
     if (actor === 0) zeroHasStruck = true;
-    const damage = Math.min(hp[target], attack.damage * hits * boost);
+    const damage = Math.min(hp[target], damageOf(actor, attack) * hits * boost);
     hp[target] -= damage;
     mp[actor] -= attack.mpCost * hits;
     turns.push({ actor, target, ability: attack.id, name: attack.name, mpCost: attack.mpCost * hits, damage, hits, hp: [...hp], mp: [...mp] });
@@ -97,7 +110,8 @@ export function simulateBattle(
     // non-lethal middle rounds, stopping when either fighter changes ability.
     if (turns.length >= 60) {
       const choices = [choose(0), choose(1)];
-      const rounds = Math.min(...choices.map((attack, actor) => Math.min(
+      // Bump hits for less each time, so only fixed-damage attacks are grouped.
+      const rounds = choices.some(attack => attack.id === 'bump') ? 0 : Math.min(...choices.map((attack, actor) => Math.min(
         Math.ceil(hp[1 - actor] / attack.damage) - 1,
         attack.mpCost ? Math.floor(mp[actor] / attack.mpCost) : Infinity,
       )));

@@ -43,7 +43,7 @@ it('lets the owner descend all five floors only at stairs, ascend, and resume th
     state = await act({ action: 'descend' });
     expect(state).toMatchObject({ x: 2, y: 2, floor: floor + 1, floorCount: 5 });
   }
-  expect(state.enemies.find((e: any) => e.kind === 'slime-king')).toMatchObject({ name: 'Slime King' });
+  expect(state.enemies.find((e: any) => e.kind === 'slime-king')).toMatchObject({ name: 'Slime King', moves: [{ id: 'bump', name: 'Bump', mpCost: 5 }] });
   expect(state.down).toBeNull();
   expect((await sendAction(id, { action: 'descend' })).status).toBe(409);
   await post('/api/signout', {}, id); await signIn(id);

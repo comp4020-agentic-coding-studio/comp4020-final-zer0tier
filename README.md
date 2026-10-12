@@ -391,7 +391,12 @@ after this update. Training increases the maximums without refilling current HP/
 Encounters use the Arena's automatic battle scene, with the monster's
 own appearance, name, and attributes. Monsters use **Claw Strike**, which costs **0 MP**;
 pets also use their learned abilities, and damage uses the same power and luck
-rolls as Arena. Initiative is the same coin toss as Arena: a fair 50/50 unless
+rolls as Arena. The **Slime King** also knows **Bump** (5 MP), which deals
+two-thirds of the pet's *current* HP, rounded up: a pet at 70 HP takes 47. Like
+every fighter, the king picks whichever affordable attack hits harder that turn.
+Bump wins while the pet's HP is high, and Claw Strike takes over as it falls.
+Its 10 MP allow at most two Bumps per battle. **Monster attributes** lists Bump
+beside the Slime King. Pets can't learn it. Initiative is the same coin toss as Arena: a fair 50/50 unless
 the pet's own equipped Unfair Coin overrides it — monsters never carry coins.
 The scene starts at the pet's saved HP/MP (plus any Copper shield), and each monster starts at full HP/MP.
 

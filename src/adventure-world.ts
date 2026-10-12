@@ -1,4 +1,5 @@
 // Pure map and movement rules, shared by persistence and focused rule tests.
+import type { MonsterAbilityId } from './combat.ts';
 import type { TreasureReward } from './treasure.ts';
 export const SIZE = 16;
 export const FLOOR_COUNT = 5;
@@ -21,6 +22,9 @@ export type Floor = {
   up: Point | null;
   down: Point | null;
 };
+// What each kind knows besides the free Claw Strike. Looked up by kind rather
+// than saved on each enemy, so maps saved before a move existed get it too.
+export const MONSTER_MOVES: Record<Enemy['kind'], readonly MonsterAbilityId[]> = { slime: [], goblin: [], 'slime-king': ['bump'] };
 export const samePoint = (a: Point, b: Point): boolean => a.x === b.x && a.y === b.y;
 export const nearby = (a: Point, b: Point): boolean => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= 1;
 export const directions = { w: [0, -1], a: [-1, 0], s: [0, 1], d: [1, 0] } as const;

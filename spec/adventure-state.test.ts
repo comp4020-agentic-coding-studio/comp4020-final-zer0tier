@@ -194,6 +194,23 @@ it.each(['slime', 'goblin', 'slime-king'] as const)('saves a %s victory, removes
   expect(pets.getPet(id)).toEqual(pet);
 });
 
+it("the Slime King Bumps for two-thirds of the pet's current HP while that beats its Claw Strike", () => {
+  const id = 'bumped';
+  const before = setupBattle(id, 'slime-king', [30, 10, 30]); // 70 HP, hits for 30; the king's Claw Strike is 18
+  expect(before.enemies.find(e => e.kind === 'slime-king')!.moves).toEqual([expect.objectContaining({ id: 'bump', mpCost: 5 })]);
+  expect(before.enemies.filter(e => e.kind !== 'slime-king').every(e => e.moves.length === 0)).toBe(true);
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5); // tails: the king strikes first
+  try {
+    const result = step(id, 'd');
+    expect(result.battle!.playback.fighters[1].abilities).toEqual(['claw-strike', 'bump']);
+    // ceil(70 × 2/3) = 47; then ceil(23 × 2/3) = 16 is less than Claw Strike's 18.
+    expect(result.battle!.playback.turns.map(t => [t.actor, t.ability, t.damage, t.hp])).toEqual([
+      [1, 'bump', 47, [23, 40]], [0, 'claw-strike', 30, [23, 10]], [1, 'claw-strike', 18, [5, 10]], [0, 'claw-strike', 10, [5, 0]],
+    ]);
+    expect(result).toMatchObject({ completed: true, hp: 19, battle: { won: true } });
+  } finally { random.mockRestore(); }
+});
+
 it('carries HP/MP across battles and floors, restoring 20% of maximum rounded up only once per victory', () => {
   const id = 'recovery'; setupBattle(id, 'slime');
   db.prepare('UPDATE adventures SET hp = ?, mp = ? WHERE player_id = ?').run(17, 0, id);

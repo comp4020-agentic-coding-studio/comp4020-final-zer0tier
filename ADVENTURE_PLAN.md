@@ -129,8 +129,12 @@ authoritative; new real-time events require the existing one-second tests.
 
 ## Decisions to settle before the relevant phase
 
-- What are the boss abilities and completion rewards? Review the initial enemy
-  stat curves after monster battles are playable.
+- What is the completion reward for defeating the Slime King? Review the
+  initial enemy stat curves after monster battles are playable.
+
+Resolved boss ability: the Slime King knows Bump (5 MP), dealing ceil(2/3 ×
+the pet's current HP). It is chosen like any attack (the strongest affordable
+one each turn), so 10 MP allows at most two Bumps a battle. Pets can't learn it.
 - Keep the existing touch direction buttons and phone layout during later steps.
 
 Resolved for phase 5: coins are reusable equipment (never consumed); Copper's

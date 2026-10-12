@@ -75,8 +75,11 @@ it('clears the previous floor on account reset and ignores its late movement res
   try {
     window.eval(readFileSync('public/adventure.js', 'utf8'));
     $('adventure-open').click();
-    finishes[0](Response.json(map(5)));
+    const grove = map(5);
+    finishes[0](Response.json({ ...grove, enemies: grove.enemies.map(e => ({ ...e, moves: e.kind === 'slime-king'
+      ? [{ id: 'bump', name: 'Bump', mpCost: 5, description: 'Two-thirds of the target’s current HP, rounded up.' }] : [] })) }));
     await vi.waitFor(() => expect($('adventure-title').textContent).toBe('Slime King’s grove'));
+    expect($('adventure-enemies').lastElementChild!.textContent).toMatch(/^Slime King · .* · Bump \(5 MP\): Two-thirds of the target’s current HP, rounded up\.$/);
     $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
     expect(finishes).toHaveLength(2);
     window.document.dispatchEvent(new window.CustomEvent('adventure:reset'));

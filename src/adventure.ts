@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { db } from './db.ts';
-import { ABILITIES, coinEffect, simulateBattle, withAttributeBonus, type Battle } from './combat.ts';
+import { ABILITIES, coinEffect, MONSTER_ABILITIES, simulateBattle, withAttributeBonus, type Battle } from './combat.ts';
 import {
   ADVENTURE_COOLDOWN_MINUTES, ADVENTURE_COST, consumeHourglass, findItem, getPet, ITEMS, LUCK, MAX_CARE,
   powerOf, spendForAdventure, use, type Pet,
 } from './pets.ts';
 import { grantTreasure } from './inventory.ts';
 import { COINS, rollTreasure } from './treasure.ts';
-import { advanceEnemies, createWorld, directions, FLOOR_COUNT, nearby, samePoint, SIZE, walkable, type Enemy, type Floor, type Point } from './adventure-world.ts';
+import {
+  advanceEnemies, createWorld, directions, FLOOR_COUNT, MONSTER_MOVES, nearby, samePoint, SIZE, walkable, type Enemy, type Floor, type Point,
+} from './adventure-world.ts';
 import { realMs, TIME_SCALE } from './clock.ts';
 
 export type AdventureBattle = {
@@ -75,7 +77,8 @@ function view(saved: Progress) {
   const floor = saved.world[saved.floor - 1];
   return {
     x: saved.x, y: saved.y, floor: saved.floor, floorCount: FLOOR_COUNT, size: SIZE,
-    name: floor.name, tiles: floor.tiles, enemies: floor.enemies, chests: floor.chests,
+    name: floor.name, tiles: floor.tiles, chests: floor.chests,
+    enemies: floor.enemies.map(e => ({ ...e, moves: MONSTER_ABILITIES.filter(a => MONSTER_MOVES[e.kind].includes(a.id)) })),
     up: floor.up, down: floor.down, revision: saved.revision, battle: saved.battle,
     inventory: saved.inventory,
     hp: saved.hp, mp: saved.mp, maxHp: saved.maxHp, maxMp: saved.maxMp, failed: saved.hp === 0,
@@ -98,7 +101,7 @@ function save(id: string, saved: Progress) {
 function resolveBattle(id: string, saved: Progress, enemy: Enemy) {
   const pet = getPet(id);
   if (!pet) return { error: 'Your pet could not be found.', status: 404 };
-  const monster = { ...enemy, id: `monster:${enemy.id}`, monster: enemy.kind,
+  const monster = { ...enemy, id: `monster:${enemy.id}`, monster: enemy.kind, abilities: MONSTER_MOVES[enemy.kind],
     color: { slime: '#0891b2', goblin: '#15803d', 'slime-king': '#c026d3' }[enemy.kind] };
   const roll = (stats: Parameters<typeof powerOf>[0]) => powerOf(stats) * (LUCK.min + Math.random() * (LUCK.max - LUCK.min));
   // Only the pet's own equipped coin applies; monsters never carry coins.
