@@ -289,20 +289,43 @@ it("a Gold coin makes the pet attack second but doubles its own first hit", () =
   } finally { random.mockRestore(); }
 });
 
-it("a Copper coin boosts HP/MP/damage for one monster battle only, without changing real attributes or the saved max", () => {
+it("a Copper coin adds HP/MP to one monster battle as a shield, without changing real attributes or the saved max", () => {
   const id = 'coin-copper';
   const before = setupBattle(id, 'slime', [12, 7, 12]); // maxHp 31, maxMp 7
   grantCoin(id, 'copper-coin');
   expect(pets.equipCoin(id, 'copper-coin')).not.toHaveProperty('error');
-  expect(before).toMatchObject({ maxHp: 31, maxMp: 7 });
+  expect(before).toMatchObject({ hp: 31, mp: 7, maxHp: 31, maxMp: 7 });
   const realStats = pets.getPet(id)!;
-  const result = step(id, 'd');
-  expect(result.battle!.playback.fighters[0]).toMatchObject({ maxHp: 34, maxMp: 8 });
-  // The saved/displayed max, and the pet's real attributes, never carry the bonus.
-  expect(result).toMatchObject({ maxHp: 31, maxMp: 7 });
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5); // tails: the slime hits first, for exactly 3
+  try {
+    const result = step(id, 'd');
+    expect(result.battle!.playback.fighters[0]).toMatchObject({ maxHp: 34, maxMp: 8 });
+    expect(result.battle!.playback.initialHp![0]).toBe(34);
+    expect(result.battle!.playback.initialMp![0]).toBe(8);
+    expect(result.battle!.playback.turns[0]).toMatchObject({ actor: 1, damage: 3, hp: [31, 6] });
+    // The shield took the whole hit; its unused MP is gone, and nothing is recovered past full.
+    expect(result).toMatchObject({ hp: 31, mp: 7, maxHp: 31, maxMp: 7, battle: { won: true, after: { hp: 31, mp: 7 } } });
+  } finally { random.mockRestore(); }
   expect(pets.getPet(id)).toMatchObject({
     strength: realStats.strength, intelligence: realStats.intelligence, charisma: realStats.charisma,
   });
+});
+
+it("a Copper shield absorbs damage for a hurt pet first but never heals it", () => {
+  const id = 'coin-copper-hurt';
+  setupBattle(id, 'goblin', [12, 7, 12]); // maxHp 31, maxMp 7; the goblin hits for exactly 5
+  db.prepare('UPDATE adventures SET hp = ?, mp = ? WHERE player_id = ?').run(10, 2, id);
+  grantCoin(id, 'copper-coin');
+  expect(pets.equipCoin(id, 'copper-coin')).not.toHaveProperty('error');
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  try {
+    const result = step(id, 'd');
+    expect(result.battle!.playback.initialHp![0]).toBe(13);
+    expect(result.battle!.playback.initialMp![0]).toBe(3);
+    expect(result.battle!.playback.turns[0]).toMatchObject({ actor: 1, damage: 5, hp: [8, 10] });
+    // 3 of the 5 damage came off the shield: 10 → 8, then a victory's 7 HP / 2 MP recovery.
+    expect(result).toMatchObject({ hp: 15, mp: 4, battle: { won: true, recovery: { hp: 7, mp: 2 }, after: { hp: 15, mp: 4 } } });
+  } finally { random.mockRestore(); }
 });
 
 it("an Arena fight applies only the attacker's equipped coin; the defender's is ignored", () => {

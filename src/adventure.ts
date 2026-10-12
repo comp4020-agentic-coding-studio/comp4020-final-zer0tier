@@ -14,6 +14,7 @@ export type AdventureBattle = {
   id: string; floor: number; enemyId: string; enemyName: string;
   won: boolean; pending: boolean; playback: Battle;
   recovery: { hp: number; mp: number };
+  after?: { hp: number; mp: number }; // what the pet carries back to the map; absent in older saves
 };
 type SavedAdventure = {
   x: number; y: number; floor: number; world_json: string | null;
@@ -103,21 +104,29 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy) {
   // Only the pet's own equipped coin applies; monsters never carry coins.
   const coin = coinEffect(pet.equippedCoin);
   const boostedPet = withAttributeBonus(pet, coin.attributeBonus);
+  // Copper's extra HP/MP sit on top of what the pet carries in, as a shield.
+  const shieldHp = boostedPet.strength + boostedPet.intelligence + boostedPet.charisma - saved.maxHp;
+  const shieldMp = boostedPet.intelligence - saved.maxMp;
   const playback = simulateBattle(boostedPet, monster, [roll(boostedPet), roll(monster)], {
-    hp: [saved.hp, monster.strength + monster.intelligence + monster.charisma], mp: [saved.mp, monster.intelligence],
+    hp: [saved.hp + shieldHp, monster.strength + monster.intelligence + monster.charisma],
+    mp: [saved.mp + shieldMp, monster.intelligence],
     first: coin.first, doubleFirstStrike: coin.doubleFirstStrike,
   });
   const won = playback.winner === pet.id;
   const floor = saved.world[saved.floor - 1];
   const last = playback.turns.at(-1)!;
-  // Copper's bonus is battle-only: never save HP/MP above the pet's real max.
-  saved.hp = Math.min(last.hp[0], saved.maxHp); saved.mp = Math.min(last.mp[0], saved.maxMp);
+  // Damage spends the shield first; whatever is left of it disappears, so a
+  // fight never leaves the pet with more HP/MP than it brought.
+  saved.hp = Math.min(last.hp[0], saved.hp); saved.mp = Math.min(last.mp[0], saved.mp);
   const recovery = {
     hp: won ? Math.min(Math.ceil(saved.maxHp * 0.2), saved.maxHp - saved.hp) : 0,
     mp: won ? Math.min(Math.ceil(saved.maxMp * 0.2), saved.maxMp - saved.mp) : 0,
   };
   saved.hp += recovery.hp; saved.mp += recovery.mp;
-  saved.battle = { id: randomUUID(), floor: saved.floor, enemyId: enemy.id, enemyName: enemy.name, won, pending: true, playback, recovery };
+  saved.battle = {
+    id: randomUUID(), floor: saved.floor, enemyId: enemy.id, enemyName: enemy.name, won, pending: true, playback, recovery,
+    after: { hp: saved.hp, mp: saved.mp },
+  };
   if (won) {
     floor.enemies = floor.enemies.filter(e => e.id !== enemy.id);
     saved.x = enemy.x; saved.y = enemy.y;

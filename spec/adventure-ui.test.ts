@@ -139,6 +139,24 @@ it('reuses automatic monster playback with carried resources and returns to the 
   } finally { dom.window.close(); }
 });
 
+it('ends the battle scene at the HP/MP the pet carries back, without a spent Copper shield', async () => {
+  const { dom, window, $ } = page();
+  const saved = battleProgress();
+  const playback = saved.battle.playback;
+  // As if a Copper shield's leftover HP and unused MP vanished after the fight.
+  saved.battle = { ...saved.battle, after: { hp: playback.turns.at(-1)!.hp[0] - 2, mp: 0 } } as typeof saved.battle;
+  window.fetch = (async () => Response.json(saved)) as typeof fetch;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement).open).toBe(true));
+    $('battle-skip').click();
+    expect($('battle-hp-text-0').textContent).toBe(`${playback.turns.at(-1)!.hp[0] - 2} / 15`);
+    expect($('battle-mp-text-0').textContent).toBe('0 / 5');
+  } finally { dom.window.close(); }
+});
+
 it('shows a failed run with disabled movement and starts a fresh adventure only when requested', async () => {
   const { dom, window, $ } = page();
   const failed = battleProgress(false);

@@ -393,7 +393,7 @@ own appearance, name, and attributes. Monsters use **Claw Strike**, which costs 
 pets also use their learned abilities, and damage uses the same power and luck
 rolls as Arena. Initiative is the same coin toss as Arena: a fair 50/50 unless
 the pet's own equipped Unfair Coin overrides it — monsters never carry coins.
-The scene starts at the pet's saved HP/MP, and each monster starts at full HP/MP.
+The scene starts at the pet's saved HP/MP (plus any Copper shield), and each monster starts at full HP/MP.
 
 On victory, the monster stays defeated and the pet occupies its tile. Recover
 **20% of maximum HP and MP, rounded up separately**, capped at their maximums.
@@ -476,6 +476,13 @@ applies (the attacker in a fight, the victim in revenge); the opponent's
 equipped coin, if any, is ignored. Copper's bonus never persists: the pet's
 real attributes, and its saved maximum HP/MP, are unchanged once the battle
 ends.
+
+In Adventure, where HP/MP carry between battles, Copper's extra 3 HP and 1 MP
+are a **shield** on top of what the pet brings in: a pet at 10 / 31 HP starts
+the fight at 13 / 34. Damage spends the shield first, and whatever is left of
+it disappears afterwards, so Copper never heals: that pet leaves the fight with
+at most 10 HP (before a victory's recovery). Arena and revenge start every
+fighter at full, so there the bonus simply raises HP/MP for that fight.
 
 The private `POST /api/adventure` accepts an empty body to resume. Its response
 includes an opaque `revision`; supply that revision with every action:

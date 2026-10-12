@@ -104,6 +104,9 @@ Each treasure reward is drawn from these category probabilities:
   it never changes the pet's real attributes or its saved maximum HP/MP. In a
   PvP fight or revenge, only the acting side's equipped coin applies (the
   attacker, or the revenge victim); the opponent's equipped coin is ignored.
+- Owner's confirmed rule: in Adventure, Copper's +3 HP/+1 MP is a temporary
+  shield on top of the carried HP/MP. Damage spends it first and any leftover
+  disappears after the fight, so Copper never heals.
 - Implemented: a new global, per-pet `equip-coin` action (`POST
   /api/pets/:id/equip-coin/:coin`, `:coin` one of the three coin IDs or
   `none`), used identically by Adventure, Arena, and revenge. Equipping

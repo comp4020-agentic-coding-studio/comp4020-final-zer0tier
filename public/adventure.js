@@ -278,9 +278,10 @@ function showBattle(replay = false) {
     key: `adventure:${battle.id}`, battle: battle.playback, viewer: battle.playback.fighters[0].id,
     title: `Floor ${battle.floor} · ${battle.enemyName}`, result: battleResult(battle),
     replay: true, returnLabel: 'Return to map',
+    // What the pet carries back to the map (a Copper shield's leftover is gone).
     resultResources: {
-      hp: [last.hp[0] + battle.recovery.hp, last.hp[1]],
-      mp: [last.mp[0] + battle.recovery.mp, last.mp[1]],
+      hp: [battle.after?.hp ?? last.hp[0] + battle.recovery.hp, last.hp[1]],
+      mp: [battle.after?.mp ?? last.mp[0] + battle.recovery.mp, last.mp[1]],
     },
   } }));
 }
