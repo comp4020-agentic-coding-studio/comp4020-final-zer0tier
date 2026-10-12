@@ -78,8 +78,12 @@ for (const [kind, label] of [['slime', 'Slime'], ['goblin', 'Goblin'], ['slime-k
   legend.append(entry);
 }
 const at = point => state && point && point.x === state.x && point.y === state.y;
+// From the latest broadcast pet; the server refuses exploring while busy anyway.
+const busyText = () => pet?.activity === 'studying' ? `Your pet is busy studying ${pet.task}. Explore once it's done.`
+  : pet?.activity === 'working' ? `Your pet is busy working at the ${pet.task}. Explore once it's done.` : '';
 function syncControls() {
-  const blocked = pending || Boolean(state?.battle?.pending) || Boolean(state?.failed);
+  const busy = Boolean(busyText());
+  const blocked = pending || Boolean(state?.battle?.pending) || Boolean(state?.failed) || busy;
   function disable(button, value) {
     // Keep keyboard input inside the map when the active control is disabled.
     if (value && document.activeElement === button) grid.focus({ preventScroll: true });
@@ -92,8 +96,8 @@ function syncControls() {
   adventure.querySelectorAll('[data-direction]').forEach(button => disable(button, blocked));
   disable(adventure.querySelector('#adventure-continue'), pending);
   disable(adventure.querySelector('#adventure-replay'), pending);
-  disable(adventure.querySelector('#adventure-restart'), pending || Boolean(state?.battle?.pending));
-  disable(adventure.querySelector('#adventure-abandon'), pending || Boolean(state?.battle?.pending));
+  disable(adventure.querySelector('#adventure-restart'), pending || Boolean(state?.battle?.pending) || busy);
+  disable(adventure.querySelector('#adventure-abandon'), pending || Boolean(state?.battle?.pending) || busy);
   const hourglasses = state?.inventory?.items.find(item => item.id === 'hourglass')?.quantity ?? 0;
   disable(adventure.querySelector('#adventure-skip-cooldown'), pending || hourglasses < 1);
   const chest = state?.chests.find(at);
@@ -207,11 +211,11 @@ function renderMap() {
   grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}. ${state.enemies.length} monsters and ${state.chests.length} chest. Monster locations are in Monster attributes. Trees block movement; stepping into a monster starts battle.`);
   status.textContent = `Column ${state.x + 1} · Row ${state.y + 1}`;
   const nearby = state.enemies.filter(e => state.encounters.includes(e.id));
-  adventure.querySelector('#adventure-notice').textContent = nearby.length
+  adventure.querySelector('#adventure-notice').textContent = busyText() || (nearby.length
     ? `${nearby.map(e => e.name).join(', ')} nearby! Step into their tile to battle, or move away.`
     : state.chests.some(at) ? (state.chests.find(at).reward ? 'This chest is empty. Your reward is saved.' : 'You found a treasure chest. Choose Open chest to collect its reward.')
     : at(state.up) ? 'Stairs up: choose Ascend to return to the previous floor.'
-    : at(state.down) ? 'Stairs down: choose Descend to explore deeper.' : '';
+    : at(state.down) ? 'Stairs down: choose Descend to explore deeper.' : '');
   syncControls();
 }
 function rewardText(reward) {
@@ -334,7 +338,7 @@ adventure.addEventListener('keydown', event => {
   const direction = { arrowup: 'w', arrowleft: 'a', arrowdown: 's', arrowright: 'd' }[key] || key;
   if (!['w', 'a', 's', 'd'].includes(direction)) return;
   event.preventDefault();
-  if (!event.repeat && state && !state.battle?.pending && !state.failed) request({ direction });
+  if (!event.repeat && state && !state.battle?.pending && !state.failed && !busyText()) request({ direction });
 });
 for (const action of ['ascend', 'descend']) {
   adventure.querySelector(`#adventure-${action}`).addEventListener('click', () => request({ action }));

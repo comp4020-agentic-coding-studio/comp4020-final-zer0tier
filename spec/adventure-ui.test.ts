@@ -5,7 +5,7 @@ import { createWorld } from '../src/adventure-world.ts';
 import { simulateBattle } from '../src/combat.ts';
 import { ABILITIES } from '../src/combat.ts';
 import { COINS } from '../src/treasure.ts';
-import { baseUrl, freshId, getRules, signUp } from './helpers.ts';
+import { baseUrl, freshId, getPet, getRules, must, signUp } from './helpers.ts';
 
 function map(floor = 1) {
   return { ...createWorld()[floor - 1], floor, floorCount: 5, size: 16, x: 2, y: 2, encounters: [], revision: 'saved-map', battle: null, completed: false, failed: false, hp: 15, mp: 5, maxHp: 15, maxMp: 5,
@@ -63,6 +63,60 @@ it('uses the signed-in pet appearance in Adventure without waiting for a later p
     await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
     expect($('adventure-grid').querySelector('.adventure-player use')?.getAttribute('href')).toBe('#pet-dragon');
     expect(($('adventure-grid').querySelector('.adventure-player') as HTMLElement).style.getPropertyValue('--pet-color')).toBe('#123456');
+  } finally { dom.window.close(); }
+});
+
+it('disables Explore the woodland, with the reason, while the signed-in pet is working', async () => {
+  const id = freshId(); await signUp(id);
+  await must(`/api/pets/${id}/work/office`, { minutes: 240 });
+  const pet = await getPet(id);
+  const rules = await getRules();
+  const { dom, window, $ } = page();
+  window.WebSocket = function () { return new window.EventTarget(); } as unknown as typeof window.WebSocket;
+  const requests = vi.fn(async (url: string) => {
+    if (url === '/api/rules') return Response.json(rules);
+    if (url === '/api/me') return Response.json({ error: 'Sign in first.' }, { status: 401 });
+    if (url === '/api/signin') return Response.json(pet);
+    return Response.json([]);
+  });
+  window.fetch = requests as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/app.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    await vi.waitFor(() => expect($('courses').children.length).toBeGreaterThan(0));
+    $('login').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await vi.waitFor(() => expect($('dashboard').hidden).toBe(false));
+    expect(($('adventure-open') as HTMLButtonElement).disabled).toBe(true);
+    expect($('adventure-hint').textContent).toBe("Working at the Office. Wait until it's done.");
+    expect($('adventure-open').getAttribute('aria-describedby')).toBe('adventure-hint');
+    $('adventure-open').click();
+    expect(($('adventure-dialog') as HTMLDialogElement).open).toBe(false);
+    expect(requests.mock.calls.some(([url]) => url === '/api/adventure')).toBe(false);
+  } finally { dom.window.close(); }
+});
+
+it('locks exploring on an open map while a live update says the pet is busy, and unlocks when it is idle again', async () => {
+  const { dom, window, $ } = page();
+  window.confirm = () => true;
+  const requests = vi.fn(async () => Response.json({ ...map(), x: 11, y: 3 }));
+  window.fetch = requests as unknown as typeof fetch;
+  const update = (activity: string, task: string | null) => window.document.dispatchEvent(new window.CustomEvent('adventure:pet', {
+    detail: { id: 'explorer', activity, task, stamina: 30, hygiene: 40, food: 0, coins: {} },
+  }));
+  const controls = () => [...$('adventure-dialog').querySelectorAll<HTMLButtonElement>('[data-direction]'),
+    $('adventure-open-chest') as HTMLButtonElement, $('adventure-abandon') as HTMLButtonElement];
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(($('adventure-open-chest') as HTMLButtonElement).disabled).toBe(false));
+    update('studying', 'Math');
+    for (const button of controls()) expect(button.disabled).toBe(true);
+    expect($('adventure-notice').textContent).toBe("Your pet is busy studying Math. Explore once it's done.");
+    $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    expect(requests).toHaveBeenCalledTimes(1);
+    update('idle', null);
+    for (const button of controls()) expect(button.disabled).toBe(false);
+    expect($('adventure-notice').textContent).toContain('treasure chest');
   } finally { dom.window.close(); }
 });
 

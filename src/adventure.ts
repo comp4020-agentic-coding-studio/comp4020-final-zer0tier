@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from './db.ts';
 import { ABILITIES, coinEffect, MONSTER_ABILITIES, simulateBattle, withAttributeBonus, type Battle } from './combat.ts';
 import {
-  ADVENTURE_COOLDOWN_MINUTES, ADVENTURE_COST, consumeHourglass, findItem, getPet, ITEMS, LUCK, MAX_CARE,
+  ADVENTURE_COOLDOWN_MINUTES, ADVENTURE_COST, busyNow, consumeHourglass, findItem, getPet, ITEMS, LUCK, MAX_CARE,
   powerOf, spendForAdventure, use, type Pet,
 } from './pets.ts';
 import { grantTreasure } from './inventory.ts';
@@ -90,6 +90,13 @@ function view(saved: Progress) {
 }
 export function adventureFor(id: string) { return view(load(id)); }
 
+// A pet that's studying or working can't explore. Looking at the map,
+// acknowledging a battle, and using items or an Hourglass stay open.
+function busyRefusal(id: string) {
+  const refusal = busyNow(getPet(id)!);
+  return refusal ? { error: refusal, status: 409 as const } : undefined;
+}
+
 // Position, removed monsters, and the exact playback are one atomic write.
 // A stale retry (even after Continue) cannot apply the same movement twice.
 function save(id: string, saved: Progress) {
@@ -144,6 +151,8 @@ export function moveAdventure(id: string, direction: unknown, revision?: unknown
   if (typeof revision !== 'string') return { error: 'Reload the map before moving.', status: 400 };
   const saved = load(id), floor = saved.world[saved.floor - 1];
   if (revision !== saved.revision || saved.battle?.pending || saved.hp === 0) return view(saved);
+  const busy = busyRefusal(id);
+  if (busy) return busy;
   const [dx, dy] = directions[direction as keyof typeof directions];
   const player = { x: saved.x + dx, y: saved.y + dy };
   if (!walkable(floor, player)) return { error: 'A tree blocks that path.', status: 409 };
@@ -159,6 +168,8 @@ export function changeFloor(id: string, action: unknown, revision?: unknown) {
   if (typeof revision !== 'string') return { error: 'Reload the map before using the stairs.', status: 400 };
   const saved = load(id), floor = saved.world[saved.floor - 1];
   if (revision !== saved.revision || saved.battle?.pending || saved.hp === 0) return view(saved);
+  const busy = busyRefusal(id);
+  if (busy) return busy;
   const stair = action === 'descend' ? floor.down : floor.up;
   if (!stair || !samePoint(saved, stair)) return { error: 'Stand on the matching stairs first.', status: 409 };
   const destination = saved.floor + (action === 'descend' ? 1 : -1);
@@ -199,6 +210,8 @@ export function restartAdventure(id: string, revision: unknown) {
   return transaction(() => {
     const saved = load(id);
     if (revision !== saved.revision || saved.battle?.pending) return view(saved);
+    const busy = busyRefusal(id);
+    if (busy) return busy;
     const now = Date.now();
     if (saved.cooldownUntil && saved.cooldownUntil > now) {
       const minutes = Math.max(1, Math.ceil(((saved.cooldownUntil - now) * TIME_SCALE) / 60_000));
@@ -234,6 +247,8 @@ export function openAdventureChest(id: string, revision: unknown) {
     const chest = saved.world[saved.floor - 1].chests.find(c => samePoint(c, saved));
     if (!chest) return { error: 'Stand on a treasure chest first.', status: 409 };
     if (chest.reward) return view(saved);
+    const busy = busyRefusal(id);
+    if (busy) return busy;
     chest.reward = grantTreasure(id, rollTreasure());
     return save(id, saved);
   });

@@ -347,6 +347,9 @@ function renderControls(pet) {
 
   arenaBlock = occupied || blocker(pet, rules.fight.needs, "fight");
   $("arena-hint").textContent = arenaBlock;
+  // A studying or working pet can't go exploring until it's done.
+  $("adventure-hint").textContent = occupied;
+  $("adventure-open").disabled = occupied !== "";
   renderFightButtons();
 
   for (const card of $("items").children) {

@@ -377,6 +377,31 @@ it("a revenge battle applies only the victim's equipped coin; the thief's is ign
   expect(outcome.battle.turns[0].actor).toBe(0);
 });
 
+it('a studying pet cannot move, use stairs, open chests, or start over, but can view, finish a battle, and use items', () => {
+  const id = 'busy-explorer';
+  setupBattle(id, 'slime');
+  const fought = step(id, 'd'); // the battle started while idle
+  expect(pets.study(id, 'math')).not.toHaveProperty('error');
+  const continued = adventure.continueAdventure(id, fought.battle!.id, adventure.adventureFor(id).revision);
+  if ('error' in continued) throw new Error(continued.error);
+  const busy = { status: 409, error: 'Your pet is busy studying Math. Wait until it\'s done.' };
+  expect(adventure.moveAdventure(id, 'd', continued.revision)).toEqual(busy);
+  db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(11, 3, id);
+  expect(adventure.openAdventureChest(id, continued.revision)).toEqual(busy);
+  db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(13, 13, id);
+  expect(adventure.changeFloor(id, 'descend', continued.revision)).toEqual(busy);
+  const pet = pets.getPet(id)!;
+  expect(adventure.restartAdventure(id, continued.revision)).toEqual(busy);
+  expect(pets.getPet(id)).toEqual(pet); // nothing charged
+  expect(adventure.adventureFor(id)).toMatchObject({ floor: 1, x: 13, y: 13, revision: continued.revision });
+  db.prepare('UPDATE pets SET food = 1 WHERE id = ?').run(id);
+  expect(adventure.useAdventureItem(id, 'food', continued.revision)).not.toHaveProperty('error');
+  // Once the lesson's time is up the pet may explore, even before its timer pays it out.
+  db.prepare('UPDATE pets SET busy_until = ? WHERE id = ?').run(Date.now() - 1, id);
+  expect(pets.getPet(id)!.activity).toBe('studying');
+  expect(adventure.changeFloor(id, 'descend', adventure.adventureFor(id).revision)).toMatchObject({ floor: 2 });
+});
+
 it('refuses to restart when stamina or hygiene is too low, spending nothing; charges the flat cost on success', () => {
   const id = 'restart-cost'; pets.getOrCreatePet(id);
   const saved = adventure.adventureFor(id);

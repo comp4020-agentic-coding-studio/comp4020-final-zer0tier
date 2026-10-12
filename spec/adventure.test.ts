@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { baseUrl, freshId, getPet, post, signUp, signIn } from './helpers.ts';
+import { baseUrl, finish, freshId, getPet, must, post, signUp, signIn } from './helpers.ts';
 
 async function sendAction(id: string, body = {}) {
   const state = await (await post('/api/adventure', {}, id)).json();
@@ -151,4 +151,15 @@ it('pet:updated — opening a chest grants exactly one reward under concurrent r
     expect(await getPet(id)).toEqual(pet);
     expect(await (await post('/api/adventure', {}, id)).json()).toEqual(moved);
   } finally { windows.forEach(ws => ws.close()); }
+});
+
+it('refuses exploring while the pet works a shift, keeps the map viewable, and allows it once the shift ends', async () => {
+  const id = freshId(); await signUp(id);
+  await must(`/api/pets/${id}/work/office`, { minutes: 240 });
+  const refused = await sendAction(id, { direction: 's' });
+  expect(refused.status).toBe(409);
+  expect((await refused.json()).error).toMatch(/busy working at the Office/i);
+  expect(await (await post('/api/adventure', {}, id)).json()).toMatchObject({ x: 2, y: 2 });
+  await finish(id);
+  expect(await (await sendAction(id, { direction: 's' })).json()).toMatchObject({ x: 2, y: 3 });
 });

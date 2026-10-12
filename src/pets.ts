@@ -345,6 +345,11 @@ function busy(pet: Pet): string | undefined {
   return `Your pet is busy ${doing}. Wait until it's done.`;
 }
 
+// For callers that don't settle the pet first: an activity whose time is up
+// no longer keeps it busy, even before its timer pays it out.
+export const busyNow = (pet: Pet, now = Date.now()): string | undefined =>
+  pet.busyUntil !== null && pet.busyUntil <= now ? undefined : busy(pet);
+
 export function setAppearance(id: string, color: string, appearance: Appearance): Outcome {
   return act(id, (pet) => {
     pet.color = color;

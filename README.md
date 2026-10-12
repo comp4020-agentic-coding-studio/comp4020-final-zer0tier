@@ -361,6 +361,13 @@ floors starts with a 16 × 16 grid, four regular enemies (slimes and goblins), a
 one marked treasure chest. Floor five also contains the **Slime King**. The map
 uses your pet's saved shape and colour as soon as you sign in.
 
+**A busy pet can't adventure.** While it is studying or working, **Explore the
+woodland** is disabled with the reason. The server refuses moves, stairs,
+opening chests, and starting over with 409 until the lesson or shift ends,
+which an Hourglass can bring forward. Viewing the map, returning from a saved
+battle, and using backpack items still work. An activity whose time is up no
+longer counts, even before it has been paid out.
+
 Stand on the down stairs at column 14, row 14 and choose **Descend**. You arrive
 at the next floor's up stairs at column 3, row 3; **Ascend** returns to the
 previous floor's down stairs. Floor one has no up stairs and floor five has no
