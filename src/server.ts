@@ -1,6 +1,6 @@
 import {
-  abandonAdventure, adventureFor, changeFloor, continueAdventure, moveAdventure, openAdventureChest, restartAdventure,
-  skipAdventureCooldown, useAdventureItem,
+  abandonAdventure, adventureFor, changeFloor, continueAdventure, moveAdventure, openAdventureChest, patrolAdventure,
+  restartAdventure, skipAdventureCooldown, useAdventureItem,
 } from "./adventure.ts";
 import express from "express";
 import { ABILITIES } from "./combat.ts";
@@ -122,6 +122,7 @@ app.post("/api/adventure", (req, res) => {
     : req.body?.action === 'abandon' ? abandonAdventure(id, req.body.revision)
     : req.body?.action === 'restart' ? restartAdventure(id, req.body.revision)
     : req.body?.action === 'skip-cooldown' ? skipAdventureCooldown(id, req.body.revision)
+    : req.body?.action === 'patrol' ? patrolAdventure(id)
     : req.body?.action !== undefined ? changeFloor(id, req.body.action, req.body.revision)
     : req.body?.direction !== undefined ? moveAdventure(id, req.body.direction, req.body.revision) : adventureFor(id);
   if (before) {

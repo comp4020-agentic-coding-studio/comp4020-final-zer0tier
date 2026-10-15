@@ -10,10 +10,13 @@ Slime King's Bump; and no adventuring while the pet studies or works. Still
 open: a completion reward for defeating the Slime King.
 This document preserves the owner's requirements.
 
-Owner's confirmed rule for monster movement (step 2): monsters take one
-cardinal step after each accepted player step, detect the eight surrounding
-cells, and stop chasing as soon as the pet leaves that range. They never start
-a battle themselves. Stairs require an explicit Ascend/Descend action.
+Owner's confirmed rule for monster movement, replacing the earlier one-step
+pursuit: monsters move in real time, about one cardinal step a second while
+the map is open, patrolling short routes. A monster sees the pet within 3
+blocks (diagonals included), walks toward it by the shortest open path, stops
+beside it, and returns to its route once the pet is more than 3 blocks away.
+They never start a battle themselves. Stairs require an explicit
+Ascend/Descend action.
 Nearby enemies produce encounter warnings; walking into a monster starts battle.
 Initial stats and scaling are documented in README.md and can be balanced later.
 
@@ -33,8 +36,8 @@ Initial stats and scaling are documented in README.md and can be balanced later.
 - Enemies become stronger on deeper floors.
 - Every floor has at least one treasure chest and several enemies.
 - Floor five contains the **Slime King** boss.
-- A monster notices the pet when the pet enters one of its eight surrounding
-  blocks (including diagonals), then tries to approach the pet.
+- Monsters patrol automatically in real time. A monster notices the pet within
+  3 blocks (including diagonals), then approaches it and stops beside it.
 - Implementation work: floor layouts, reachable chests and stairs, enemy spawn
   rules, depth-based stats, detection, pursuit, and encounter triggers.
 

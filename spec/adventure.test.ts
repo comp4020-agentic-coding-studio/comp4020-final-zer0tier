@@ -37,7 +37,7 @@ it('lets the owner descend all five floors only at stairs, ascend, and resume th
   expect((await post('/api/adventure', { action: 'descend', direction: 's' }, id)).status).toBe(400);
   let state = await act();
   for (let floor = 1; floor < 5; floor++) {
-    // The outer path avoids every monster's detection radius.
+    // The outer path crosses no monster, and nothing patrols while the test walks it.
     for (const direction of ['w', ...Array(12).fill('d'), ...Array(12).fill('s'), 'a']) state = await act({ direction });
     expect(state).toMatchObject({ x: 13, y: 13, floor });
     state = await act({ action: 'descend' });
@@ -51,28 +51,57 @@ it('lets the owner descend all five floors only at stairs, ascend, and resume th
   expect(await act({ action: 'ascend' })).toMatchObject({ floor: 4, x: 13, y: 13 });
 });
 
-it('saves pursuit and encounters, allows escape, and does not advance enemies on reads or rejected moves', async () => {
+it('monsters patrol in real time, chase a pet within 3 blocks, stop beside it, and lose it once it gets away', async () => {
   const id = freshId(); await signUp(id);
   const act = async (body = {}) => (await sendAction(id, body)).json();
-  await act(); await act({ direction: 'd' });
-  const noticed = await act({ direction: 'd' });
-  expect(noticed.enemies[0]).toMatchObject({ x: 5, y: 2, alerted: true });
-  expect(noticed.encounters).toContain(noticed.enemies[0].id);
-  expect(await act()).toEqual(noticed);
-  expect((await sendAction(id, { direction: 'x' })).status).toBe(400);
-  expect(await act()).toEqual(noticed);
-  const escaped = await act({ direction: 'a' });
-  expect(escaped.enemies[0]).toMatchObject({ x: 5, y: 2, alerted: false });
-  expect(escaped.encounters).toEqual([]);
+  const patrol = async () => {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return (await post('/api/adventure', { action: 'patrol' }, id)).json();
+  };
+  const start = await act();
+  expect(start.patrolMs).toBe(1000);
+  expect(start.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: false, route: [{ x: 6, y: 2 }, { x: 9, y: 2 }] });
+  // Patrolling, out of sight: one block per step along its route, and the
+  // revision stays, so a move sent alongside still applies.
+  const walked = await patrol();
+  expect(walked.enemies[0]).toMatchObject({ x: 7, y: 2, alerted: false });
+  expect(walked.revision).toBe(start.revision);
+  // Asking again straight away (another window, or a quick retry) moves nothing.
+  expect(await (await post('/api/adventure', { action: 'patrol' }, id)).json()).toEqual(walked);
+  expect(await act()).toEqual(walked);
   await post('/api/signout', {}, id); await signIn(id);
-  expect(await act()).toEqual(escaped);
+  expect(await act()).toEqual(walked);
+  // Four blocks off, it keeps patrolling; within three it sees the pet and comes.
+  const spotted = await act({ direction: 'd' });
+  expect(spotted).toMatchObject({ x: 3, y: 2, encounters: [] });
+  expect(spotted.enemies[0]).toMatchObject({ x: 7, y: 2, alerted: false });
+  const seen = await act({ direction: 'd' });
+  expect(seen.enemies[0]).toMatchObject({ x: 7, y: 2, alerted: true });
+  const chased = await patrol();
+  expect(chased.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: true });
+  const beside = await patrol();
+  expect(beside.enemies[0]).toMatchObject({ x: 5, y: 2, alerted: true });
+  expect(beside.encounters).toContain(beside.enemies[0].id);
+  // Next to the pet, it waits there: it never starts a battle itself.
+  const waited = await patrol();
+  expect(waited).toMatchObject({ x: 4, y: 2, battle: null });
+  expect(waited.enemies[0]).toMatchObject({ x: 5, y: 2 });
+  expect((await sendAction(id, { direction: 'x' })).status).toBe(400);
+  expect(await act()).toEqual(waited);
+  // More than 3 blocks away, it loses the pet and heads back along its route.
+  for (const direction of ['w', 'a', 'a', 'a']) await act({ direction });
+  const away = await act();
+  expect(away).toMatchObject({ x: 1, y: 1, encounters: [] });
+  expect(away.enemies[0]).toMatchObject({ x: 5, y: 2, alerted: false });
+  expect((await patrol()).enemies[0]).toMatchObject({ x: 6, y: 2, alerted: false });
 });
 
 it('saves exactly one monster battle for concurrent moves and retries, including after returning to exploration', async () => {
   const id = freshId(); await signUp(id);
   const pet = await getPet(id);
-  await sendAction(id, { direction: 'd' });
-  const before = await (await sendAction(id, { direction: 'd' })).json();
+  // Reach the slime beside its spawn, at column 7, before it walks away.
+  for (const direction of ['d', 'd', 'd']) await sendAction(id, { direction });
+  const before = await (await post('/api/adventure', {}, id)).json();
   const request = { direction: 'd', revision: before.revision, winner: id, strength: 9999, reward: 9999 };
   const results = await Promise.all(Array.from({ length: 6 }, async () => {
     const res = await post('/api/adventure', request, id);
@@ -81,7 +110,7 @@ it('saves exactly one monster battle for concurrent moves and retries, including
   }));
   const result = results[0];
   for (const duplicate of results) expect(duplicate).toEqual(result);
-  expect(result).toMatchObject({ x: 5, y: 2, battle: { pending: true, enemyName: 'Slime', won: true } });
+  expect(result).toMatchObject({ x: 6, y: 2, battle: { pending: true, enemyName: 'Slime', won: true } });
   expect(result.enemies).toHaveLength(3);
   expect(result.battle.playback.fighters[0]).toMatchObject({ id, maxHp: 15, maxMp: 5 });
   expect(result.battle.playback.fighters[1]).toMatchObject({ id: 'monster:f1-enemy-0', name: 'Slime', monster: 'slime', maxHp: 6, maxMp: 1 });
@@ -96,7 +125,7 @@ it('saves exactly one monster battle for concurrent moves and retries, including
   expect(continued.battle.playback).toEqual(result.battle.playback);
   expect(await (await post('/api/adventure', continuation, id)).json()).toEqual(continued);
   expect(await (await post('/api/adventure', request, id)).json()).toEqual(continued);
-  expect(await (await sendAction(id, { direction: 's' })).json()).toMatchObject({ x: 5, y: 3 });
+  expect(await (await sendAction(id, { direction: 's' })).json()).toMatchObject({ x: 6, y: 3 });
   expect(await getPet(id)).toEqual(pet);
 });
 

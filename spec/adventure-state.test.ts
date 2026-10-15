@@ -403,6 +403,45 @@ it('a studying pet cannot move, use stairs, open chests, or start over, but can 
   expect(adventure.changeFloor(id, 'descend', adventure.adventureFor(id).revision)).toMatchObject({ floor: 2 });
 });
 
+it('patrols at most once a second, keeps the revision, and gives older saves their routes', () => {
+  const id = 'patroller'; pets.getOrCreatePet(id);
+  const start = adventure.adventureFor(id);
+  // A map saved before monsters patrolled: no routes, and the old alerted flag.
+  const world = createWorld();
+  for (const floor of world) for (const enemy of floor.enemies) Object.assign(enemy, { route: undefined, leg: undefined, alerted: false });
+  db.prepare('UPDATE adventures SET world_json = ? WHERE player_id = ?').run(JSON.stringify(world), id);
+  expect(adventure.adventureFor(id).enemies.map(e => e.route)).toEqual(createWorld()[0].enemies.map(e => e.route));
+  const walked = adventure.patrolAdventure(id);
+  expect(walked.revision).toBe(start.revision);
+  expect(walked.enemies.find(e => e.id === 'f1-enemy-1')).toMatchObject({ x: 11, y: 5 });
+  expect(adventure.patrolAdventure(id)).toEqual(walked);
+  expect(afterRestart(id)).toEqual(walked);
+  // The step was saved before the move, which applies to the same revision.
+  const moved = step(id, 's');
+  expect(moved.enemies).toEqual(walked.enemies.map(e => ({ ...e, alerted: false })));
+});
+
+it('never patrols during a pending battle, while the pet studies or works, or once the run has ended', () => {
+  const id = 'patrol-paused';
+  setupBattle(id, 'slime', [100, 100, 100]);
+  const ready = () => db.prepare('UPDATE adventures SET patrolled_at = NULL WHERE player_id = ?').run(id);
+  const fought = step(id, 'd');
+  ready();
+  expect(adventure.patrolAdventure(id)).toEqual(fought);
+  const continued = continueRun(id);
+  expect(pets.study(id, 'math')).not.toHaveProperty('error');
+  ready();
+  expect(adventure.patrolAdventure(id)).toEqual(adventure.adventureFor(id));
+  expect(adventure.adventureFor(id).enemies).toEqual(continued.enemies);
+  db.prepare('UPDATE pets SET busy_until = ? WHERE id = ?').run(Date.now() - 1, id);
+  ready();
+  expect(adventure.patrolAdventure(id).enemies).not.toEqual(continued.enemies);
+  const abandoned = adventure.abandonAdventure(id, adventure.adventureFor(id).revision);
+  if ('error' in abandoned) throw new Error(abandoned.error);
+  ready();
+  expect(adventure.patrolAdventure(id)).toEqual(abandoned);
+});
+
 it('refuses to restart when stamina or hygiene is too low, spending nothing; charges the flat cost on success', () => {
   const id = 'restart-cost'; pets.getOrCreatePet(id);
   const saved = adventure.abandonAdventure(id, adventure.adventureFor(id).revision);

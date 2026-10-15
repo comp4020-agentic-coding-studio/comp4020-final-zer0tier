@@ -39,7 +39,7 @@ adventure.innerHTML = `
     <p class="help" id="adventure-stair-hint"></p>
     <div class="adventure-legend" aria-label="Map legend"></div>
     <details><summary>Monster attributes</summary><ul id="adventure-enemies"></ul></details>
-    <p class="help">Monsters notice the eight blocks around them and move after you. Go around them to avoid battle.</p>
+    <p class="help">Monsters patrol on their own. One that spots your pet within 3 blocks (marked !) walks toward it and stops beside it. Step into a monster to battle, or move more than 3 blocks away to lose it.</p>
     <p class="help">HP and MP carry between battles. Each victory restores 20% of their maximums, rounded up. Defeat ends the adventure.</p>
     <p class="help" id="adventure-restart-cost"></p>
     <p id="adventure-completion" class="help" role="status" hidden>Slime King defeated! The woodland is complete. You can keep exploring.</p>
@@ -59,6 +59,9 @@ document.body.append(adventure);
 const grid = adventure.querySelector('#adventure-grid');
 const status = adventure.querySelector('#adventure-status');
 let pending = false, generation = 0, state = null, pet = null, shownBattle = null;
+// Order of map requests sent and of the last one shown, so an older answer
+// never replaces a newer one.
+let sent = 0, shown = 0, patrolling = false;
 const icons = {
   slime: '<use href="#monster-slime"/>',
   goblin: '<use href="#monster-goblin"/>',
@@ -161,7 +164,6 @@ setInterval(() => { if (adventure.open) renderCooldown(); }, 1000);
 
 function renderMap() {
   if (!state) return;
-  grid.replaceChildren();
   adventure.querySelector('#adventure-title').textContent = state.name;
   adventure.querySelector('#adventure-floor').textContent = `ADVENTURE · FLOOR ${state.floor} / ${state.floorCount}`;
   adventure.querySelector('#adventure-stair-hint').textContent = state.down
@@ -181,6 +183,13 @@ function renderMap() {
   const opened = state.chests.find(chest => chest.reward);
   adventure.querySelector('#adventure-treasure').textContent = opened ? rewardText(opened.reward) : '';
   renderInventory();
+  renderMonsters();
+  status.textContent = `Column ${state.x + 1} · Row ${state.y + 1}`;
+  syncControls();
+}
+// What a monster's step can change, so a patrol leaves the rest of the
+// window, its focus, and its announcements alone.
+function renderMonsters() {
   const roster = adventure.querySelector('#adventure-enemies');
   roster.replaceChildren();
   for (const enemy of state.enemies) {
@@ -189,6 +198,7 @@ function renderMap() {
     item.textContent = `${enemy.name} · column ${enemy.x + 1}, row ${enemy.y + 1} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence} · STR ${enemy.strength} / INT ${enemy.intelligence} / CHA ${enemy.charisma}${moves}`;
     roster.append(item);
   }
+  grid.replaceChildren();
   state.tiles.forEach((row, y) => [...row].forEach((tile, x) => {
     const cell = document.createElement('span');
     cell.className = tile === '#' ? 'adventure-tree' : 'adventure-path';
@@ -212,14 +222,17 @@ function renderMap() {
     grid.append(cell);
   }));
   grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}. ${state.enemies.length} monsters and ${state.chests.length} chest. Monster locations are in Monster attributes. Trees block movement; stepping into a monster starts battle.`);
-  status.textContent = `Column ${state.x + 1} · Row ${state.y + 1}`;
   const nearby = state.enemies.filter(e => state.encounters.includes(e.id));
-  adventure.querySelector('#adventure-notice').textContent = busyText() || (nearby.length
+  const spotted = state.enemies.filter(e => e.alerted && !state.encounters.includes(e.id));
+  const notice = busyText() || (nearby.length
     ? `${nearby.map(e => e.name).join(', ')} nearby! Step into their tile to battle, or move away.`
+    : spotted.length ? `${spotted.map(e => e.name).join(', ')} spotted you! Move more than 3 blocks away to lose ${spotted.length > 1 ? 'them' : 'it'}.`
     : state.chests.some(at) ? (state.chests.find(at).reward ? 'This chest is empty. Your reward is saved.' : 'You found a treasure chest. Choose Open chest to collect its reward.')
     : at(state.up) ? 'Stairs up: choose Ascend to return to the previous floor.'
     : at(state.down) ? 'Stairs down: choose Descend to explore deeper.' : '');
-  syncControls();
+  // Only a new message is announced again.
+  const noticeText = adventure.querySelector('#adventure-notice');
+  if (noticeText.textContent !== notice) noticeText.textContent = notice;
 }
 function rewardText(reward) {
   return reward.category === 'ability'
@@ -298,7 +311,7 @@ function showBattle(replay = false) {
 async function request(payload = {}) {
   if (pending) return;
   if (payload.direction || payload.action) payload = { ...payload, revision: state?.revision };
-  const version = generation;
+  const version = generation, order = ++sent;
   pending = true;
   grid.setAttribute('aria-busy', 'true');
   syncControls();
@@ -310,7 +323,7 @@ async function request(payload = {}) {
     const result = await response.json();
     if (version !== generation) return;
     if (!response.ok) throw new Error(result.error || 'Could not explore. Try again.');
-    state = result;
+    state = result; shown = order;
     renderMap();
     if (state.battle?.pending) showBattle();
   } catch (error) {
@@ -323,6 +336,36 @@ async function request(payload = {}) {
     }
   }
 }
+// Monsters move in real time while the map is open and on screen: the page
+// asks for each step, and the server decides where they go and how often.
+async function patrol() {
+  if (!adventure.open || document.hidden || patrolling || pending || !state || state.battle?.pending
+    || state.failed || state.abandoned || busyText()) return;
+  const version = generation, order = ++sent;
+  patrolling = true;
+  try {
+    const response = await fetch('/api/adventure', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'patrol' }),
+    });
+    const result = await response.json();
+    // A move sent since then answers with fresher news; this step shows next time.
+    if (!response.ok || version !== generation || pending || order < shown) return;
+    const changed = result.revision !== state.revision;
+    state = result; shown = order;
+    if (!changed) return renderMonsters();
+    renderMap();
+    if (state.battle?.pending) showBattle();
+  } catch {
+    // The next step tries again.
+  } finally {
+    patrolling = false;
+  }
+}
+(function tick() {
+  patrol();
+  setTimeout(tick, state?.patrolMs ?? 1000);
+})();
 document.getElementById('adventure-open').addEventListener('click', () => {
   if (adventure.open) return;
   clearMap();

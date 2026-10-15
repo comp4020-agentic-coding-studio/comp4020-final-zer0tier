@@ -8,7 +8,7 @@ import {
 import { grantTreasure } from './inventory.ts';
 import { COINS, rollTreasure } from './treasure.ts';
 import {
-  advanceEnemies, createWorld, directions, FLOOR_COUNT, MONSTER_MOVES, nearby, samePoint, SIZE, walkable, type Enemy, type Floor, type Point,
+  createWorld, directions, FLOOR_COUNT, MONSTER_MOVES, nearby, patrol, samePoint, sees, SIZE, walkable, type Enemy, type Floor, type Point,
 } from './adventure-world.ts';
 import { realMs, TIME_SCALE } from './clock.ts';
 
@@ -21,13 +21,13 @@ export type AdventureBattle = {
 type SavedAdventure = {
   x: number; y: number; floor: number; world_json: string | null;
   revision: string | null; battle_json: string | null;
-  hp: number | null; mp: number | null; cooldown_until: number | null; abandoned: number;
+  hp: number | null; mp: number | null; cooldown_until: number | null; abandoned: number; patrolled_at: number | null;
 };
 type Progress = {
   x: number; y: number; floor: number; world: Floor[];
   revision: string; battle: AdventureBattle | null;
   hp: number; mp: number; maxHp: number; maxMp: number;
-  cooldownUntil: number | null; abandoned: boolean;
+  cooldownUntil: number | null; abandoned: boolean; patrolledAt: number;
   inventory: ReturnType<typeof inventoryView>;
 };
 
@@ -57,18 +57,26 @@ function vacatePlayerTile(floor: Floor, player: Point): void {
 
 function load(id: string): Progress {
   db.prepare('INSERT OR IGNORE INTO adventures (player_id, x, y) VALUES (?, ?, ?)').run(id, 2, 2);
-  const saved = db.prepare('SELECT x, y, floor, world_json, revision, battle_json, hp, mp, cooldown_until, abandoned FROM adventures WHERE player_id = ?').get(id) as SavedAdventure;
+  const saved = db.prepare('SELECT x, y, floor, world_json, revision, battle_json, hp, mp, cooldown_until, abandoned, patrolled_at FROM adventures WHERE player_id = ?').get(id) as SavedAdventure;
   const pet = getPet(id)!;
   const maxHp = pet.strength + pet.intelligence + pet.charisma, maxMp = pet.intelligence;
   const hp = Math.min(saved.hp ?? maxHp, maxHp), mp = Math.min(saved.mp ?? maxMp, maxMp);
   const world: Floor[] = saved.world_json ? JSON.parse(saved.world_json) : createWorld();
+  // Maps saved before monsters patrolled give each one its route from a fresh map.
+  if (world.some(floor => floor.enemies.some(e => !e.route))) {
+    const fresh = createWorld();
+    for (const floor of world) for (const enemy of floor.enemies) {
+      enemy.route ??= fresh[floor.number - 1].enemies.find(e => e.id === enemy.id)?.route ?? [{ x: enemy.x, y: enemy.y }, { x: enemy.x, y: enemy.y }];
+      enemy.leg ??= 1;
+    }
+  }
   const revision = saved.revision ?? randomUUID();
   if (!saved.world_json || !saved.revision || saved.hp === null || saved.mp === null) {
     vacatePlayerTile(world[saved.floor - 1], saved);
     db.prepare('UPDATE adventures SET world_json = ?, revision = ?, hp = ?, mp = ? WHERE player_id = ?').run(JSON.stringify(world), revision, hp, mp, id);
   }
   return { x: saved.x, y: saved.y, floor: saved.floor, world, revision, hp, mp, maxHp, maxMp,
-    cooldownUntil: saved.cooldown_until, abandoned: saved.abandoned === 1,
+    cooldownUntil: saved.cooldown_until, abandoned: saved.abandoned === 1, patrolledAt: saved.patrolled_at ?? 0,
     inventory: inventoryView(pet),
     battle: saved.battle_json ? JSON.parse(saved.battle_json) as AdventureBattle : null };
 }
@@ -83,13 +91,14 @@ function view(saved: Progress) {
   return {
     x: saved.x, y: saved.y, floor: saved.floor, floorCount: FLOOR_COUNT, size: SIZE,
     name: floor.name, tiles: floor.tiles, chests: floor.chests,
-    enemies: floor.enemies.map(e => ({ ...e, moves: MONSTER_ABILITIES.filter(a => MONSTER_MOVES[e.kind].includes(a.id)) })),
+    // `alerted`: the monster sees the pet and is walking toward it.
+    enemies: floor.enemies.map(e => ({ ...e, alerted: sees(e, saved), moves: MONSTER_ABILITIES.filter(a => MONSTER_MOVES[e.kind].includes(a.id)) })),
     up: floor.up, down: floor.down, revision: saved.revision, battle: saved.battle,
     inventory: saved.inventory,
     hp: saved.hp, mp: saved.mp, maxHp: saved.maxHp, maxMp: saved.maxMp, failed: saved.hp === 0,
     abandoned: saved.abandoned, completed: complete(saved),
     encounters: floor.enemies.filter(e => nearby(e, saved)).map(e => e.id),
-    cooldownUntil: saved.cooldownUntil, timeScale: TIME_SCALE,
+    cooldownUntil: saved.cooldownUntil, timeScale: TIME_SCALE, patrolMs: PATROL_MS,
     restartCost: ADVENTURE_COST, cooldownMinutes: ADVENTURE_COOLDOWN_MINUTES,
   };
 }
@@ -145,7 +154,6 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy) {
     floor.enemies = floor.enemies.filter(e => e.id !== enemy.id);
     saved.x = enemy.x; saved.y = enemy.y;
   }
-  for (const other of floor.enemies) other.alerted = nearby(other, saved);
   return save(id, saved);
 }
 
@@ -163,9 +171,24 @@ export function moveAdventure(id: string, direction: unknown, revision?: unknown
   if (!walkable(floor, player)) return { error: 'A tree blocks that path.', status: 409 };
   const enemy = floor.enemies.find(e => samePoint(e, player));
   if (enemy) return resolveBattle(id, saved, enemy);
-  advanceEnemies(floor, player);
   saved.x = player.x; saved.y = player.y;
   return save(id, saved);
+}
+
+// Monsters move in real time, but only while their owner has the map open:
+// the page asks for a step every PATROL_MS, and the server takes one at most
+// that often (less a little slack for timer jitter), however many windows ask.
+// A step keeps the revision, so a move sent at the same moment still applies,
+// to the monsters' new positions. Nothing moves during a battle, after the run
+// ends, or while the pet studies or works.
+export const PATROL_MS = 1000;
+export function patrolAdventure(id: string) {
+  const saved = load(id), now = Date.now();
+  if (saved.battle?.pending || over(saved) || busyNow(getPet(id)!) || now - saved.patrolledAt < PATROL_MS * 0.8) return view(saved);
+  patrol(saved.world[saved.floor - 1], saved);
+  db.prepare('UPDATE adventures SET world_json = ?, patrolled_at = ? WHERE player_id = ? AND revision = ?')
+    .run(JSON.stringify(saved.world), now, id, saved.revision);
+  return adventureFor(id);
 }
 
 export function changeFloor(id: string, action: unknown, revision?: unknown) {

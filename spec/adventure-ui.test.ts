@@ -120,6 +120,39 @@ it('locks exploring on an open map while a live update says the pet is busy, and
   } finally { dom.window.close(); }
 });
 
+it('moves monsters on the open map in real time, keeping focus, and stops asking once the map closes', async () => {
+  const { dom, window, $ } = page();
+  Object.defineProperty(window.document, 'hidden', { value: false });
+  const start = map();
+  const walked = { ...start, enemies: start.enemies.map((e, i) => i === 0 ? { ...e, x: 5, alerted: true } : e) };
+  const bodies: unknown[] = [];
+  window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
+    const body = JSON.parse(options.body as string);
+    bodies.push(body);
+    return Response.json(body.action === 'patrol' ? walked : start);
+  }) as unknown as typeof fetch;
+  const cell = (x: number, y: number) => $('adventure-grid').children[y * 16 + x];
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    expect(cell(6, 2).classList.contains('adventure-marker-slime')).toBe(true);
+    $('adventure-grid').focus();
+    await vi.waitFor(() => expect(cell(5, 2).classList.contains('adventure-marker-slime')).toBe(true), { timeout: 2500 });
+    expect(bodies[1]).toEqual({ action: 'patrol' });
+    expect($('adventure-grid').children).toHaveLength(256);
+    expect(cell(5, 2).classList.contains('adventure-alerted')).toBe(true);
+    expect(cell(6, 2).classList.contains('adventure-marker-slime')).toBe(false);
+    expect($('adventure-enemies').firstElementChild!.textContent).toContain('column 6, row 3');
+    expect($('adventure-notice').textContent).toBe('Slime spotted you! Move more than 3 blocks away to lose it.');
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+    $('adventure-close').click();
+    const asked = bodies.length;
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    expect(bodies).toHaveLength(asked);
+  } finally { dom.window.close(); }
+});
+
 it('clears the previous floor on account reset and ignores its late movement response', async () => {
   const { dom, window, $ } = page();
   const finishes: ((response: Response) => void)[] = [];

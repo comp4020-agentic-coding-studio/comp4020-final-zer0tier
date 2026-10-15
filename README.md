@@ -386,13 +386,29 @@ down stairs. Leave or Escape closes the window. Your floor, position, HP/MP, and
 each floor's remaining enemies are saved privately to your account, including across server
 restarts. Older clearing saves retain their positions during migration.
 
-Monsters detect the pet in any of their eight surrounding blocks, including
-diagonals. After each accepted player step, each nearby monster tries to move
-one cardinal block closer. They stop next to the pet, cannot cross trees, chests,
-stairs, or other monsters, and stop pursuing when the pet leaves detection range.
-Blocked player moves, opening the map, using stairs, and battles do not advance
-other monsters. An exclamation mark and a message warn about nearby monsters.
-Walk into a monster's tile to start a battle; adjacency alone does not start one.
+**Monsters move in real time.** While the map is open and on screen, every
+monster on your floor takes one cardinal step about once a second, whether or
+not you move. Out of sight, each walks back and forth along its own short
+patrol route. A monster sees your pet anywhere within **3 blocks** in every
+direction, diagonals included (a 7 × 7 square, even through trees). It then
+walks toward the pet by the shortest open path, around trees, and **stops
+beside it**: monsters never start a battle themselves. Once the pet is more
+than 3 blocks away, the monster loses it and heads back to its route. Monsters
+cannot cross trees, chests, stairs, the pet, or each other, and no patrol route
+comes within sight of the stairs, so arriving on a floor is safe. An
+exclamation mark marks every monster that has spotted your pet, with a message
+when one is on your trail or right beside you. Walk into a monster's tile to
+start a battle; being next to one does not start it.
+
+The page asks the server for each step (`{ "action": "patrol" }`). The server
+decides where every monster goes and saves each step, and it takes at most one
+step a second, however many windows ask. Monsters only move for their owner
+while that owner has the map open. They stay put while the map is closed or the
+tab is hidden, while a battle awaits **Return to map**, after the run ends, and
+while the pet studies or works. A monster step doesn't change the map's
+`revision`, so a move you send at the same moment still applies, to the
+monsters' new positions. Saves from before patrols existed keep their monster
+positions and gain the routes.
 Enemy attributes and positions are listed under **Monster
 attributes**, and every stair and chest is reachable through the map's paths.
 
@@ -531,6 +547,7 @@ includes an opaque `revision`; supply that revision with every action:
 - `{ "action": "continue", "battleId": "…", "revision": "…" }` acknowledges a battle.
 - `{ "action": "abandon", "revision": "…" }` ends the run in progress at once, for free (`abandoned: true` in the response). It changes nothing for a run that is already over or has a battle waiting.
 - `{ "action": "restart", "revision": "…" }` starts fresh after failure, completion, or abandoning; refused with 409 while a run is still in progress or if stamina/hygiene are too low, or 429 while the 4-hour cooldown is active.
+- `{ "action": "patrol" }` moves the monsters on the pet's floor one step, at most once a second (see above). Otherwise, and whenever the run is paused, it returns the current state unchanged. It needs no revision and keeps the current one.
 - `{ "action": "skip-cooldown", "revision": "…" }` spends one Hourglass to clear an active cooldown early; refused with 409 if there's no Hourglass to spend. A no-op, returning the current state, if no cooldown is active.
 - `{ "action": "open-chest", "revision": "…" }` opens the chest under the pet.
 - `{ "action": "use-item", "item": "food" | "soap" | "hourglass", "revision": "…" }` uses one backpack item.

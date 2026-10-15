@@ -143,3 +143,4 @@ if (!adventureColumns.has("hp")) db.exec("ALTER TABLE adventures ADD COLUMN hp I
 if (!adventureColumns.has("mp")) db.exec("ALTER TABLE adventures ADD COLUMN mp INTEGER");
 if (!adventureColumns.has("cooldown_until")) db.exec("ALTER TABLE adventures ADD COLUMN cooldown_until INTEGER");
 if (!adventureColumns.has("abandoned")) db.exec("ALTER TABLE adventures ADD COLUMN abandoned INTEGER NOT NULL DEFAULT 0");
+if (!adventureColumns.has("patrolled_at")) db.exec("ALTER TABLE adventures ADD COLUMN patrolled_at INTEGER");
