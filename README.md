@@ -124,7 +124,7 @@ previews an unsaved change on the pet.
 Tap or click your pet in its header to touch it there, or use the buttons under
 **Play with your pet** (on desktop, beneath the pet in the left column). The
 same four touches work on other players' pets while you visit them (see
-[Visit, play and steal](#visit-play-and-steal)):
+**Visit, play and steal** below):
 
 | Touch | Where on the pet | Reaction |
 | --- | --- | --- |

@@ -599,6 +599,8 @@ a[href], summary { cursor: var(--cursor-pointer); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+  /* A touch's floating effect would sit still on the pet; the line says it all. */
+  .pet-effects { display: none; }
 }
 
 .theft-notifications { margin-bottom: 1rem; }
