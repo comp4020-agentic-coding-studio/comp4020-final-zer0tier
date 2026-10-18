@@ -38,7 +38,8 @@ app for each area of the game, which grew to 63 by
   The cost is that it can't scale beyond one machine, which a game for a room
   of friends doesn't need.
 - **WebSockets one way.** Players act over HTTP; the socket only carries
-  `pet:updated` and `fight:finished`.
+  news from the server: `pet:updated`, `fight:finished`, `feed:added`,
+  `team:updated` ([`f89b791`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/f89b791)) and `pet:touched` ([`12cdf79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/12cdf79)).
 - **No front-end framework.** Less to fit in 256 MB, but `public/app.js` is now
   the largest file, and the first thing I'd revisit if the UI grows.
 - **Timed activities stored, not held in memory.** A lesson or shift records
@@ -111,6 +112,50 @@ rather than pick defaults, and the answers — reusable equipment, battle-only
 Copper, applies everywhere, only the acting side's coin counts — are mine and
 are now recorded in `ADVENTURE_PLAN.md`.
 
+## Making two players meet (crit 10)
+
+The crit 10 brief asks the app to tell two people apart, let them act on shared
+state, and check on the server what each may see and change. Looking at my own
+game against that, the weak spot was visiting: at someone else's pet, the only
+thing you could do was steal. So I directed this week's work at things two
+players do together, and at making visits two-way:
+
+- **Team Adventure.** A Team up window lets up to four players set off on one
+  shared map, with live monsters that patrol and chase
+  ([`534215f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/534215f), [`f89b791`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/f89b791)). I confirmed the battle and knock-out rules;
+  the defaults the agent picked (cost, who the monster hits) are marked in
+  `ADVENTURE_PLAN.md` as open to my review rather than presented as decided.
+- **Playing with pets.** First with your own pet, kept entirely in the browser
+  because it changes nothing ([`d4a4f4a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/d4a4f4a)), then with any pet you visit
+  ([`12cdf79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/12cdf79)). That second step had to go through the server: if a touch
+  stayed in the visitor's browser, the owner would never know anyone came.
+- **Helping.** Feeding or cleaning someone else's pet ([`4a18fed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4a18fed)). The
+  agent stopped to ask me whose food gets used, and I chose the visitor's own,
+  so helping is a real gift and can't drain someone else's cupboard.
+
+## Who may see and change what
+
+This is the decision the crit asks to be checked on the server and written down.
+Every player has one account and one pet. Anyone can *see* any pet, its fights,
+the feed and its recent visitors, because the game is about watching each other
+play. Only a pet's owner can *act* for it: every `POST /api/pets/:id/...` checks
+the session owns `:id` (401 signed out, 403 someone else's pet) before anything
+runs ([`896a6ec`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/896a6ec)). Visiting doesn't loosen that. Touching, feeding,
+cleaning and stealing are all actions *by your own pet* on another one, so they
+go through the same check, and the server records who did it. The rules then
+limit what one player can do to another's pet: a touch changes nothing; help
+spends only the helper's items and can only raise the other pet's stamina or
+hygiene; theft is capped at $30 and once per pet per UTC day. The README states
+this in its multi-user section, and `spec/touch.test.ts` and `spec/help.test.ts`
+check that the owner of one pet can't act as another (403).
+
+**Logging who did what.** The crit is narrated from `flyctl logs`, so the
+server now prints one line per touch or help on another player's pet, naming
+the player, e.g. `player=alice action=help pet=bob item=food amount=40`
+([`12cdf79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/12cdf79), [`4a18fed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4a18fed)). That covers the new visiting interactions
+only. Sign-ins, fights, thefts, lessons and team changes don't log yet, so
+from the logs alone I can't yet narrate everything two classmates do.
+
 ## Corrections, and where they landed
 
 My main check was asking the agent to review its own work with the code-review
@@ -154,6 +199,17 @@ land in the harness rather than as a retry:
   the same questions directly in this conversation before it wrote any code,
   and it filed the scope overreach as feedback on the tool rather than quietly
   accepting the shortcut.
+- When I asked the agent to check this week's work for bugs, it verified each
+  suspicion against the running app instead of guessing. It confirmed two:
+  with reduced motion on, a touch's floating heart still sat on the pet
+  although the README promised only text, and a README link pointed at an
+  anchor that `/readme/` doesn't render ([`7e333ce`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/7e333ce)). It also probed the
+  new endpoints with bad input and concurrent requests and found them sound.
+- Timing specs kept failing locally (monster patrols, a shift ending, free
+  supplies). Rather than accept "flaky", the agent reran one against the
+  previous commit to show my change wasn't the cause, then measured WSL's wall
+  clock jumping up to about 7 seconds against a steady clock. The same specs
+  pass in CI, so the fix is restarting WSL, not changing the game.
 
 ## What the history shows, honestly
 
@@ -167,23 +223,26 @@ shows one focused commit per feature or fix since then, each saying what
 changed and why. The first version of this account is
 [`7a27f8b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/7a27f8b).
 
-## What's real-time, and what isn't yet decided
+## What's real-time, and what stays private
 
 Every pet change, fight and feed entry has broadcast live since the baseline
-commit; that hasn't changed as the game has grown; `spec/realtime.test.ts` now
-covers each new event (appearance, revenge, equipping a coin) the same way.
-Adventure is the one exception by design: it's one player exploring, so its
-state is private and never goes out over the socket. That split — what's
-shared live and what stays per-player — is itself the kind of concurrency
-decision crit 9 asks for, but I haven't yet written it up as a decision record
-with the alternatives I didn't take, which is this week's remaining work.
+commit, and `spec/realtime.test.ts` opens real WebSockets for each event,
+including the new ones: forming a team ([`f89b791`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/f89b791)), touching another
+player's pet ([`12cdf79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/12cdf79)), and helping, which reaches both players'
+windows as two `pet:updated` events and then the feed entry ([`4a18fed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4a18fed)).
+What stays private is anything that's one player's own business: a solo
+Adventure run, your theft reports, and playing with your own pet. That line
+moved this week. Adventure used to be entirely private, but a team's run now
+shares one map, and visits now reach the owner. Both moved because the shared
+version is what makes it interactable with other people. I still haven't
+written the crit 9 decision record with the alternatives I didn't take.
 
 ## Next
 
-Write the crit 9 architecture decision record on concurrent use, arguing
-against at least one option I didn't pick. Read and cite writing on the small
-web and games for a handful of friends, and revise the definition of good
-against it; play with other people to judge what the spec can't (pacing,
-prices, whether the Arena is better with a full room, whether Adventure needs
-an entry cost); and decide whether trading or recruiting pets is the next
-interaction to build.
+Make every action log who did it, not just touches and helps: sign-in, fights,
+thefts, lessons, shifts and team changes, so the logs can narrate a whole
+session. Then write the concurrency decision record, arguing against at least
+one option I didn't take (polling instead of WebSockets, or broadcasting only
+to the players involved). Play with other people to judge what the spec can't:
+whether helping is worth a $15 food, and whether teams need a smaller entry
+cost. And decide between trading and recruiting pets as the next interaction.
