@@ -478,3 +478,38 @@ it("pet:touched — playing with someone else's pet reaches the visitor's and th
     for (const ws of windows) ws.close();
   }
 });
+
+it("pet:updated and feed:added — feeding someone else's pet reaches the helper's and the owner's windows within 1s, both pets before the news", async () => {
+  const helper = freshId(), owner = freshId();
+  await signUp(helper); await signUp(owner);
+  await post(`/api/pets/${helper}/collect-supplies`);
+  await workHour(owner);
+  const windows = [await open(), await open()];
+  try {
+    const orders: string[][] = windows.map(() => []);
+    windows.forEach((ws, i) => ws.addEventListener("message", (msg) => {
+      const event = JSON.parse(String(msg.data));
+      if (event.type === "pet:updated" && [helper, owner].includes(event.pet.id)) orders[i].push(event.pet.id);
+      if (event.type === "feed:added" && event.entry.kind === "helped" && event.entry.pet === helper) orders[i].push("news");
+    }));
+    const updates = windows.map((ws) => Promise.all([
+      nextUpdate(ws, helper, (pet) => pet.food === 0),
+      nextUpdate(ws, owner, (pet) => pet.stamina === 100),
+      nextFeed(ws, (entry) => entry.kind === "helped" && entry.pet === helper),
+    ]));
+    const res = await post(`/api/pets/${helper}/help/${owner}`, { item: "food" });
+    expect(res.status).toBe(200);
+    const result = await res.json();
+    for (const [mine, theirs, news] of await Promise.all(updates)) {
+      expect(mine.pet).toEqual(result.helper);
+      expect(theirs.pet).toEqual(result.pet);
+      expect(news.entry).toMatchObject({ pet: helper, other: owner, item: "food" });
+    }
+    for (const order of orders) {
+      expect(order.indexOf(helper)).toBeLessThan(order.indexOf("news"));
+      expect(order.indexOf(owner)).toBeLessThan(order.indexOf("news"));
+    }
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});

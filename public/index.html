@@ -265,6 +265,32 @@
                 </span>
                 <div><p id="visit-activity"></p><p id="visit-money" class="visit-money"></p></div>
               </div>
+              <section id="visit-help" class="visit-help" aria-labelledby="visit-help-heading">
+                <h5 id="visit-help-heading" class="visit-help-heading">Help out</h5>
+                <div class="meters">
+                  <div class="meter meter-stamina">
+                    <span class="meter-label" id="visit-stamina-label"><svg class="icon" aria-hidden="true"><use href="#i-stamina" /></svg>Stamina</span>
+                    <div class="meter-track" id="visit-stamina" role="meter" aria-labelledby="visit-stamina-label" aria-valuemin="0" aria-valuemax="100">
+                      <div class="meter-fill"></div>
+                    </div>
+                    <span class="meter-value" id="visit-stamina-value"></span>
+                  </div>
+                  <div class="meter meter-hygiene">
+                    <span class="meter-label" id="visit-hygiene-label"><svg class="icon" aria-hidden="true"><use href="#i-hygiene" /></svg>Hygiene</span>
+                    <div class="meter-track" id="visit-hygiene" role="meter" aria-labelledby="visit-hygiene-label" aria-valuemin="0" aria-valuemax="100">
+                      <div class="meter-fill"></div>
+                    </div>
+                    <span class="meter-value" id="visit-hygiene-value"></span>
+                  </div>
+                </div>
+                <div class="help-buttons">
+                  <button type="button" class="chip-btn chip-buy" id="help-food" data-help="food"></button>
+                  <button type="button" class="chip-btn chip-buy" id="help-soap" data-help="soap"></button>
+                </div>
+                <p id="help-hint" class="hint"></p>
+                <p id="help-news" class="hint" role="status"></p>
+                <p id="help-error" class="error" role="alert"></p>
+              </section>
               <section id="visit-play" class="visit-play" aria-label="Play with this pet">
                 <p id="visit-play-help" class="help"></p>
                 <div class="play-buttons">

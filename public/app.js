@@ -401,6 +401,7 @@ let visitLoads = 0;
 let visitLoading = false;
 let visitReady = false;
 let stealing = false;
+let helping = null; // "food" or "soap" while a help request is in flight
 let fighting = false; // a fight request is in flight
 let arenaBlock = ""; // why this pet can't fight right now, or ""
 let avenging = null; // the pet that last attacked this one, for the Revenge button
@@ -508,7 +509,42 @@ function renderVisit() {
   renderPetAvatar($("visit-avatar"), pet);
   $("visit-activity").textContent = pet.activity === "idle" ? "At home" : busyText(pet);
   $("visit-money").textContent = `$${pet.money} saved`;
+  for (const need of ["stamina", "hygiene"]) {
+    const track = $(`visit-${need}`);
+    track.setAttribute("aria-valuenow", pet[need]);
+    track.querySelector(".meter-fill").style.setProperty("--fill", pet[need] / (rules?.maxCare ?? 100));
+    $(`visit-${need}-value`).textContent = pet[need];
+  }
   renderStealControls();
+  renderHelpControls();
+}
+
+// Feeding or cleaning the visited pet spends one of your own Food or Soap.
+function renderHelpControls() {
+  const pet = rivals.get(visiting);
+  if (!pet || !rules || !current) return;
+  const items = rules.items.filter((i) => i.effect === "restore");
+  const loading = visitLoading || !visitReady;
+  // Why giving each item is off, or "" if you can give it.
+  const why = (item) => {
+    if (pet.id === rules.botId) return "The bot looks after itself.";
+    if (current[item.id] < 1) return `You have no ${item.name.toLowerCase()} to give.`;
+    if (pet[item.restores] >= rules.maxCare) return `${pet.id}'s ${item.restores} is full.`;
+    return "";
+  };
+  for (const item of items) {
+    const button = $(`help-${item.id}`);
+    const verb = item.id === "food" ? "Feed" : "Clean";
+    button.disabled = helping !== null || loading || why(item) !== "";
+    button.textContent = helping === item.id ? `${verb}ing…` : `${verb} (+${item.amount} ${item.restores})`;
+    button.setAttribute("aria-busy", String(helping === item.id));
+  }
+  const empty = items.filter((item) => current[item.id] < 1);
+  let hint = [...new Set(items.map(why).filter(Boolean))].join(" ");
+  if (pet.id !== rules.botId && empty.length === items.length) hint = "You have no food or soap to give.";
+  if (pet.id !== rules.botId && empty.length) hint += " Buy some at the shop.";
+  $("help-hint").textContent = loading ? ""
+    : hint || `Uses your own food or soap. You have ${current.food} food and ${current.soap} soap.`;
 }
 
 function renderStealControls() {
@@ -536,6 +572,8 @@ async function openVisit(id, focus = true) {
   visitReady = false;
   $("steal-news").textContent = "";
   $("steal-error").textContent = "";
+  $("help-news").textContent = "";
+  $("help-error").textContent = "";
   renderVisit();
   if (focus) $("visit-heading").focus();
   const before = rivals.get(id);
@@ -567,6 +605,8 @@ function closeVisit() {
   document.dispatchEvent(new CustomEvent("visit:pet", { detail: null }));
   $("steal-news").textContent = "";
   $("steal-error").textContent = "";
+  $("help-news").textContent = "";
+  $("help-error").textContent = "";
 }
 
 $("visit-close").addEventListener("click", () => {
@@ -603,6 +643,42 @@ $("steal").addEventListener("click", async () => {
     renderStealControls();
   }
 });
+
+for (const button of document.querySelectorAll("[data-help]")) {
+  button.addEventListener("click", async () => {
+    if (!current || !visiting || button.disabled || helping) return;
+    const owner = current.id;
+    const target = visiting;
+    const visit = visitLoads;
+    const item = button.dataset.help;
+    helping = item;
+    $("help-error").textContent = "";
+    $("help-news").textContent = "";
+    renderHelpControls();
+    try {
+      const res = await fetch(`/api/pets/${encodeURIComponent(owner)}/help/${encodeURIComponent(target)}`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ item }),
+      });
+      if (current?.id !== owner) return;
+      if (res.status === 401) return sessionEnded();
+      if (res.status === 403) return sessionChanged();
+      const body = await res.json();
+      if (visit !== visitLoads) return;
+      if (!res.ok) $("help-error").textContent = body.error ?? "Couldn't help. Try again.";
+      else $("help-news").textContent = item === "food"
+        ? `You fed ${target}: +${body.amount} stamina.`
+        : `You cleaned ${target}: +${body.amount} hygiene.`;
+      // Both pets' new counts arrive through pet:updated in every window.
+    } catch {
+      if (current?.id === owner && visit === visitLoads) {
+        $("help-error").textContent = "Couldn't confirm that. Check your cupboard before trying again.";
+      }
+    } finally {
+      helping = null;
+      renderHelpControls();
+    }
+  });
+}
 
 function renderFightButtons() {
   for (const button of $("rivals").querySelectorAll(".fight-btn")) button.disabled = fighting || arenaBlock !== "";
@@ -724,6 +800,8 @@ function feedText(entry) {
       return [entry.pet, entry.won ? ` won revenge and recovered $${entry.amount} from ` : " failed revenge against ", entry.other, "."];
     case "stole":
       return [entry.pet, ` stole $${entry.amount} from `, entry.other, "."];
+    case "helped":
+      return [entry.pet, entry.item === "food" ? " fed " : " cleaned ", entry.other, "."];
     case "fight": {
       const loser = entry.winner === entry.pet ? entry.other : entry.pet;
       return [entry.winner, " beat ", loser, entry.spoils ? ` and took $${entry.spoils}.` : "."];
@@ -974,6 +1052,7 @@ function render(pet) {
     renderBusy(pet);
     renderSchool(pet, previous);
     renderControls(pet);
+    if (visiting) renderHelpControls(); // your own food and soap decide what you can give
     if (previous?.id !== pet.id) {
       closeVisit();
       pinned = null;
@@ -1239,6 +1318,11 @@ function connect() {
       feed.set(event.entry.id, event.entry);
       renderFeed();
       if (event.entry.kind === "revenge" && event.entry.pet === current.id) loadThefts();
+      if (event.entry.kind === "helped" && event.entry.other === current.id) {
+        $("notice").textContent = event.entry.item === "food"
+          ? `${event.entry.pet} fed your pet with their own food.`
+          : `${event.entry.pet} cleaned your pet with their own soap.`;
+      }
       if (event.entry.kind === "stole" && event.entry.other === current.id) {
         loadThefts();
         $("notice").textContent = `${event.entry.pet} stole $${event.entry.amount} from your pet. Your pet is protected from theft until midnight UTC.`;

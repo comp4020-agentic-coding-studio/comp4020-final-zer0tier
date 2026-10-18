@@ -113,3 +113,72 @@ it("re-enables stealing when daily protection expires without needing a reload",
     p.dom.window.close();
   }
 });
+
+it("feeds and cleans the visited pet with your own food and soap, and shows what the broadcasts say", async () => {
+  const p = await page();
+  const { $, pet, opponent } = p;
+  const feed = $("help-food") as HTMLButtonElement;
+  const clean = $("help-soap") as HTMLButtonElement;
+  try {
+    // The neighbour is tired and dirty; you have nothing to give yet.
+    p.send({ type: "pet:updated", pet: { ...opponent, stamina: 70, hygiene: 40 } });
+    await p.visit(opponent.id);
+    p.send({ type: "pet:updated", pet: { ...opponent, stamina: 70, hygiene: 40 } });
+    expect($("visit-stamina-value").textContent).toBe("70");
+    expect($("visit-hygiene").getAttribute("aria-valuenow")).toBe("40");
+    expect(feed.textContent).toBe("Feed (+40 stamina)");
+    expect(clean.textContent).toBe("Clean (+50 hygiene)");
+    expect(feed.disabled).toBe(true);
+    expect($("help-hint").textContent).toBe("You have no food or soap to give. Buy some at the shop.");
+    // Your own cupboard fills (e.g. from free supplies): the buttons wake up.
+    p.send({ type: "pet:updated", pet: { ...pet, food: 1, soap: 2 } });
+    expect(feed.disabled).toBe(false);
+    expect(clean.disabled).toBe(false);
+    expect($("help-hint").textContent).toBe("Uses your own food or soap. You have 1 food and 2 soap.");
+    feed.click();
+    feed.click();
+    expect(feed.textContent).toBe("Feeding…");
+    expect(clean.disabled).toBe(true);
+    const posts = p.requests.mock.calls.filter(([, options]) => options?.method === "POST");
+    expect(posts).toHaveLength(1);
+    expect(posts[0]).toEqual([`/api/pets/${pet.id}/help/${opponent.id}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ item: "food" }),
+    }]);
+    // Nothing changes until the server's broadcasts arrive.
+    expect($("visit-stamina-value").textContent).toBe("70");
+    p.send({ type: "pet:updated", pet: { ...pet, food: 0, soap: 2 } });
+    p.send({ type: "pet:updated", pet: { ...opponent, stamina: 100, hygiene: 40 } });
+    p.finish(Response.json({ item: "food", amount: 30 }));
+    await vi.waitFor(() => expect($("help-news").textContent).toBe("You fed neighbour: +30 stamina."));
+    expect($("visit-stamina-value").textContent).toBe("100");
+    expect(feed.disabled).toBe(true);
+    expect(clean.disabled).toBe(false);
+    // Out of food (the first reason the Feed button is off) and soap to spare.
+    expect($("help-hint").textContent).toBe("You have no food to give. Buy some at the shop.");
+    p.send({ type: "feed:added", entry: { id: 3, kind: "helped", pet: pet.id, other: opponent.id, item: "food", at: new Date().toISOString() } });
+    expect($("feed").textContent).toContain("You fed neighbour.");
+    // A refusal (someone else cleaned it first) is shown, not applied.
+    clean.click();
+    p.finish(Response.json({ error: "neighbour's hygiene is already full." }, { status: 409 }));
+    await vi.waitFor(() => expect($("help-error").textContent).toBe("neighbour's hygiene is already full."));
+    expect($("help-news").textContent).toBe("");
+    // The bot can't be helped.
+    await p.visit("0");
+    expect(clean.disabled).toBe(true);
+    expect($("help-hint").textContent).toBe("The bot looks after itself.");
+  } finally {
+    p.dom.window.close();
+  }
+});
+
+it("tells the owner when someone feeds or cleans their pet", async () => {
+  const p = await page();
+  const { $, pet } = p;
+  try {
+    p.send({ type: "feed:added", entry: { id: 4, kind: "helped", pet: "neighbour", other: pet.id, item: "soap", at: new Date().toISOString() } });
+    expect($("notice").textContent).toBe("neighbour cleaned your pet with their own soap.");
+    expect($("feed").textContent).toContain("neighbour cleaned you.");
+  } finally {
+    p.dom.window.close();
+  }
+});

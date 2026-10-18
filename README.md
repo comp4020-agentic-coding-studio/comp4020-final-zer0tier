@@ -18,13 +18,17 @@ the point of the game rather than boxes to tick:
   its owner can act for it, so a stranger can't train, shop or fight with
   yours. A player who joins while you're playing appears in your Arena straight
   away. Visiting is how players reach each other's pets: you can play with
-  (touch) or steal from a pet you visit, but always *as your own pet*, so the
-  server checks your session owns the acting pet and records who did it. A
-  touch changes nothing in the game, which is why anyone may do it to any pet;
-  its owner sees who came by, and the server logs each one by player.
+  (touch), feed, clean or steal from a pet you visit, but always *as your own
+  pet*, so the server checks your session owns the acting pet and records who
+  did it. A touch changes nothing in the game, which is why anyone may do it
+  to any pet. Feeding and cleaning only ever spend *your* food or soap and can
+  only raise the other pet's stamina or hygiene, so a visitor can help but
+  never use up or harm what someone else owns. Owners see who came by, and the
+  server logs each touch and help by player.
   *Enforced:* `spec/pets.test.ts` (one pet per ID, owner-only actions,
   401/403), `spec/touch.test.ts` (touching only as your own pet, never your own
-  pet, and changing nothing else), `spec/fight.test.ts` (new pets listed after
+  pet, and changing nothing else), `spec/help.test.ts` (helping only as your
+  own pet, from your own cupboard, exactly once), `spec/fight.test.ts` (new pets listed after
   the bot).
 - **You see each other act (real-time).** Every change to a pet, and every fight,
   reaches every open window within a second, with no reload: your rival's shift
@@ -61,8 +65,9 @@ interesting, and whether the Arena is more fun with a room full of people, which
 is the capstone showcase this is designed for. Those are tested by playing it
 with others, not by `spec/`.
 
-**What I chose not to build (yet):** chat, trading or gifting between pets, and
-recruiting other players' pets. Each adds interaction, but the first version
+**What I chose not to build (yet):** chat, trading or giving items to other
+players outright (you can feed or clean their pet with your own food or soap,
+but not hand it over), and recruiting other players' pets. Each adds interaction, but the first version
 proves the core loop (train, work, fight, see others do the same) before
 widening it.
 
@@ -316,6 +321,15 @@ visitors** gains you), and in anyone else's who is visiting it too. Each
 player can touch a given pet once a second. Touching costs nothing, works
 while either pet is busy, and changes no money, stats, stamina or hygiene.
 
+**Help out** by feeding or cleaning it. The visit shows its stamina and
+hygiene; **Feed** and **Clean** give it one Food or Soap **from your own
+cupboard** (bought at the shop or collected as free daily supplies), restoring
++40 stamina or +50 hygiene, never past 100. It's a gift: it costs you the item,
+and changes no money or stats. You can't help when you have none to give, when
+that need is already full, or the bot. Helping works while either pet is busy.
+Both pets update live in every window, its owner gets a notice saying who
+helped, and it appears in **Happening now**.
+
 **Steal $10–$30** takes a random whole
 dollar amount from that pet and adds it to yours. The amount never exceeds
 its balance; a pet with less than $10 cannot be robbed. Visiting and stealing
@@ -340,8 +354,8 @@ your own pet is highlighted when it makes the board.
 ### Happening now
 
 Below your fights, the Arena shows the 15 newest things that happened anywhere
-in the game, live: a player joining, every theft, every fight (who won, and any money
-taken), a pet moving up a school, and a pet being promoted at work. Ordinary
+in the game, live: a player joining, every theft, every time someone feeds or
+cleans another player's pet, every fight (who won, and any money taken), a pet moving up a school, and a pet being promoted at work. Ordinary
 lessons and shifts stay out of it, so it isn't flooded. Entries about your pet
 are highlighted.
 
@@ -376,7 +390,8 @@ the built-in `node:sqlite` for storage.
 - **Actions** (owner only): `POST /api/pets/:id/study/:course`,
   `work/:location` (with `{"minutes": 60}`), `upgrade/:location`, `buy/:item`,
   `use/:item`, `collect-supplies`, `fight/:opponent`, `steal/:opponent`,
-  `touch/:pet` (with `{"kind": "pat"}`) and `equip-coin/:coin`
+  `help/:pet` (with `{"item": "food"}` or `"soap"`), `touch/:pet` (with
+  `{"kind": "pat"}`) and `equip-coin/:coin`
   (`:coin` is `copper-coin`, `silver-coin`, `gold-coin`, or `none` to unequip).
   `collect-supplies` adds the free daily Food and Soap and sets the pet's
   `suppliesAvailableAt` (epoch milliseconds of the next UTC midnight, or `null`
@@ -389,7 +404,11 @@ the built-in `node:sqlite` for storage.
   target before transferring money, saving protection and recording the feed
   entry in one transaction. Repeated thefts return 429; insufficient funds
   return 409; self/bot targets return 400. The daily limit uses real UTC days,
-  independent of `TIME_SCALE`. Touching saves and returns
+  independent of `TIME_SCALE`. Helping returns `{ helper, pet, item, amount }`
+  (`amount` is how much stamina or hygiene it actually restored); both pets
+  change in one transaction and are broadcast as `pet:updated`, then a
+  `helped` feed entry. An empty cupboard or a full need returns 409; yourself,
+  the bot, or any item but food and soap return 400. Touching saves and returns
   `{ id, visitor, pet, kind, at }`, where `kind` is `pat`, `tickle`, `stroke`
   or `paw` (anything else returns 400). Touching your own pet returns 400, a
   missing pet 404, and a second touch of the same pet within a second 429.
@@ -414,9 +433,10 @@ the built-in `node:sqlite` for storage.
   event whenever a team in the **Team up** window changes or sets off, and a
   `pet:touched` event, carrying the saved touch, whenever a visitor plays with
   someone else's pet. The feed keeps its newest 500 entries in SQLite.
-- **Logs:** each touch on another player's pet prints one line naming who did
-  it, e.g. `player=alice action=touch pet=bob kind=pat`, so
-  `flyctl logs` shows who played with whose pet.
+- **Logs:** each touch or help on another player's pet prints one line naming
+  who did it, e.g. `player=alice action=touch pet=bob kind=pat` or
+  `player=alice action=help pet=bob item=food amount=40`, so `flyctl logs`
+  shows who played with or looked after whose pet.
 
 ## Adventure exploration
 

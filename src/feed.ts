@@ -8,6 +8,7 @@ export type FeedEntry =
   | { id: number; at: string; kind: "joined"; pet: string }
   | { id: number; at: string; kind: "fight"; pet: string; other: string; winner: string; spoils: number }
   | { id: number; at: string; kind: "stole"; pet: string; other: string; amount: number }
+  | { id: number; at: string; kind: "helped"; pet: string; other: string; item: "food" | "soap" }
   | { id: number; at: string; kind: "school"; pet: string; school: string }
   | { id: number; at: string; kind: "promoted"; pet: string; location: string; rank: number };
 

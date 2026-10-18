@@ -1,5 +1,5 @@
 import { TIME_SCALE, realMs } from "./clock.ts";
-import { db } from "./db.ts";
+import { db, transaction } from "./db.ts";
 import { record } from "./feed.ts";
 import { coinEffect, simulateBattle, withAttributeBonus, type Battle } from "./combat.ts";
 import { inventoryFor } from "./inventory.ts";
@@ -704,6 +704,39 @@ export function steal(thiefId: string, victimId: string): StealOutcome {
   }
 }
 
+
+// Helping: a visitor feeds or cleans someone else's pet with Food or Soap from
+// their own cupboard. Both pets change together, or neither does.
+export type HelpOutcome =
+  | { helper: Pet; pet: Pet; item: "food" | "soap"; amount: number }
+  | { status: 400 | 404 | 409; error: string };
+
+export function help(helperId: string, petId: string, itemId: "food" | "soap"): HelpOutcome {
+  if (helperId === petId) return { status: 400, error: "Feed and clean your own pet from Care & shop." };
+  if (helperId === BOT_ID || petId === BOT_ID) return { status: 400, error: "The bot looks after itself." };
+  const item = ITEMS.find((i) => i.id === itemId)!;
+  if (item.effect !== "restore") return { status: 400, error: "Only Food and Soap help another pet." };
+  return transaction(() => {
+    const helper = getPet(helperId);
+    const pet = getPet(petId);
+    if (!helper) return { status: 404, error: "no such pet" };
+    if (!pet) return { status: 404, error: `There's no pet called ${petId}.` };
+    const now = Date.now();
+    finishIfDue(helper, now);
+    finishIfDue(pet, now);
+    if (helper[item.id] < 1) {
+      return { status: 409, error: `You have no ${item.name.toLowerCase()} to give. Buy some at the shop.` };
+    }
+    if (pet[item.restores] >= MAX_CARE) return { status: 409, error: `${petId}'s ${item.restores} is already full.` };
+    const amount = Math.min(MAX_CARE, pet[item.restores] + item.amount) - pet[item.restores];
+    helper[item.id]--;
+    pet[item.restores] += amount;
+    write(helper);
+    write(pet);
+    record({ kind: "helped", pet: helperId, other: petId, item: item.id });
+    return { helper: getPet(helperId)!, pet: getPet(petId)!, item: item.id, amount };
+  });
+}
 
 // Theft reports survive feed pruning and are consumed only by a completed revenge.
 export interface Theft {
