@@ -26,6 +26,7 @@ import { recentFeed } from "./feed.ts";
 import { followUp } from "./followups.ts";
 import { attachRealtime, broadcast } from "./realtime.ts";
 import { schedule, scheduleAll } from "./scheduler.ts";
+import { TOUCH_KINDS, isTouchKind, touch, touchesOn } from "./touches.ts";
 
 const app = express();
 app.use(express.json());
@@ -224,6 +225,13 @@ app.get("/api/pets/:id/fights", (req, res) => {
   res.json(recentFights(req.params.id, 10));
 });
 
+// Who has played with a pet lately, newest first. Touches are broadcast to
+// every window anyway, so like fights they're open to read.
+app.get("/api/pets/:id/touches", (req, res) => {
+  if (!isValidId(req.params.id) || !getPet(req.params.id)) return notFound(res, "pet");
+  res.json(touchesOn(req.params.id));
+});
+
 app.get("/api/pets/:id", (req, res) => {
   const pet = isValidId(req.params.id) ? getPet(req.params.id) : undefined;
   if (!pet) {
@@ -366,6 +374,19 @@ app.post("/api/pets/:id/steal/:opponent", (req, res) => {
   broadcast({ type: "pet:updated", pet: outcome.victim });
   followUp();
   res.json(outcome);
+});
+
+// Playing with someone else's pet, as your own: saved, logged, then broadcast
+// so it reacts in every window showing it, its owner's included.
+app.post("/api/pets/:id/touch/:pet", (req, res) => {
+  if (!isValidId(req.params.id) || !isValidId(req.params.pet)) return notFound(res, "pet");
+  const kind = req.body?.kind;
+  if (!isTouchKind(kind)) return void res.status(400).json({ error: `kind must be one of ${TOUCH_KINDS.join(", ")}` });
+  const outcome = touch(req.params.id, req.params.pet, kind);
+  if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
+  console.log(`player=${outcome.touch.visitor} action=touch pet=${outcome.touch.pet} kind=${outcome.touch.kind}`);
+  broadcast({ type: "pet:touched", touch: outcome.touch });
+  res.json(outcome.touch);
 });
 
 app.post("/api/pets/:id/revenge/:theft", (req, res) => {

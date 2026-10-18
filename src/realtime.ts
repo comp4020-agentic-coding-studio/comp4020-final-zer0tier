@@ -3,6 +3,7 @@ import { WebSocket, WebSocketServer } from "ws";
 import type { FeedEntry } from "./feed.ts";
 import type { Fight, Pet } from "./pets.ts";
 import type { Team } from "./teams.ts";
+import type { Touch } from "./touches.ts";
 
 // Server -> client events. Clients act over HTTP; the socket only carries news.
 export type ServerEvent =
@@ -13,7 +14,10 @@ export type ServerEvent =
   | { type: "feed:added"; entry: FeedEntry }
   // A team forming in the Team up window changed or set off. Players it no
   // longer lists (who left, declined, or were disbanded) recognise its id.
-  | { type: "team:updated"; team: Team };
+  | { type: "team:updated"; team: Team }
+  // A visitor touched someone else's pet. It reacts in every window showing
+  // it, and its owner's visitors list gains the touch.
+  | { type: "pet:touched"; touch: Touch };
 
 let wss: WebSocketServer | undefined;
 

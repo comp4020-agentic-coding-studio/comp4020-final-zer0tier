@@ -449,3 +449,32 @@ it("team:updated — declining an invitation reaches the leader's window within 
     ws.close();
   }
 });
+
+function nextTouch(ws: WebSocket, matches: (touch: any) => boolean): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("no pet:touched within 1s")), 1000);
+    ws.addEventListener("message", (msg) => {
+      const event = JSON.parse(String(msg.data));
+      if (event.type === "pet:touched" && matches(event.touch)) {
+        clearTimeout(timer);
+        resolve(event.touch);
+      }
+    });
+  });
+}
+
+it("pet:touched — playing with someone else's pet reaches the visitor's and the owner's windows within 1s", async () => {
+  const visitor = freshId(), owner = freshId();
+  await signUp(visitor); await signUp(owner);
+  const windows = [await open(), await open()];
+  try {
+    const touched = windows.map((ws) => nextTouch(ws, (t) => t.visitor === visitor && t.pet === owner));
+    const res = await post(`/api/pets/${visitor}/touch/${owner}`, { kind: "paw" });
+    expect(res.status).toBe(200);
+    const saved = await res.json();
+    for (const event of await Promise.all(touched)) expect(event).toEqual(saved);
+    expect(saved).toMatchObject({ visitor, pet: owner, kind: "paw" });
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});

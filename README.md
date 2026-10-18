@@ -17,8 +17,15 @@ the point of the game rather than boxes to tick:
   account and exactly one pet. Anyone can look at any pet in the Arena, but only
   its owner can act for it, so a stranger can't train, shop or fight with
   yours. A player who joins while you're playing appears in your Arena straight
-  away. *Enforced:* `spec/pets.test.ts` (one pet per ID, owner-only actions,
-  401/403), `spec/fight.test.ts` (new pets listed after the bot).
+  away. Visiting is how players reach each other's pets: you can play with
+  (touch) or steal from a pet you visit, but always *as your own pet*, so the
+  server checks your session owns the acting pet and records who did it. A
+  touch changes nothing in the game, which is why anyone may do it to any pet;
+  its owner sees who came by, and the server logs each one by player.
+  *Enforced:* `spec/pets.test.ts` (one pet per ID, owner-only actions,
+  401/403), `spec/touch.test.ts` (touching only as your own pet, never your own
+  pet, and changing nothing else), `spec/fight.test.ts` (new pets listed after
+  the bot).
 - **You see each other act (real-time).** Every change to a pet, and every fight,
   reaches every open window within a second, with no reload: your rival's shift
   ending, their level-up, the fight they just started against you. The Arena's
@@ -115,7 +122,9 @@ previews an unsaved change on the pet.
 ### Playing with your pet
 
 Tap or click your pet in its header to touch it there, or use the buttons under
-**Play with your pet** (on desktop, beneath the pet in the left column):
+**Play with your pet** (on desktop, beneath the pet in the left column). The
+same four touches work on other players' pets while you visit them (see
+[Visit, play and steal](#visit-play-and-steal)):
 
 | Touch | Where on the pet | Reaction |
 | --- | --- | --- |
@@ -127,8 +136,14 @@ Tap or click your pet in its header to touch it there, or use the buttons under
 The pet reacts with a short animation and a line describing what it does,
 which screen readers announce. A pet that's studying or working still reacts,
 then gets back to its lesson or shift. Playing is just for fun: it costs
-nothing, changes nothing in the game, and isn't saved, sent to the server, or
-shown to other players. With reduced motion turned on, only the line appears.
+nothing and changes nothing in the game. Playing with your own pet isn't saved,
+sent to the server, or shown to other players. With reduced motion turned on,
+only the line appears.
+
+Under the buttons, **Recent visitors** lists the last five players who played
+with your pet, each with their latest touch and when it was, newest first. When
+someone touches your pet while you're signed in, it reacts on your dashboard and
+says who did it.
 
 ### School
 
@@ -287,10 +302,21 @@ accepts only a theft against your own pet. Completed attempts cannot pay out twi
 Signing out clears pending revenge controls; late responses from an earlier
 login cannot change the new login’s notifications or buttons.
 
-### Visit and steal
+### Visit, play and steal
 
 Press **Visit** beside a pet in the Arena (or look it up by player ID) to see
-its appearance, activity and balance. **Steal $10–$30** takes a random whole
+its appearance, activity and balance.
+
+**Play with it** by tapping or clicking it where you'd like to touch it, or
+with **Pat head**, **Tickle belly**, **Stroke cheek** and **Shake paw** under
+it. Unlike playing with your own pet, this is a visit: the server saves who
+touched which pet and how, and tells every open window. The pet reacts only
+once that news arrives, in your window, in its owner's (whose **Recent
+visitors** gains you), and in anyone else's who is visiting it too. Each
+player can touch a given pet once a second. Touching costs nothing, works
+while either pet is busy, and changes no money, stats, stamina or hygiene.
+
+**Steal $10–$30** takes a random whole
 dollar amount from that pet and adds it to yours. The amount never exceeds
 its balance; a pet with less than $10 cannot be robbed. Visiting and stealing
 are instant, cost no stamina or hygiene, and work while either pet is busy.
@@ -349,7 +375,8 @@ the built-in `node:sqlite` for storage.
   in an HttpOnly cookie, stored only as a hash.
 - **Actions** (owner only): `POST /api/pets/:id/study/:course`,
   `work/:location` (with `{"minutes": 60}`), `upgrade/:location`, `buy/:item`,
-  `use/:item`, `collect-supplies`, `fight/:opponent`, `steal/:opponent` and `equip-coin/:coin`
+  `use/:item`, `collect-supplies`, `fight/:opponent`, `steal/:opponent`,
+  `touch/:pet` (with `{"kind": "pat"}`) and `equip-coin/:coin`
   (`:coin` is `copper-coin`, `silver-coin`, `gold-coin`, or `none` to unequip).
   `collect-supplies` adds the free daily Food and Soap and sets the pet's
   `suppliesAvailableAt` (epoch milliseconds of the next UTC midnight, or `null`
@@ -362,7 +389,10 @@ the built-in `node:sqlite` for storage.
   target before transferring money, saving protection and recording the feed
   entry in one transaction. Repeated thefts return 429; insufficient funds
   return 409; self/bot targets return 400. The daily limit uses real UTC days,
-  independent of `TIME_SCALE`.
+  independent of `TIME_SCALE`. Touching saves and returns
+  `{ id, visitor, pet, kind, at }`, where `kind` is `pat`, `tickle`, `stroke`
+  or `paw` (anything else returns 400). Touching your own pet returns 400, a
+  missing pet 404, and a second touch of the same pet within a second 429.
 - **Appearance** (owner only): `POST /api/pets/:id/appearance` with both
   fields, e.g. `{"color":"#12abef","appearance":"dragon"}`. Color must match
   `/^#[0-9a-f]{6}$/i`; appearance must be `cat`, `dog`, `bird`, `dragon` or
@@ -371,16 +401,22 @@ the built-in `node:sqlite` for storage.
   complete saved pet, including `color` and `appearance`. Clients wait for
   that broadcast to display a change. Both columns migrate in place on startup.
 - **Reading** (anyone): `GET /api/pets` lists pets, `GET /api/pets/:id` shows
-  one, `GET /api/pets/:id/fights` its recent fights, `GET /api/feed` what's
+  one, `GET /api/pets/:id/fights` its recent fights, `GET /api/pets/:id/touches`
+  its five most recent visitors (each one's latest touch, newest first),
+  `GET /api/feed` what's
   been happening across the game (newest first), `GET /api/leaderboard?by=wins`
   (or `power`) the top 10 players, and `GET /api/rules` the
   schools, courses, work locations, items and costs.
 - **Real time:** the server broadcasts a `pet:updated` event over the socket
   after every change, a `fight:finished` event after each fight (with the
   `spoils` the winner took), a `feed:added` event for each new entry in
-  Happening now, sent after the change it describes, and a `team:updated`
-  event whenever a team in the **Team up** window changes or sets off. The
-  feed keeps its newest 500 entries in SQLite.
+  Happening now, sent after the change it describes, a `team:updated`
+  event whenever a team in the **Team up** window changes or sets off, and a
+  `pet:touched` event, carrying the saved touch, whenever a visitor plays with
+  someone else's pet. The feed keeps its newest 500 entries in SQLite.
+- **Logs:** each touch on another player's pet prints one line naming who did
+  it, e.g. `player=alice action=touch pet=bob kind=pat`, so
+  `flyctl logs` shows who played with whose pet.
 
 ## Adventure exploration
 

@@ -232,6 +232,12 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .play-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; margin-top: 0.5rem; }
 .play-buttons .chip-btn { min-height: 44px; }
 .pet-reaction { margin: 0.5rem 0 0; min-height: 1.5em; font-weight: 600; font-size: 0.875rem; overflow-wrap: anywhere; }
+.visitors-heading { margin: 0.75rem 0 0.25rem; font-size: 0.875rem; }
+.visitors { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+.visitors li { display: flex; justify-content: space-between; gap: 0.75rem; font-size: 0.875rem; padding: 0.35rem 0.75rem; border-radius: 12px; background: var(--bg); }
+.visitors li > span { min-width: 0; overflow-wrap: anywhere; }
+.visitors time { flex: none; color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.visit-play { margin-bottom: 1rem; }
 .appearance-settings { margin-bottom: 1.5rem; padding: 0.75rem 1rem; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); }
 .appearance-settings h3 { margin: 0 0 0.5rem; }
 .appearance-fields { display: flex; align-items: end; flex-wrap: wrap; gap: 0.75rem; }
@@ -500,7 +506,8 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .visit-head h4 { margin: 0; overflow-wrap: anywhere; min-width: 0; flex: 1 1 12rem; }
 .visit-head .chip-btn { padding-inline: 0.75rem; }
 .visit-pet { display: flex; align-items: center; gap: 1rem; margin-block: 1rem; }
-.visit-pet .pet { width: 100px; height: 92px; flex: none; }
+.visit-pet .pet-touch { width: 100px; }
+.visit-pet .pet-touch .pet { height: 92px; }
 .visit-pet p { margin: 0.25rem 0; }
 .visit-money { color: var(--money); font-weight: 700; }
 .visit #steal { margin-top: 0.75rem; padding-inline: 1rem; }

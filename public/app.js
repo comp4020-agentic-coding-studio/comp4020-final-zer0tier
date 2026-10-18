@@ -501,6 +501,8 @@ function renderRivals() {
 function renderVisit() {
   const pet = rivals.get(visiting);
   $("visit").hidden = !pet || !current;
+  // Playing with the visited pet lives in interact.js.
+  document.dispatchEvent(new CustomEvent("visit:pet", { detail: pet && current ? pet : null }));
   if (!pet || !current) return;
   $("visit-heading").textContent = `Visiting ${pet.id}`;
   renderPetAvatar($("visit-avatar"), pet);
@@ -562,6 +564,7 @@ function closeVisit() {
   visitLoads++;
   visitReady = false;
   $("visit").hidden = true;
+  document.dispatchEvent(new CustomEvent("visit:pet", { detail: null }));
   $("steal-news").textContent = "";
   $("steal-error").textContent = "";
 }
@@ -1196,6 +1199,7 @@ function connect() {
     $("live").dataset.state = "live";
     if (!current) return;
     loadThefts();
+    document.dispatchEvent(new CustomEvent("realtime:resync")); // touches missed while disconnected
     const { id } = current;
     const seen = broadcasts;
     try {
@@ -1227,6 +1231,8 @@ function connect() {
       renderRivals();
     } else if (event.type === "team:updated") {
       document.dispatchEvent(new CustomEvent("team:updated", { detail: event.team }));
+    } else if (event.type === "pet:touched") {
+      document.dispatchEvent(new CustomEvent("pet:touched", { detail: event.touch }));
     } else if (event.type === "fight:finished") {
       onFight(event.fight);
     } else if (event.type === "feed:added" && current && rules) {

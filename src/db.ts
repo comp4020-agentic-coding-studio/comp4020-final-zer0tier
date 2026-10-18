@@ -112,6 +112,16 @@ db.exec(`
     resolved_at TEXT
   );
   CREATE INDEX IF NOT EXISTS thefts_by_victim ON thefts (victim, id);
+  -- Visitors patting, tickling, stroking or shaking paws with someone else's
+  -- pet. Only each pet's newest few are kept, for its owner's visitors list.
+  CREATE TABLE IF NOT EXISTS touches (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    visitor TEXT NOT NULL REFERENCES pets (id),
+    pet     TEXT NOT NULL REFERENCES pets (id),
+    kind    TEXT NOT NULL,
+    at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+  CREATE INDEX IF NOT EXISTS touches_by_pet ON touches (pet, id);
   CREATE TABLE IF NOT EXISTS accounts (
     id            TEXT PRIMARY KEY REFERENCES pets (id),
     password_hash TEXT NOT NULL,

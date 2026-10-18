@@ -152,6 +152,9 @@
             <button type="button" class="chip-btn chip-buy" data-touch="paw">Shake paw</button>
           </div>
           <p id="pet-reaction" class="pet-reaction" role="status" aria-live="polite"></p>
+          <h4 id="visitors-heading" class="visitors-heading">Recent visitors</h4>
+          <ul id="visitors" class="visitors" aria-labelledby="visitors-heading"></ul>
+          <p id="visitors-empty" class="help">Nobody has dropped by yet. Other players can visit from the Arena.</p>
         </section>
 
         <form id="appearance-settings" class="appearance-settings" aria-labelledby="appearance-heading">
@@ -256,9 +259,23 @@
                 <button type="button" id="visit-close" class="chip-btn chip-buy">Leave visit</button>
               </div>
               <div class="visit-pet">
-                <svg id="visit-avatar" class="pet" viewBox="0 0 120 110"></svg>
+                <span id="visit-touch" class="pet-touch" data-reaction="">
+                  <svg id="visit-avatar" class="pet" viewBox="0 0 120 110"></svg>
+                  <span class="pet-effects" aria-hidden="true"></span>
+                </span>
                 <div><p id="visit-activity"></p><p id="visit-money" class="visit-money"></p></div>
               </div>
+              <section id="visit-play" class="visit-play" aria-label="Play with this pet">
+                <p id="visit-play-help" class="help"></p>
+                <div class="play-buttons">
+                  <button type="button" class="chip-btn chip-buy" data-visit-touch="pat">Pat head</button>
+                  <button type="button" class="chip-btn chip-buy" data-visit-touch="tickle">Tickle belly</button>
+                  <button type="button" class="chip-btn chip-buy" data-visit-touch="stroke">Stroke cheek</button>
+                  <button type="button" class="chip-btn chip-buy" data-visit-touch="paw">Shake paw</button>
+                </div>
+                <p id="visit-reaction" class="pet-reaction" role="status" aria-live="polite"></p>
+                <p id="visit-touch-error" class="error" role="alert"></p>
+              </section>
               <p id="steal-hint" class="hint"></p>
               <button type="button" id="steal" class="chip-btn chip-buy" aria-describedby="steal-hint"></button>
               <p id="steal-news" class="hint" role="status"></p>
