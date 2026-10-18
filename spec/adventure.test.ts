@@ -6,6 +6,19 @@ async function sendAction(id: string, body = {}) {
   return post('/api/adventure', { revision: state.revision, ...body }, id);
 }
 
+// The monsters' next step after `from`, about a second on. The server skips a
+// request that comes too soon by its clock, so ask again until the map
+// changes. A wall clock that jumps (seen on WSL, by up to ~8 s) holds steps
+// back until it has caught up.
+async function nextStep(id: string, from: unknown): Promise<any> {
+  for (let i = 0; i < 15; i++) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const state = await (await post('/api/adventure', { action: 'patrol' }, id)).json();
+    if (JSON.stringify(state) !== JSON.stringify(from)) return state;
+  }
+  return from;
+}
+
 it('saves one-block adventure movement, blocks trees, and isolates player positions', async () => {
   const id = freshId(); await signUp(id);
   const read = async () => (await post('/api/adventure', {}, id)).json();
@@ -54,16 +67,12 @@ it('lets the owner descend all five floors only at stairs, ascend, and resume th
 it('monsters patrol in real time, chase a pet within 3 blocks, and lose it once it gets away', async () => {
   const id = freshId(); await signUp(id);
   const act = async (body = {}) => (await sendAction(id, body)).json();
-  const patrol = async () => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return (await post('/api/adventure', { action: 'patrol' }, id)).json();
-  };
   const start = await act();
   expect(start.patrolMs).toBe(1000);
   expect(start.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: false, route: [{ x: 6, y: 2 }, { x: 9, y: 2 }] });
   // Patrolling, out of sight: one block per step along its route, and the
   // revision stays, so a move sent alongside still applies.
-  const walked = await patrol();
+  const walked = await nextStep(id, start);
   expect(walked.enemies[0]).toMatchObject({ x: 7, y: 2, alerted: false });
   expect(walked.revision).toBe(start.revision);
   // Asking again straight away (another window, or a quick retry) moves nothing.
@@ -77,7 +86,7 @@ it('monsters patrol in real time, chase a pet within 3 blocks, and lose it once 
   expect(spotted.enemies[0]).toMatchObject({ x: 7, y: 2, alerted: false });
   const seen = await act({ direction: 'd' });
   expect(seen.enemies[0]).toMatchObject({ x: 7, y: 2, alerted: true });
-  const chased = await patrol();
+  const chased = await nextStep(id, seen);
   expect(chased.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: true });
   // A step short of the pet, the pet slips away before the monster reaches it.
   // More than 3 blocks away, it loses the pet and heads back along its route.
@@ -86,32 +95,22 @@ it('monsters patrol in real time, chase a pet within 3 blocks, and lose it once 
   const away = await act();
   expect(away).toMatchObject({ x: 1, y: 1, encounters: [], battle: null });
   expect(away.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: false });
-  expect((await patrol()).enemies[0]).toMatchObject({ x: 7, y: 2, alerted: false });
+  expect((await nextStep(id, away)).enemies[0]).toMatchObject({ x: 7, y: 2, alerted: false });
 });
 
 it('a monster that catches the pet attacks it on its next step, and the battle is saved like any other', async () => {
   const id = freshId(); await signUp(id);
   const act = async (body = {}) => (await sendAction(id, body)).json();
-  // The next monster step: the server skips a request that comes too soon by
-  // its clock, so ask again until the map changes.
-  const patrol = async (from: unknown) => {
-    for (let i = 0; i < 5; i++) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const state = await (await post('/api/adventure', { action: 'patrol' }, id)).json();
-      if (JSON.stringify(state) !== JSON.stringify(from)) return state;
-    }
-    return from as any;
-  };
   // Two blocks from the floor-one slime at its spawn (column 7, row 3).
   await act({ direction: 'd' });
   const before = await act({ direction: 'd' });
   expect(before.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: true });
   // It steps up beside the pet, which is warned, and then walks into it.
-  const beside = await patrol(before);
+  const beside = await nextStep(id, before);
   expect(beside).toMatchObject({ x: 4, y: 2, battle: null, revision: before.revision });
   expect(beside.enemies[0]).toMatchObject({ x: 5, y: 2 });
   expect(beside.encounters).toEqual(['f1-enemy-0']);
-  const attacked = await patrol(beside);
+  const attacked = await nextStep(id, beside);
   expect(attacked).toMatchObject({ x: 4, y: 2, battle: { pending: true, attacked: true, enemyId: 'f1-enemy-0', enemyName: 'Slime' } });
   expect(attacked.revision).not.toBe(before.revision);
   expect(attacked.battle.playback.fighters.map((f: { id: string }) => f.id)).toEqual([id, 'monster:f1-enemy-0']);
