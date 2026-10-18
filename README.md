@@ -442,7 +442,11 @@ the built-in `node:sqlite` for storage.
 
 Choose **Adventure** under **Make their day** on desktop, or the Adventure
 section on a phone, then **Explore the woodland**. Move one block per press with
-W/A/S/D, arrow keys, or the on-screen direction buttons. Each of the five fixed
+W/A/S/D, arrow keys, or the on-screen direction buttons. The map takes the
+keyboard as soon as it opens. **Space** acts on the tile your pet stands on: it
+opens an unopened chest, or takes the stairs there (Descend or Ascend), so the
+whole adventure plays without a mouse. On a focused button, Space presses that
+button instead. Each of the five fixed
 floors starts with a 16 × 16 grid, four regular enemies (slimes and goblins), and at least
 one marked treasure chest. Floor five also contains the **Slime King**. The map
 uses your pet's saved shape and colour as soon as you sign in.
@@ -454,7 +458,7 @@ which an Hourglass can bring forward. Viewing the map, returning from a saved
 battle, and using backpack items still work. An activity whose time is up no
 longer counts, even before it has been paid out.
 
-Stand on the down stairs at column 14, row 14 and choose **Descend**. You arrive
+Stand on the down stairs at column 14, row 14 and press Space or choose **Descend**. You arrive
 at the next floor's up stairs at column 3, row 3; **Ascend** returns to the
 previous floor's down stairs. Floor one has no up stairs and floor five has no
 down stairs. Leave or Escape closes the window. Your floor, position, HP/MP, and
@@ -581,17 +585,26 @@ Slime King marks the woodland complete; you can explore remaining paths or
 choose **Start new adventure**.
 
 **Defeat fails the adventure.** HP stays at zero and movement and stairs are
-disabled. Return to the map to see the result, then choose **Start new adventure**
-to reset to floor one with full HP/MP and a fresh set of monsters. Leaving or
-reloading keeps the failed run; it does not restart automatically.
+disabled. Returning to the map shows the result, and a window asks **Start a new
+adventure?** with its cost: **Yes** resets to floor one with full HP/MP and a
+fresh set of monsters, and **No** leaves the failed run on screen with **Start
+new adventure** to choose later. While the pet still rests from its last start,
+the window first asks whether to **use an Hourglass to skip the wait**, if it
+has one, and then whether to start; with no Hourglass it asks nothing. Leaving
+or reloading keeps the failed run; it does not restart automatically.
 
 **Abandon run ends the mini-game immediately.** While exploring (with no
-battle waiting), **Abandon run** asks for confirmation, then ends the run on
+battle waiting), **Abandon run** asks **Yes** or **No** first, then ends the run on
 the spot, like a defeat, and closes the map. Abandoning is free. Reopening
 Adventure shows **Adventure abandoned** with movement, stairs, and chests
 disabled; the only way on is **Start new adventure**. A finished or failed
 run can't be abandoned, and the server refuses to start a new adventure (409)
 while a run is still in progress.
+
+**Every confirmation is a Yes/No window.** Whenever the game needs you to
+confirm something, it opens a small window with the question and **Yes** and
+**No**, never the browser's own prompt. Focus starts on **No**, so a stray key
+never confirms; Escape or a click outside the window also answers No.
 
 **Skip to result**, **Replay battle**, and **Watch last battle** only play the
 saved turns. **Return to map** (or Escape from the battle window) acknowledges
@@ -617,7 +630,7 @@ recovery; chests grant the items below.
 
 ### Treasure and inventory
 
-Stand on a treasure chest and choose **Open chest**. Each chest awards one reward
+Stand on a treasure chest and press Space or choose **Open chest**. Each chest awards one reward
 per run: **Food 30%, Soap 30%, Ability 20%, Hourglass 15%, Unfair coin 5%**.
 The two ability types have equal chances within the ability category; Copper,
 Silver, and Gold Coins have equal chances within the coin category. Opened chests

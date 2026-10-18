@@ -3,8 +3,8 @@ adventure.id = 'adventure-dialog';
 adventure.setAttribute('aria-labelledby', 'adventure-title');
 adventure.innerHTML = `
   <header><div><p class="section-label" id="adventure-floor">ADVENTURE · FLOOR 1 / 5</p><h2 id="adventure-title">Woodland clearing</h2></div>
-    <button type="button" id="adventure-close" class="chip-btn" autofocus>Leave</button></header>
-  <p class="help">W/A/S/D or arrow keys to move one block. Step into a monster to battle; one that catches your pet attacks it.</p>
+    <button type="button" id="adventure-close" class="chip-btn">Leave</button></header>
+  <p class="help">W/A/S/D or arrow keys to move one block. Space opens a chest or takes the stairs you stand on. Step into a monster to battle; one that catches your pet attacks it.</p>
   <div class="adventure-layout"><div class="adventure-map-area">
   <div id="adventure-grid" role="img" aria-label="Woodland map" tabindex="0"></div>
   <p id="adventure-status" role="status">Opening the clearing…</p>
@@ -51,7 +51,7 @@ adventure.innerHTML = `
     <p class="help">HP and MP carry between battles. Each victory restores 20% of their maximums, rounded up. Defeat ends the adventure.</p>
     <p class="help" id="adventure-restart-cost"></p>
     <p id="adventure-completion" class="help" role="status" hidden>Slime King defeated! The woodland is complete. You can keep exploring.</p>
-    <p class="help">Stand on a chest and choose Open chest. Each chest holds one reward per adventure.</p>
+    <p class="help">Stand on a chest and press Space or choose Open chest. Each chest holds one reward per adventure.</p>
     <details><summary>Treasure chances</summary><p class="help">Food 30% · Soap 30% · Ability 20% · Hourglass 15% · Unfair coin 5%. Abilities and coin types have equal chances within their category.</p></details>
     <details class="adventure-backpack">
       <summary id="adventure-backpack-title">Your backpack</summary>
@@ -180,7 +180,7 @@ function renderMap() {
   adventure.querySelector('#adventure-title').textContent = state.name;
   adventure.querySelector('#adventure-floor').textContent = `ADVENTURE · FLOOR ${state.floor} / ${state.floorCount}`;
   adventure.querySelector('#adventure-stair-hint').textContent = state.down
-    ? 'Find the ↓ stairs at column 14, row 14. Stand there and choose Descend.'
+    ? 'Find the ↓ stairs at column 14, row 14. Stand there and press Space or choose Descend.'
     : state.completed ? 'Final floor. The Slime King has been defeated.' : 'Final floor. The Slime King guards this grove.';
   adventure.querySelector('#adventure-completion').hidden = !state.completed;
   adventure.querySelector('#adventure-failure').hidden = !state.failed && !state.abandoned;
@@ -262,15 +262,15 @@ function renderMonsters() {
     grid.append(cell);
   }));
   const mates = teammatesHere(), sharing = mates.filter(m => m.x === state.x && m.y === state.y).map(m => m.id);
-  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Monster locations are in Monster attributes. Trees block movement; stepping into a monster starts battle, and so does a monster stepping into your pet.`);
+  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Monster locations are in Monster attributes. Trees block movement; stepping into a monster starts battle, and so does a monster stepping into your pet. Space opens a chest or takes the stairs your pet stands on.`);
   const nearby = state.enemies.filter(e => state.encounters.includes(e.id));
   const spotted = state.enemies.filter(e => e.alerted && !state.encounters.includes(e.id));
   const notice = busyText() || (nearby.length
     ? `${nearby.map(e => e.name).join(', ')} nearby! Step into ${nearby.length > 1 ? 'one' : 'it'} to battle, or move away before ${nearby.length > 1 ? 'they attack' : 'it attacks'}.`
     : spotted.length ? `${spotted.map(e => e.name).join(', ')} spotted you! Move more than 3 blocks away to lose ${spotted.length > 1 ? 'them' : 'it'}.`
-    : state.chests.some(at) ? (state.chests.find(at).reward ? 'This chest is empty. Your reward is saved.' : 'You found a treasure chest. Choose Open chest to collect its reward.')
-    : at(state.up) ? 'Stairs up: choose Ascend to return to the previous floor.'
-    : at(state.down) ? 'Stairs down: choose Descend to explore deeper.' : '');
+    : state.chests.some(at) ? (state.chests.find(at).reward ? 'This chest is empty. Your reward is saved.' : 'You found a treasure chest. Press Space or choose Open chest to collect its reward.')
+    : at(state.up) ? 'Stairs up: press Space or choose Ascend to return to the previous floor.'
+    : at(state.down) ? 'Stairs down: press Space or choose Descend to explore deeper.' : '');
   // Only a new message is announced again.
   const noticeText = adventure.querySelector('#adventure-notice');
   if (noticeText.textContent !== notice) noticeText.textContent = notice;
@@ -537,6 +537,9 @@ function openMap(payload) {
   if (adventure.open) return request(payload);
   clearMap();
   adventure.showModal();
+  // The map takes focus, so the keyboard plays at once and Space never
+  // presses Leave by accident.
+  grid.focus({ preventScroll: true });
   return request(payload);
 }
 function openLobby() {
@@ -603,8 +606,23 @@ adventure.querySelectorAll('[data-direction]').forEach(button => button.addEvent
   if (state) request({ direction: button.dataset.direction });
   else request();
 }));
+// Space acts on what the pet stands on: it opens the chest, or takes the
+// stairs. On a focused button or summary, Space presses that instead.
+function interact() {
+  const chest = state?.chests.find(at);
+  const control = chest && !chest.reward ? '#adventure-open-chest'
+    : at(state?.down) ? '#adventure-descend' : at(state?.up) ? '#adventure-ascend' : null;
+  const button = control && adventure.querySelector(control);
+  if (button && !button.disabled) button.click();
+}
 adventure.addEventListener('keydown', event => {
   if (!adventure.open || event.ctrlKey || event.metaKey || event.altKey || event.target.matches('input, textarea, select, [contenteditable]')) return;
+  if (event.key === ' ') {
+    if (event.target.matches('button, summary, a[href]')) return;
+    event.preventDefault();
+    if (!event.repeat) interact();
+    return;
+  }
   const key = event.key.toLowerCase();
   const direction = { arrowup: 'w', arrowleft: 'a', arrowdown: 's', arrowright: 'd' }[key] || key;
   if (!['w', 'a', 's', 'd'].includes(direction)) return;
@@ -622,10 +640,13 @@ adventure.querySelector('#adventure-restart').addEventListener('click', async ()
 });
 // Once a run is over, the next can be a team's instead.
 adventure.querySelector('#adventure-team-up').addEventListener('click', chooseTeam);
+// Asks Yes or No in the game's confirmation window (public/confirm.js).
+const ask = (title, message) => new Promise(answer =>
+  document.dispatchEvent(new CustomEvent('confirm:ask', { detail: { title, message, answer } })));
 // Abandoning ends the mini-game at once: the run is over and the map closes.
 adventure.querySelector('#adventure-abandon').addEventListener('click', async () => {
   const cost = state?.restartCost;
-  if (!window.confirm(`Abandon this adventure? It ends now${cost ? `, and starting a new one costs ${cost.stamina} stamina and ${cost.hygiene} hygiene` : ''}.`)) return;
+  if (!await ask('Abandon this adventure?', `It ends now${cost ? `, and starting a new one costs ${cost.stamina} stamina and ${cost.hygiene} hygiene` : ''}.`)) return;
   await request({ action: 'abandon' });
   if (adventure.open && state?.abandoned) {
     adventure.close();
@@ -636,9 +657,29 @@ adventure.querySelector('#adventure-skip-cooldown').addEventListener('click', ()
 async function continueExploring() {
   if (!state?.battle?.pending) return;
   await request({ action: 'continue', battleId: state.battle.id });
-  if (adventure.open && !document.querySelector('#battle-dialog')?.open) {
-    (state?.failed ? adventure.querySelector('#adventure-restart') : grid).focus({ preventScroll: true });
-  }
+  if (!adventure.open || document.querySelector('#battle-dialog')?.open) return;
+  if (!state?.failed) return grid.focus({ preventScroll: true });
+  // The way on: Start new adventure, or Skip wait while the pet rests.
+  const next = [...adventure.querySelectorAll('#adventure-restart, #adventure-skip-cooldown')].find(button => !button.hidden && !button.disabled);
+  (next ?? grid).focus({ preventScroll: true });
+  offerFreshStart();
+}
+// After a defeat, ask whether to go again. While the pet still rests, first
+// ask whether to spend an Hourglass on the wait, then whether to start. No
+// leaves the failed run on screen, with its buttons, to decide later.
+async function offerFreshStart() {
+  const cost = state.restartCost, hourglasses = state.inventory?.items.find(item => item.id === 'hourglass')?.quantity ?? 0;
+  const resting = cooldownActive();
+  if (resting && hourglasses < 1) return;
+  const yes = await ask('Your pet was defeated', resting
+    ? `${cooldownText(true)} Use an Hourglass to skip the wait?`
+    : `Start a new adventure? It costs ${cost.stamina} stamina and ${cost.hygiene} hygiene, and opens a ${state.cooldownMinutes / 60}-hour wait before the next one.`);
+  if (!yes || !adventure.open || !state?.failed) return;
+  await request({ action: resting ? 'skip-cooldown' : 'restart' });
+  if (!adventure.open) return;
+  if (!state?.failed) return grid.focus({ preventScroll: true });
+  adventure.querySelector('#adventure-restart').focus({ preventScroll: true });
+  if (resting && !cooldownActive()) offerFreshStart();
 }
 adventure.querySelector('#adventure-continue').addEventListener('click', continueExploring);
 document.addEventListener('battle:closed', ({ detail }) => {

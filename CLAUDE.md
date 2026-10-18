@@ -14,6 +14,9 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   Check desktop and phone sizes, keyboard access, and overflow before committing.
 - Keep the rules concise and specific to this project. Do not turn a one-off
   implementation choice into a permanent rule without the owner's direction.
+- Whenever the player must confirm something, ask in the game's own Yes/No
+  window (`confirm:ask`, `public/confirm.js`), never `window.confirm`.
+- Keep the Adventure playable from the keyboard alone, mouse optional.
 
 ## Stack (don't add to it without asking)
 

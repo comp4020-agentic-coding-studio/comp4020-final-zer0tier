@@ -279,14 +279,24 @@ it('shows a failed run with disabled movement and starts a fresh adventure only 
   try {
     window.eval(readFileSync('public/battle.js', 'utf8'));
     window.eval(readFileSync('public/adventure.js', 'utf8'));
+    window.eval(readFileSync('public/confirm.js', 'utf8'));
     $('adventure-open').click();
     await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement).open).toBe(true));
     $('battle-skip').click();
     expect($('battle-status').textContent).toContain('Adventure failed');
     $('battle-close').click();
-    await vi.waitFor(() => expect(($('adventure-restart') as HTMLButtonElement).disabled).toBe(false));
-    expect($('adventure-failure').hidden).toBe(false);
+    // Back on the map, a window asks whether to go again, with focus on No.
+    await vi.waitFor(() => expect(($('confirm-dialog') as HTMLDialogElement | null)?.open).toBe(true));
+    expect($('confirm-title').textContent).toBe('Your pet was defeated');
+    expect($('confirm-message').textContent).toBe('Start a new adventure? It costs 40 stamina and 20 hygiene, and opens a 4-hour wait before the next one.');
+    expect(window.document.activeElement?.id).toBe('confirm-no');
+    $('confirm-no').click();
+    // No leaves the failed run on screen, to start again later.
+    expect(($('confirm-dialog') as HTMLDialogElement).open).toBe(false);
     expect(window.document.activeElement?.id).toBe('adventure-restart');
+    expect(requests).toHaveBeenCalledTimes(2);
+    expect(($('adventure-restart') as HTMLButtonElement).disabled).toBe(false);
+    expect($('adventure-failure').hidden).toBe(false);
     for (const button of $('adventure-dialog').querySelectorAll<HTMLButtonElement>('[data-direction]')) expect(button.disabled).toBe(true);
     $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 's', bubbles: true }));
     expect(requests).toHaveBeenCalledTimes(2);
@@ -301,9 +311,12 @@ it('shows a failed run with disabled movement and starts a fresh adventure only 
 
 it('ends the mini-game at once on Abandon run: the map closes, and reopening offers only a new adventure', async () => {
   const { dom, window, $ } = page();
-  const confirms: string[] = [];
-  let answer = false;
-  window.confirm = (message?: string) => { confirms.push(String(message)); return answer; };
+  window.confirm = () => { throw new Error('The game asks in its own window, not the browser\'s.'); };
+  // Answers the game's Yes/No window once it asks.
+  const answer = async (yes: boolean) => {
+    await vi.waitFor(() => expect(($('confirm-dialog') as HTMLDialogElement | null)?.open).toBe(true));
+    $(yes ? 'confirm-yes' : 'confirm-no').click();
+  };
   let state: ReturnType<typeof map> & { abandoned?: boolean } = map();
   const cooldownUntil = Date.now() + 4 * 60 * 60 * 1000;
   const requests = vi.fn(async (_url: string, options: RequestInit) => {
@@ -315,18 +328,28 @@ it('ends the mini-game at once on Abandon run: the map closes, and reopening off
   window.fetch = requests as unknown as typeof fetch;
   try {
     window.eval(readFileSync('public/adventure.js', 'utf8'));
+    window.eval(readFileSync('public/confirm.js', 'utf8'));
     const dialog = $('adventure-dialog') as HTMLDialogElement;
     $('adventure-open').click();
     await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
     expect($('adventure-abandon').hidden).toBe(false);
     expect($('adventure-restart').hidden).toBe(true);
-    $('adventure-abandon').click(); // cancelled
+    $('adventure-abandon').focus(); $('adventure-abandon').click();
+    await answer(false);
     expect(requests).toHaveBeenCalledTimes(1);
     expect(dialog.open).toBe(true);
-    answer = true;
+    expect(window.document.activeElement?.id).toBe('adventure-abandon');
     $('adventure-abandon').click();
+    expect($('confirm-title').textContent).toBe('Abandon this adventure?');
+    expect($('confirm-message').textContent).toBe('It ends now, and starting a new one costs 40 stamina and 20 hygiene.');
+    // Escape answers No too.
+    $('confirm-dialog').dispatchEvent(new window.Event('cancel'));
+    ($('confirm-dialog') as HTMLDialogElement).close();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(requests).toHaveBeenCalledTimes(1);
+    $('adventure-abandon').click();
+    await answer(true);
     await vi.waitFor(() => expect(dialog.open).toBe(false));
-    expect(confirms.at(-1)).toBe('Abandon this adventure? It ends now, and starting a new one costs 40 stamina and 20 hygiene.');
     expect(JSON.parse(requests.mock.calls[1][1].body as string)).toEqual({ action: 'abandon', revision: 'saved-map' });
     expect(window.document.activeElement?.id).toBe('adventure-open');
     // Reopening shows the ended run: no more exploring, only a (paid) new adventure.
@@ -345,6 +368,7 @@ it('ends the mini-game at once on Abandon run: the map closes, and reopening off
     expect($('adventure-skip-cooldown').hidden).toBe(true);
     expect($('adventure-abandon').hidden).toBe(false);
     $('adventure-abandon').click();
+    await answer(true);
     await vi.waitFor(() => expect(dialog.open).toBe(false));
     $('adventure-open').click();
     await vi.waitFor(() => expect($('adventure-failure').hidden).toBe(false));
@@ -376,6 +400,109 @@ it('keeps keyboard movement focused on the map when using stairs disables the se
     expect(requests[2].body).toEqual({ direction: 'd', revision: 'saved-map' });
     requests[2].finish(Response.json({ ...map(2), x: 3 }));
     await vi.waitFor(() => expect($('adventure-status').textContent).toBe('Column 4 · Row 3'));
+  } finally { dom.window.close(); }
+});
+
+it('opens the map with focus on it, and Space opens the chest or takes the stairs the pet stands on', async () => {
+  const { dom, window, $ } = page();
+  let saved: ReturnType<typeof map> = { ...map(), x: 11, y: 3 };
+  const bodies: any[] = [];
+  window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
+    const body = JSON.parse(options.body as string);
+    bodies.push(body);
+    if (body.action === 'open-chest') saved = { ...saved, revision: 'opened', chests: saved.chests.map(c => ({ ...c, reward: { category: 'food', id: 'food', name: 'Food', quantity: 1 } })) };
+    if (body.direction === 'd') saved = { ...saved, revision: 'at-stairs', x: 13, y: 13 };
+    if (body.action === 'descend') saved = { ...map(2), revision: 'floor-2' };
+    if (body.action === 'ascend') saved = { ...map(1), revision: 'floor-1', x: 13, y: 13 };
+    return Response.json(saved);
+  }) as unknown as typeof fetch;
+  const space = (target: Element = window.document.activeElement!) =>
+    target.dispatchEvent(new window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(($('adventure-open-chest') as HTMLButtonElement).disabled).toBe(false));
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+    expect($('adventure-notice').textContent).toBe('You found a treasure chest. Press Space or choose Open chest to collect its reward.');
+    expect(space()).toBe(false); // the page doesn't scroll
+    await vi.waitFor(() => expect($('adventure-open-chest').textContent).toBe('Chest opened'));
+    expect(bodies.at(-1)).toEqual({ action: 'open-chest', revision: 'saved-map' });
+    // An opened chest, or a plain path, has nothing to act on.
+    const asked = bodies.length;
+    space();
+    expect(bodies).toHaveLength(asked);
+    $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    await vi.waitFor(() => expect($('adventure-status').textContent).toBe('Column 14 · Row 14'));
+    expect($('adventure-notice').textContent).toBe('Stairs down: press Space or choose Descend to explore deeper.');
+    space();
+    await vi.waitFor(() => expect($('adventure-floor').textContent).toBe('ADVENTURE · FLOOR 2 / 5'));
+    expect(bodies.at(-1)).toEqual({ action: 'descend', revision: 'at-stairs' });
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+    space();
+    await vi.waitFor(() => expect($('adventure-floor').textContent).toBe('ADVENTURE · FLOOR 1 / 5'));
+    expect(bodies.at(-1)).toEqual({ action: 'ascend', revision: 'floor-2' });
+    // On a focused button, Space presses that button instead (here, Leave).
+    $('adventure-close').focus();
+    expect(space()).toBe(true);
+    expect(bodies.at(-1)).toEqual({ action: 'ascend', revision: 'floor-2' });
+  } finally { dom.window.close(); }
+});
+
+it('after a defeat while the pet rests, asks to spend an Hourglass on the wait, then whether to start again', async () => {
+  const { dom, window, $ } = page();
+  const failed = battleProgress(false), cooldownUntil = Date.now() + 4 * 60 * 60 * 1000;
+  const withGlass = (quantity: number) => ({ ...failed.inventory, items: [{ id: 'hourglass', name: 'Hourglass', effect: 'skip', quantity, usable: false }] });
+  let saved: any = { ...failed, cooldownUntil, inventory: withGlass(1) };
+  const bodies: any[] = [];
+  window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
+    const body = JSON.parse(options.body as string);
+    bodies.push(body);
+    if (body.action === 'continue') saved = { ...saved, revision: 'returned', battle: { ...saved.battle, pending: false } };
+    if (body.action === 'skip-cooldown') saved = { ...saved, revision: 'rested', cooldownUntil: null, inventory: withGlass(0) };
+    if (body.action === 'restart') saved = { ...map(), revision: 'fresh' };
+    return Response.json(saved);
+  }) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    window.eval(readFileSync('public/confirm.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement).open).toBe(true));
+    $('battle-close').click();
+    await vi.waitFor(() => expect(($('confirm-dialog') as HTMLDialogElement | null)?.open).toBe(true));
+    expect($('confirm-message').textContent).toBe('Your pet needs to rest. Next adventure in 4 h. Use an Hourglass to skip the wait?');
+    $('confirm-yes').click();
+    // The wait is gone, so the next question is whether to start.
+    await vi.waitFor(() => expect($('confirm-message').textContent).toMatch(/^Start a new adventure\?/));
+    expect(bodies.at(-1)).toEqual({ action: 'skip-cooldown', revision: 'returned' });
+    expect(($('confirm-dialog') as HTMLDialogElement).open).toBe(true);
+    $('confirm-yes').click();
+    await vi.waitFor(() => expect($('adventure-failure').hidden).toBe(true));
+    expect(bodies.at(-1)).toEqual({ action: 'restart', revision: 'rested' });
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+  } finally { dom.window.close(); }
+});
+
+it('asks nothing after a defeat while the pet rests with no Hourglass to spend', async () => {
+  const { dom, window, $ } = page();
+  let saved: any = { ...battleProgress(false), cooldownUntil: Date.now() + 60 * 60 * 1000 };
+  window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
+    if (JSON.parse(options.body as string).action === 'continue') saved = { ...saved, battle: { ...saved.battle, pending: false } };
+    return Response.json(saved);
+  }) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    window.eval(readFileSync('public/confirm.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement).open).toBe(true));
+    $('battle-close').click();
+    await vi.waitFor(() => expect($('adventure-cooldown').hidden).toBe(false));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect($('confirm-dialog')).toBeNull();
+    expect(($('adventure-skip-cooldown') as HTMLButtonElement).disabled).toBe(true);
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+    expect($('adventure-cooldown').textContent).toBe('Your pet needs to rest. Next adventure in 1 h.');
   } finally { dom.window.close(); }
 });
 
