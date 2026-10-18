@@ -2,6 +2,7 @@ import {
   abandonAdventure, adventureFor, changeFloor, continueAdventure, moveAdventure, openAdventureChest, patrolAdventure,
   restartAdventure, skipAdventureCooldown, useAdventureItem,
 } from "./adventure.ts";
+import { accept, invite, leave, setOff, teamFor, type TeamOutcome } from "./teams.ts";
 import express from "express";
 import { ABILITIES } from "./combat.ts";
 import { COINS, TREASURE_RATES } from './treasure.ts';
@@ -135,6 +136,42 @@ app.post("/api/adventure", (req, res) => {
   }
   if ("error" in result) return void res.status(result.status).json({ error: result.error });
   res.json(result);
+});
+
+// The Team up window. Each change is saved, then broadcast as team:updated.
+app.get("/api/team", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: "Sign in first." });
+  res.json(teamFor(id));
+});
+
+app.post("/api/team", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: "Sign in first." });
+  const { action, player, team } = req.body ?? {};
+  const teamId = Number.isSafeInteger(team) && team > 0 ? team as number : undefined;
+  let outcome: TeamOutcome;
+  if (action === "invite") {
+    if (!isValidId(player)) return void res.status(400).json({ error: "Player ID must be 1–32 letters, digits, - or _." });
+    outcome = invite(id, player);
+  } else if (action === "accept" || action === "leave") {
+    if (teamId === undefined) return void res.status(400).json({ error: "Choose a team." });
+    outcome = action === "accept" ? accept(id, teamId) : leave(id, teamId);
+  } else if (action === "set-off") {
+    outcome = setOff(id);
+  } else {
+    return void res.status(400).json({ error: "Choose invite, accept, leave or set-off." });
+  }
+  if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
+  // Setting off spends stamina and hygiene, so those pets go out first.
+  if (action === "set-off") {
+    for (const member of outcome.team.members) broadcast({ type: "pet:updated", pet: getPet(member.id)! });
+  }
+  broadcast({ type: "team:updated", team: outcome.team });
+  followUp();
+  res.json(teamFor(id));
 });
 
 // Theft reports are private to the signed-in victim.

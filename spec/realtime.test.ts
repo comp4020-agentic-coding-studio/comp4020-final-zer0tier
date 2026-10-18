@@ -387,3 +387,65 @@ it("feed:added — moving up a school, when the lesson ends on its own, reaches 
     for (const ws of windows) ws.close();
   }
 });
+
+// Resolves with the first team:updated that `matches`; fails past 1 s.
+function nextTeam(ws: WebSocket, matches: (team: any) => boolean): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("no team:updated within 1s")), 1000);
+    ws.addEventListener("message", (msg) => {
+      const event = JSON.parse(String(msg.data));
+      if (event.type === "team:updated" && matches(event.team)) {
+        clearTimeout(timer);
+        resolve(event.team);
+      }
+    });
+  });
+}
+
+it("team:updated — inviting, joining, and setting off together reach both players' windows within 1s", async () => {
+  const leader = freshId(), mate = freshId();
+  await signUp(leader); await signUp(mate);
+  const act = async (as: string, body: unknown) => {
+    const res = await post("/api/team", body, as);
+    expect(res.status).toBe(200);
+    return res.json();
+  };
+  const windows = [await open(), await open()];
+  try {
+    const invited = windows.map((ws) => nextTeam(ws, (team) => team.leader === leader && team.members.some((m: any) => m.id === mate)));
+    const { team } = await act(leader, { action: "invite", player: mate });
+    for (const event of await Promise.all(invited)) expect(event).toEqual(team);
+    expect(team.members).toMatchObject([{ id: leader, joined: true }, { id: mate, joined: false }]);
+
+    const joined = windows.map((ws) => nextTeam(ws, (t) => t.id === team.id && t.members.every((m: any) => m.joined)));
+    expect((await act(mate, { action: "accept", team: team.id })).team).toMatchObject({ id: team.id, leader });
+    for (const event of await Promise.all(joined)) expect(event.members).toMatchObject([{ id: leader, waiting: null }, { id: mate, waiting: null }]);
+
+    // Setting off spends both pets' stamina/hygiene, broadcast before the team.
+    const order: string[] = [];
+    windows[0].addEventListener("message", (msg) => order.push(JSON.parse(String(msg.data)).type));
+    const spent = windows.map((ws) => nextUpdate(ws, mate, (pet) => pet.stamina === 60));
+    const set = windows.map((ws) => nextTeam(ws, (t) => t.id === team.id && t.status === "exploring"));
+    const after = await act(leader, { action: "set-off" });
+    expect(after).toMatchObject({ team: null, run: { team: team.id, state: "exploring" } });
+    for (const event of await Promise.all(set)) expect(event.members.map((m: any) => m.id)).toEqual([leader, mate]);
+    for (const event of await Promise.all(spent)) expect(event.pet).toMatchObject({ stamina: 60, hygiene: 80 });
+    expect(order.indexOf("pet:updated")).toBeLessThan(order.indexOf("team:updated"));
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});
+
+it("team:updated — declining an invitation reaches the leader's window within 1s", async () => {
+  const leader = freshId(), mate = freshId();
+  await signUp(leader); await signUp(mate);
+  const { team } = await (await post("/api/team", { action: "invite", player: mate }, leader)).json();
+  const ws = await open();
+  try {
+    const declined = nextTeam(ws, (t) => t.id === team.id && t.members.length === 1);
+    expect((await post("/api/team", { action: "leave", team: team.id }, mate)).status).toBe(200);
+    expect((await declined).members).toMatchObject([{ id: leader }]);
+  } finally {
+    ws.close();
+  }
+});

@@ -20,9 +20,12 @@ export type Floor = {
   name: string;
   tiles: string[];
   enemies: Enemy[];
-  chests: (Point & { id: string; reward?: TreasureReward })[];
+  // `openedBy` names the teammate who opened a chest on a team's shared map.
+  chests: (Point & { id: string; reward?: TreasureReward; openedBy?: string })[];
   up: Point | null;
   down: Point | null;
+  // A team's map steps each floor on its own clock, since teammates spread out.
+  patrolledAt?: number;
 };
 // What each kind knows besides the free Claw Strike. Looked up by kind rather
 // than saved on each enemy, so maps saved before a move existed get it too.
@@ -92,16 +95,19 @@ function stepToward(mover: Point, goal: Point, open: (p: Point) => boolean): voi
   }
 }
 
-// One real-time step for every monster on the floor. One that sees the pet
-// walks toward it and stops beside it (it never starts a battle); the rest walk
-// their routes, heading back to them after a chase. Trees, chests, stairs, the
-// pet, and other monsters block the way.
-export function patrol(floor: Floor, player: Point): void {
-  const open = (p: Point) => walkable(floor, p) && !samePoint(p, player)
+// One real-time step for every monster on the floor. One that sees a pet
+// walks toward the nearest it sees and stops beside it (it never starts a
+// battle); the rest walk their routes, heading back to them after a chase.
+// Trees, chests, stairs, pets, and other monsters block the way.
+export function patrol(floor: Floor, pets: Point | readonly Point[]): void {
+  const players = 'x' in pets ? [pets] : pets;
+  const open = (p: Point) => walkable(floor, p) && !players.some(player => samePoint(p, player))
     && !floor.enemies.some(e => samePoint(e, p)) && !floor.chests.some(chest => samePoint(chest, p))
     && ![floor.up, floor.down].some(stair => stair && samePoint(stair, p));
+  const distance = (a: Point, b: Point) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
   for (const enemy of floor.enemies) {
-    if (sees(enemy, player)) { stepToward(enemy, player, open); continue; }
+    const target = players.filter(player => sees(enemy, player)).sort((a, b) => distance(enemy, a) - distance(enemy, b))[0];
+    if (target) { stepToward(enemy, target, open); continue; }
     if (samePoint(enemy, enemy.route[enemy.leg])) enemy.leg = enemy.leg === 0 ? 1 : 0;
     stepToward(enemy, enemy.route[enemy.leg], open);
   }

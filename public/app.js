@@ -1225,6 +1225,8 @@ function connect() {
       rivals.set(event.pet.id, event.pet);
       trimRivals();
       renderRivals();
+    } else if (event.type === "team:updated") {
+      document.dispatchEvent(new CustomEvent("team:updated", { detail: event.team }));
     } else if (event.type === "fight:finished") {
       onFight(event.fight);
     } else if (event.type === "feed:added" && current && rules) {

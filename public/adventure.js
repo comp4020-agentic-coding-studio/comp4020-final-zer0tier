@@ -12,7 +12,10 @@ adventure.innerHTML = `
   <p id="adventure-failure" role="status" hidden>Adventure failed. Start a new adventure to try again.</p>
   <p id="adventure-cooldown" role="status" hidden></p>
   <button type="button" id="adventure-skip-cooldown" class="chip-btn" hidden>Skip wait (use Hourglass)</button>
-  <button type="button" id="adventure-restart" class="chip-btn" hidden>Start new adventure</button>
+  <div class="adventure-next">
+    <button type="button" id="adventure-restart" class="chip-btn" hidden>Start new adventure</button>
+    <button type="button" id="adventure-team-up" class="chip-btn chip-buy" hidden>Team up</button>
+  </div>
   <button type="button" id="adventure-abandon" class="chip-btn" hidden>Abandon run</button>
   <section id="adventure-battle-summary" aria-label="Last monster battle" hidden>
     <p id="adventure-result" role="status"></p>
@@ -35,6 +38,11 @@ adventure.innerHTML = `
   <p id="adventure-treasure" role="status"></p>
   <p id="adventure-notice" role="status"></p>
   </div><aside class="adventure-guide" aria-label="Floor guide">
+    <section id="adventure-team" aria-labelledby="adventure-team-heading" hidden>
+      <h3 id="adventure-team-heading">Your team</h3>
+      <ul id="adventure-team-list"></ul>
+      <p class="help">Teammates beside your pet (diagonals too) join its battles. Each chest opens once for the whole team.</p>
+    </section>
     <h3>On this floor</h3>
     <p class="help" id="adventure-stair-hint"></p>
     <div class="adventure-legend" aria-label="Map legend"></div>
@@ -100,6 +108,7 @@ function syncControls() {
   disable(adventure.querySelector('#adventure-continue'), pending);
   disable(adventure.querySelector('#adventure-replay'), pending);
   disable(adventure.querySelector('#adventure-restart'), pending || Boolean(state?.battle?.pending) || busy);
+  disable(adventure.querySelector('#adventure-team-up'), pending || Boolean(state?.battle?.pending));
   disable(adventure.querySelector('#adventure-abandon'), pending || Boolean(state?.battle?.pending) || busy);
   const hourglasses = state?.inventory?.items.find(item => item.id === 'hourglass')?.quantity ?? 0;
   disable(adventure.querySelector('#adventure-skip-cooldown'), pending || hourglasses < 1);
@@ -119,6 +128,8 @@ function clearMap() {
   adventure.querySelector('#adventure-floor').textContent = 'ADVENTURE';
   adventure.querySelector('#adventure-stair-hint').textContent = '';
   adventure.querySelector('#adventure-enemies').replaceChildren();
+  adventure.querySelector('#adventure-team').hidden = true;
+  adventure.querySelector('#adventure-team-list').replaceChildren();
   adventure.querySelector('#adventure-notice').textContent = '';
   adventure.querySelector('#adventure-battle-summary').hidden = true;
   adventure.querySelector('#adventure-result').textContent = '';
@@ -126,6 +137,7 @@ function clearMap() {
   adventure.querySelector('#adventure-completion').hidden = true;
   adventure.querySelector('#adventure-failure').hidden = true;
   adventure.querySelector('#adventure-restart').hidden = true;
+  adventure.querySelector('#adventure-team-up').hidden = true;
   adventure.querySelector('#adventure-abandon').hidden = true;
   adventure.querySelector('#adventure-cooldown').hidden = true;
   adventure.querySelector('#adventure-skip-cooldown').hidden = true;
@@ -157,6 +169,7 @@ function renderCooldown() {
   if (active) adventure.querySelector('#adventure-cooldown').textContent = cooldownText(ended);
   adventure.querySelector('#adventure-skip-cooldown').hidden = !active || !ended;
   adventure.querySelector('#adventure-restart').hidden = active || !ended;
+  adventure.querySelector('#adventure-team-up').hidden = active || !ended;
   adventure.querySelector('#adventure-abandon').hidden = ended || Boolean(state.battle?.pending);
   syncControls();
 }
@@ -187,9 +200,25 @@ function renderMap() {
   status.textContent = `Column ${state.x + 1} · Row ${state.y + 1}`;
   syncControls();
 }
+// Teammates still exploring this floor stand on the map with your pet.
+const teammatesHere = () => (state?.team?.members ?? []).filter(m => m.floor === state.floor && m.status === 'exploring');
+function renderTeam() {
+  const roster = adventure.querySelector('#adventure-team');
+  roster.hidden = !state?.team;
+  const list = adventure.querySelector('#adventure-team-list');
+  list.replaceChildren();
+  for (const mate of state?.team?.members ?? []) {
+    const row = document.createElement('li');
+    const where = mate.status === 'exploring' ? `floor ${mate.floor}, column ${mate.x + 1}, row ${mate.y + 1} · HP ${mate.hp} / ${mate.maxHp}`
+      : mate.status === 'defeated' ? 'defeated' : 'abandoned the run';
+    row.textContent = `${mate.id} · ${where}`;
+    list.append(row);
+  }
+}
 // What a monster's step can change, so a patrol leaves the rest of the
 // window, its focus, and its announcements alone.
 function renderMonsters() {
+  renderTeam();
   const roster = adventure.querySelector('#adventure-enemies');
   roster.replaceChildren();
   for (const enemy of state.enemies) {
@@ -213,15 +242,27 @@ function renderMonsters() {
       cell.title = enemy ? `${enemy.name} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence}` : chest ? (chest.reward ? `Opened chest · ${chest.reward.name}` : 'Unopened treasure chest') : `Stairs ${stair.kind}`;
       if (enemy?.alerted) cell.classList.add('adventure-alerted');
     }
+    const mate = teammatesHere().find(m => m.x === x && m.y === y);
+    if (mate && !(x === state.x && y === state.y)) {
+      cell.classList.add('adventure-teammate');
+      cell.title = `${mate.id} · HP ${mate.hp} / ${mate.maxHp}`;
+      cell.innerHTML = avatarFor(mate);
+    }
     if (x === state.x && y === state.y) {
       cell.classList.add('adventure-player');
+      // Teammates can share a tile (they all set off from the same one).
+      if (mate) {
+        cell.classList.add('adventure-shared');
+        cell.dataset.shared = String(teammatesHere().filter(m => m.x === x && m.y === y).length + 1);
+      }
       const shape = ['blob', 'cat', 'dog', 'bird', 'dragon'].includes(pet?.appearance) ? pet.appearance : 'blob';
       cell.innerHTML = `<svg class="pet-avatar" viewBox="0 0 120 110" aria-hidden="true"><use href="#pet-${shape}" /></svg>`;
       if (pet?.color) cell.style.setProperty('--pet-color', pet.color);
     }
     grid.append(cell);
   }));
-  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}. ${state.enemies.length} monsters and ${state.chests.length} chest. Monster locations are in Monster attributes. Trees block movement; stepping into a monster starts battle.`);
+  const mates = teammatesHere(), sharing = mates.filter(m => m.x === state.x && m.y === state.y).map(m => m.id);
+  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Monster locations are in Monster attributes. Trees block movement; stepping into a monster starts battle.`);
   const nearby = state.enemies.filter(e => state.encounters.includes(e.id));
   const spotted = state.enemies.filter(e => e.alerted && !state.encounters.includes(e.id));
   const notice = busyText() || (nearby.length
@@ -287,25 +328,28 @@ async function equipCoin(button, coinId) {
     button.disabled = false;
   }
 }
+// In a team battle the team can win while this pet is knocked out.
 function battleResult(battle) {
+  const knockedOut = battle.after?.hp === 0;
+  const team = battle.playback.fighters.length > 2 ? 'Your team' : 'You';
+  if (battle.won && knockedOut) return `${team} defeated ${battle.enemyName} on floor ${battle.floor}, but your pet was knocked out. Its adventure is over; your teammates explore on.`;
   return battle.won
-    ? `You defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}`
-    : `${battle.enemyName} defeated you. Adventure failed. Start a new adventure to try again.`;
+    ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}`
+    : `${battle.enemyName} defeated ${team === 'You' ? 'you' : 'your team'}. Adventure failed. Start a new adventure to try again.`;
 }
 function showBattle(replay = false) {
   const battle = state?.battle;
   if (!battle || (!replay && shownBattle === battle.id)) return;
   shownBattle = battle.id;
-  const last = battle.playback.turns.at(-1);
+  const last = battle.playback.turns.at(-1), mine = battle.fighter ?? 0;
+  // What the pet carries back to the map (a Copper shield's leftover is gone).
+  const hp = [...last.hp], mp = [...last.mp];
+  hp[mine] = battle.after?.hp ?? last.hp[mine] + battle.recovery.hp;
+  mp[mine] = battle.after?.mp ?? last.mp[mine] + battle.recovery.mp;
   document.dispatchEvent(new CustomEvent('battle:show', { detail: {
-    key: `adventure:${battle.id}`, battle: battle.playback, viewer: battle.playback.fighters[0].id,
-    title: `Floor ${battle.floor} · ${battle.enemyName}`, result: battleResult(battle),
-    replay: true, returnLabel: 'Return to map',
-    // What the pet carries back to the map (a Copper shield's leftover is gone).
-    resultResources: {
-      hp: [battle.after?.hp ?? last.hp[0] + battle.recovery.hp, last.hp[1]],
-      mp: [battle.after?.mp ?? last.mp[0] + battle.recovery.mp, last.mp[1]],
-    },
+    key: `adventure:${battle.id}`, battle: battle.playback, viewer: battle.playback.fighters[mine].id,
+    title: `Floor ${battle.floor} · ${battle.enemyName}`, result: battleResult(battle), won: battle.won,
+    replay: true, returnLabel: 'Return to map', resultResources: { hp, mp },
   } }));
 }
 async function request(payload = {}) {
@@ -366,11 +410,192 @@ async function patrol() {
   patrol();
   setTimeout(tick, state?.patrolMs ?? 1000);
 })();
-document.getElementById('adventure-open').addEventListener('click', () => {
-  if (adventure.open) return;
+// Before an adventure starts, a small window lets the player set off alone or
+// team up: invite other players by ID, accept invitations, and (as leader) set
+// off together on one shared map. The server decides everything; the window
+// shows what it last said, refreshed by team:updated broadcasts.
+const teamUp = document.createElement('dialog');
+teamUp.id = 'team-dialog';
+teamUp.setAttribute('aria-labelledby', 'team-title');
+teamUp.innerHTML = `
+  <header><div><p class="section-label">ADVENTURE</p><h2 id="team-title">Team up?</h2></div>
+    <button type="button" id="team-close" class="chip-btn chip-buy">Close</button></header>
+  <p class="help" id="team-help"></p>
+  <section id="team-invitations" aria-labelledby="team-invitations-heading" hidden>
+    <h3 id="team-invitations-heading">Invitations</h3><ul id="team-invitation-list"></ul>
+  </section>
+  <section aria-labelledby="team-members-heading">
+    <h3 id="team-members-heading">Your team</h3><ul id="team-members"></ul>
+  </section>
+  <form id="team-invite">
+    <label for="team-invite-id">Invite a player by ID</label>
+    <div class="team-invite-row">
+      <input id="team-invite-id" name="player" required maxlength="32" pattern="[A-Za-z0-9_\\-]+" spellcheck="false" autocomplete="off" />
+      <button type="submit" class="chip-btn">Invite</button>
+    </div>
+  </form>
+  <p id="team-error" class="error" role="alert"></p>
+  <p id="team-status" role="status"></p>
+  <div class="team-actions">
+    <button type="button" id="team-set-off" class="chip-btn" hidden>Set off together</button>
+    <button type="button" id="team-leave" class="chip-btn chip-buy" hidden>Leave team</button>
+    <button type="button" id="team-solo" class="chip-btn chip-buy">Go solo</button>
+  </div>`;
+document.body.append(teamUp);
+let lobby = null, lobbyGeneration = 0, lobbyPending = false;
+const avatarFor = member => {
+  const shape = ['blob', 'cat', 'dog', 'bird', 'dragon'].includes(member.appearance) ? member.appearance : 'blob';
+  const color = /^#[0-9a-f]{6}$/i.test(member.color) ? member.color : '#f59e0b';
+  return `<svg class="pet-avatar team-avatar" viewBox="0 0 120 110" aria-hidden="true" style="--pet-color: ${color}"><use href="#pet-${shape}" /></svg>`;
+};
+function renderLobby() {
+  if (!lobby) return;
+  const me = pet?.id, team = lobby.team, leader = team?.leader === me;
+  const cost = state?.restartCost ?? { stamina: 40, hygiene: 20 };
+  teamUp.querySelector('#team-help').textContent = `Explore the woodland alone, or invite up to ${lobby.size - 1} other players to share one map. Teammates beside your pet join its battles. Setting off costs each pet ${cost.stamina} stamina and ${cost.hygiene} hygiene, the same as starting any new adventure.`;
+  const invitations = teamUp.querySelector('#team-invitation-list');
+  invitations.replaceChildren();
+  teamUp.querySelector('#team-invitations').hidden = lobby.invitations.length === 0 || Boolean(team);
+  for (const invitation of lobby.invitations) {
+    const row = document.createElement('li'), text = document.createElement('span');
+    text.textContent = `${invitation.leader} invited you (${invitation.members.filter(m => m.joined).length} joined)`;
+    const join = document.createElement('button'), decline = document.createElement('button');
+    join.type = decline.type = 'button';
+    join.className = 'chip-btn'; decline.className = 'chip-btn chip-buy';
+    join.textContent = 'Join'; decline.textContent = 'Decline';
+    join.setAttribute('aria-label', `Join ${invitation.leader}'s team`);
+    decline.setAttribute('aria-label', `Decline ${invitation.leader}'s invitation`);
+    join.addEventListener('click', () => teamRequest({ action: 'accept', team: invitation.id }));
+    decline.addEventListener('click', () => teamRequest({ action: 'leave', team: invitation.id }));
+    row.append(text, join, decline);
+    invitations.append(row);
+  }
+  const members = teamUp.querySelector('#team-members');
+  members.replaceChildren();
+  for (const member of team?.members ?? [{ id: me, color: pet?.color, appearance: pet?.appearance, joined: true, waiting: null }]) {
+    const row = document.createElement('li'), name = document.createElement('strong'), detail = document.createElement('span');
+    row.innerHTML = avatarFor(member);
+    name.textContent = member.id === me ? `${member.id} (you)` : member.id;
+    detail.textContent = [member.id === team?.leader ? 'Leader' : '', !member.joined ? 'Invited' : member.waiting ? `Not ready: ${member.waiting}` : team ? 'Ready' : '']
+      .filter(Boolean).join(' · ');
+    row.append(name, detail);
+    members.append(row);
+  }
+  teamUp.querySelector('#team-invite').hidden = Boolean(team) && !leader;
+  const full = (team?.members.length ?? 1) >= lobby.size;
+  teamUp.querySelector('#team-invite button').disabled = lobbyPending || full;
+  teamUp.querySelector('#team-invite-id').disabled = lobbyPending || full;
+  const setOff = teamUp.querySelector('#team-set-off');
+  setOff.hidden = !leader;
+  setOff.disabled = lobbyPending || !team || team.members.filter(m => m.joined).length < 2 || team.members.some(m => m.waiting);
+  const leaving = teamUp.querySelector('#team-leave');
+  leaving.hidden = !team;
+  leaving.textContent = leader ? 'Disband team' : 'Leave team';
+  const solo = teamUp.querySelector('#team-solo');
+  solo.hidden = Boolean(team);
+  solo.disabled = lobbyPending;
+  teamUp.querySelector('#team-status').textContent = !team ? ''
+    : leader ? (team.members.length < 2 ? 'Invite a player to team up.' : setOff.disabled ? 'Waiting for every teammate to join and be ready.' : 'Everyone is ready. Set off together!')
+    : `Waiting for ${team.leader} to set off.`;
+}
+// A run under way (solo or a team's) reopens on the map; otherwise the
+// player chooses how to start.
+async function loadLobby() {
+  const version = ++lobbyGeneration;
+  const response = await fetch('/api/team');
+  const result = await response.json();
+  if (version !== lobbyGeneration) return null;
+  if (!response.ok) throw new Error(result.error || 'Could not open the Team up window.');
+  if (!result?.run) throw new Error('Could not open the Team up window.');
+  lobby = result;
+  return lobby;
+}
+async function teamRequest(body) {
+  if (lobbyPending) return;
+  lobbyPending = true;
+  teamUp.querySelector('#team-error').textContent = '';
+  renderLobby();
+  try {
+    const response = await fetch('/api/team', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Could not update the team. Try again.');
+    ++lobbyGeneration;
+    lobby = result;
+    if (body.action === 'invite') teamUp.querySelector('#team-invite-id').value = '';
+    if (lobby.run.state === 'exploring' && lobby.run.team) return openMap();
+  } catch (error) {
+    teamUp.querySelector('#team-error').textContent = error.message || 'Connection lost. Try again.';
+  } finally {
+    lobbyPending = false;
+    renderLobby();
+  }
+}
+function openMap(payload) {
+  if (teamUp.open) teamUp.close();
+  if (adventure.open) return request(payload);
   clearMap();
   adventure.showModal();
-  request();
+  return request(payload);
+}
+function openLobby() {
+  teamUp.querySelector('#team-error').textContent = '';
+  renderLobby();
+  if (!teamUp.open) teamUp.showModal();
+  // An invitation waiting to be answered comes first.
+  const invitation = !lobby.team && lobby.invitations.length > 0;
+  teamUp.querySelector(invitation ? '#team-invitation-list button'
+    : lobby.team?.leader === pet?.id || !lobby.team ? '#team-invite-id' : '#team-leave').focus({ preventScroll: true });
+}
+document.getElementById('adventure-open').addEventListener('click', async () => {
+  if (adventure.open || teamUp.open) return;
+  await openMap();
+  // A pet that hasn't set off yet chooses: alone, or with a team.
+  if (adventure.open && state?.started === false) await chooseTeam();
+});
+// Swaps the map for the Team up window, if the server can show it.
+async function chooseTeam() {
+  try {
+    if (!await loadLobby()) return;
+  } catch (error) {
+    status.textContent = error.message;
+    return;
+  }
+  if (adventure.open) adventure.close();
+  openLobby();
+}
+teamUp.querySelector('#team-invite').addEventListener('submit', event => {
+  event.preventDefault();
+  const player = teamUp.querySelector('#team-invite-id').value.trim();
+  if (player) teamRequest({ action: 'invite', player });
+});
+teamUp.querySelector('#team-set-off').addEventListener('click', () => teamRequest({ action: 'set-off' }));
+teamUp.querySelector('#team-leave').addEventListener('click', () => {
+  if (lobby?.team) teamRequest({ action: 'leave', team: lobby.team.id });
+});
+// Going solo opens the pet's own map: a first run starts with its first
+// move, and after a run has ended, solo starts a fresh one.
+teamUp.querySelector('#team-solo').addEventListener('click', async () => {
+  const ended = lobby?.run.state === 'ended';
+  await openMap();
+  if (ended && adventure.open && (state?.failed || state?.abandoned || state?.completed)) {
+    await request({ action: 'restart' });
+    if (adventure.open) grid.focus({ preventScroll: true });
+  }
+});
+teamUp.querySelector('#team-close').addEventListener('click', () => teamUp.close());
+teamUp.addEventListener('close', () => {
+  if (!adventure.open) document.getElementById('adventure-open').focus({ preventScroll: true });
+});
+// Another player's change to a team this player is on, or invited to.
+document.addEventListener('team:updated', async ({ detail: team }) => {
+  if (!lobby || !pet) return;
+  const mine = lobby.team?.id === team.id || lobby.invitations.some(i => i.id === team.id) || team.members.some(m => m.id === pet.id);
+  if (!mine) return;
+  try { await loadLobby(); } catch { return; }
+  if (teamUp.open && lobby.run.state === 'exploring' && lobby.run.team) return openMap();
+  if (teamUp.open) renderLobby();
 });
 adventure.querySelector('#adventure-close').addEventListener('click', () => adventure.close());
 adventure.addEventListener('close', () => { generation++; pending = false; state = null; });
@@ -395,6 +620,8 @@ adventure.querySelector('#adventure-restart').addEventListener('click', async ()
   await request({ action: 'restart' });
   if (adventure.open) grid.focus({ preventScroll: true });
 });
+// Once a run is over, the next can be a team's instead.
+adventure.querySelector('#adventure-team-up').addEventListener('click', chooseTeam);
 // Abandoning ends the mini-game at once: the run is over and the map closes.
 adventure.querySelector('#adventure-abandon').addEventListener('click', async () => {
   const cost = state?.restartCost;
@@ -436,6 +663,8 @@ document.addEventListener('adventure:pet', event => {
 });
 document.addEventListener('adventure:reset', () => {
   generation++; pending = false; state = null; pet = null;
+  lobbyGeneration++; lobbyPending = false; lobby = null;
   if (adventure.open) adventure.close();
+  if (teamUp.open) teamUp.close();
   clearMap();
 });

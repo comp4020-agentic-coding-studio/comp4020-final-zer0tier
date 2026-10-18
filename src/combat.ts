@@ -24,17 +24,19 @@ export interface Fighter {
   color: string; appearance: string; abilities: string[];
   name?: string; monster?: MonsterKind;
 }
+// Indices into the battle's fighters. A one-on-one battle has two; a team's
+// Adventure battle lists its pets first and the monster last.
 export interface BattleTurn {
-  actor: 0 | 1; target: 0 | 1; ability: AbilityId;
+  actor: number; target: number; ability: AbilityId;
   name?: string; mpCost?: number; // absent in older saved replays
-  damage: number; hits: number; hp: [number, number]; mp: [number, number];
+  damage: number; hits: number; hp: number[]; mp: number[];
 }
 // How the turn order was decided, saved so every replay can show it. `toss`
 // is null when the acting pet's Silver or Gold Coin fixed the order instead.
 export interface Initiative { toss: 'heads' | 'tails' | null; coin: CoinId | null }
 export interface Battle {
-  fighters: [Fighter, Fighter]; turns: BattleTurn[]; winner: string;
-  initialHp?: [number, number]; initialMp?: [number, number]; // absent in older saved replays
+  fighters: Fighter[]; turns: BattleTurn[]; winner: string;
+  initialHp?: number[]; initialMp?: number[]; // absent in older saved replays
   initiative?: Initiative; // absent in older saved replays
 }
 // Before battle, a coin toss decides initiative (heads = fighter 0 first), fair
@@ -56,29 +58,35 @@ export function withAttributeBonus(pet: PetStats, bonus: number): PetStats {
   if (!bonus) return pet;
   return { ...pet, strength: pet.strength + bonus, intelligence: pet.intelligence + bonus, charisma: pet.charisma + bonus };
 }
+function fighterOf(pet: PetStats, roll: number): Fighter {
+  return {
+    id: pet.id,
+    ...(pet.name ? { name: pet.name } : {}),
+    ...(pet.monster ? { monster: pet.monster } : {}),
+    maxHp: pet.strength + pet.intelligence + pet.charisma,
+    maxMp: pet.intelligence,
+    damage: Math.max(1, Math.round(pet.strength * roll / (2 * pet.strength + pet.intelligence + pet.charisma))),
+    color: pet.color ?? "#f59e0b", appearance: pet.appearance ?? "blob",
+    abilities: ALL_ABILITIES.filter(ability => ability.id === 'claw-strike' || pet.abilities?.includes(ability.id)).map(ability => ability.id),
+  };
+}
+// Fixed per-hit damage; Bump's depends on the target's HP, so each battle works it out per strike.
+function attacksOf(pet: PetStats, fighter: Fighter, roll: number) {
+  return ALL_ABILITIES.filter(ability => fighter.abilities.includes(ability.id)).map(ability => ({
+    ...ability,
+    damage: ability.id === 'firebolt'
+      ? Math.max(1, Math.round(1.5 * pet.intelligence * roll / (2 * pet.strength + pet.intelligence + pet.charisma)))
+      : ability.id === 'heavy-strike' ? Math.ceil(fighter.damage * 1.5) : fighter.damage,
+  }));
+}
 export function simulateBattle(
   a: PetStats, b: PetStats, rolls: [number, number],
   // A coin's effect can be spread in whole; its attribute bonus must already be
   // applied to `a` (withAttributeBonus), so it is ignored here.
   options?: { hp?: [number, number]; mp?: [number, number] } & Partial<CoinEffect>,
 ): Battle {
-  const fighters = [a, b].map((pet, i) => ({
-    id: pet.id,
-    ...(pet.name ? { name: pet.name } : {}),
-    ...(pet.monster ? { monster: pet.monster } : {}),
-    maxHp: pet.strength + pet.intelligence + pet.charisma,
-    maxMp: pet.intelligence,
-    damage: Math.max(1, Math.round(pet.strength * rolls[i] / (2 * pet.strength + pet.intelligence + pet.charisma))),
-    color: pet.color ?? "#f59e0b", appearance: pet.appearance ?? "blob",
-    abilities: ALL_ABILITIES.filter(ability => ability.id === 'claw-strike' || pet.abilities?.includes(ability.id)).map(ability => ability.id),
-  })) as [Fighter, Fighter];
-  // Fixed per-hit damage; Bump's depends on the target's HP, so damageOf works it out per strike.
-  const attacks = [a, b].map((pet, i) => ALL_ABILITIES.filter(ability => fighters[i].abilities.includes(ability.id)).map(ability => ({
-    ...ability,
-    damage: ability.id === 'firebolt'
-      ? Math.max(1, Math.round(1.5 * pet.intelligence * rolls[i] / (2 * pet.strength + pet.intelligence + pet.charisma)))
-      : ability.id === 'heavy-strike' ? Math.ceil(fighters[i].damage * 1.5) : fighters[i].damage,
-  })));
+  const fighters = [a, b].map((pet, i) => fighterOf(pet, rolls[i])) as [Fighter, Fighter];
+  const attacks = [a, b].map((pet, i) => attacksOf(pet, fighters[i], rolls[i]));
   const initialHp = fighters.map((f, i) => Math.max(0, Math.min(f.maxHp, options?.hp?.[i] ?? f.maxHp))) as [number, number];
   const initialMp = fighters.map((f, i) => Math.max(0, Math.min(f.maxMp, options?.mp?.[i] ?? f.maxMp))) as [number, number];
   const hp: [number, number] = [...initialHp];
@@ -122,4 +130,48 @@ export function simulateBattle(
   }
   const initiative = options?.toss !== undefined ? { initiative: { toss: options.toss, coin: options.coin ?? null } } : {};
   return { fighters, turns, winner: hp[0] > 0 ? a.id : b.id, initialHp, initialMp, ...initiative };
+}
+
+// Teammates fighting one monster together in Adventure: pets first, monster
+// last. A round is every pet still standing striking the monster in order,
+// then the monster striking whichever pet has the most HP left (the earlier
+// on a tie); `first: 1` puts the monster's strike first. A pet at 0 HP drops
+// out, and the battle ends once the monster or every pet is down. Every
+// strike does at least 1 damage, so the monster's HP bounds its length.
+export function simulateTeamBattle(
+  pets: PetStats[], monster: PetStats, rolls: number[],
+  // As in simulateBattle, the coin is the first pet's own, its attribute bonus already applied.
+  options: { hp: number[]; mp: number[] } & Partial<CoinEffect>,
+): Battle {
+  const all = [...pets, monster], boss = pets.length;
+  const fighters = all.map((pet, i) => fighterOf(pet, rolls[i]));
+  const attacks = all.map((pet, i) => attacksOf(pet, fighters[i], rolls[i]));
+  const initialHp = fighters.map((f, i) => Math.max(0, Math.min(f.maxHp, options.hp[i] ?? f.maxHp)));
+  const initialMp = fighters.map((f, i) => Math.max(0, Math.min(f.maxMp, options.mp[i] ?? f.maxMp)));
+  const hp = [...initialHp], mp = [...initialMp];
+  const turns: BattleTurn[] = [];
+  const damageOf = (target: number, attack: (typeof attacks)[number][number]) =>
+    attack.id === 'bump' ? Math.ceil(hp[target] * 2 / 3) : attack.damage;
+  let zeroHasStruck = false;
+  function strike(actor: number, target: number) {
+    const attack = attacks[actor].filter(a => a.mpCost <= mp[actor]).reduce((best, a) => {
+      const gain = damageOf(target, a) - damageOf(target, best);
+      return gain > 0 || (gain === 0 && a.mpCost < best.mpCost) ? a : best;
+    });
+    const boost = options.doubleFirstStrike && actor === 0 && !zeroHasStruck ? 2 : 1;
+    if (actor === 0) zeroHasStruck = true;
+    const damage = Math.min(hp[target], damageOf(target, attack) * boost);
+    hp[target] -= damage;
+    mp[actor] -= attack.mpCost;
+    turns.push({ actor, target, ability: attack.id, name: attack.name, mpCost: attack.mpCost, damage, hits: 1, hp: [...hp], mp: [...mp] });
+  }
+  const standing = () => pets.map((_, i) => i).filter(i => hp[i] > 0);
+  const petsStrike = () => { for (const i of standing()) if (hp[boss] > 0) strike(i, boss); };
+  const monsterStrikes = () => strike(boss, standing().reduce((most, i) => hp[i] > hp[most] ? i : most));
+  while (hp[boss] > 0 && standing().length) {
+    if (options.first === 1) { monsterStrikes(); if (standing().length) petsStrike(); }
+    else { petsStrike(); if (hp[boss] > 0) monsterStrikes(); }
+  }
+  const initiative = options.toss !== undefined ? { initiative: { toss: options.toss, coin: options.coin ?? null } } : {};
+  return { fighters, turns, winner: hp[boss] > 0 ? monster.id : pets[0].id, initialHp, initialMp, ...initiative };
 }

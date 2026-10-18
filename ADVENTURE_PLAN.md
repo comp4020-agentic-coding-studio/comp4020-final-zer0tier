@@ -6,8 +6,9 @@ five, chest landmarks, enemy detection/pursuit, and automatic monster battles
 with saved HP/MP and outcomes; atomic chest rewards, persistent inventory, item
 use, and learned abilities; a coin-toss initiative with reusable, equippable
 Copper/Silver/Gold coins; an entry cost and cooldown on starting fresh; the
-Slime King's Bump; and no adventuring while the pet studies or works. Still
-open: a completion reward for defeating the Slime King.
+Slime King's Bump; no adventuring while the pet studies or works; and
+multiplayer teams (below). Still open: a completion reward for defeating the
+Slime King.
 This document preserves the owner's requirements.
 
 Owner's confirmed rule for monster movement, replacing the earlier one-step
@@ -158,3 +159,21 @@ Owner's confirmed rule for abandoning: Abandon run ends the mini-game
 immediately, like a defeat. The run is saved as abandoned, the map closes,
 and abandoning costs nothing. Only Start new adventure (with the cost and
 cooldown above) continues, and a new run can't start while one is in progress.
+
+## 6. Multiplayer teams
+
+Owner's request: add multiplayer Adventure; before an adventure starts, a
+small window lets the player team up with other players.
+
+Owner's confirmed rules: teammates within 1 block of the pet that walks into
+a monster (diagonals included) join that battle as a team against the
+monster; a defeated teammate's run ends (it is out) while the rest keep
+exploring, and the team's run ends when nobody is left standing; a team holds
+up to 4 pets (the leader plus up to 3 invited players).
+
+Implemented defaults, open to the owner's review: the window opens on a
+pet's first visit and from **Team up** after a run ends; setting off costs
+each pet a fresh start (40 stamina/20 hygiene, 4-hour cooldown); a team shares
+one map and its chests (first opener gets the reward) while each pet keeps its
+own position and HP/MP; the monster strikes the pet with the most HP left;
+only the walking pet's coin applies.

@@ -2,7 +2,7 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import { createWorld } from '../src/adventure-world.ts';
-import { simulateBattle } from '../src/combat.ts';
+import { coinEffect, simulateBattle, simulateTeamBattle } from '../src/combat.ts';
 import { ABILITIES } from '../src/combat.ts';
 import { COINS } from '../src/treasure.ts';
 import { baseUrl, freshId, getPet, getRules, must, signUp } from './helpers.ts';
@@ -446,5 +446,103 @@ it('re-enables a coin button instead of leaving it stuck disabled when equip-coi
     expect(button.disabled).toBe(true);
     resolveEquip!(Response.json({ error: "You don't have that coin to equip." }, { status: 409 }));
     await vi.waitFor(() => expect(button.disabled).toBe(false));
+  } finally { dom.window.close(); }
+});
+
+it('offers the Team up window before a first adventure, then opens the shared map with teammates once the team sets off', async () => {
+  const { dom, window, $ } = page();
+  const me = { id: 'explorer', color: '#123456', appearance: 'cat', joined: true, waiting: null };
+  const mate = { id: 'pal', color: '#654321', appearance: 'dog', joined: false, waiting: null };
+  let lobby: any = { team: null, invitations: [], run: { team: null, state: 'new' }, size: 4 };
+  const fresh = { ...map(), started: false, team: null as unknown };
+  // Teammates set off from the same tile.
+  const shared = { ...map(), started: true, team: { id: 7, members: [{ id: 'pal', color: '#654321', appearance: 'dog', floor: 1, x: 2, y: 2, hp: 15, maxHp: 15, status: 'exploring' }] } };
+  let onMap = fresh;
+  const bodies: any[] = [];
+  window.fetch = vi.fn(async (url: string, options?: RequestInit) => {
+    const body = options?.body ? JSON.parse(options.body as string) : undefined;
+    if (url === '/api/team') {
+      if (body) bodies.push(body);
+      if (body?.action === 'invite') lobby = { ...lobby, team: { id: 7, leader: 'explorer', status: 'forming', members: [me, mate] } };
+      if (body?.action === 'set-off') { lobby = { ...lobby, team: null, run: { team: 7, state: 'exploring' } }; onMap = shared; }
+      return Response.json(lobby);
+    }
+    return Response.json(onMap);
+  }) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    window.document.dispatchEvent(new window.CustomEvent('adventure:pet', { detail: { id: 'explorer', color: '#123456', appearance: 'cat', activity: 'idle', coins: {} } }));
+    $('adventure-open').click();
+    const teamUp = $('team-dialog') as HTMLDialogElement;
+    await vi.waitFor(() => expect(teamUp.open).toBe(true));
+    expect(($('adventure-dialog') as HTMLDialogElement).open).toBe(false);
+    expect($('team-help').textContent).toContain('40 stamina and 20 hygiene');
+    expect($('team-members').textContent).toBe('explorer (you)');
+    expect($('team-solo').hidden).toBe(false);
+    expect(window.document.activeElement?.id).toBe('team-invite-id');
+    ($('team-invite-id') as HTMLInputElement).value = 'pal';
+    $('team-invite').dispatchEvent(new window.Event('submit', { cancelable: true }));
+    await vi.waitFor(() => expect($('team-members').textContent).toContain('pal'));
+    expect(bodies).toEqual([{ action: 'invite', player: 'pal' }]);
+    expect([...$('team-members').children].map(row => row.textContent)).toEqual(['explorer (you)Leader · Ready', 'palInvited']);
+    expect(($('team-set-off') as HTMLButtonElement).disabled).toBe(true);
+    expect($('team-solo').hidden).toBe(true);
+    expect($('team-leave').textContent).toBe('Disband team');
+    // The invited player joins: a broadcast refreshes the window from the server.
+    lobby = { ...lobby, team: { ...lobby.team, members: [me, { ...mate, joined: true }] } };
+    window.document.dispatchEvent(new window.CustomEvent('team:updated', { detail: lobby.team }));
+    await vi.waitFor(() => expect(($('team-set-off') as HTMLButtonElement).disabled).toBe(false));
+    expect($('team-status').textContent).toBe('Everyone is ready. Set off together!');
+    $('team-set-off').click();
+    await vi.waitFor(() => expect(($('adventure-dialog') as HTMLDialogElement).open).toBe(true));
+    expect(teamUp.open).toBe(false);
+    expect(bodies.at(-1)).toEqual({ action: 'set-off' });
+    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    // Sharing the pet's tile: a badge counts both pets, and the map says who.
+    const start = $('adventure-grid').children[2 * 16 + 2] as HTMLElement;
+    expect(start.classList.contains('adventure-shared')).toBe(true);
+    expect(start.dataset.shared).toBe('2');
+    expect($('adventure-grid').getAttribute('aria-label')).toContain('Your pet is at column 3, row 3, with pal.');
+    expect($('adventure-team').hidden).toBe(false);
+    expect($('adventure-team-list').textContent).toBe('pal · floor 1, column 3, row 3 · HP 15 / 15');
+    // Once the teammate walks on, it stands on its own tile.
+    onMap = { ...shared, team: { ...shared.team, members: [{ ...shared.team.members[0], x: 3 }] } };
+    Object.defineProperty(window.document, 'hidden', { value: false });
+    await vi.waitFor(() => expect($('adventure-grid').children[2 * 16 + 3].classList.contains('adventure-teammate')).toBe(true), { timeout: 2500 });
+    const cell = $('adventure-grid').children[2 * 16 + 3];
+    expect(cell.querySelector('use')?.getAttribute('href')).toBe('#pet-dog');
+    expect($('adventure-grid').children[2 * 16 + 2].classList.contains('adventure-shared')).toBe(false);
+    expect($('adventure-grid').getAttribute('aria-label')).toContain('1 teammate here');
+  } finally { dom.window.close(); }
+});
+
+it('shows a team battle from the viewer\'s own side, with teammates as extra cards', async () => {
+  const { dom, window, $ } = page();
+  const playback = simulateTeamBattle(
+    [{ id: 'pal', strength: 6, intelligence: 1, charisma: 1 }, { id: 'explorer', strength: 4, intelligence: 1, charisma: 1, appearance: 'cat' }],
+    { id: 'monster:f1-enemy-0', name: 'Slime', monster: 'slime', strength: 3, intelligence: 1, charisma: 2 },
+    [7, 5, 4], { hp: [8, 6, 6], mp: [1, 1, 1], ...coinEffect(null, () => 0) },
+  );
+  const saved = { ...map(), started: true, revision: 'team-battle', battle: {
+    id: 'shared-battle', enemyId: 'f1-enemy-0', enemyName: 'Slime', floor: 1, won: true, pending: true, fighter: 1,
+    recovery: { hp: 0, mp: 0 }, after: { hp: 6, mp: 1 }, playback,
+  } };
+  window.fetch = (async () => Response.json(saved)) as typeof fetch;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement).open).toBe(true));
+    expect($('battle-name-0').textContent).toBe('explorer (you)');
+    expect($('battle-name-1').textContent).toBe('Slime');
+    expect($('battle-name-2').textContent).toBe('pal');
+    expect($('battle-allies').hidden).toBe(false);
+    expect($('battle-hp-text-0').textContent).toBe('6 / 6');
+    expect($('battle-hp-text-2').textContent).toBe('8 / 8');
+    expect($('battle-initiative').textContent).toBe("Coin toss: Heads. pal's team attacks first.");
+    $('battle-skip').click();
+    expect($('battle-status').textContent).toMatch(/^Victory! Your team defeated Slime on floor 1/);
+    expect($('battle-hp-text-1').textContent).toBe('0 / 6');
+    expect($('battle-log').textContent).toContain('pal used Claw Strike');
   } finally { dom.window.close(); }
 });

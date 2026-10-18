@@ -2,6 +2,7 @@ import type { Server } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 import type { FeedEntry } from "./feed.ts";
 import type { Fight, Pet } from "./pets.ts";
+import type { Team } from "./teams.ts";
 
 // Server -> client events. Clients act over HTTP; the socket only carries news.
 export type ServerEvent =
@@ -9,7 +10,10 @@ export type ServerEvent =
   // Sent after both fighters' pet:updated, so clients can tell the story.
   | { type: "fight:finished"; fight: Fight }
   // Sent last, after the change it describes, for the Arena's "Happening now".
-  | { type: "feed:added"; entry: FeedEntry };
+  | { type: "feed:added"; entry: FeedEntry }
+  // A team forming in the Team up window changed or set off. Players it no
+  // longer lists (who left, declined, or were disbanded) recognise its id.
+  | { type: "team:updated"; team: Team };
 
 let wss: WebSocketServer | undefined;
 

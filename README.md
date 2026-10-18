@@ -359,9 +359,10 @@ the built-in `node:sqlite` for storage.
   schools, courses, work locations, items and costs.
 - **Real time:** the server broadcasts a `pet:updated` event over the socket
   after every change, a `fight:finished` event after each fight (with the
-  `spoils` the winner took), and a `feed:added` event for each new entry in
-  Happening now, sent after the change it describes. The feed keeps its newest
-  500 entries in SQLite.
+  `spoils` the winner took), a `feed:added` event for each new entry in
+  Happening now, sent after the change it describes, and a `team:updated`
+  event whenever a team in the **Team up** window changes or sets off. The
+  feed keeps its newest 500 entries in SQLite.
 
 ## Adventure exploration
 
@@ -419,6 +420,62 @@ Intelligence. A new run starts with full resources. Current HP/MP carry between
 battles and floors, and leaving, signing out, or restarting the server does not
 refill them. Existing exploration saves receive full HP/MP on their first visit
 after this update. Training increases the maximums without refilling current HP/MP.
+
+### Teaming up
+
+A pet's first adventure, and any new one after a run has ended, can be played
+alone or with up to three other players. Choosing **Explore the woodland** for
+the first time opens the small **Team up?** window instead of the map. Once a
+run has ended, **Team up** beside **Start new adventure** opens it again.
+
+- **Go solo** opens the woodland as before (after an ended run, it starts a
+  fresh one, at the usual cost).
+- **Invite a player by ID** makes your pet a team's leader and invites that
+  player. A team holds at most **4 pets**, invitations included. Only players
+  with accounts can be invited, and only the leader invites.
+- An invited player sees the invitation in their own **Team up?** window and
+  can **Join** or **Decline**. A pet joins one forming team at a time; **Leave
+  team** takes it off, and the leader's **Disband team** ends the team for
+  everyone.
+- **Set off together** (leader only) needs at least one other pet to have
+  joined, and every joined pet to be ready. Each pet is checked as **Start
+  new adventure** would check it: no run in progress (abandon it first), no
+  battle awaiting **Return to map**, not studying or working, no adventure
+  cooldown, and enough stamina and hygiene. The window says what each pet is
+  waiting on. Setting off charges every pet **40 stamina and 20 hygiene** and
+  opens each pet's 4-hour cooldown, the same as starting a new adventure.
+  Invitations still pending lapse.
+
+Every teammate then explores **one shared map**: one set of floors, monsters,
+and chests, starting together at floor one. Each pet keeps its own position,
+floor, HP and MP, and the map shows teammates on the same floor (with their
+positions and HP under **Your team**). Every window refreshes about once a
+second through its monster steps, so each player sees the others move. A
+monster sees and chases whichever teammate it can see that is nearest, and
+each floor's monsters take at most one step a second, whichever teammate's
+window asks.
+
+**Teammates beside your pet join its battles.** When a pet walks into a
+monster, every teammate exploring within 1 block of it (diagonals included)
+fights alongside it, unless that teammate is busy, already has a battle
+waiting, or is out of the run. A team battle is one automatic battle scene:
+each standing pet strikes the monster in turn (the pet that walked in first),
+then the monster strikes whichever pet has the most HP left. The coin toss
+(and only the walking pet's equipped coin) decides whether the pets or the
+monster go first. Each pet uses its own learned abilities, carried HP/MP, and
+a Copper shield only if it is the walking pet's. Every pet in the battle sees
+the same saved battle from its own side and returns to the map separately.
+
+**A knocked-out pet is out; the team plays on.** A pet at 0 HP after a battle
+(won or lost) has failed its run, exactly like a solo defeat, while its
+teammates keep exploring. After a victory, every pet still standing recovers
+20% of its maximum HP and MP; the monster is removed for everyone; the walking
+pet takes its tile. A team's run ends for each pet when it is defeated or
+abandons the run; abandoning leaves the rest exploring. **Start new
+adventure** after that is always solo; to team up again, use **Team up**.
+
+**Each chest opens once for the whole team.** The first teammate to choose
+**Open chest** gets its reward; for everyone else it shows as opened, by them.
 
 ### Monster battles
 
@@ -551,6 +608,34 @@ includes an opaque `revision`; supply that revision with every action:
 - `{ "action": "skip-cooldown", "revision": "…" }` spends one Hourglass to clear an active cooldown early; refused with 409 if there's no Hourglass to spend. A no-op, returning the current state, if no cooldown is active.
 - `{ "action": "open-chest", "revision": "…" }` opens the chest under the pet.
 - `{ "action": "use-item", "item": "food" | "soap" | "hourglass", "revision": "…" }` uses one backpack item.
+
+Each response also includes `started` (false until the pet first acts on its
+map or sets off with a team) and `team`: `null` on a solo run, or the team's
+`id` and every other teammate's `id`, `color`, `appearance`, `floor`, `x`, `y`,
+`hp`, `maxHp`, and `status` (`exploring`, `defeated`, or `abandoned`). In a
+team battle, `battle.fighter` gives the pet's place in `battle.playback.fighters`
+(the pets in order, then the monster last).
+
+The **Team up** window uses `GET /api/team` (signed in), which returns the
+forming `team` the pet has joined (or `null`), its pending `invitations`, its
+own `run` (`team` id or `null`, and `state`: `new`, `exploring`, or `ended`),
+and the team `size` limit. Each team lists `members` (the leader first), each
+with `joined` and, while forming, `waiting`: why that pet can't set off yet,
+or `null`. `POST /api/team` takes one action and answers with the same view:
+
+- `{ "action": "invite", "player": "…" }` invites a player, forming a team
+  led by the pet if it has none; 400 for a malformed ID, 404 for an unknown
+  player, 409 if not the leader, already on the team, or the team is full.
+- `{ "action": "accept", "team": 7 }` joins an invitation; 404 if it's no
+  longer open, 409 while on another team.
+- `{ "action": "leave", "team": 7 }` declines an invitation or leaves; when
+  the leader leaves, the team disbands (`status: "disbanded"`, no members).
+- `{ "action": "set-off" }` (leader only) starts the shared run; 409 with the
+  reason if anyone isn't ready.
+
+Each accepted action saves first, then broadcasts `team:updated` with the team
+as saved; setting off also broadcasts each member's `pet:updated` first, for
+the stamina and hygiene spent.
 
 Stale revisions return the current saved state without applying the action,
 including retries after a battle or a new run. Movement is paused while a battle

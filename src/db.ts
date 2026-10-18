@@ -8,6 +8,21 @@ mkdirSync(dataDir, { recursive: true });
 
 export const db = new DatabaseSync(join(dataDir, "virtuepets.db"));
 
+// Runs `action` as one transaction, or as part of the one already open, and
+// rolls it back if `action` throws.
+export function transaction<T>(action: () => T): T {
+  if (db.isTransaction) return action();
+  db.prepare("BEGIN IMMEDIATE").run();
+  try {
+    const result = action();
+    db.prepare("COMMIT").run();
+    return result;
+  } catch (error) {
+    db.prepare("ROLLBACK").run();
+    throw error;
+  }
+}
+
 db.exec(`
   PRAGMA journal_mode = WAL;
   CREATE TABLE IF NOT EXISTS pets (
@@ -44,6 +59,24 @@ db.exec(`
     x INTEGER NOT NULL,
     y INTEGER NOT NULL
   );
+  -- A team forms in the Team up window, then shares one map once it sets off.
+  -- A disbanded team never set off; its members are gone.
+  CREATE TABLE IF NOT EXISTS teams (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    leader     TEXT    NOT NULL REFERENCES pets (id),
+    status     TEXT    NOT NULL DEFAULT 'forming' CHECK (status IN ('forming', 'exploring', 'disbanded')),
+    world_json TEXT
+  );
+  -- Who is forming each team: joined = 0 is a pending invitation, and a pet
+  -- joins at most one. Setting off moves the members onto adventures.team_id.
+  CREATE TABLE IF NOT EXISTS team_members (
+    team_id   INTEGER NOT NULL REFERENCES teams (id),
+    player_id TEXT    NOT NULL REFERENCES pets (id),
+    joined    INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (team_id, player_id)
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS one_team_per_pet ON team_members (player_id) WHERE joined = 1;
+  CREATE INDEX IF NOT EXISTS team_members_by_player ON team_members (player_id);
   CREATE TABLE IF NOT EXISTS inventory (
     player_id TEXT NOT NULL REFERENCES pets (id),
     item_id TEXT NOT NULL,
@@ -144,3 +177,12 @@ if (!adventureColumns.has("mp")) db.exec("ALTER TABLE adventures ADD COLUMN mp I
 if (!adventureColumns.has("cooldown_until")) db.exec("ALTER TABLE adventures ADD COLUMN cooldown_until INTEGER");
 if (!adventureColumns.has("abandoned")) db.exec("ALTER TABLE adventures ADD COLUMN abandoned INTEGER NOT NULL DEFAULT 0");
 if (!adventureColumns.has("patrolled_at")) db.exec("ALTER TABLE adventures ADD COLUMN patrolled_at INTEGER");
+// A team run's shared map lives on its team; solo runs keep team_id NULL.
+if (!adventureColumns.has("team_id")) db.exec("ALTER TABLE adventures ADD COLUMN team_id INTEGER");
+// A pet that has never set off yet chooses solo or a team first. Runs saved
+// before teams existed were already under way.
+if (!adventureColumns.has("started")) {
+  db.exec("ALTER TABLE adventures ADD COLUMN started INTEGER NOT NULL DEFAULT 0");
+  db.exec("UPDATE adventures SET started = 1");
+}
+db.exec("CREATE INDEX IF NOT EXISTS adventures_by_team ON adventures (team_id)");

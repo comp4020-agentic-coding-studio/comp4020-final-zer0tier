@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { ABILITIES, coinEffect, MONSTER_ABILITIES, simulateBattle } from '../src/combat.ts';
+import { ABILITIES, coinEffect, MONSTER_ABILITIES, simulateBattle, simulateTeamBattle } from '../src/combat.ts';
 
 const a = { id: 'a', strength: 5, intelligence: 7, charisma: 3 };
 const b = { id: 'b', strength: 5, intelligence: 5, charisma: 5 };
@@ -141,4 +141,46 @@ it('never groups Bump into multi-hit rounds, even past the turn where long battl
     .filter(({ turn }) => turn.ability === 'bump');
   expect(bumps.at(-1)!.i).toBeGreaterThanOrEqual(60);
   for (const { turn, before } of bumps) expect(turn).toMatchObject({ hits: 1, damage: Math.ceil(before * 2 / 3) });
+});
+
+it('a team battle: every standing pet strikes in turn, then the monster hits whichever pet has the most HP', () => {
+  // Rolls of half each fighter's power make each Claw Strike exactly half its strength.
+  const rex = { id: 'rex', strength: 4, intelligence: 1, charisma: 1 }; // 6 HP, hits for 2
+  const ace = { id: 'ace', strength: 6, intelligence: 1, charisma: 1 }; // 8 HP, hits for 3
+  const goblin = { id: 'monster:g', strength: 10, intelligence: 1, charisma: 9 }; // 20 HP, hits for 5
+  const battle = simulateTeamBattle([rex, ace], goblin, [5, 7, 15], { hp: [6, 8, 20], mp: [1, 1, 1], first: 0 });
+  expect(battle.fighters.map(f => f.id)).toEqual(['rex', 'ace', 'monster:g']);
+  expect(battle.turns.map(t => [t.actor, t.target, t.damage, t.hp])).toEqual([
+    [0, 2, 2, [6, 8, 18]], [1, 2, 3, [6, 8, 15]], [2, 1, 5, [6, 3, 15]], // ace has more HP, so it's hit
+    [0, 2, 2, [6, 3, 13]], [1, 2, 3, [6, 3, 10]], [2, 0, 5, [1, 3, 10]], // now rex has more
+    [0, 2, 2, [1, 3, 8]], [1, 2, 3, [1, 3, 5]], [2, 1, 3, [1, 0, 5]], // ace is knocked out and drops out
+    [0, 2, 2, [1, 0, 3]], [2, 0, 1, [0, 0, 3]],
+  ]);
+  expect(battle.winner).toBe('monster:g');
+  expect(battle.initialHp).toEqual([6, 8, 20]);
+});
+
+it('a team can win with a pet knocked out; tails puts the monster first, and Gold doubles only the first pet\'s first hit', () => {
+  const rex = { id: 'rex', strength: 4, intelligence: 1, charisma: 1 };
+  const ace = { id: 'ace', strength: 6, intelligence: 1, charisma: 1 };
+  const slime = { id: 'monster:s', strength: 10, intelligence: 1, charisma: 1 }; // 12 HP, hits for 5
+  const tails = simulateTeamBattle([rex, ace], slime, [5, 7, 11], { hp: [6, 4, 12], mp: [1, 1, 1], ...coinEffect(null, () => 0.5) });
+  expect(tails.initiative).toEqual({ toss: 'tails', coin: null });
+  expect(tails.turns.map(t => [t.actor, t.target, t.damage])).toEqual([
+    [2, 0, 5], [0, 2, 2], [1, 2, 3], [2, 1, 4], [0, 2, 2], [2, 0, 1],
+  ]);
+  expect(tails.winner).toBe('monster:s');
+  // Gold: the monster goes first, then rex's first hit is doubled (4), never again.
+  const gold = simulateTeamBattle([rex, ace], slime, [5, 7, 11], { hp: [6, 8, 12], mp: [1, 1, 1], ...coinEffect('gold-coin') });
+  expect(gold.turns.map(t => [t.actor, t.target, t.damage])).toEqual([
+    [2, 1, 5], [0, 2, 4], [1, 2, 3], [2, 0, 5], [0, 2, 2], [1, 2, 3],
+  ]);
+  expect(gold.turns.at(-1)!.hp).toEqual([1, 3, 0]);
+  expect(gold.winner).toBe('rex'); // the team's win
+  // A team can win with a teammate down: ace falls, then rex finishes the slime.
+  const costly = simulateTeamBattle([rex, ace], slime, [5, 7, 11], { hp: [6, 3, 7], mp: [1, 1, 1], first: 1 });
+  expect(costly.turns.map(t => [t.actor, t.target, t.hp])).toEqual([
+    [2, 0, [1, 3, 7]], [0, 2, [1, 3, 5]], [1, 2, [1, 3, 2]], [2, 1, [1, 0, 2]], [0, 2, [1, 0, 0]],
+  ]);
+  expect(costly.winner).toBe('rex');
 });

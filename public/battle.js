@@ -26,6 +26,7 @@ function buildDialog() {
         <label for="battle-hp-1">HP <span id="battle-hp-text-1"></span></label><meter id="battle-hp-1" min="0" aria-label="Defender HP"></meter>
         <label for="battle-mp-1">MP <span id="battle-mp-text-1"></span></label><meter id="battle-mp-1" min="0" aria-label="Defender MP"></meter></article>
     </div>
+    <section class="battle-allies" id="battle-allies" aria-label="Teammates in this battle" hidden></section>
     <div class="battle-ability"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 4-5 24M18 4l-5 24M27 4l-5 24"/></svg>
       <div><strong id="battle-ability-name">Automatic attacks</strong><span id="battle-ability-cost">Strongest affordable attack each turn</span></div></div>
     <p id="battle-status" role="status" aria-live="polite"></p>
@@ -45,6 +46,9 @@ function buildDialog() {
     if (queue.length) play(queue.shift());
   });
 }
+// Which saved fighter each card shows. Cards 0 and 1 are the viewer's side
+// and its opponent; a team battle's other pets get a card each, from 2 on.
+let cards = [0, 1];
 function avatar(fighter, index) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 120 110');
@@ -68,12 +72,32 @@ function avatar(fighter, index) {
   $(`battle-avatar-${index}`).replaceChildren(svg);
 }
 function meters(hp, mp) {
-  scene.battle.fighters.forEach((fighter, i) => {
-    for (const [kind, value, max] of [['hp', hp[i], fighter.maxHp], ['mp', mp[i], fighter.maxMp]]) {
-      $(`battle-${kind}-${i}`).max = Math.max(1, max);
-      $(`battle-${kind}-${i}`).value = value;
-      $(`battle-${kind}-text-${i}`).textContent = `${value} / ${max}`;
+  cards.forEach((fighterIndex, card) => {
+    const fighter = scene.battle.fighters[fighterIndex];
+    for (const [kind, value, max] of [['hp', hp[fighterIndex], fighter.maxHp], ['mp', mp[fighterIndex], fighter.maxMp]]) {
+      $(`battle-${kind}-${card}`).max = Math.max(1, max);
+      $(`battle-${kind}-${card}`).value = value;
+      $(`battle-${kind}-text-${card}`).textContent = `${value} / ${max}`;
     }
+  });
+}
+// One small card per teammate fighting alongside the viewer's pet.
+function allyCards(battle) {
+  const allies = $('battle-allies');
+  allies.replaceChildren();
+  allies.hidden = cards.length < 3;
+  cards.slice(2).forEach((fighterIndex, offset) => {
+    const card = offset + 2;
+    const article = document.createElement('article');
+    article.className = 'battle-fighter battle-ally';
+    article.id = `battle-fighter-${card}`;
+    article.innerHTML = `<h3 id="battle-name-${card}"></h3><div class="battle-avatar" id="battle-avatar-${card}"></div>
+      <label for="battle-hp-${card}">HP <span id="battle-hp-text-${card}"></span></label><meter id="battle-hp-${card}" min="0"></meter>
+      <label for="battle-mp-${card}">MP <span id="battle-mp-text-${card}"></span></label><meter id="battle-mp-${card}" min="0"></meter>`;
+    allies.append(article);
+    const name = fighterName(battle.fighters[fighterIndex]);
+    $(`battle-hp-${card}`).setAttribute('aria-label', `${name} HP`);
+    $(`battle-mp-${card}`).setAttribute('aria-label', `${name} MP`);
   });
 }
 function describe(step) {
@@ -90,10 +114,13 @@ const fighterName = fighter => fighter.name || fighter.id;
 function initiativeText(battle) {
   const initiative = battle.initiative;
   if (!initiative) return '';
-  const [pet, other] = battle.fighters.map(fighterName);
-  if (initiative.coin === 'silver-coin') return `${pet}'s Silver Coin: ${pet} attacks first.`;
+  // The first pet's toss or coin decides; in a team battle its whole team
+  // goes first or second together, against the monster listed last.
+  const pet = fighterName(battle.fighters[0]), other = fighterName(battle.fighters.at(-1));
+  const side = battle.fighters.length > 2 ? `${pet}'s team` : pet;
+  if (initiative.coin === 'silver-coin') return `${pet}'s Silver Coin: ${side} attacks first.`;
   if (initiative.coin === 'gold-coin') return `${pet}'s Gold Coin: ${other} attacks first, but ${pet}'s first hit deals double damage.`;
-  const toss = initiative.toss === 'heads' ? `Coin toss: Heads. ${pet} attacks first.` : `Coin toss: Tails. ${other} attacks first.`;
+  const toss = initiative.toss === 'heads' ? `Coin toss: Heads. ${side} attacks first.` : `Coin toss: Tails. ${other} attacks first.`;
   return initiative.coin === 'copper-coin' ? `${toss} ${pet}'s Copper Coin adds +1 to every attribute.` : toss;
 }
 function addLog(step) {
@@ -109,11 +136,11 @@ function advance() {
   meters(step.hp, step.mp);
   addLog(step);
   $('battle-status').textContent = describe(step);
-  for (const i of [0, 1]) $(`battle-fighter-${i}`).classList.remove('striking', 'hit');
+  cards.forEach((_, card) => $(`battle-fighter-${card}`).classList.remove('striking', 'hit'));
   if (!reducedMotion.matches) {
     void $('battle-fighter-0').offsetWidth;
-    $(`battle-fighter-${step.actor}`).classList.add('striking');
-    $(`battle-fighter-${step.target}`).classList.add('hit');
+    $(`battle-fighter-${cards.indexOf(step.actor)}`).classList.add('striking');
+    $(`battle-fighter-${cards.indexOf(step.target)}`).classList.add('hit');
   }
   timer = setTimeout(advance, reducedMotion.matches ? 350 : 750);
 }
@@ -124,12 +151,12 @@ function finish() {
   const last = scene.battle.turns.at(-1);
   abilityLabel(last);
   meters(scene.resultResources?.hp ?? last.hp, scene.resultResources?.mp ?? last.mp);
-  $('battle-status').textContent = `${scene.battle.winner === scene.viewer ? 'Victory!' : 'Defeat.'} ${scene.result}`;
+  $('battle-status').textContent = `${scene.won ?? scene.battle.winner === scene.viewer ? 'Victory!' : 'Defeat.'} ${scene.result}`;
   const skipped = document.activeElement === $('battle-skip');
   $('battle-skip').hidden = true;
   $('battle-replay').hidden = false;
   if (skipped) $('battle-replay').focus();
-  for (const i of [0, 1]) $(`battle-fighter-${i}`).classList.remove('striking', 'hit');
+  cards.forEach((_, card) => $(`battle-fighter-${card}`).classList.remove('striking', 'hit'));
 }
 function play(next) {
   clearTimeout(timer);
@@ -148,9 +175,16 @@ function play(next) {
   $('battle-status').textContent = 'Ready. Let the battle begin!';
   $('battle-ability-name').textContent = 'Automatic attacks';
   $('battle-ability-cost').textContent = 'Strongest affordable attack each turn';
-  next.battle.fighters.forEach((fighter, i) => {
-    $(`battle-name-${i}`).textContent = fighter.id === next.viewer ? `${fighterName(fighter)} (you)` : fighterName(fighter);
-    avatar(fighter, i);
+  // A team battle (pets, then the monster last) shows the viewer's pet against
+  // the monster, with its teammates beside them.
+  const fighters = next.battle.fighters, last = fighters.length - 1;
+  const mine = Math.max(0, fighters.findIndex(fighter => fighter.id === next.viewer));
+  cards = fighters.length === 2 ? [0, 1] : [mine, last, ...fighters.map((_, i) => i).filter(i => i !== mine && i !== last)];
+  allyCards(next.battle);
+  cards.forEach((fighterIndex, card) => {
+    const fighter = fighters[fighterIndex];
+    $(`battle-name-${card}`).textContent = fighter.id === next.viewer ? `${fighterName(fighter)} (you)` : fighterName(fighter);
+    avatar(fighter, card);
   });
   meters(next.battle.initialHp ?? next.battle.fighters.map(f => f.maxHp), next.battle.initialMp ?? next.battle.fighters.map(f => f.maxMp));
   if (!dialog.open) dialog.showModal();
