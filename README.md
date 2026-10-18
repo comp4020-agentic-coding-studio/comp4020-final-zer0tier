@@ -112,6 +112,24 @@ leaderboard and **Happening now** feed, including older feed entries. Every open
 window updates from the server's broadcast; picking or saving a setting never
 previews an unsaved change on the pet.
 
+### Playing with your pet
+
+Tap or click your pet in its header to touch it there, or use the buttons under
+**Play with your pet** (on desktop, beneath the pet in the left column):
+
+| Touch | Where on the pet | Reaction |
+| --- | --- | --- |
+| **Pat head** | The top of the head, or between the eyes | A happy squish and hearts |
+| **Tickle belly** | The belly | A giggling wiggle |
+| **Stroke cheek** | Either side of the face | A lean into your hand and sparkles |
+| **Shake paw** | The feet | A hop and stars |
+
+The pet reacts with a short animation and a line describing what it does,
+which screen readers announce. A pet that's studying or working still reacts,
+then gets back to its lesson or shift. Playing is just for fun: it costs
+nothing, changes nothing in the game, and isn't saved, sent to the server, or
+shown to other players. With reduced motion turned on, only the line appears.
+
 ### School
 
 Every pet starts at primary school. There are four courses:

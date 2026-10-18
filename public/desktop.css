@@ -32,7 +32,9 @@
   .desktop-pet { overflow-y: auto; scrollbar-gutter: stable; }
   .desktop-pet .pet-hero { flex-direction: column; text-align: center; gap: 10px; margin: 0 0 18px; }
   .desktop-pet .pet-hero > div { width: 100%; }
-  .desktop-pet .pet-hero > .pet { width: 110px; height: 100px; }
+  .desktop-pet .pet-hero > .pet-touch { width: 110px; }
+  .desktop-pet .pet-hero > .pet-touch > .pet { height: 100px; }
+  .desktop-pet .play { margin: 0 0 18px; }
   .desktop-pet h2 { font-size: 1.2rem; }
   .desktop-pet .activity { margin: 4px 0 12px; }
   .desktop-pet .meters { margin-top: 0; }

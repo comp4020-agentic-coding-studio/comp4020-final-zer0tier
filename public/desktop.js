@@ -75,6 +75,7 @@ function mountDesktop() {
   const pet = region('Your pet and care', 'desktop-pet');
   pet.append(element('p', 'desktop-eyebrow', 'YOUR COMPANION'));
   move(dashboard.querySelector('.pet-hero'), pet);
+  move(dashboard.querySelector('.play'), pet);
   move(dashboard.querySelector('.stats'), pet);
   const quick = element('section', 'desktop-quick-care');
   quick.setAttribute('aria-label', 'Quick care');

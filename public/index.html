@@ -116,7 +116,10 @@
 
       <section id="dashboard" class="card dashboard" hidden aria-labelledby="pet-heading">
         <div class="pet-hero">
-          <svg id="pet-avatar" class="pet" viewBox="0 0 120 110" role="img"></svg>
+          <span id="pet-touch" class="pet-touch" data-reaction="">
+            <svg id="pet-avatar" class="pet" viewBox="0 0 120 110" role="img"></svg>
+            <span class="pet-effects" aria-hidden="true"></span>
+          </span>
           <div>
             <h2 id="pet-heading"><span id="pet-name"></span>'s pet</h2>
             <p class="activity">Currently <small id="activity"></small></p>
@@ -138,6 +141,18 @@
             </div>
           </div>
         </div>
+
+        <section class="play" aria-labelledby="play-heading">
+          <h3 id="play-heading" class="section-label">Play with your pet</h3>
+          <p class="help">Tap or click your pet where you'd like to touch it, or choose:</p>
+          <div class="play-buttons">
+            <button type="button" class="chip-btn chip-buy" data-touch="pat">Pat head</button>
+            <button type="button" class="chip-btn chip-buy" data-touch="tickle">Tickle belly</button>
+            <button type="button" class="chip-btn chip-buy" data-touch="stroke">Stroke cheek</button>
+            <button type="button" class="chip-btn chip-buy" data-touch="paw">Shake paw</button>
+          </div>
+          <p id="pet-reaction" class="pet-reaction" role="status" aria-live="polite"></p>
+        </section>
 
         <form id="appearance-settings" class="appearance-settings" aria-labelledby="appearance-heading">
           <h3 id="appearance-heading" class="section-label">Pet appearance</h3>
@@ -295,5 +310,6 @@
     <script type="module" src="/desktop.js"></script>
     <script type="module" src="/battle.js"></script>
     <script type="module" src="/adventure.js"></script>
+    <script type="module" src="/interact.js"></script>
   </body>
 </html>
