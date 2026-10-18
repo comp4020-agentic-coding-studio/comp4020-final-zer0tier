@@ -421,6 +421,20 @@ it('patrols at most once a second, keeps the revision, and gives older saves the
   expect(moved.enemies).toEqual(walked.enemies.map(e => ({ ...e, alerted: false })));
 });
 
+it('a monster beside the pet attacks it on its step, saving the battle with the pet left where it stood', () => {
+  const id = 'ambushed';
+  const start = setupBattle(id, 'slime', [100, 100, 100]); // the pet stands just left of the slime
+  const slime = start.enemies.find(e => e.kind === 'slime')!;
+  const attacked = adventure.patrolAdventure(id);
+  expect(attacked).toMatchObject({ x: slime.x - 1, y: slime.y, battle: { attacked: true, pending: true, won: true, enemyId: slime.id } });
+  expect(attacked.revision).not.toBe(start.revision);
+  expect(attacked.enemies.some(e => e.id === slime.id)).toBe(false);
+  expect(afterRestart(id)).toEqual(attacked);
+  // A move sent with the old revision gets the battle back instead.
+  expect(adventure.moveAdventure(id, 'd', start.revision)).toEqual(attacked);
+  expect(continueRun(id)).toMatchObject({ x: slime.x - 1, battle: { pending: false } });
+});
+
 it('never patrols during a pending battle, while the pet studies or works, or once the run has ended', () => {
   const id = 'patrol-paused';
   setupBattle(id, 'slime', [100, 100, 100]);

@@ -153,6 +153,24 @@ it('moves monsters on the open map in real time, keeping focus, and stops asking
   } finally { dom.window.close(); }
 });
 
+it('opens the battle scene when a monster attacks the pet on its step, naming the attacker', async () => {
+  const { dom, window, $ } = page();
+  Object.defineProperty(window.document, 'hidden', { value: false });
+  const start = map(), fought = battleProgress();
+  const attacked = { ...fought, x: start.x, battle: { ...fought.battle, attacked: true } };
+  window.fetch = vi.fn(async (_url: string, options: RequestInit) =>
+    Response.json(JSON.parse(options.body as string).action === 'patrol' ? attacked : start)) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement | null)?.open).toBe(true), { timeout: 2500 });
+    expect($('battle-title').textContent).toBe('Floor 1 · Slime attacks!');
+    expect(($('adventure-continue') as HTMLButtonElement).hidden).toBe(false);
+  } finally { dom.window.close(); }
+});
+
 it('clears the previous floor on account reset and ignores its late movement response', async () => {
   const { dom, window, $ } = page();
   const finishes: ((response: Response) => void)[] = [];

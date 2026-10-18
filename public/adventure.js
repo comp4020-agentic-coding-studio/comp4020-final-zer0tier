@@ -4,7 +4,7 @@ adventure.setAttribute('aria-labelledby', 'adventure-title');
 adventure.innerHTML = `
   <header><div><p class="section-label" id="adventure-floor">ADVENTURE · FLOOR 1 / 5</p><h2 id="adventure-title">Woodland clearing</h2></div>
     <button type="button" id="adventure-close" class="chip-btn" autofocus>Leave</button></header>
-  <p class="help">W/A/S/D or arrow keys to move one block. Step into a monster to battle.</p>
+  <p class="help">W/A/S/D or arrow keys to move one block. Step into a monster to battle; one that catches your pet attacks it.</p>
   <div class="adventure-layout"><div class="adventure-map-area">
   <div id="adventure-grid" role="img" aria-label="Woodland map" tabindex="0"></div>
   <p id="adventure-status" role="status">Opening the clearing…</p>
@@ -47,7 +47,7 @@ adventure.innerHTML = `
     <p class="help" id="adventure-stair-hint"></p>
     <div class="adventure-legend" aria-label="Map legend"></div>
     <details><summary>Monster attributes</summary><ul id="adventure-enemies"></ul></details>
-    <p class="help">Monsters patrol on their own. One that spots your pet within 3 blocks (marked !) walks toward it and stops beside it. Step into a monster to battle, or move more than 3 blocks away to lose it.</p>
+    <p class="help">Monsters patrol on their own. One that spots your pet within 3 blocks (marked !) walks toward it and, once beside it, attacks on its next step. Step into a monster to battle it, or move more than 3 blocks away to lose it.</p>
     <p class="help">HP and MP carry between battles. Each victory restores 20% of their maximums, rounded up. Defeat ends the adventure.</p>
     <p class="help" id="adventure-restart-cost"></p>
     <p id="adventure-completion" class="help" role="status" hidden>Slime King defeated! The woodland is complete. You can keep exploring.</p>
@@ -262,11 +262,11 @@ function renderMonsters() {
     grid.append(cell);
   }));
   const mates = teammatesHere(), sharing = mates.filter(m => m.x === state.x && m.y === state.y).map(m => m.id);
-  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Monster locations are in Monster attributes. Trees block movement; stepping into a monster starts battle.`);
+  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Monster locations are in Monster attributes. Trees block movement; stepping into a monster starts battle, and so does a monster stepping into your pet.`);
   const nearby = state.enemies.filter(e => state.encounters.includes(e.id));
   const spotted = state.enemies.filter(e => e.alerted && !state.encounters.includes(e.id));
   const notice = busyText() || (nearby.length
-    ? `${nearby.map(e => e.name).join(', ')} nearby! Step into their tile to battle, or move away.`
+    ? `${nearby.map(e => e.name).join(', ')} nearby! Step into ${nearby.length > 1 ? 'one' : 'it'} to battle, or move away before ${nearby.length > 1 ? 'they attack' : 'it attacks'}.`
     : spotted.length ? `${spotted.map(e => e.name).join(', ')} spotted you! Move more than 3 blocks away to lose ${spotted.length > 1 ? 'them' : 'it'}.`
     : state.chests.some(at) ? (state.chests.find(at).reward ? 'This chest is empty. Your reward is saved.' : 'You found a treasure chest. Choose Open chest to collect its reward.')
     : at(state.up) ? 'Stairs up: choose Ascend to return to the previous floor.'
@@ -348,7 +348,7 @@ function showBattle(replay = false) {
   mp[mine] = battle.after?.mp ?? last.mp[mine] + battle.recovery.mp;
   document.dispatchEvent(new CustomEvent('battle:show', { detail: {
     key: `adventure:${battle.id}`, battle: battle.playback, viewer: battle.playback.fighters[mine].id,
-    title: `Floor ${battle.floor} · ${battle.enemyName}`, result: battleResult(battle), won: battle.won,
+    title: `Floor ${battle.floor} · ${battle.enemyName}${battle.attacked ? ' attacks!' : ''}`, result: battleResult(battle), won: battle.won,
     replay: true, returnLabel: 'Return to map', resultResources: { hp, mp },
   } }));
 }

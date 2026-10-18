@@ -18,6 +18,7 @@ export type AdventureBattle = {
   recovery: { hp: number; mp: number };
   after?: { hp: number; mp: number }; // what the pet carries back to the map; absent in older saves
   fighter?: number; // this pet's place in a team battle's playback; absent means the first
+  attacked?: true; // the monster walked into the pet, rather than the pet into it
 };
 type SavedAdventure = {
   x: number; y: number; floor: number; world_json: string | null;
@@ -158,7 +159,9 @@ function alliesOf(saved: Progress): Progress[] {
   return floormates(saved).filter(mate => nearby(mate, saved) && !mate.battle?.pending && !busyNow(mate.pet));
 }
 
-function resolveBattle(id: string, saved: Progress, enemy: Enemy) {
+// `attacked`: the monster walked into the pet, so a win leaves the pet where
+// it stands rather than moving it onto the monster's tile.
+function resolveBattle(id: string, saved: Progress, enemy: Enemy, attacked = false) {
   const pet = getPet(id);
   if (!pet) return { error: 'Your pet could not be found.', status: 404 };
   const allies = alliesOf(saved);
@@ -200,12 +203,12 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy) {
     fighter.hp += recovery.hp; fighter.mp += recovery.mp;
     fighter.battle = {
       id: battleId, floor: saved.floor, enemyId: enemy.id, enemyName: enemy.name, won, pending: true, playback, recovery,
-      after: { hp: fighter.hp, mp: fighter.mp }, ...(index ? { fighter: index } : {}),
+      after: { hp: fighter.hp, mp: fighter.mp }, ...(index ? { fighter: index } : {}), ...(attacked ? { attacked: true as const } : {}),
     };
   });
   if (won) {
     floor.enemies = floor.enemies.filter(e => e.id !== enemy.id);
-    if (saved.hp > 0) { saved.x = enemy.x; saved.y = enemy.y; }
+    if (saved.hp > 0 && !attacked) { saved.x = enemy.x; saved.y = enemy.y; }
   }
   return transaction(() => {
     for (const ally of allies) {
@@ -242,21 +245,37 @@ export function moveAdventure(id: string, direction: unknown, revision?: unknown
 // ends, or while the pet studies or works. On a team's map each floor steps on
 // its own clock, for any teammate there who asks, and its monsters chase
 // whichever teammate is nearest.
+// A monster already beside the pet it's chasing walks into it instead, which
+// starts a battle as if the pet had walked into the monster; that battle
+// changes the revision. A pet that's busy, out, or already has a battle
+// waiting isn't attacked: the monster waits beside it.
 export const PATROL_MS = 1000;
 export function patrolAdventure(id: string) {
   const saved = load(id), now = Date.now(), floor = saved.world[saved.floor - 1];
   const last = saved.teamId === null ? saved.patrolledAt : floor.patrolledAt ?? 0;
   if (saved.battle?.pending || over(saved) || busyNow(saved.pet) || now - last < PATROL_MS * 0.8) return view(saved);
-  if (saved.teamId === null) {
-    patrol(floor, saved);
-    db.prepare('UPDATE adventures SET world_json = ?, patrolled_at = ? WHERE player_id = ? AND revision = ?')
-      .run(JSON.stringify(saved.world), now, id, saved.revision);
-  } else {
-    patrol(floor, [saved, ...floormates(saved)]);
-    floor.patrolledAt = now;
-    db.prepare('UPDATE teams SET world_json = ? WHERE id = ?').run(JSON.stringify(saved.world), saved.teamId);
-  }
-  return adventureFor(id);
+  return transaction(() => {
+    let attacks;
+    if (saved.teamId === null) {
+      attacks = patrol(floor, saved);
+      db.prepare('UPDATE adventures SET world_json = ?, patrolled_at = ? WHERE player_id = ? AND revision = ?')
+        .run(JSON.stringify(saved.world), now, id, saved.revision);
+    } else {
+      attacks = patrol(floor, [saved, ...floormates(saved)]);
+      floor.patrolledAt = now;
+      db.prepare('UPDATE teams SET world_json = ? WHERE id = ?').run(JSON.stringify(saved.world), saved.teamId);
+    }
+    // Each battle reads the map as the one before it left it: a teammate
+    // drawn into an earlier battle, or a monster it removed, is skipped, and
+    // so is any attack the saved map no longer matches.
+    for (const attack of attacks) {
+      const victim = load(attack.pet.id), enemy = victim.world[victim.floor - 1].enemies.find(e => e.id === attack.enemy.id);
+      if (!enemy || !samePoint(enemy, attack.enemy) || !samePoint(victim, attack.pet) || victim.floor !== saved.floor
+        || victim.battle?.pending || over(victim) || busyNow(victim.pet)) continue;
+      resolveBattle(victim.id, victim, enemy, true);
+    }
+    return adventureFor(id);
+  });
 }
 
 export function changeFloor(id: string, action: unknown, revision?: unknown) {

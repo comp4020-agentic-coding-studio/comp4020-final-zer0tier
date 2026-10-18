@@ -62,12 +62,25 @@ it('a monster sees the pet anywhere within 3 blocks, diagonals included, and wal
   }
 });
 
-it('stops beside the pet without stepping onto it, and never starts a battle itself', () => {
-  for (const player of [{ x: 7, y: 2 }, { x: 7, y: 3 }]) {
+it('walks up beside the pet, never onto it, and on its next step attacks it', () => {
+  for (const player of [{ x: 7, y: 2 }, { x: 7, y: 3 }, { x: 8, y: 4 }]) {
     const floor = alone({ x: 6, y: 2 }), enemy = floor.enemies[0];
-    for (let i = 0; i < 5; i++) patrol(floor, player);
-    expect(Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y)).toBe(1);
+    const gap = () => Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y);
+    while (gap() > 1) expect(patrol(floor, player)).toEqual([]);
+    const at = { x: enemy.x, y: enemy.y };
+    // Beside it, the monster attacks the pet it caught, and stays where it is.
+    expect(patrol(floor, player)).toEqual([{ enemy, pet: player }]);
+    expect(enemy).toMatchObject(at);
   }
+  // A diagonal neighbour isn't beside it yet: the monster steps in first.
+  const floor = alone({ x: 6, y: 2 });
+  expect(patrol(floor, { x: 7, y: 3 })).toEqual([]);
+  expect(patrol(floor, { x: 7, y: 3 })).toHaveLength(1);
+});
+
+it('attacks whichever pet it chases, the nearest it sees, and only that one', () => {
+  const floor = alone({ x: 6, y: 2 }), near = { x: 7, y: 2 }, far = { x: 6, y: 4 };
+  expect(patrol(floor, [far, near])).toEqual([{ enemy: floor.enemies[0], pet: near }]);
 });
 
 it('patrols back and forth along its route while the pet is more than 3 blocks away', () => {

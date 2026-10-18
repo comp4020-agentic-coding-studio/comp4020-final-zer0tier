@@ -198,3 +198,27 @@ it('monsters on a team map chase the nearest teammate they see, stepping once pe
   expect(adventure.patrolAdventure(mate).enemies[0]).toMatchObject({ x: slime.x, y: slime.y, alerted: true });
   expect(adventure.patrolAdventure(lead).enemies[0]).toMatchObject({ x: slime.x, y: slime.y });
 });
+
+it('a monster that catches a teammate attacks it, whoever asked for the step, and pets beside it join in', () => {
+  const [lead, mate, near] = [player('am-lead', [6, 2, 2]), player('am-mate', [6, 2, 2]), player('am-near', [6, 2, 2])];
+  team(lead, mate, near);
+  const slime = createWorld()[0].enemies[0]; // at column 7, row 3
+  place(lead, 1, 14); place(mate, slime.x - 1, slime.y); place(near, slime.x - 2, slime.y + 1);
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  let walked;
+  try { walked = adventure.patrolAdventure(lead); } finally { random.mockRestore(); }
+  // The lead, far off, asked for the step and stays out of it.
+  expect(walked.battle).toBeNull();
+  expect(walked.enemies.some(e => e.id === slime.id)).toBe(false);
+  const caught = adventure.adventureFor(mate);
+  expect(caught).toMatchObject({ x: slime.x - 1, y: slime.y, battle: { attacked: true, pending: true, won: true } });
+  expect(caught.battle!.playback.fighters.map(f => f.id)).toEqual([mate, near, `monster:${slime.id}`]);
+  expect(adventure.adventureFor(near).battle).toMatchObject({ id: caught.battle!.id, fighter: 1, attacked: true });
+  // A pet with a battle still waiting isn't attacked again: the goblin waits beside it.
+  const goblin = walked.enemies.find(e => e.kind === 'goblin')!;
+  place(mate, goblin.x - 1, goblin.y);
+  const later = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000);
+  try { walked = adventure.patrolAdventure(lead); } finally { later.mockRestore(); }
+  expect(walked.enemies.find(e => e.id === goblin.id)).toMatchObject({ x: goblin.x, y: goblin.y });
+  expect(adventure.adventureFor(mate).battle!.id).toBe(caught.battle!.id);
+});

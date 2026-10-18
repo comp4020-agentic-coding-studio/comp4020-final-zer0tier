@@ -16,9 +16,12 @@ pursuit: monsters move in real time, about one cardinal step a second while
 the map is open, patrolling short routes. A monster sees the pet within 3
 blocks (diagonals included), walks toward it by the shortest open path, stops
 beside it, and returns to its route once the pet is more than 3 blocks away.
-They never start a battle themselves. Stairs require an explicit
-Ascend/Descend action.
+Stairs require an explicit Ascend/Descend action.
 Nearby enemies produce encounter warnings; walking into a monster starts battle.
+Owner's direction (2026-10-19), replacing "they never start a battle
+themselves": a monster that has caught up with the pet attacks it directly.
+Once beside the pet, its next step walks into it and starts the battle, which
+leaves the player one step to strike first or get away.
 Initial stats and scaling are documented in README.md and can be balanced later.
 
 ## 1. Adventure entry and exploration
@@ -38,7 +41,7 @@ Initial stats and scaling are documented in README.md and can be balanced later.
 - Every floor has at least one treasure chest and several enemies.
 - Floor five contains the **Slime King** boss.
 - Monsters patrol automatically in real time. A monster notices the pet within
-  3 blocks (including diagonals), then approaches it and stops beside it.
+  3 blocks (including diagonals), approaches it, and once beside it, attacks.
 - Implementation work: floor layouts, reachable chests and stairs, enemy spawn
   rules, depth-based stats, detection, pursuit, and encounter triggers.
 

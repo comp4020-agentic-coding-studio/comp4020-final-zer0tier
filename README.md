@@ -466,14 +466,18 @@ monster on your floor takes one cardinal step about once a second, whether or
 not you move. Out of sight, each walks back and forth along its own short
 patrol route. A monster sees your pet anywhere within **3 blocks** in every
 direction, diagonals included (a 7 × 7 square, even through trees). It then
-walks toward the pet by the shortest open path, around trees, and **stops
-beside it**: monsters never start a battle themselves. Once the pet is more
-than 3 blocks away, the monster loses it and heads back to its route. Monsters
-cannot cross trees, chests, stairs, the pet, or each other, and no patrol route
-comes within sight of the stairs, so arriving on a floor is safe. An
-exclamation mark marks every monster that has spotted your pet, with a message
-when one is on your trail or right beside you. Walk into a monster's tile to
-start a battle; being next to one does not start it.
+walks toward the pet by the shortest open path, around trees, until it stands
+right beside it (up, down, left or right). **On its next step it attacks**: it
+walks into the pet, and that starts a battle exactly as if your pet had walked
+into it, except that your pet stays on its own tile if it wins. So you have one
+step, about a second, to strike first by walking into the monster, or to move
+away. Once the pet is more than 3 blocks away, the monster loses it and heads
+back to its route. Monsters cannot cross trees, chests, stairs, the pet, or
+each other, and no patrol route comes within sight of the stairs, so arriving
+on a floor is safe. An exclamation mark marks every monster that has spotted
+your pet, with a message when one is on your trail or right beside you. A
+monster doesn't attack a pet that is studying or working, or one whose last
+battle is waiting for **Return to map**; it waits beside it instead.
 
 The page asks the server for each step (`{ "action": "patrol" }`). The server
 decides where every monster goes and saves each step, and it takes at most one
@@ -482,7 +486,9 @@ while that owner has the map open. They stay put while the map is closed or the
 tab is hidden, while a battle awaits **Return to map**, after the run ends, and
 while the pet studies or works. A monster step doesn't change the map's
 `revision`, so a move you send at the same moment still applies, to the
-monsters' new positions. Saves from before patrols existed keep their monster
+monsters' new positions. A step that starts a battle does change it, as any
+battle does; the response carries the battle, with `battle.attacked: true`, and
+the battle scene's title says the monster attacks. Saves from before patrols existed keep their monster
 positions and gain the routes.
 Enemy attributes and positions are listed under **Monster
 attributes**, and every stair and chest is reachable through the map's paths.
@@ -530,21 +536,23 @@ each floor's monsters take at most one step a second, whichever teammate's
 window asks.
 
 **Teammates beside your pet join its battles.** When a pet walks into a
-monster, every teammate exploring within 1 block of it (diagonals included)
-fights alongside it, unless that teammate is busy, already has a battle
-waiting, or is out of the run. A team battle is one automatic battle scene:
-each standing pet strikes the monster in turn (the pet that walked in first),
-then the monster strikes whichever pet has the most HP left. The coin toss
-(and only the walking pet's equipped coin) decides whether the pets or the
-monster go first. Each pet uses its own learned abilities, carried HP/MP, and
-a Copper shield only if it is the walking pet's. Every pet in the battle sees
+monster, or a monster attacks a pet, every teammate exploring within 1 block of
+that pet (diagonals included) fights alongside it, unless that teammate is busy,
+already has a battle waiting, or is out of the run. A team battle is one
+automatic battle scene: each standing pet strikes the monster in turn (the pet
+that walked in, or was attacked, first), then the monster strikes whichever pet
+has the most HP left. The coin toss (and only that first pet's equipped coin)
+decides whether the pets or the monster go first. Each pet uses its own learned
+abilities, carried HP/MP, and a Copper shield only if it is the first pet's.
+A monster attacks the teammate it is chasing, whichever teammate's window asked
+for the step. Every pet in the battle sees
 the same saved battle from its own side and returns to the map separately.
 
 **A knocked-out pet is out; the team plays on.** A pet at 0 HP after a battle
 (won or lost) has failed its run, exactly like a solo defeat, while its
 teammates keep exploring. After a victory, every pet still standing recovers
-20% of its maximum HP and MP; the monster is removed for everyone; the walking
-pet takes its tile. A team's run ends for each pet when it is defeated or
+20% of its maximum HP and MP; the monster is removed for everyone; a pet that
+walked in takes its tile. A team's run ends for each pet when it is defeated or
 abandons the run; abandoning leaves the rest exploring. **Start new
 adventure** after that is always solo; to team up again, use **Team up**.
 
@@ -678,7 +686,7 @@ includes an opaque `revision`; supply that revision with every action:
 - `{ "action": "continue", "battleId": "…", "revision": "…" }` acknowledges a battle.
 - `{ "action": "abandon", "revision": "…" }` ends the run in progress at once, for free (`abandoned: true` in the response). It changes nothing for a run that is already over or has a battle waiting.
 - `{ "action": "restart", "revision": "…" }` starts fresh after failure, completion, or abandoning; refused with 409 while a run is still in progress or if stamina/hygiene are too low, or 429 while the 4-hour cooldown is active.
-- `{ "action": "patrol" }` moves the monsters on the pet's floor one step, at most once a second (see above). Otherwise, and whenever the run is paused, it returns the current state unchanged. It needs no revision and keeps the current one.
+- `{ "action": "patrol" }` moves the monsters on the pet's floor one step, at most once a second (see above). Otherwise, and whenever the run is paused, it returns the current state unchanged. It needs no revision, and keeps the current one unless a monster attacks and starts a battle.
 - `{ "action": "skip-cooldown", "revision": "…" }` spends one Hourglass to clear an active cooldown early; refused with 409 if there's no Hourglass to spend. A no-op, returning the current state, if no cooldown is active.
 - `{ "action": "open-chest", "revision": "…" }` opens the chest under the pet.
 - `{ "action": "use-item", "item": "food" | "soap" | "hourglass", "revision": "…" }` uses one backpack item.

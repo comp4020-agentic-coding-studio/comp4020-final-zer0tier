@@ -51,7 +51,7 @@ it('lets the owner descend all five floors only at stairs, ascend, and resume th
   expect(await act({ action: 'ascend' })).toMatchObject({ floor: 4, x: 13, y: 13 });
 });
 
-it('monsters patrol in real time, chase a pet within 3 blocks, stop beside it, and lose it once it gets away', async () => {
+it('monsters patrol in real time, chase a pet within 3 blocks, and lose it once it gets away', async () => {
   const id = freshId(); await signUp(id);
   const act = async (body = {}) => (await sendAction(id, body)).json();
   const patrol = async () => {
@@ -79,21 +79,48 @@ it('monsters patrol in real time, chase a pet within 3 blocks, stop beside it, a
   expect(seen.enemies[0]).toMatchObject({ x: 7, y: 2, alerted: true });
   const chased = await patrol();
   expect(chased.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: true });
-  const beside = await patrol();
-  expect(beside.enemies[0]).toMatchObject({ x: 5, y: 2, alerted: true });
-  expect(beside.encounters).toContain(beside.enemies[0].id);
-  // Next to the pet, it waits there: it never starts a battle itself.
-  const waited = await patrol();
-  expect(waited).toMatchObject({ x: 4, y: 2, battle: null });
-  expect(waited.enemies[0]).toMatchObject({ x: 5, y: 2 });
-  expect((await sendAction(id, { direction: 'x' })).status).toBe(400);
-  expect(await act()).toEqual(waited);
+  // A step short of the pet, the pet slips away before the monster reaches it.
   // More than 3 blocks away, it loses the pet and heads back along its route.
+  expect((await sendAction(id, { direction: 'x' })).status).toBe(400);
   for (const direction of ['w', 'a', 'a', 'a']) await act({ direction });
   const away = await act();
-  expect(away).toMatchObject({ x: 1, y: 1, encounters: [] });
-  expect(away.enemies[0]).toMatchObject({ x: 5, y: 2, alerted: false });
-  expect((await patrol()).enemies[0]).toMatchObject({ x: 6, y: 2, alerted: false });
+  expect(away).toMatchObject({ x: 1, y: 1, encounters: [], battle: null });
+  expect(away.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: false });
+  expect((await patrol()).enemies[0]).toMatchObject({ x: 7, y: 2, alerted: false });
+});
+
+it('a monster that catches the pet attacks it on its next step, and the battle is saved like any other', async () => {
+  const id = freshId(); await signUp(id);
+  const act = async (body = {}) => (await sendAction(id, body)).json();
+  // The next monster step: the server skips a request that comes too soon by
+  // its clock, so ask again until the map changes.
+  const patrol = async (from: unknown) => {
+    for (let i = 0; i < 5; i++) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const state = await (await post('/api/adventure', { action: 'patrol' }, id)).json();
+      if (JSON.stringify(state) !== JSON.stringify(from)) return state;
+    }
+    return from as any;
+  };
+  // Two blocks from the floor-one slime at its spawn (column 7, row 3).
+  await act({ direction: 'd' });
+  const before = await act({ direction: 'd' });
+  expect(before.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: true });
+  // It steps up beside the pet, which is warned, and then walks into it.
+  const beside = await patrol(before);
+  expect(beside).toMatchObject({ x: 4, y: 2, battle: null, revision: before.revision });
+  expect(beside.enemies[0]).toMatchObject({ x: 5, y: 2 });
+  expect(beside.encounters).toEqual(['f1-enemy-0']);
+  const attacked = await patrol(beside);
+  expect(attacked).toMatchObject({ x: 4, y: 2, battle: { pending: true, attacked: true, enemyId: 'f1-enemy-0', enemyName: 'Slime' } });
+  expect(attacked.revision).not.toBe(before.revision);
+  expect(attacked.battle.playback.fighters.map((f: { id: string }) => f.id)).toEqual([id, 'monster:f1-enemy-0']);
+  // Nothing moves, and the pet can't, until the player returns to the map.
+  expect(await (await post('/api/adventure', { action: 'patrol' }, id)).json()).toEqual(attacked);
+  expect(await act({ direction: 'a' })).toEqual(attacked);
+  const continued = await act({ action: 'continue', battleId: attacked.battle.id });
+  expect(continued).toMatchObject({ x: 4, y: 2, battle: { pending: false } });
+  expect(continued.enemies.some((e: { id: string }) => e.id === 'f1-enemy-0')).toBe(!attacked.battle.won);
 });
 
 it('saves exactly one monster battle for concurrent moves and retries, including after returning to exploration', async () => {

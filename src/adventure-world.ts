@@ -96,19 +96,23 @@ function stepToward(mover: Point, goal: Point, open: (p: Point) => boolean): voi
 }
 
 // One real-time step for every monster on the floor. One that sees a pet
-// walks toward the nearest it sees and stops beside it (it never starts a
-// battle); the rest walk their routes, heading back to them after a chase.
-// Trees, chests, stairs, pets, and other monsters block the way.
-export function patrol(floor: Floor, pets: Point | readonly Point[]): void {
-  const players = 'x' in pets ? [pets] : pets;
+// walks toward the nearest it sees; once beside it, its next step walks into
+// the pet instead, and it stays put while the caller starts that battle. The
+// rest walk their routes, heading back to them after a chase. Trees, chests,
+// stairs, pets, and other monsters block the way.
+export function patrol<P extends Point>(floor: Floor, pets: P | readonly P[]): { enemy: Enemy; pet: P }[] {
+  const players: readonly P[] = 'x' in pets ? [pets] : pets;
+  const attacks: { enemy: Enemy; pet: P }[] = [];
   const open = (p: Point) => walkable(floor, p) && !players.some(player => samePoint(p, player))
     && !floor.enemies.some(e => samePoint(e, p)) && !floor.chests.some(chest => samePoint(chest, p))
     && ![floor.up, floor.down].some(stair => stair && samePoint(stair, p));
   const distance = (a: Point, b: Point) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
   for (const enemy of floor.enemies) {
     const target = players.filter(player => sees(enemy, player)).sort((a, b) => distance(enemy, a) - distance(enemy, b))[0];
+    if (target && distance(enemy, target) === 1) { attacks.push({ enemy, pet: target }); continue; }
     if (target) { stepToward(enemy, target, open); continue; }
     if (samePoint(enemy, enemy.route[enemy.leg])) enemy.leg = enemy.leg === 0 ? 1 : 0;
     stepToward(enemy, enemy.route[enemy.leg], open);
   }
+  return attacks;
 }
