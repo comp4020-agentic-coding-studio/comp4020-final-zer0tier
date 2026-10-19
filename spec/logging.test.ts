@@ -205,3 +205,79 @@ it("logs authentication, ownership, gameplay, parser and unknown-route rejection
   }
   expect(output).not.toContain("log-spoof");
 });
+
+it("logs an action_result naming who did what for sign-in, fights, theft, revenge, lessons, shifts and team changes", async () => {
+  const alice = `log-alice-${Date.now().toString(36)}`;
+  const bob = `log-bob-${Date.now().toString(36)}`;
+  const since = logs().length;
+  const signedUp = await post("/api/signup", { id: alice, password });
+  expect(signedUp.status).toBe(201);
+  await signedUp.json();
+  cookies.set(alice, signedUp.headers.getSetCookie().find((cookie) => cookie.startsWith("session="))!.split(";")[0]);
+  await logged({ event: "action_result", user: alice, action: "signup", created: "true" }, since);
+
+  const signedIn = await post("/api/signin", { id: alice, password });
+  expect(signedIn.status).toBe(200);
+  await signedIn.json();
+  await logged({ event: "action_result", user: alice, action: "signin", created: "false" }, since);
+
+  const bobUp = await post("/api/signup", { id: bob, password });
+  expect(bobUp.status).toBe(201);
+  await bobUp.json();
+  cookies.set(bob, bobUp.headers.getSetCookie().find((cookie) => cookie.startsWith("session="))!.split(";")[0]);
+
+  // Alice studies, then works, so her finished lesson and shift both log, and
+  // she ends up with enough money to pay back double when Bob takes revenge.
+  const studySince = logs().length;
+  const studied = await post(`/api/pets/${alice}/study/math`, undefined, alice);
+  expect(studied.status).toBe(200);
+  await studied.json();
+  await logged({ event: "action_result", user: alice, action: "studying_finished", task: "Math" }, studySince);
+
+  const aliceWorkSince = logs().length;
+  const aliceWorked = await post(`/api/pets/${alice}/work/office`, { minutes: 60 }, alice);
+  expect(aliceWorked.status).toBe(200);
+  await aliceWorked.json();
+  await logged({ event: "action_result", user: alice, action: "working_finished", task: "Office" }, aliceWorkSince);
+
+  const bobWorkSince = logs().length;
+  const bobWorked = await post(`/api/pets/${bob}/work/construction`, { minutes: 60 }, bob);
+  expect(bobWorked.status).toBe(200);
+  await bobWorked.json();
+  await logged({ event: "action_result", user: bob, action: "working_finished", task: "Construction site" }, bobWorkSince);
+
+  const fightSince = logs().length;
+  const fought = await post(`/api/pets/${alice}/fight/${bob}`, undefined, alice);
+  expect(fought.status).toBe(200);
+  const fightResult = await fought.json();
+  await logged({ event: "action_result", user: alice, action: "fight", opponent: bob, winner: fightResult.fight.winner }, fightSince);
+
+  const stealSince = logs().length;
+  const stole = await post(`/api/pets/${alice}/steal/${bob}`, undefined, alice);
+  expect(stole.status).toBe(200);
+  const stealResult = await stole.json();
+  await logged({ event: "action_result", user: alice, action: "steal", victim: bob, amount: String(stealResult.amount) }, stealSince);
+
+  const theft = (await (await fetch(`${baseUrl}/api/thefts`, { headers: { cookie: cookies.get(bob)! } })).json())[0];
+  const revengeSince = logs().length;
+  const avenged = await post(`/api/pets/${bob}/revenge/${theft.id}`, undefined, bob);
+  expect(avenged.status).toBe(200);
+  const revengeResult = await avenged.json();
+  await logged({ event: "action_result", user: bob, action: "revenge", thief: alice, won: String(revengeResult.won) }, revengeSince);
+
+  const teamSince = logs().length;
+  const invited = await post("/api/team", { action: "invite", player: bob }, alice);
+  expect(invited.status).toBe(200);
+  const team = await invited.json();
+  await logged({ event: "action_result", user: alice, action: "team_invite", team: String(team.team.id), player: bob }, teamSince);
+
+  const accepted = await post("/api/team", { action: "accept", team: team.team.id }, bob);
+  expect(accepted.status).toBe(200);
+  await accepted.json();
+  await logged({ event: "action_result", user: bob, action: "team_accept", team: String(team.team.id) }, teamSince);
+
+  const left = await post("/api/team", { action: "leave", team: team.team.id }, bob);
+  expect(left.status).toBe(200);
+  await left.json();
+  await logged({ event: "action_result", user: bob, action: "team_leave", team: String(team.team.id) }, teamSince);
+});

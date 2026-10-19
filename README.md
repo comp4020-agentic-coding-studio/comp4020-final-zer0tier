@@ -458,9 +458,15 @@ the built-in `node:sqlite` for storage.
   successful JSON API response sent to its one requester, such as a pet or
   arena refresh, saved action result, or private Adventure state. Snapshots
   use HTTP, as they do when the client resyncs after reconnecting.
-  Touch and help also produce `action_result` lines naming the target pet and
-  kind/item/amount. Logs exclude passwords, session cookies, query strings,
-  request bodies and snapshot contents; values containing spaces are quoted.
+  An `action_result` line follows most actions, naming who did it and the
+  outcome: touch and help name the target pet and kind/item/amount; signing up
+  or in names `created` (new pet or not); a fight or revenge names the
+  opponent and the winner or whether revenge succeeded; stealing names the
+  victim and amount; a finished lesson or shift names the task and what it
+  paid, logged when it ends, not when it's started; and a team change
+  (`team_invite`, `team_accept`, `team_leave`, `team_set-off`) names the team.
+  Logs exclude passwords, session cookies, query strings, request bodies and
+  snapshot contents; values containing spaces are quoted.
 
   Example lines (IDs shortened):
 

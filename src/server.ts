@@ -73,6 +73,7 @@ async function authenticate(
   res: express.Response,
   how: (id: string, password: string, address: string) => Promise<AuthOutcome>,
   okStatus: number,
+  action: "signup" | "signin",
 ): Promise<void> {
   const { id, password } = req.body ?? {};
   if (!isValidId(id)) {
@@ -96,6 +97,9 @@ async function authenticate(
     return;
   }
   res.locals.logUser = outcome.pet.id;
+  logEvent("action_result", {
+    user: outcome.pet.id, room: ROOM, client_in_room: clientsInRoom(), action, created: outcome.created,
+  });
   // A new pet joins every open arena.
   if (outcome.created) broadcast({ type: "pet:updated", pet: outcome.pet });
   followUp();
@@ -103,8 +107,8 @@ async function authenticate(
   res.status(okStatus).json(outcome.pet);
 }
 
-app.post("/api/signup", (req, res) => authenticate(req, res, signUp, 201));
-app.post("/api/signin", (req, res) => authenticate(req, res, signIn, 200));
+app.post("/api/signup", (req, res) => authenticate(req, res, signUp, 201, "signup"));
+app.post("/api/signin", (req, res) => authenticate(req, res, signIn, 200, "signin"));
 
 app.post("/api/signout", (req, res) => {
   const token = sessionToken(req.headers.cookie);
@@ -182,6 +186,10 @@ app.post("/api/team", (req, res) => {
     return void res.status(400).json({ error: "Choose invite, accept, leave or set-off." });
   }
   if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
+  logEvent("action_result", {
+    user: id, room: ROOM, client_in_room: clientsInRoom(), action: `team_${action}`, team: outcome.team.id,
+    ...(action === "invite" ? { player } : {}),
+  });
   // Setting off spends stamina and hygiene, so those pets go out first.
   if (action === "set-off") {
     for (const member of outcome.team.members) broadcast({ type: "pet:updated", pet: getPet(member.id)! });
@@ -317,7 +325,13 @@ app.post("/api/pets/:id/study/:course", (req, res) => {
   const course = findCourse(req.params.course);
   if (!course) return notFound(res, "course");
   if (!isValidId(req.params.id)) return notFound(res, "pet");
-  respond(res, study(req.params.id, course.id));
+  const outcome = study(req.params.id, course.id);
+  if ("pet" in outcome) {
+    logEvent("action_result", {
+      user: req.params.id, room: ROOM, client_in_room: clientsInRoom(), action: "study", course: course.id,
+    });
+  }
+  respond(res, outcome);
 });
 
 app.post("/api/pets/:id/work/:location", (req, res) => {
@@ -329,7 +343,13 @@ app.post("/api/pets/:id/work/:location", (req, res) => {
     res.status(400).json({ error: `minutes must be one of ${SHIFT_MINUTES.join(", ")}` });
     return;
   }
-  respond(res, work(req.params.id, location.id, minutes));
+  const outcome = work(req.params.id, location.id, minutes);
+  if ("pet" in outcome) {
+    logEvent("action_result", {
+      user: req.params.id, room: ROOM, client_in_room: clientsInRoom(), action: "work", location: location.id, minutes,
+    });
+  }
+  respond(res, outcome);
 });
 
 app.post("/api/pets/:id/upgrade/:location", (req, res) => {
@@ -371,6 +391,10 @@ app.post("/api/pets/:id/fight/:opponent", (req, res) => {
     res.status(outcome.status).json({ error: outcome.error });
     return;
   }
+  logEvent("action_result", {
+    user: outcome.attacker.id, room: ROOM, client_in_room: clientsInRoom(),
+    action: "fight", opponent: outcome.defender.id, winner: outcome.fight.winner, spoils: outcome.fight.spoils,
+  });
   broadcast({ type: "pet:updated", pet: outcome.attacker });
   broadcast({ type: "pet:updated", pet: outcome.defender });
   broadcast({ type: "fight:finished", fight: outcome.fight });
@@ -386,6 +410,10 @@ app.post("/api/pets/:id/steal/:opponent", (req, res) => {
     res.status(outcome.status).json({ error: outcome.error });
     return;
   }
+  logEvent("action_result", {
+    user: outcome.thief.id, room: ROOM, client_in_room: clientsInRoom(),
+    action: "steal", victim: outcome.victim.id, amount: outcome.amount,
+  });
   broadcast({ type: "pet:updated", pet: outcome.thief });
   broadcast({ type: "pet:updated", pet: outcome.victim });
   followUp();
@@ -432,6 +460,10 @@ app.post("/api/pets/:id/revenge/:theft", (req, res) => {
   }
   const outcome = revenge(req.params.id, Number(req.params.theft));
   if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
+  logEvent("action_result", {
+    user: outcome.victim.id, room: ROOM, client_in_room: clientsInRoom(),
+    action: "revenge", thief: outcome.thief.id, won: outcome.won, reward: outcome.reward,
+  });
   broadcast({ type: "pet:updated", pet: outcome.victim });
   broadcast({ type: "pet:updated", pet: outcome.thief });
   followUp();

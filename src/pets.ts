@@ -3,6 +3,8 @@ import { db, transaction } from "./db.ts";
 import { record } from "./feed.ts";
 import { coinEffect, simulateBattle, withAttributeBonus, type Battle } from "./combat.ts";
 import { inventoryFor } from "./inventory.ts";
+import { logEvent, ROOM } from "./logging.ts";
+import { clientsInRoom } from "./realtime.ts";
 import { isCoinId, type CoinId } from "./treasure.ts";
 
 // Keep this literal list identical to public/app.js: the unbundled browser
@@ -275,6 +277,8 @@ const schoolOf = (pet: Pet) => SCHOOLS.findIndex((s) => s.id === pet.school);
 function finishIfDue(pet: Pet, now: number): boolean {
   if (pet.busyUntil === null || pet.busyUntil > now) return false;
   const reward = pet.reward!;
+  const activity = pet.activity;
+  const task = pet.task;
   for (const attribute of ATTRIBUTES) pet[attribute] += reward[attribute];
   pet.money += reward.money;
   pet.credits += reward.credits;
@@ -289,6 +293,10 @@ function finishIfDue(pet: Pet, now: number): boolean {
   pet.busySince = null;
   pet.busyUntil = null;
   pet.reward = null;
+  logEvent("action_result", {
+    user: pet.id, room: ROOM, client_in_room: clientsInRoom(), action: `${activity}_finished`,
+    task: task ?? "", money: reward.money, credits: reward.credits,
+  });
   return true;
 }
 
