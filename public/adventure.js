@@ -4,7 +4,7 @@ adventure.setAttribute('aria-labelledby', 'adventure-title');
 adventure.innerHTML = `
   <header><div><p class="section-label" id="adventure-floor">ADVENTURE · FLOOR 1 / 5</p><h2 id="adventure-title">Woodland clearing</h2></div>
     <button type="button" id="adventure-close" class="chip-btn">Leave</button></header>
-  <p class="help">W/A/S/D or arrow keys to move one block. Space opens a chest or takes the stairs you stand on. Step into a monster to battle; one that catches your pet attacks it.</p>
+  <p class="help">Move: WASD or arrows. Space: act on your tile (open, climb).</p>
   <div class="adventure-layout"><div class="adventure-map-area">
   <div id="adventure-grid" role="img" aria-label="Woodland map" tabindex="0"></div>
   <p id="adventure-status" role="status">Opening the clearing…</p>
@@ -41,26 +41,26 @@ adventure.innerHTML = `
     <section id="adventure-team" aria-labelledby="adventure-team-heading" hidden>
       <h3 id="adventure-team-heading">Your team</h3>
       <ul id="adventure-team-list"></ul>
-      <p class="help">Teammates beside your pet (diagonals too) join its battles. Each chest opens once for the whole team.</p>
+      <p class="help">Nearby teammates join your battles. One reward per chest, team-wide.</p>
     </section>
     <h3>On this floor</h3>
     <p class="help" id="adventure-stair-hint"></p>
     <div class="adventure-legend" aria-label="Map legend"></div>
-    <details><summary>Monster attributes</summary><ul id="adventure-enemies"></ul></details>
-    <p class="help">Monsters patrol on their own. One that spots your pet within 3 blocks (marked !) walks toward it and, once beside it, attacks on its next step. Step into a monster to battle it, or move more than 3 blocks away to lose it.</p>
-    <p class="help">HP and MP carry between battles. Each victory restores 20% of their maximums, rounded up. Defeat ends the adventure.</p>
+    <p class="help">HP/MP carry over. Win = +20% back.</p>
+    <details><summary>Monster attributes</summary>
+      <p class="help">A monster within 3 blocks (!) chases, then attacks once beside you.</p>
+      <ul id="adventure-enemies"></ul>
+    </details>
     <p class="help" id="adventure-restart-cost"></p>
-    <p id="adventure-completion" class="help" role="status" hidden>Slime King defeated! The woodland is complete. You can keep exploring.</p>
-    <p class="help">Stand on a chest and press Space or choose Open chest. Each chest holds one reward per adventure.</p>
-    <details><summary>Treasure chances</summary><p class="help">Food 30% · Soap 30% · Ability 20% · Hourglass 15% · Unfair coin 5%. Abilities and coin types have equal chances within their category.</p></details>
+    <p id="adventure-completion" class="help" role="status" hidden>Slime King defeated! Keep exploring if you like.</p>
+    <details><summary>Treasure odds</summary><p class="help">Food 30% · Soap 30% · Ability 20% · Hourglass 15% · Coin 5%.</p></details>
     <details class="adventure-backpack">
       <summary id="adventure-backpack-title">Your backpack</summary>
       <p class="help" id="adventure-care"></p>
       <ul id="adventure-items"></ul>
       <h4>Learned abilities</h4><ul id="adventure-abilities"></ul>
-      <p class="help">Your pet uses its strongest affordable attack automatically. Items and learned abilities stay with your pet.</p>
       <h4>Unfair coins</h4><ul id="adventure-coins"></ul>
-      <p class="help">A coin toss decides who attacks first; an equipped coin applies in Adventure, Arena, and revenge.</p>
+      <p class="help">A coin toss decides who strikes first.</p>
     </details>
   </aside></div>`;
 document.body.append(adventure);
@@ -180,14 +180,14 @@ function renderMap() {
   adventure.querySelector('#adventure-title').textContent = state.name;
   adventure.querySelector('#adventure-floor').textContent = `ADVENTURE · FLOOR ${state.floor} / ${state.floorCount}`;
   adventure.querySelector('#adventure-stair-hint').textContent = state.down
-    ? 'Find the ↓ stairs at column 14, row 14. Stand there and press Space or choose Descend.'
-    : state.completed ? 'Final floor. The Slime King has been defeated.' : 'Final floor. The Slime King guards this grove.';
+    ? '↓ stairs: column 14, row 14.'
+    : state.completed ? 'Final floor. Slime King defeated.' : 'Final floor: the Slime King.';
   adventure.querySelector('#adventure-completion').hidden = !state.completed;
   adventure.querySelector('#adventure-failure').hidden = !state.failed && !state.abandoned;
   adventure.querySelector('#adventure-failure').textContent =
     `Adventure ${state.abandoned ? 'abandoned' : 'failed'}. Start a new adventure to try again.`;
   adventure.querySelector('#adventure-restart-cost').textContent =
-    `Starting a fresh adventure — after winning, failing, or abandoning one — costs ${state.restartCost.stamina} stamina and ${state.restartCost.hygiene} hygiene and opens a ${state.cooldownMinutes / 60}-hour wait, skippable with an Hourglass.`;
+    `New run: ${state.restartCost.stamina} stamina, ${state.restartCost.hygiene} hygiene, ${state.cooldownMinutes / 60}h cooldown.`;
   renderCooldown();
   adventure.querySelector('#adventure-resources').textContent = `HP ${state.hp} / ${state.maxHp} · MP ${state.mp} / ${state.maxMp}`;
   adventure.querySelector('#adventure-battle-summary').hidden = !state.battle;
@@ -268,8 +268,8 @@ function renderMonsters() {
   const notice = busyText() || (nearby.length
     ? `${nearby.map(e => e.name).join(', ')} nearby! Step into ${nearby.length > 1 ? 'one' : 'it'} to battle, or move away before ${nearby.length > 1 ? 'they attack' : 'it attacks'}.`
     : spotted.length ? `${spotted.map(e => e.name).join(', ')} spotted you! Move more than 3 blocks away to lose ${spotted.length > 1 ? 'them' : 'it'}.`
-    : state.chests.some(at) ? (state.chests.find(at).reward ? 'This chest is empty. Your reward is saved.' : 'You found a treasure chest. Press Space or choose Open chest to collect its reward.')
-    : at(state.up) ? 'Stairs up: press Space or choose Ascend to return to the previous floor.'
+    : state.chests.some(at) ? (state.chests.find(at).reward ? 'Chest already opened.' : 'You found a treasure chest. Press Space or choose Open chest to collect its reward.')
+    : at(state.up) ? 'Stairs up: Space or Ascend.'
     : at(state.down) ? 'Stairs down: press Space or choose Descend to explore deeper.' : '');
   // Only a new message is announced again.
   const noticeText = adventure.querySelector('#adventure-notice');
@@ -452,7 +452,7 @@ function renderLobby() {
   if (!lobby) return;
   const me = pet?.id, team = lobby.team, leader = team?.leader === me;
   const cost = state?.restartCost ?? { stamina: 40, hygiene: 20 };
-  teamUp.querySelector('#team-help').textContent = `Explore the woodland alone, or invite up to ${lobby.size - 1} other players to share one map. Teammates beside your pet join its battles. Setting off costs each pet ${cost.stamina} stamina and ${cost.hygiene} hygiene, the same as starting any new adventure.`;
+  teamUp.querySelector('#team-help').textContent = `Go solo, or invite up to ${lobby.size - 1} players to share a map. Setting off costs each pet ${cost.stamina} stamina and ${cost.hygiene} hygiene.`;
   const invitations = teamUp.querySelector('#team-invitation-list');
   invitations.replaceChildren();
   teamUp.querySelector('#team-invitations').hidden = lobby.invitations.length === 0 || Boolean(team);
