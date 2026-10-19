@@ -687,6 +687,73 @@ it('offers the Team up window before a first adventure, then opens the shared ma
   } finally { dom.window.close(); }
 });
 
+it('keeps reference info in the Game guide: shown once as a new pet reaches the map, then only from its button', async () => {
+  const { dom, window, $ } = page();
+  Object.defineProperty(window.document, 'hidden', { value: true }); // no patrol steps
+  const lobby = { team: null, invitations: [], run: { team: null, state: 'new' }, size: 4 };
+  let saved: any = { ...map(), started: false, hp: 9, maxHp: 15, mp: 2, maxMp: 5 };
+  const bodies: any[] = [];
+  window.fetch = vi.fn(async (url: string, options?: RequestInit) => {
+    if (url === '/api/team') return Response.json(lobby);
+    const body = options?.body ? JSON.parse(options.body as string) : {};
+    bodies.push(body);
+    if (body.direction) saved = { ...saved, started: true, x: saved.x + 1, revision: 'moved' };
+    return Response.json(saved);
+  }) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    const adventure = $('adventure-dialog') as HTMLDialogElement, guide = $('adventure-guide') as HTMLDialogElement;
+    // A first visit asks how to set off before anything else.
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(($('team-dialog') as HTMLDialogElement).open).toBe(true));
+    expect(guide.open).toBe(false);
+    $('team-solo').click();
+    await vi.waitFor(() => expect(guide.open).toBe(true));
+    expect(adventure.open).toBe(true);
+    expect(window.document.activeElement?.id).toBe('adventure-guide-close');
+    // Monster stats, treasure odds and run costs live in the guide, not on the map.
+    for (const id of ['adventure-enemies', 'adventure-restart-cost', 'adventure-stair-hint']) {
+      expect(guide.contains($(id))).toBe(true);
+      expect(adventure.contains($(id))).toBe(false);
+    }
+    expect($('adventure-enemies').children).toHaveLength(4);
+    expect(guide.textContent).toContain('Food 30%');
+    expect($('adventure-restart-cost').textContent).toBe('A new run costs 40 stamina and 20 hygiene. The next one opens 4 hours later.');
+    expect(adventure.textContent).not.toMatch(/Slime ·|Food 30%|Monster attributes|chases you/);
+    // HP and MP are rings: the arc's share is what's left.
+    const ring = (kind: string) => $(`adventure-${kind}-ring`);
+    expect(ring('hp').style.getPropertyValue('--gauge')).toBe('0.6');
+    expect(ring('hp').getAttribute('aria-valuetext')).toBe('9 of 15');
+    expect($('adventure-hp-text').textContent).toBe('9/15');
+    expect(ring('mp').style.getPropertyValue('--gauge')).toBe('0.4');
+    expect($('adventure-mp-text').textContent).toBe('2/5');
+    expect($('adventure-resources').textContent).toBe('HP 9 / 15 · MP 2 / 5');
+    // Keys pressed in the guide never move the pet behind it.
+    guide.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    expect(bodies.some(body => body.direction)).toBe(false);
+    $('adventure-guide-close').click();
+    expect(guide.open).toBe(false);
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+    adventure.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    await vi.waitFor(() => expect($('adventure-status').textContent).toBe('Column 4 · Row 3'));
+    // Once the pet has moved, reopening the map leaves the guide closed.
+    $('adventure-close').click();
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(guide.open).toBe(false);
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+    // Game guide opens it any time, and a battle starting closes it.
+    $('adventure-guide-open').click();
+    expect(guide.open).toBe(true);
+    window.document.dispatchEvent(new window.CustomEvent('battle:show', { detail: {
+      key: 'adventure:guide-test', battle: battleProgress().battle.playback, viewer: 'explorer', title: 'Floor 1 · Slime', result: '', won: true, replay: true,
+    } }));
+    expect(guide.open).toBe(false);
+  } finally { dom.window.close(); }
+});
+
 it('shows a team battle from the viewer\'s own side, with teammates as extra cards', async () => {
   const { dom, window, $ } = page();
   const playback = simulateTeamBattle(

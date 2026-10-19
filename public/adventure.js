@@ -1,88 +1,146 @@
 const adventure = document.createElement('dialog');
 adventure.id = 'adventure-dialog';
 adventure.setAttribute('aria-labelledby', 'adventure-title');
+// The Adventure fills the screen: a slim top bar, the map, and a bottom bar
+// with the HP/MP rings on the left and the movement pad on the right. Every
+// explanation and reference table lives in the Game guide window instead.
 adventure.innerHTML = `
-  <header><div><p class="section-label" id="adventure-floor">ADVENTURE · FLOOR 1 / 5</p><h2 id="adventure-title">Woodland clearing</h2></div>
+  <header class="adventure-top"><div><p class="section-label" id="adventure-floor">ADVENTURE · FLOOR 1 / 5</p><h2 id="adventure-title">Woodland clearing</h2></div>
     <div class="adventure-header-actions">
-      <button type="button" id="adventure-tutorial-toggle" class="chip-btn chip-buy">How to play</button>
+      <button type="button" id="adventure-abandon" class="chip-btn chip-buy" hidden>Abandon run</button>
+      <button type="button" id="adventure-guide-open" class="chip-btn chip-buy" aria-haspopup="dialog">Game guide</button>
       <button type="button" id="adventure-close" class="chip-btn">Leave</button>
     </div></header>
-  <p class="help adventure-tutorial-line" id="adventure-intro">Move: WASD or arrows. Space: act on your tile (open, climb).</p>
-  <div class="adventure-layout"><div class="adventure-map-area">
-  <div id="adventure-grid" role="img" aria-label="Woodland map" tabindex="0"></div>
-  <p id="adventure-status" role="status">Opening the clearing…</p>
-  <p id="adventure-resources" aria-live="polite"></p>
-  <p id="adventure-failure" role="status" hidden>Adventure failed. Start a new adventure to try again.</p>
-  <p id="adventure-cooldown" role="status" hidden></p>
-  <button type="button" id="adventure-skip-cooldown" class="chip-btn" hidden>Skip wait (use Hourglass)</button>
-  <div class="adventure-next">
-    <button type="button" id="adventure-restart" class="chip-btn" hidden>Start new adventure</button>
-    <button type="button" id="adventure-team-up" class="chip-btn chip-buy" hidden>Team up</button>
-  </div>
-  <button type="button" id="adventure-abandon" class="chip-btn" hidden>Abandon run</button>
-  <section id="adventure-battle-summary" aria-label="Last monster battle" hidden>
-    <p id="adventure-result" role="status"></p>
-    <div class="adventure-battle-actions">
-      <button type="button" id="adventure-replay" class="chip-btn">Watch last battle</button>
-      <button type="button" id="adventure-continue" class="chip-btn" hidden>Continue exploring</button>
+  <div class="adventure-stage">
+    <div class="adventure-side">
+      <section id="adventure-team" aria-labelledby="adventure-team-heading" hidden>
+        <h3 id="adventure-team-heading">Your team</h3>
+        <ul id="adventure-team-list"></ul>
+      </section>
+      <details class="adventure-backpack">
+        <summary id="adventure-backpack-title">Your backpack</summary>
+        <p class="help" id="adventure-care"></p>
+        <ul id="adventure-items"></ul>
+        <h4>Learned abilities</h4><ul id="adventure-abilities"></ul>
+        <h4>Unfair coins</h4><ul id="adventure-coins"></ul>
+      </details>
     </div>
-  </section>
-  <div class="adventure-controls" aria-label="Movement controls">
-    <button type="button" data-direction="w" aria-label="Move up">↑</button>
-    <button type="button" data-direction="a" aria-label="Move left">←</button>
-    <button type="button" data-direction="s" aria-label="Move down">↓</button>
-    <button type="button" data-direction="d" aria-label="Move right">→</button>
+    <div class="adventure-board">
+      <div id="adventure-grid" role="img" aria-label="Woodland map" tabindex="0"></div>
+      <p id="adventure-status" role="status" class="visually-hidden">Opening the clearing…</p>
+      <div class="adventure-messages">
+        <p id="adventure-notice" role="status"></p>
+        <p id="adventure-treasure" role="status"></p>
+        <p id="adventure-completion" role="status" hidden>Slime King defeated! Keep exploring if you like.</p>
+        <p id="adventure-failure" role="status" hidden>Adventure failed. Start a new adventure to try again.</p>
+        <p id="adventure-cooldown" role="status" hidden></p>
+        <section id="adventure-battle-summary" aria-label="Last monster battle" hidden>
+          <p id="adventure-result" role="status"></p>
+          <div class="adventure-buttons">
+            <button type="button" id="adventure-replay" class="chip-btn chip-buy">Watch last battle</button>
+            <button type="button" id="adventure-continue" class="chip-btn" hidden>Continue exploring</button>
+          </div>
+        </section>
+        <div class="adventure-buttons">
+          <button type="button" id="adventure-skip-cooldown" class="chip-btn" hidden>Skip wait (use Hourglass)</button>
+          <button type="button" id="adventure-restart" class="chip-btn" hidden>Start new adventure</button>
+          <button type="button" id="adventure-team-up" class="chip-btn chip-buy" hidden>Team up</button>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="adventure-stairs">
-    <button type="button" id="adventure-ascend" class="chip-btn" disabled>↑ Ascend</button>
-    <button type="button" id="adventure-descend" class="chip-btn" disabled>↓ Descend</button>
-  </div>
-  <button type="button" id="adventure-open-chest" class="chip-btn" disabled>Open chest</button>
-  <p id="adventure-treasure" role="status"></p>
-  <p id="adventure-notice" role="status"></p>
-  </div><aside class="adventure-guide" aria-label="Floor guide">
-    <section id="adventure-team" aria-labelledby="adventure-team-heading" hidden>
-      <h3 id="adventure-team-heading">Your team</h3>
-      <ul id="adventure-team-list"></ul>
-      <p class="help adventure-tutorial-line">Nearby teammates join your battles. One reward per chest, team-wide.</p>
-    </section>
-    <h3>On this floor</h3>
-    <p class="help" id="adventure-stair-hint"></p>
-    <div class="adventure-legend" aria-label="Map legend"></div>
-    <p class="help adventure-tutorial-line">HP/MP carry over. Win = +20% back.</p>
-    <details><summary>Monster attributes</summary>
-      <p class="help adventure-tutorial-line">A monster within 3 blocks (!) chases, then attacks once beside you.</p>
-      <ul id="adventure-enemies"></ul>
-    </details>
-    <p class="help" id="adventure-restart-cost"></p>
-    <p id="adventure-completion" class="help" role="status" hidden>Slime King defeated! Keep exploring if you like.</p>
-    <details><summary>Treasure odds</summary><p class="help">Food 30% · Soap 30% · Ability 20% · Hourglass 15% · Coin 5%.</p></details>
-    <details class="adventure-backpack">
-      <summary id="adventure-backpack-title">Your backpack</summary>
-      <p class="help" id="adventure-care"></p>
-      <ul id="adventure-items"></ul>
-      <h4>Learned abilities</h4><ul id="adventure-abilities"></ul>
-      <h4>Unfair coins</h4><ul id="adventure-coins"></ul>
-      <p class="help adventure-tutorial-line">A coin toss decides who strikes first.</p>
-    </details>
-  </aside></div>`;
+  <footer class="adventure-hud">
+    <div class="adventure-gauges">
+      <div class="adventure-gauge adventure-gauge-hp" id="adventure-hp-ring" role="meter" aria-label="HP" aria-valuemin="0">
+        <span class="adventure-gauge-value"><b>HP</b><span id="adventure-hp-text"></span></span>
+      </div>
+      <div class="adventure-gauge adventure-gauge-mp" id="adventure-mp-ring" role="meter" aria-label="MP" aria-valuemin="0">
+        <span class="adventure-gauge-value"><b>MP</b><span id="adventure-mp-text"></span></span>
+      </div>
+      <p id="adventure-resources" class="visually-hidden" aria-live="polite"></p>
+    </div>
+    <div class="adventure-actions">
+      <button type="button" id="adventure-open-chest" class="chip-btn" disabled>Open chest</button>
+      <button type="button" id="adventure-ascend" class="chip-btn" disabled>↑ Ascend</button>
+      <button type="button" id="adventure-descend" class="chip-btn" disabled>↓ Descend</button>
+    </div>
+    <div class="adventure-controls" aria-label="Movement controls">
+      <button type="button" data-direction="w" aria-label="Move up">↑</button>
+      <button type="button" data-direction="a" aria-label="Move left">←</button>
+      <button type="button" data-direction="s" aria-label="Move down">↓</button>
+      <button type="button" data-direction="d" aria-label="Move right">→</button>
+    </div>
+  </footer>`;
 document.body.append(adventure);
+// Everything a player might look up, kept off the map: how to play, the map
+// key, this floor's monsters, treasure odds, and what a new run costs. It
+// opens on its own for a pet's first adventure, and from Game guide after.
+const guide = document.createElement('dialog');
+guide.id = 'adventure-guide';
+guide.setAttribute('aria-labelledby', 'adventure-guide-title');
+guide.innerHTML = `
+  <header><div><p class="section-label">ADVENTURE</p><h2 id="adventure-guide-title">Game guide</h2></div>
+    <button type="button" id="adventure-guide-close" class="chip-btn">Close</button></header>
+  <section aria-labelledby="adventure-guide-play">
+    <h3 id="adventure-guide-play">How to play</h3>
+    <ul class="adventure-guide-list">
+      <li>Move with W/A/S/D, the arrow keys, or the arrow pad.</li>
+      <li>Space opens a chest or takes the stairs you stand on.</li>
+      <li>Walk into a monster to battle it.</li>
+      <li>A monster that spots you (!) chases you. Once beside you, it attacks.</li>
+      <li>Move more than 3 blocks away to lose it.</li>
+      <li>HP and MP carry between battles. A win gives back 20%.</li>
+      <li>A coin toss decides who strikes first.</li>
+      <li>Teammates beside you join your battles.</li>
+      <li>On a team, each chest opens once, for whoever gets there first.</li>
+    </ul>
+  </section>
+  <section aria-labelledby="adventure-guide-map">
+    <h3 id="adventure-guide-map">Map key</h3>
+    <div class="adventure-legend"></div>
+    <p class="help" id="adventure-stair-hint"></p>
+  </section>
+  <section aria-labelledby="adventure-guide-monsters">
+    <h3 id="adventure-guide-monsters">Monster attributes</h3>
+    <ul id="adventure-enemies"></ul>
+  </section>
+  <section aria-labelledby="adventure-guide-treasure">
+    <h3 id="adventure-guide-treasure">Treasure odds</h3>
+    <p class="help">Each chest gives one reward: Food 30% · Soap 30% · Ability 20% · Hourglass 15% · Coin 5%.</p>
+  </section>
+  <section aria-labelledby="adventure-guide-runs">
+    <h3 id="adventure-guide-runs">New runs</h3>
+    <p class="help" id="adventure-restart-cost"></p>
+  </section>`;
+document.body.append(guide);
 const grid = adventure.querySelector('#adventure-grid');
 const status = adventure.querySelector('#adventure-status');
 let pending = false, generation = 0, state = null, pet = null, shownBattle = null;
 // Order of map requests sent and of the last one shown, so an older answer
 // never replaces a newer one.
 let sent = 0, shown = 0, patrolling = false;
-// Shown automatically only for a pet that has never adventured before
-// (state.started), then stays out of the way; How to play brings it back.
-let tutorialSeen = false, tutorialKnown = false;
-function renderTutorial() {
-  adventure.querySelectorAll('.adventure-tutorial-line').forEach(line => { line.hidden = tutorialSeen; });
+// Whether this opening of the map has already decided to show the guide.
+let guideOffered = false;
+function openGuide() {
+  if (guide.open || !adventure.open) return;
+  guide.showModal();
+  guide.querySelector('#adventure-guide-close').focus({ preventScroll: true });
 }
-adventure.querySelector('#adventure-tutorial-toggle').addEventListener('click', () => {
-  tutorialSeen = false;
-  renderTutorial();
-});
+adventure.querySelector('#adventure-guide-open').addEventListener('click', openGuide);
+guide.querySelector('#adventure-guide-close').addEventListener('click', () => guide.close());
+// Closing the guide hands the keyboard straight back to the map.
+guide.addEventListener('close', () => { if (adventure.open) grid.focus({ preventScroll: true }); });
+// A battle that starts while the guide is open takes over the screen.
+document.addEventListener('battle:show', () => { if (guide.open) guide.close(); });
+// Draws one HP or MP ring: the coloured arc shows how much is left.
+function gauge(kind, value, max) {
+  const ring = adventure.querySelector(`#adventure-${kind}-ring`);
+  ring.style.setProperty('--gauge', String(max > 0 ? Math.max(0, Math.min(1, value / max)) : 0));
+  ring.setAttribute('aria-valuemax', String(max));
+  ring.setAttribute('aria-valuenow', String(value));
+  ring.setAttribute('aria-valuetext', `${value} of ${max}`);
+  adventure.querySelector(`#adventure-${kind}-text`).textContent = `${value}/${max}`;
+}
 const icons = {
   slime: '<use href="#monster-slime"/>',
   goblin: '<use href="#monster-goblin"/>',
@@ -93,7 +151,7 @@ const icons = {
   down: '<path d="M3 21h6v-6h6V9h6M5 2v8m-3-3 3 3 3-3"/>',
 };
 const mapIcon = kind => `<svg viewBox="0 0 24 24" aria-hidden="true" class="adventure-icon">${icons[kind]}</svg>`;
-const legend = adventure.querySelector('.adventure-legend');
+const legend = guide.querySelector('.adventure-legend');
 for (const [kind, label] of [['slime', 'Slime'], ['goblin', 'Goblin'], ['slime-king', 'Slime King'], ['chest', 'Chest'], ['up', 'Stairs up'], ['down', 'Stairs down']]) {
   const entry = document.createElement('span');
   entry.className = `adventure-marker-${kind}`;
@@ -133,14 +191,15 @@ function syncControls() {
     pending || Boolean(state?.battle?.pending) || !state?.inventory?.items.find(item => item.id === button.dataset.useItem)?.usable));
 }
 function clearMap() {
-  state = null; shownBattle = null; tutorialKnown = false;
+  state = null; shownBattle = null; guideOffered = false;
+  if (guide.open) guide.close();
   grid.replaceChildren();
   grid.setAttribute('aria-label', 'Woodland map');
   grid.setAttribute('aria-busy', 'false');
   adventure.querySelector('#adventure-title').textContent = 'Woodland adventure';
   adventure.querySelector('#adventure-floor').textContent = 'ADVENTURE';
-  adventure.querySelector('#adventure-stair-hint').textContent = '';
-  adventure.querySelector('#adventure-enemies').replaceChildren();
+  guide.querySelector('#adventure-stair-hint').textContent = '';
+  guide.querySelector('#adventure-enemies').replaceChildren();
   adventure.querySelector('#adventure-team').hidden = true;
   adventure.querySelector('#adventure-team-list').replaceChildren();
   adventure.querySelector('#adventure-notice').textContent = '';
@@ -154,8 +213,10 @@ function clearMap() {
   adventure.querySelector('#adventure-abandon').hidden = true;
   adventure.querySelector('#adventure-cooldown').hidden = true;
   adventure.querySelector('#adventure-skip-cooldown').hidden = true;
-  adventure.querySelector('#adventure-restart-cost').textContent = '';
+  guide.querySelector('#adventure-restart-cost').textContent = '';
   adventure.querySelector('#adventure-resources').textContent = '';
+  gauge('hp', 0, 0);
+  gauge('mp', 0, 0);
   for (const id of ['adventure-treasure', 'adventure-care', 'adventure-items', 'adventure-abilities', 'adventure-coins']) {
     adventure.querySelector(`#${id}`).replaceChildren();
   }
@@ -190,23 +251,21 @@ setInterval(() => { if (adventure.open) renderCooldown(); }, 1000);
 
 function renderMap() {
   if (!state) return;
-  // Shown by default only before the pet's very first move; later refreshes
-  // (patrols, battles) leave a player's own How to play toggle alone.
-  if (!tutorialKnown) { tutorialSeen = state.started; tutorialKnown = true; }
-  renderTutorial();
   adventure.querySelector('#adventure-title').textContent = state.name;
   adventure.querySelector('#adventure-floor').textContent = `ADVENTURE · FLOOR ${state.floor} / ${state.floorCount}`;
-  adventure.querySelector('#adventure-stair-hint').textContent = state.down
-    ? '↓ stairs: column 14, row 14.'
-    : state.completed ? 'Final floor. Slime King defeated.' : 'Final floor: the Slime King.';
+  guide.querySelector('#adventure-stair-hint').textContent = state.down
+    ? 'The ↓ stairs are at column 14, row 14.'
+    : state.completed ? 'Final floor. The Slime King is defeated.' : 'Final floor. The Slime King lives here.';
   adventure.querySelector('#adventure-completion').hidden = !state.completed;
   adventure.querySelector('#adventure-failure').hidden = !state.failed && !state.abandoned;
   adventure.querySelector('#adventure-failure').textContent =
     `Adventure ${state.abandoned ? 'abandoned' : 'failed'}. Start a new adventure to try again.`;
-  adventure.querySelector('#adventure-restart-cost').textContent =
-    `New run: ${state.restartCost.stamina} stamina, ${state.restartCost.hygiene} hygiene, ${state.cooldownMinutes / 60}h cooldown.`;
+  guide.querySelector('#adventure-restart-cost').textContent =
+    `A new run costs ${state.restartCost.stamina} stamina and ${state.restartCost.hygiene} hygiene. The next one opens ${state.cooldownMinutes / 60} hours later.`;
   renderCooldown();
   adventure.querySelector('#adventure-resources').textContent = `HP ${state.hp} / ${state.maxHp} · MP ${state.mp} / ${state.maxMp}`;
+  gauge('hp', state.hp, state.maxHp);
+  gauge('mp', state.mp, state.maxMp);
   adventure.querySelector('#adventure-battle-summary').hidden = !state.battle;
   adventure.querySelector('#adventure-result').textContent = state.battle ? battleResult(state.battle) : '';
   adventure.querySelector('#adventure-continue').hidden = !state.battle?.pending;
@@ -236,7 +295,7 @@ function renderTeam() {
 // window, its focus, and its announcements alone.
 function renderMonsters() {
   renderTeam();
-  const roster = adventure.querySelector('#adventure-enemies');
+  const roster = guide.querySelector('#adventure-enemies');
   roster.replaceChildren();
   for (const enemy of state.enemies) {
     const item = document.createElement('li');
@@ -279,7 +338,7 @@ function renderMonsters() {
     grid.append(cell);
   }));
   const mates = teammatesHere(), sharing = mates.filter(m => m.x === state.x && m.y === state.y).map(m => m.id);
-  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Monster locations are in Monster attributes. Trees block movement; stepping into a monster starts battle, and so does a monster stepping into your pet. Space opens a chest or takes the stairs your pet stands on.`);
+  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Monster locations are in the Game guide. Trees block movement; stepping into a monster starts battle, and so does a monster stepping into your pet. Space opens a chest or takes the stairs your pet stands on.`);
   const nearby = state.enemies.filter(e => state.encounters.includes(e.id));
   const spotted = state.enemies.filter(e => e.alerted && !state.encounters.includes(e.id));
   const notice = busyText() || (nearby.length
@@ -387,6 +446,7 @@ async function request(payload = {}) {
     state = result; shown = order;
     renderMap();
     if (state.battle?.pending) showBattle();
+    else offerGuide();
   } catch (error) {
     if (version === generation) status.textContent = error.message || 'Connection lost. Try again.';
   } finally {
@@ -539,9 +599,10 @@ async function teamRequest(body) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Could not update the team. Try again.');
     ++lobbyGeneration;
+    const wasNew = lobby?.run.state === 'new';
     lobby = result;
     if (body.action === 'invite') teamUp.querySelector('#team-invite-id').value = '';
-    if (lobby.run.state === 'exploring' && lobby.run.team) return openMap();
+    if (lobby.run.state === 'exploring' && lobby.run.team) { firstRun = wasNew; return openMap(); }
   } catch (error) {
     teamUp.querySelector('#team-error').textContent = error.message || 'Connection lost. Try again.';
   } finally {
@@ -549,8 +610,21 @@ async function teamRequest(body) {
     renderLobby();
   }
 }
-function openMap(payload) {
+// A pet that has never made a move gets the guide once, as it reaches the
+// map. Opening from the Adventure button waits: a first visit goes to the
+// Team up window, and the guide follows Go solo or setting off together.
+// Setting off counts as starting, so a pet's first team run is remembered
+// from the Team up window it set off from.
+let holdGuide = false, firstRun = false;
+function offerGuide() {
+  if (guideOffered || holdGuide || !state) return;
+  guideOffered = true;
+  if (state.started === false || firstRun) openGuide();
+  firstRun = false;
+}
+function openMap(payload, { guideLater = false } = {}) {
   if (teamUp.open) teamUp.close();
+  holdGuide = guideLater;
   if (adventure.open) return request(payload);
   clearMap();
   adventure.showModal();
@@ -570,9 +644,11 @@ function openLobby() {
 }
 document.getElementById('adventure-open').addEventListener('click', async () => {
   if (adventure.open || teamUp.open) return;
-  await openMap();
+  await openMap(undefined, { guideLater: true });
   // A pet that hasn't set off yet chooses: alone, or with a team.
   if (adventure.open && state?.started === false) await chooseTeam();
+  // Still on the map (a returning pet, or Team up couldn't open): no wait.
+  if (adventure.open) { holdGuide = false; offerGuide(); }
 });
 // Swaps the map for the Team up window, if the server can show it.
 async function chooseTeam() {
@@ -613,12 +689,16 @@ document.addEventListener('team:updated', async ({ detail: team }) => {
   if (!lobby || !pet) return;
   const mine = lobby.team?.id === team.id || lobby.invitations.some(i => i.id === team.id) || team.members.some(m => m.id === pet.id);
   if (!mine) return;
+  const wasNew = lobby.run.state === 'new';
   try { await loadLobby(); } catch { return; }
-  if (teamUp.open && lobby.run.state === 'exploring' && lobby.run.team) return openMap();
+  if (teamUp.open && lobby.run.state === 'exploring' && lobby.run.team) { firstRun = wasNew; return openMap(); }
   if (teamUp.open) renderLobby();
 });
 adventure.querySelector('#adventure-close').addEventListener('click', () => adventure.close());
-adventure.addEventListener('close', () => { generation++; pending = false; state = null; });
+adventure.addEventListener('close', () => {
+  generation++; pending = false; state = null;
+  if (guide.open) guide.close();
+});
 adventure.querySelectorAll('[data-direction]').forEach(button => button.addEventListener('click', () => {
   if (state) request({ direction: button.dataset.direction });
   else request();
@@ -722,6 +802,7 @@ document.addEventListener('adventure:pet', event => {
 document.addEventListener('adventure:reset', () => {
   generation++; pending = false; state = null; pet = null;
   lobbyGeneration++; lobbyPending = false; lobby = null;
+  holdGuide = false; firstRun = false;
   if (adventure.open) adventure.close();
   if (teamUp.open) teamUp.close();
   clearMap();

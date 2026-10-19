@@ -511,10 +511,21 @@ on: it opens an unopened chest, or takes the stairs there (Descend or
 Ascend), so the whole adventure plays without a mouse. On a focused button,
 Space presses that button instead.
 
-A pet's first ever visit shows short how-to-play notes inline on the map
-(controls, how monsters behave, HP/MP carrying over, coin tosses). Once the
-pet has taken its first action, later visits leave the map uncluttered; a
-**How to play** button in the dialog's header brings the notes back anytime.
+The Adventure fills the whole screen. A slim top bar shows the floor, with
+**Abandon run**, **Game guide**, and **Leave**. The map takes up the middle.
+At the bottom left, two rings show your pet's **HP (red)** and **MP (blue)**:
+the coloured arc is what's left, and the number inside reads e.g. `12/15`. The
+arrow pad sits at the bottom right. **Open chest**, **Ascend**, and **Descend**
+appear only while your pet stands on a chest or stairs. Your team and
+backpack sit beside the map (under it on a phone).
+
+The map itself carries no instructions. Everything to look up lives in the
+**Game guide** window: how to play, the map key, where the down stairs are,
+each monster's position and attributes, the treasure odds, and what a new run
+costs. It opens on its own the first time a pet reaches the map (after **Go
+solo**, or after setting off with a team), and from **Game guide** any time
+after that. Close or Escape returns the keyboard to the map. A battle that
+starts while it's open closes it.
 
 Each of the five fixed floors starts with a 16 × 16 grid, four regular
 enemies (slimes and goblins), and at least one marked treasure chest. Floor
@@ -567,8 +578,8 @@ does change it, as any battle does; the response carries the battle, with
 `battle.attacked: true`, and the battle scene's title says the monster
 attacks. Saves from before patrols existed keep their monster positions and
 gain the routes. Enemy attributes and positions are listed under **Monster
-attributes**, and every stair and chest is reachable through the map's
-paths.
+attributes** in the Game guide, and every stair and chest is reachable
+through the map's paths.
 
 For initial balancing, floor-one slimes have STR/INT/CHA **3/1/2**, and
 goblins have **5/3/2**. Each deeper floor adds **2/1/1**. The floor-five
@@ -651,7 +662,7 @@ MP), which deals two-thirds of the pet's *current* HP, rounded up: a pet at
 70 HP takes 47. Like every fighter, the king picks whichever affordable
 attack hits harder that turn. Bump wins while the pet's HP is high; Claw
 Strike takes over as it falls. Its 10 MP allow at most two Bumps per
-battle. **Monster attributes** lists Bump beside the Slime King. Pets can't
+battle. The Game guide's **Monster attributes** lists Bump beside the Slime King. Pets can't
 learn it. Initiative uses the same coin toss as Arena: a fair 50/50 unless
 the pet's own equipped Unfair Coin overrides it — monsters never carry
 coins. The scene starts at the pet's saved HP/MP (plus any Copper shield),

@@ -1,84 +1,135 @@
+/* The Adventure takes the whole screen: a slim top bar, the map as large as
+   fits, and a bottom bar with the HP/MP rings (left) and the arrow pad (right). */
 #adventure-dialog {
-  width: min(860px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
-  box-sizing: border-box; overflow: auto; padding: 20px;
-  color: var(--fg); background: var(--surface); border: 2px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow);
+  width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0;
+  box-sizing: border-box; padding: 12px 20px; border: 0; border-radius: 0;
+  color: var(--fg); background: var(--bg); overflow: hidden;
 }
-#adventure-dialog::backdrop { background: rgb(0 0 0 / 65%); }
-#adventure-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-#adventure-dialog h2 { margin: 4px 0; }
-#adventure-dialog .help { margin: 10px 0; }
-.adventure-header-actions { display: flex; flex-shrink: 0; gap: 8px; }
+#adventure-dialog[open] { display: flex; flex-direction: column; gap: 8px; }
+#adventure-dialog::backdrop { background: var(--bg); }
+.adventure-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none; }
+.adventure-top h2 { margin: 2px 0 0; font-size: 1.25rem; }
+.adventure-header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .adventure-header-actions button { min-height: 44px; }
-@media (max-width: 480px) { .adventure-header-actions { flex-wrap: wrap; justify-content: flex-end; } }
+#adventure-dialog :focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
+
+.adventure-stage { flex: 1; min-height: 0; display: flex; justify-content: center; gap: 16px; }
+.adventure-board { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 #adventure-grid {
-  display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); grid-template-rows: repeat(16, minmax(0, 1fr)); aspect-ratio: 1;
-  width: min(100%, max(240px, calc(100dvh - 350px)));
-  margin: 12px auto; border: 2px solid var(--border); background: var(--bg);
+  display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); grid-template-rows: repeat(16, minmax(0, 1fr));
+  aspect-ratio: 1; flex: 0 1 auto; width: auto; height: 100%; max-width: 100%; min-height: 0;
+  border: 2px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface);
 }
-#adventure-grid > span { min-width: 0; min-height: 0; border: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
+#adventure-grid > span { position: relative; min-width: 0; min-height: 0; border: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
 .adventure-tree { background: var(--money); border-radius: 40% 40% 15% 15%; box-shadow: inset 0 -3px rgb(0 0 0 / 20%); }
 .adventure-player { background: var(--bg-glow); outline: 2px solid var(--primary); z-index: 1; }
 .adventure-player svg { color: var(--pet-color, #f59e0b); display: block; width: 100%; height: 100%; }
-#adventure-status { text-align: center; min-height: 1.5em; margin: 8px 0; }
-#adventure-resources { text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; margin: 8px 0 12px; }
-#adventure-failure { color: var(--error); text-align: center; }
-#adventure-restart { display: block; margin: 12px auto; min-height: 44px; }
-#adventure-open-chest { display: block; margin: 12px auto 0; min-height: 44px; }
-#adventure-treasure { text-align: center; font-weight: 700; font-size: .9rem; }
 .adventure-chest-opened { opacity: .65; }
-.adventure-backpack { border-top: 1px solid var(--border); margin-top: 16px; }
-.adventure-backpack h4 { font-size: .9rem; margin: 16px 0 8px; }
-.adventure-backpack ul { list-style: none; padding: 0; margin: 0; font-size: .8rem; }
-.adventure-backpack li { margin-bottom: 12px; overflow-wrap: anywhere; }
-#adventure-items li, #adventure-coins li { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-#adventure-items button, #adventure-coins button { min-height: 44px; }
-.adventure-controls { display: flex; justify-content: center; gap: 8px; }
-.adventure-controls button { min-width: 48px; min-height: 48px; border: 1px solid var(--border); border-radius: 12px; color: var(--fg); background: var(--bg); font-size: 24px; }
-.adventure-controls button:active { background: var(--bg-glow); }
-#adventure-dialog :focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
-@media (max-width: 480px) { #adventure-dialog { padding: 12px; } #adventure-dialog h2 { font-size: 20px; } }
-
-.adventure-layout { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 20px; }
-.adventure-map-area { min-width: 0; }
-.adventure-stairs { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
-.adventure-stairs button { min-height: 44px; }
-#adventure-battle-summary { margin: 12px 0; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
-#adventure-result { margin: 0 0 10px; font-size: .85rem; }
-.adventure-battle-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-.adventure-battle-actions button { min-height: 44px; }
-#adventure-notice { min-height: 2.6em; margin: 10px 0 0; font-size: .85rem; text-align: center; }
-.adventure-guide { border-left: 1px solid var(--border); padding-left: 16px; }
-.adventure-guide h3 { margin: 10px 0; font-size: 1rem; }
-.adventure-guide summary { padding: 12px 0; cursor: pointer; font-size: .9rem; }
-#adventure-enemies { padding-left: 16px; font-size: .8rem; }
-#adventure-enemies li { margin-bottom: 10px; }
-.adventure-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 6px; font-size: .75rem; }
-.adventure-legend > span { display: flex; align-items: center; gap: 4px; }
 .adventure-icon { display: block; width: 100%; height: 100%; fill: none; stroke: var(--fg); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
-.adventure-legend .adventure-icon { width: 24px; height: 24px; flex-shrink: 0; }
 .adventure-marker-slime { color: var(--hygiene); }
 .adventure-marker-goblin { color: var(--money); }
 .adventure-marker-slime-king { color: var(--charisma); }
 .adventure-marker-chest { color: var(--stamina); }
-#adventure-grid > span { position: relative; }
 .adventure-alerted { outline: 2px solid var(--error); outline-offset: -2px; }
 .adventure-alerted::after { content: '!'; position: absolute; top: -5px; right: -2px; color: var(--on-primary); background: var(--primary); font: bold 12px sans-serif; border-radius: 50%; width: 12px; text-align: center; }
-@media (max-width: 640px) {
-  .adventure-layout { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  .adventure-guide { border-left: 0; border-top: 1px solid var(--border); padding: 0; }
-  .adventure-legend { grid-template-columns: repeat(3, 1fr); }
-}
-
-.adventure-next { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 12px auto; }
-.adventure-next #adventure-restart { margin: 0; }
-.adventure-next button { min-height: 44px; }
 .adventure-teammate { background: color-mix(in srgb, var(--bg-glow) 60%, transparent); outline: 2px dashed var(--muted); outline-offset: -2px; }
 .adventure-teammate svg { color: var(--pet-color, #f59e0b); display: block; width: 100%; height: 100%; }
 /* Your pet's tile, shared with teammates: a badge counts the pets on it. */
 .adventure-shared::after { content: attr(data-shared); position: absolute; bottom: -4px; right: -4px; min-width: 14px; padding: 0 2px; box-sizing: border-box; color: var(--on-primary); background: var(--intelligence); font: bold 10px/14px sans-serif; border-radius: 7px; text-align: center; }
-#adventure-team-list { padding-left: 16px; font-size: .8rem; }
-#adventure-team-list li { margin-bottom: 8px; overflow-wrap: anywhere; }
+
+/* Short messages under the map: what is nearby, rewards, and how a run ended. */
+.adventure-messages { flex: none; width: min(100%, 560px); display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-size: .9rem; }
+.adventure-messages p { margin: 0; overflow-wrap: anywhere; }
+.adventure-messages p:empty { display: none; }
+#adventure-treasure { font-weight: 700; }
+#adventure-failure { color: var(--error); font-weight: 700; }
+#adventure-battle-summary { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+#adventure-result { font-size: .85rem; }
+.adventure-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.adventure-buttons:not(:has(button:not([hidden]))) { display: none; }
+
+/* Team and backpack sit beside the map on wide screens, and under it on phones. */
+.adventure-side { flex: 0 0 220px; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; }
+.adventure-side:not(:has(#adventure-team:not([hidden]))) .adventure-backpack:not([open]) { margin-top: auto; }
+.adventure-side h3 { margin: 0 0 6px; font-size: 1rem; }
+#adventure-team-list { margin: 0; padding-left: 16px; font-size: .8rem; }
+#adventure-team-list li { margin-bottom: 6px; overflow-wrap: anywhere; }
+.adventure-backpack { padding: 4px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.adventure-backpack summary { padding: 10px 0; font-weight: 700; }
+.adventure-backpack h4 { font-size: .9rem; margin: 16px 0 8px; }
+.adventure-backpack ul { list-style: none; padding: 0; margin: 0; font-size: .8rem; }
+.adventure-backpack li { margin-bottom: 12px; overflow-wrap: anywhere; }
+.adventure-backpack .help { margin: 0 0 10px; }
+#adventure-items li, #adventure-coins li { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+#adventure-items button, #adventure-coins button { min-height: 44px; }
+
+/* Bottom bar: HP/MP rings on the left, tile actions, arrow pad on the right.
+   Registering --gauge lets the ring sweep smoothly when HP or MP changes. */
+@property --gauge { syntax: '<number>'; inherits: false; initial-value: 0; }
+.adventure-hud { flex: none; display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: 12px; }
+.adventure-gauges { display: flex; gap: 12px; }
+.adventure-gauge {
+  --gauge: 0; --size: 84px;
+  position: relative; display: grid; place-items: center; width: var(--size); height: var(--size); border-radius: 50%;
+  background: conic-gradient(var(--tone) calc(var(--gauge) * 1turn), color-mix(in srgb, var(--tone) 18%, var(--surface)) 0);
+  transition: --gauge 300ms var(--ease);
+}
+.adventure-gauge::before { content: ''; position: absolute; inset: 9px; border-radius: 50%; background: var(--surface); box-shadow: inset 0 1px 3px rgb(0 0 0 / 15%); }
+.adventure-gauge-hp { --tone: var(--strength); }
+.adventure-gauge-mp { --tone: var(--intelligence); }
+.adventure-gauge-value { position: relative; display: grid; justify-items: center; line-height: 1.1; font-variant-numeric: tabular-nums; font-weight: 700; font-size: .85rem; }
+.adventure-gauge-value b { color: var(--tone); font-size: .75rem; letter-spacing: .08em; }
+.adventure-actions { display: flex; flex-wrap: wrap; justify-content: center; align-self: center; gap: 8px; }
+.adventure-actions button { min-height: 44px; }
+.adventure-actions button:disabled { display: none; }
+.adventure-controls { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(2, 48px); gap: 6px; }
+.adventure-controls button { min-width: 48px; min-height: 48px; border: 1px solid var(--border); border-radius: 12px; color: var(--fg); background: var(--surface); font-size: 24px; }
+.adventure-controls button:active { background: var(--bg-glow); }
+.adventure-controls [data-direction="w"] { grid-column: 2; grid-row: 1; }
+.adventure-controls [data-direction="a"] { grid-column: 1; grid-row: 2; }
+.adventure-controls [data-direction="s"] { grid-column: 2; grid-row: 2; }
+.adventure-controls [data-direction="d"] { grid-column: 3; grid-row: 2; }
+
+/* Phones: the map on top, then the backpack, with the HUD fixed to the bottom
+   edge (rings left, pad right). The middle scrolls when the backpack is open. */
+@media (max-width: 760px) {
+  #adventure-dialog { padding: 8px 12px; gap: 8px; }
+  .adventure-top h2 { font-size: 1.1rem; }
+  .adventure-stage { flex-direction: column; justify-content: flex-start; gap: 8px; overflow-y: auto; }
+  .adventure-board { flex: none; order: -1; }
+  #adventure-grid { width: 100%; height: auto; }
+  .adventure-side { flex: none; overflow: visible; padding: 0; }
+  .adventure-side:not(:has(#adventure-team:not([hidden]))) .adventure-backpack:not([open]) { margin-top: 0; }
+  .adventure-hud { grid-template-columns: auto 1fr; padding-top: 8px; border-top: 1px solid var(--border); }
+  .adventure-actions { grid-column: 1 / -1; grid-row: 1; }
+  .adventure-controls { justify-self: end; }
+  .adventure-gauge { --size: 68px; }
+  .adventure-gauge::before { inset: 7px; }
+}
+
+/* The Game guide: a window over the map with everything to look up. */
+#adventure-guide {
+  width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+  box-sizing: border-box; overflow: auto; padding: 20px;
+  color: var(--fg); background: var(--surface); border: 2px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+#adventure-guide::backdrop { background: rgb(0 0 0 / 55%); }
+#adventure-guide header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#adventure-guide header .chip-btn { min-height: 44px; }
+#adventure-guide h2 { margin: 4px 0; }
+#adventure-guide h3 { margin: 20px 0 8px; font-size: 1rem; }
+#adventure-guide .help { margin: 8px 0 0; }
+#adventure-guide :focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
+.adventure-guide-list { margin: 0; padding-left: 20px; font-size: .9rem; }
+.adventure-guide-list li { margin-bottom: 4px; }
+.adventure-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; font-size: .8rem; }
+.adventure-legend > span { display: flex; align-items: center; gap: 6px; }
+.adventure-legend .adventure-icon { width: 24px; height: 24px; flex-shrink: 0; }
+#adventure-enemies { margin: 0; padding-left: 20px; font-size: .85rem; }
+#adventure-enemies li { margin-bottom: 8px; overflow-wrap: anywhere; }
+@media (max-width: 480px) { #adventure-guide { padding: 12px; } #adventure-guide h2 { font-size: 20px; } .adventure-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .adventure-gauge { transition: none; } }
 
 #team-dialog {
   width: min(480px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
