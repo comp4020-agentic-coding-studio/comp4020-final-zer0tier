@@ -511,6 +511,11 @@ on: it opens an unopened chest, or takes the stairs there (Descend or
 Ascend), so the whole adventure plays without a mouse. On a focused button,
 Space presses that button instead.
 
+A pet's first ever visit shows short how-to-play notes inline on the map
+(controls, how monsters behave, HP/MP carrying over, coin tosses). Once the
+pet has taken its first action, later visits leave the map uncluttered; a
+**How to play** button in the dialog's header brings the notes back anytime.
+
 Each of the five fixed floors starts with a 16 × 16 grid, four regular
 enemies (slimes and goblins), and at least one marked treasure chest. Floor
 five also holds the **Slime King**. The map uses your pet's saved shape and

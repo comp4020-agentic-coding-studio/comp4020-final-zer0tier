@@ -3,8 +3,11 @@ adventure.id = 'adventure-dialog';
 adventure.setAttribute('aria-labelledby', 'adventure-title');
 adventure.innerHTML = `
   <header><div><p class="section-label" id="adventure-floor">ADVENTURE · FLOOR 1 / 5</p><h2 id="adventure-title">Woodland clearing</h2></div>
-    <button type="button" id="adventure-close" class="chip-btn">Leave</button></header>
-  <p class="help">Move: WASD or arrows. Space: act on your tile (open, climb).</p>
+    <div class="adventure-header-actions">
+      <button type="button" id="adventure-tutorial-toggle" class="chip-btn chip-buy">How to play</button>
+      <button type="button" id="adventure-close" class="chip-btn">Leave</button>
+    </div></header>
+  <p class="help adventure-tutorial-line" id="adventure-intro">Move: WASD or arrows. Space: act on your tile (open, climb).</p>
   <div class="adventure-layout"><div class="adventure-map-area">
   <div id="adventure-grid" role="img" aria-label="Woodland map" tabindex="0"></div>
   <p id="adventure-status" role="status">Opening the clearing…</p>
@@ -41,14 +44,14 @@ adventure.innerHTML = `
     <section id="adventure-team" aria-labelledby="adventure-team-heading" hidden>
       <h3 id="adventure-team-heading">Your team</h3>
       <ul id="adventure-team-list"></ul>
-      <p class="help">Nearby teammates join your battles. One reward per chest, team-wide.</p>
+      <p class="help adventure-tutorial-line">Nearby teammates join your battles. One reward per chest, team-wide.</p>
     </section>
     <h3>On this floor</h3>
     <p class="help" id="adventure-stair-hint"></p>
     <div class="adventure-legend" aria-label="Map legend"></div>
-    <p class="help">HP/MP carry over. Win = +20% back.</p>
+    <p class="help adventure-tutorial-line">HP/MP carry over. Win = +20% back.</p>
     <details><summary>Monster attributes</summary>
-      <p class="help">A monster within 3 blocks (!) chases, then attacks once beside you.</p>
+      <p class="help adventure-tutorial-line">A monster within 3 blocks (!) chases, then attacks once beside you.</p>
       <ul id="adventure-enemies"></ul>
     </details>
     <p class="help" id="adventure-restart-cost"></p>
@@ -60,7 +63,7 @@ adventure.innerHTML = `
       <ul id="adventure-items"></ul>
       <h4>Learned abilities</h4><ul id="adventure-abilities"></ul>
       <h4>Unfair coins</h4><ul id="adventure-coins"></ul>
-      <p class="help">A coin toss decides who strikes first.</p>
+      <p class="help adventure-tutorial-line">A coin toss decides who strikes first.</p>
     </details>
   </aside></div>`;
 document.body.append(adventure);
@@ -70,6 +73,16 @@ let pending = false, generation = 0, state = null, pet = null, shownBattle = nul
 // Order of map requests sent and of the last one shown, so an older answer
 // never replaces a newer one.
 let sent = 0, shown = 0, patrolling = false;
+// Shown automatically only for a pet that has never adventured before
+// (state.started), then stays out of the way; How to play brings it back.
+let tutorialSeen = false, tutorialKnown = false;
+function renderTutorial() {
+  adventure.querySelectorAll('.adventure-tutorial-line').forEach(line => { line.hidden = tutorialSeen; });
+}
+adventure.querySelector('#adventure-tutorial-toggle').addEventListener('click', () => {
+  tutorialSeen = false;
+  renderTutorial();
+});
 const icons = {
   slime: '<use href="#monster-slime"/>',
   goblin: '<use href="#monster-goblin"/>',
@@ -120,7 +133,7 @@ function syncControls() {
     pending || Boolean(state?.battle?.pending) || !state?.inventory?.items.find(item => item.id === button.dataset.useItem)?.usable));
 }
 function clearMap() {
-  state = null; shownBattle = null;
+  state = null; shownBattle = null; tutorialKnown = false;
   grid.replaceChildren();
   grid.setAttribute('aria-label', 'Woodland map');
   grid.setAttribute('aria-busy', 'false');
@@ -177,6 +190,10 @@ setInterval(() => { if (adventure.open) renderCooldown(); }, 1000);
 
 function renderMap() {
   if (!state) return;
+  // Shown by default only before the pet's very first move; later refreshes
+  // (patrols, battles) leave a player's own How to play toggle alone.
+  if (!tutorialKnown) { tutorialSeen = state.started; tutorialKnown = true; }
+  renderTutorial();
   adventure.querySelector('#adventure-title').textContent = state.name;
   adventure.querySelector('#adventure-floor').textContent = `ADVENTURE · FLOOR ${state.floor} / ${state.floorCount}`;
   adventure.querySelector('#adventure-stair-hint').textContent = state.down

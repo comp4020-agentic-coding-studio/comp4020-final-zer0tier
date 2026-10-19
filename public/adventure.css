@@ -8,6 +8,9 @@
 #adventure-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 #adventure-dialog h2 { margin: 4px 0; }
 #adventure-dialog .help { margin: 10px 0; }
+.adventure-header-actions { display: flex; flex-shrink: 0; gap: 8px; }
+.adventure-header-actions button { min-height: 44px; }
+@media (max-width: 480px) { .adventure-header-actions { flex-wrap: wrap; justify-content: flex-end; } }
 #adventure-grid {
   display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); grid-template-rows: repeat(16, minmax(0, 1fr)); aspect-ratio: 1;
   width: min(100%, max(240px, calc(100dvh - 350px)));
