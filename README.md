@@ -604,7 +604,9 @@ while a run is still in progress.
 **Every confirmation is a Yes/No window.** Whenever the game needs you to
 confirm something, it opens a small window with the question and **Yes** and
 **No**, never the browser's own prompt. Focus starts on **No**, so a stray key
-never confirms; Escape or a click outside the window also answers No.
+never confirms; Escape or a click outside the window also answers No. A battle
+that starts while the window is open (a monster attacking, or an Arena fight)
+answers it No as well, since the question no longer fits the moment.
 
 **Skip to result**, **Replay battle**, and **Watch last battle** only play the
 saved turns. **Return to map** (or Escape from the battle window) acknowledges

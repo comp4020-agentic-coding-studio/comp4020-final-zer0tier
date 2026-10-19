@@ -483,6 +483,32 @@ it('after a defeat while the pet rests, asks to spend an Hourglass on the wait, 
   } finally { dom.window.close(); }
 });
 
+it('a monster attack while Abandon run is being asked answers it No, so a later Yes can\'t abandon by surprise', async () => {
+  const { dom, window, $ } = page();
+  const start = map(), fought = battleProgress();
+  const attacked = { ...fought, x: start.x, battle: { ...fought.battle, attacked: true } };
+  const bodies: any[] = [];
+  window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
+    const body = JSON.parse(options.body as string);
+    bodies.push(body);
+    return Response.json(body.action === 'patrol' ? attacked : start);
+  }) as unknown as typeof fetch;
+  Object.defineProperty(window.document, 'hidden', { value: false });
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    window.eval(readFileSync('public/confirm.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    $('adventure-abandon').click();
+    await vi.waitFor(() => expect(($('confirm-dialog') as HTMLDialogElement | null)?.open).toBe(true));
+    // The monster's step attacks: the battle opens, and the question is gone.
+    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement | null)?.open).toBe(true), { timeout: 2500 });
+    expect(($('confirm-dialog') as HTMLDialogElement).open).toBe(false);
+    expect(bodies.some(body => body.action === 'abandon')).toBe(false);
+  } finally { dom.window.close(); }
+});
+
 it('asks nothing after a defeat while the pet rests with no Hourglass to spend', async () => {
   const { dom, window, $ } = page();
   let saved: any = { ...battleProgress(false), cooldownUntil: Date.now() + 60 * 60 * 1000 };

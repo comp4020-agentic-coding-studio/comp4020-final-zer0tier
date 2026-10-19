@@ -1,8 +1,9 @@
 // The game's one way to ask before acting: a small window with Yes and No.
 // Any script asks by dispatching `confirm:ask` with a title, a message, and
 // an `answer` callback that receives true (Yes) or false (No). Escape, a
-// click outside the window, and a new question all answer No. Focus starts on
-// No, so a stray key never confirms, and returns to wherever it was before.
+// click outside the window, a new question, and a battle starting all answer
+// No. Focus starts on No, so a stray key never confirms, and returns to
+// wherever it was before.
 let confirmDialog = null, question = null, askedFrom = null;
 
 function buildConfirmDialog() {
@@ -50,5 +51,8 @@ document.addEventListener('confirm:ask', ({ detail }) => {
   confirmDialog.showModal();
   confirmDialog.querySelector('#confirm-no').focus({ preventScroll: true });
 });
-// Signing out answers any open question No.
+// Signing out answers any open question No, and so does a battle starting
+// (a monster's attack, or an Arena fight): the question was about a moment
+// that has passed, so it's asked again only if it still applies.
 document.addEventListener('adventure:reset', () => answerQuestion(false));
+document.addEventListener('battle:show', () => answerQuestion(false));
