@@ -196,36 +196,56 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .pet-hero { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.5rem; }
 .pet { width: clamp(88px, 25vw, 120px); flex: none; color: var(--pet-color, #f59e0b); }
 .pet-hero > div { flex: 1; min-width: 0; }
-.pet-hero .pet-body { animation: bob 3s ease-in-out infinite; transform-origin: 60px 100px; }
-.pet-shape { fill: currentColor; stroke: var(--pet-ink); stroke-width: 2; stroke-linejoin: round; }
+.pet-shape { fill: currentColor; stroke: var(--pet-ink); stroke-width: 2; stroke-linejoin: round; filter: url(#pet-3d); }
 .pet-shade { fill: color-mix(in srgb, currentColor 75%, var(--pet-ink)); }
-.pet-belly { fill: #ffedd5; }
+.pet-belly { fill: var(--pet-belly); }
 .pet-eye-white { fill: #fff; }
 .pet-eye { fill: var(--pet-ink); }
+.pet-eye-shine { fill: #fff; }
 .pet-mouth { fill: none; stroke: var(--pet-ink); stroke-width: 3; stroke-linecap: round; }
-.pet-beak { fill: #fbbf24; stroke: var(--pet-ink); stroke-width: 2; }
-.pet-shadow { fill: var(--fg); opacity: 0.08; }
+.pet-beak { fill: #fbbf24; stroke: var(--pet-ink); stroke-width: 2; filter: url(#pet-3d); }
+.pet-shadow { fill: var(--pet-ink); opacity: 0.12; }
 .pet-small { width: 2rem; height: 2rem; vertical-align: middle; }
 .pet-inline { width: 1.5rem; height: 1.5rem; margin-right: 0.15rem; }
+/* The face inside each shape is drawn through <use>, which page rules can't
+   reach, so it follows custom properties set on the avatar: --pet-look-x/y
+   move the pupils, --pet-blink closes the eyes, and --pet-joy swaps them
+   for happy ones. */
+.pet-eyes { transform-origin: 60px 54px; transform: scaleY(var(--pet-blink, 1)); opacity: calc(1 - var(--pet-joy, 0)); transition: transform 90ms ease-in; }
+.pet-look { transform: translate(var(--pet-look-x, 0px), var(--pet-look-y, 0px)); transition: transform 180ms var(--ease); }
+.pet-happy-eyes { fill: none; stroke: var(--pet-ink); stroke-width: 3; stroke-linecap: round; opacity: var(--pet-joy, 0); }
+.pet-blush { opacity: calc(0.55 + var(--pet-joy, 0) * 0.45); }
 /* Playing with the pet: a touch plays a short reaction on the avatar's
    wrapper (which re-renders never replace), and floats a little effect up. */
 /* A span, so the header's `.pet-hero > div` text-column rules skip it. */
-.pet-touch { display: block; position: relative; flex: none; width: clamp(88px, 25vw, 120px); }
-.pet-touch .pet { display: block; width: 100%; cursor: var(--cursor-pointer); touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.pet-touch { display: block; position: relative; flex: none; width: clamp(88px, 25vw, 120px); perspective: 420px; }
+.pet-touch .pet { display: block; width: 100%; cursor: var(--cursor-pointer); touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  overflow: visible; transform: rotateY(var(--pet-turn-y, 0deg)) rotateX(var(--pet-turn-x, 0deg)); transition: transform 300ms var(--ease); }
+/* A companion is alive: it breathes, its shadow breathes with it, and it
+   blinks now and then (interact.js sets the blink, the gaze and the turn). */
+.pet-touch .pet-body { transform-origin: 60px 100px; animation: pet-breathe 3.2s ease-in-out infinite; }
+.pet-touch .pet-shadow { transform-origin: 60px 102px; animation: pet-shadow-breathe 3.2s ease-in-out infinite; }
+.pet-touch[data-activity="studying"] .pet-body, .pet-touch[data-activity="working"] .pet-body { animation-duration: 2.2s; }
 .pet-effects { display: block; position: absolute; inset: 0; pointer-events: none; }
 .pet-effect { position: absolute; left: 50%; top: 10%; font: 800 1.25rem/1 "Nunito Sans", system-ui, sans-serif; animation: float-up 1.1s ease-out forwards; }
 .pet-effect-hearts { color: var(--strength); }
 .pet-effect-giggles { color: var(--charisma); top: 45%; font-size: 1rem; }
 .pet-effect-sparkles { color: var(--stamina); top: 30%; left: 15%; }
 .pet-effect-stars { color: var(--intelligence); top: 70%; left: 75%; }
-.pet-touch[data-reaction="pat"] .pet { animation: pet-squish 600ms var(--ease); transform-origin: 50% 90%; }
-.pet-touch[data-reaction="tickle"] .pet { animation: pet-wiggle 600ms ease-in-out; }
-.pet-touch[data-reaction="stroke"] .pet { animation: pet-lean 700ms var(--ease); transform-origin: 50% 90%; }
-.pet-touch[data-reaction="paw"] .pet { animation: pet-hop 600ms var(--ease); }
-@keyframes pet-squish { 30% { transform: scale(1.08, 0.88); } 60% { transform: scale(0.96, 1.06); } }
-@keyframes pet-wiggle { 20%, 60% { transform: rotate(-6deg); } 40%, 80% { transform: rotate(6deg); } }
-@keyframes pet-lean { 40% { transform: rotate(-9deg) translateX(-4px); } }
-@keyframes pet-hop { 40% { transform: translateY(-12px); } 70% { transform: translateY(0) scale(1.05, 0.95); } }
+/* Each touch: a springy squash and stretch on the body, and happy eyes. */
+.pet-touch:not([data-reaction=""]) .pet { --pet-joy: 1; }
+.pet-touch[data-reaction="pat"] .pet-body { animation: pet-squish 650ms var(--ease); }
+.pet-touch[data-reaction="tickle"] .pet-body { animation: pet-wiggle 700ms ease-in-out; transform-origin: 60px 90px; }
+.pet-touch[data-reaction="stroke"] .pet-body { animation: pet-lean 800ms var(--ease); }
+.pet-touch[data-reaction="paw"] .pet-body { animation: pet-hop 700ms var(--ease); }
+.pet-touch[data-reaction="paw"] .pet-shadow { animation: pet-shadow-hop 700ms var(--ease); }
+@keyframes pet-breathe { 50% { transform: translateY(-2px) scale(1.025, 0.985); } }
+@keyframes pet-shadow-breathe { 50% { transform: scale(0.94); } }
+@keyframes pet-squish { 25% { transform: scale(1.12, 0.84); } 55% { transform: scale(0.94, 1.08) translateY(-3px); } 80% { transform: scale(1.03, 0.98); } }
+@keyframes pet-wiggle { 15%, 55% { transform: rotate(-8deg) scale(1.02); } 35%, 75% { transform: rotate(8deg) scale(1.02); } }
+@keyframes pet-lean { 35% { transform: rotate(-10deg) translateX(-4px) scale(1.03, 0.97); } 70% { transform: rotate(2deg); } }
+@keyframes pet-hop { 20% { transform: scale(1.08, 0.9); } 50% { transform: translateY(-16px) scale(0.95, 1.07); } 75% { transform: translateY(0) scale(1.1, 0.9); } }
+@keyframes pet-shadow-hop { 50% { transform: scale(0.65); opacity: 0.05; } }
 @keyframes float-up { from { opacity: 0; transform: translate(-50%, 0) scale(0.6); } 25% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -36px) scale(1.2); } }
 .play { margin-bottom: 1.5rem; }
 .play h3 { margin: 0 0 0.25rem; }
@@ -599,7 +619,6 @@ a[href], summary { cursor: var(--cursor-pointer); }
 .footer { text-align: center; padding: 1rem 1rem 2rem; font-weight: 600; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(12px); } }
-@keyframes bob { 50% { transform: translateY(-4px); } }
 @keyframes bump { 40% { transform: scale(1.25); color: var(--tone); } }
 
 @media (prefers-reduced-motion: reduce) {

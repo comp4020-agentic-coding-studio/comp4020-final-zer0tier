@@ -33,10 +33,44 @@
       <symbol id="monster-slime" viewBox="0 0 24 24"><path d="M3 18C2 7 8 5 12 7c6-4 10 4 9 11Z" fill="currentColor"/><path d="M8 13v2m8-2v2m-6 3h4"/></symbol>
       <symbol id="monster-goblin" viewBox="0 0 24 24"><path d="m5 9-3-5 7 3h6l7-3-3 5v8l-7 4-7-4Z" fill="currentColor"/><path d="m7 11 3 2m7-2-3 2m-4 4h4"/></symbol>
       <symbol id="monster-slime-king" viewBox="0 0 24 24"><path d="M3 20C2 11 7 9 12 10c5-3 10 3 9 10Z" fill="currentColor"/><path d="m6 9-1-6 5 3 2-4 2 4 5-3-1 6Z" fill="var(--money)"/><path d="M8 14v2m8-2v2m-6 3h4"/></symbol>
+      <!-- Soft light from the upper left, so each pet reads as a rounded toy:
+           the shape's own outline is blurred into a height map, shaded, and
+           given a glossy highlight. Only the body's colour is lit; the face
+           stays crisp on top. -->
+      <filter id="pet-3d" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="height" />
+        <feSpecularLighting in="height" surfaceScale="6" specularConstant="0.9" specularExponent="22" lighting-color="#fff" result="gloss">
+          <fePointLight x="30" y="0" z="90" />
+        </feSpecularLighting>
+        <feComposite in="gloss" in2="SourceAlpha" operator="in" result="glossOnShape" />
+        <feDiffuseLighting in="height" surfaceScale="6" diffuseConstant="1.15" lighting-color="#fff" result="light">
+          <feDistantLight azimuth="235" elevation="55" />
+        </feDiffuseLighting>
+        <feComposite in="SourceGraphic" in2="light" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" result="shaded" />
+        <feComposite in="glossOnShape" in2="shaded" operator="arithmetic" k1="0" k2="0.55" k3="1" k4="0" />
+      </filter>
+      <radialGradient id="pet-belly-light" cx="40%" cy="30%" r="75%">
+        <stop offset="0" stop-color="#fff" stop-opacity="0.85" /><stop offset="1" stop-color="#fff" stop-opacity="0" />
+      </radialGradient>
+      <radialGradient id="pet-blush" r="50%">
+        <stop offset="0" stop-color="#fb7185" stop-opacity="0.75" /><stop offset="1" stop-color="#fb7185" stop-opacity="0" />
+      </radialGradient>
+      <!-- One face for every shape. The pupils sit in .pet-look, which follows
+           the pointer, and the eyes in .pet-eyes, which blink; .pet-happy-eyes
+           replace them while the pet is pleased. -->
       <symbol id="pet-face" viewBox="0 0 120 110">
         <ellipse class="pet-belly" cx="60" cy="76" rx="24" ry="17" />
-        <ellipse class="pet-eye-white" cx="45" cy="53" rx="8" ry="10" /><ellipse class="pet-eye-white" cx="75" cy="53" rx="8" ry="10" />
-        <circle class="pet-eye" cx="46" cy="54" r="4" /><circle class="pet-eye" cx="74" cy="54" r="4" />
+        <ellipse class="pet-belly-light" cx="60" cy="76" rx="24" ry="17" fill="url(#pet-belly-light)" />
+        <ellipse class="pet-blush" cx="36" cy="67" rx="7" ry="4.5" fill="url(#pet-blush)" /><ellipse class="pet-blush" cx="84" cy="67" rx="7" ry="4.5" fill="url(#pet-blush)" />
+        <g class="pet-eyes">
+          <ellipse class="pet-eye-white" cx="45" cy="53" rx="8" ry="10" /><ellipse class="pet-eye-white" cx="75" cy="53" rx="8" ry="10" />
+          <g class="pet-look">
+            <circle class="pet-eye" cx="46" cy="54" r="5" /><circle class="pet-eye" cx="74" cy="54" r="5" />
+            <circle class="pet-eye-shine" cx="48" cy="51" r="2" /><circle class="pet-eye-shine" cx="76" cy="51" r="2" />
+            <circle class="pet-eye-shine" cx="44.5" cy="56.5" r="0.9" /><circle class="pet-eye-shine" cx="72.5" cy="56.5" r="0.9" />
+          </g>
+        </g>
+        <path class="pet-happy-eyes" d="M38 55q7-8 14 0M68 55q7-8 14 0" />
         <path class="pet-mouth" d="M53 72q7 6 14 0" />
       </symbol>
       <symbol id="pet-blob" viewBox="0 0 120 110">

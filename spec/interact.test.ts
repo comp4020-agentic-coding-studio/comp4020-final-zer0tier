@@ -5,9 +5,13 @@ import { expect, it, vi } from 'vitest';
 // Touching your own pet is only for fun: it plays a reaction in this window
 // and never asks the server for anything. Touching a pet you're visiting goes
 // to the server, and the pet reacts when the pet:touched broadcast arrives.
-function page(saved: object[] = []) {
+function page(saved: object[] = [], reducedMotion = false) {
   const dom = new JSDOM(readFileSync('public/index.html', 'utf8'), { url: 'http://localhost/', runScripts: 'outside-only' });
   const { window } = dom;
+  // The page's own timers, so a test can fake them (vi.useFakeTimers fakes Node's).
+  window.setTimeout = ((callback: () => void, ms?: number) => setTimeout(callback, ms)) as unknown as typeof window.setTimeout;
+  window.matchMedia = (() => ({ matches: reducedMotion })) as unknown as typeof window.matchMedia;
+  window.requestAnimationFrame = ((callback: () => void) => setTimeout(callback, 0)) as unknown as typeof window.requestAnimationFrame;
   const $ = (id: string) => window.document.getElementById(id)!;
   let answer = (): Response => Response.json({});
   const requests = vi.fn(async (url: string, options?: RequestInit) => {
@@ -184,4 +188,42 @@ it("the owner's pet reacts to a visitor's touch and lists each visitor's latest 
     expect(rows()).toEqual([]);
     expect($('visitors-empty').hidden).toBe(false);
   } finally { dom.window.close(); }
+});
+
+it('keeps the companion alive: it blinks, and looks and turns toward the pointer, but not with reduced motion', async () => {
+  for (const reduced of [false, true]) {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    const { dom, window, $, signIn } = page([], reduced); // after faking, so its blink timer is fake too
+    Object.defineProperty(window.document, 'hidden', { value: false }); // jsdom's page is hidden by default
+    try {
+      signIn({ id: 'rex', activity: 'studying' });
+      expect($('pet-touch').dataset.activity).toBe('studying');
+      const avatar = $('pet-avatar');
+      avatar.getBoundingClientRect = () => ({ left: 100, top: 100, width: 100, height: 100 }) as DOMRect;
+      Object.defineProperties(window, { innerWidth: { value: 1000 }, innerHeight: { value: 800 } });
+      // A pointer up and to the right: the eyes follow it and the pet turns that way.
+      window.document.dispatchEvent(new window.MouseEvent('pointermove', { clientX: 900, clientY: 0 }));
+      vi.advanceTimersByTime(1);
+      const look = () => ['--pet-look-x', '--pet-look-y', '--pet-turn-y'].map(name => avatar.style.getPropertyValue(name));
+      if (reduced) expect(look()).toEqual(['', '', '']);
+      else {
+        const [x, y, turn] = look().map(parseFloat);
+        expect(x).toBeGreaterThan(0); expect(y).toBeLessThan(0); expect(turn).toBeGreaterThan(0);
+        expect(x).toBeLessThanOrEqual(2); expect(Math.abs(y)).toBeLessThanOrEqual(2);
+      }
+      // Within 8 seconds it blinks at least once, and opens its eyes again.
+      let blinked = false;
+      for (let ms = 0; ms < 8000; ms += 20) {
+        vi.advanceTimersByTime(20);
+        if (avatar.style.getPropertyValue('--pet-blink')) blinked = true;
+      }
+      expect(blinked).toBe(!reduced);
+      vi.advanceTimersByTime(200);
+      if (!reduced) expect(avatar.style.getPropertyValue('--pet-blink')).toBe('');
+      // Leaving the window, it looks straight back out again.
+      window.document.documentElement.dispatchEvent(new window.MouseEvent('pointerleave'));
+      vi.advanceTimersByTime(1);
+      expect(look()).toEqual(['', '', '']);
+    } finally { vi.useRealTimers(); dom.window.close(); }
+  }
 });

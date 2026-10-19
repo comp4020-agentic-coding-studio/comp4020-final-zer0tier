@@ -90,6 +90,52 @@ function stage(wrapper) {
 const mine = stage($('pet-touch'));
 const theirs = stage($('visit-touch'));
 
+// Keeping a companion alive between touches: it blinks every few seconds,
+// and while a pointer moves over the page its eyes follow it and it turns
+// toward it in 3D. Neither happens with reduced motion, nor while the
+// page is hidden. The face reads these custom properties through <use>.
+const still = window.matchMedia?.('(prefers-reduced-motion: reduce)') ?? { matches: false };
+const companions = [$('pet-touch'), $('visit-touch')];
+function blink() {
+  if (!still.matches && !document.hidden) {
+    for (const wrapper of companions) {
+      const svg = wrapper.querySelector('.pet');
+      svg.style.setProperty('--pet-blink', '0.1');
+      setTimeout(() => svg.style.removeProperty('--pet-blink'), 140);
+    }
+  }
+  // Every 2.5 to 6 seconds, so it never looks mechanical.
+  setTimeout(blink, 2500 + Math.random() * 3500);
+}
+setTimeout(blink, 2000);
+let gazeFrame = 0, pointer = null;
+function follow() {
+  gazeFrame = 0;
+  for (const wrapper of companions) {
+    const svg = wrapper.querySelector('.pet');
+    const box = svg.getBoundingClientRect();
+    if (!pointer || !box.width || still.matches) {
+      for (const name of ['--pet-look-x', '--pet-look-y', '--pet-turn-x', '--pet-turn-y']) svg.style.removeProperty(name);
+      continue;
+    }
+    // How far the pointer is from the pet's face, as -1..1 across the page.
+    const dx = Math.max(-1, Math.min(1, (pointer.x - (box.left + box.width / 2)) / (window.innerWidth / 2)));
+    const dy = Math.max(-1, Math.min(1, (pointer.y - (box.top + box.height / 2)) / (window.innerHeight / 2)));
+    svg.style.setProperty('--pet-look-x', `${(dx * 2).toFixed(2)}px`);
+    svg.style.setProperty('--pet-look-y', `${(dy * 2).toFixed(2)}px`);
+    svg.style.setProperty('--pet-turn-y', `${(dx * 14).toFixed(1)}deg`);
+    svg.style.setProperty('--pet-turn-x', `${(-dy * 10).toFixed(1)}deg`);
+  }
+}
+const watch = (to) => {
+  pointer = to;
+  if (!gazeFrame) gazeFrame = requestAnimationFrame(follow);
+};
+document.addEventListener('pointermove', (event) => watch({ x: event.clientX, y: event.clientY }), { passive: true });
+// When the pointer leaves the window, the pet looks back at you.
+document.documentElement.addEventListener('pointerleave', () => watch(null));
+document.addEventListener('visibilitychange', () => { if (document.hidden) watch(null); });
+
 // A fresh announcement each time, even for the same line twice in a row.
 function say(line, where = said) {
   where.textContent = '';
@@ -197,6 +243,7 @@ document.addEventListener('adventure:pet', ({ detail }) => {
     renderVisitors();
   }
   current = detail;
+  $('pet-touch').dataset.activity = detail.activity ?? 'idle';
   if (switched) loadVisitors();
 });
 document.addEventListener('realtime:resync', loadVisitors);
@@ -209,6 +256,7 @@ document.addEventListener('visit:pet', ({ detail }) => {
   }
   visited = detail;
   if (!detail) return;
+  $('visit-touch').dataset.activity = detail.activity ?? 'idle';
   $('visit-play-help').textContent = `Tap or click ${detail.id} where you'd like to touch it, or choose:`;
   $('visit-play').setAttribute('aria-label', `Play with ${detail.id}`);
 });

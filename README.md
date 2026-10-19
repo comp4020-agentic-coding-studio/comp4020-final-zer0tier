@@ -120,7 +120,15 @@ appearance is free and works while studying or working. Only the owner can
 change it, and it stays saved when you sign out or the server restarts.
 
 The saved color and shape appear in the dashboard header, Arena pets,
-leaderboard and **Happening now** feed, including older feed entries. Every open
+leaderboard and **Happening now** feed, including older feed entries.
+
+Every pet is softly lit, so it looks like a rounded little toy: a glossy
+highlight, gentle shading, shiny eyes and rosy cheeks, in any colour, in light
+and dark mode. Your companion in the header, and a pet you visit, are alive:
+they breathe (a little faster while studying or working), blink every few
+seconds, follow your pointer with their eyes, and turn toward it in 3D. With
+reduced motion turned on they stay still, lit but without breathing, blinking,
+or following. The 3D look is drawn in the browser, with no extra download. Every open
 window updates from the server's broadcast; picking or saving a setting never
 previews an unsaved change on the pet.
 
@@ -136,14 +144,15 @@ same four touches work on other players' pets while you visit them (see
 | **Pat head** | The top of the head, or between the eyes | A happy squish and hearts |
 | **Tickle belly** | The belly | A giggling wiggle |
 | **Stroke cheek** | Either side of the face | A lean into your hand and sparkles |
-| **Shake paw** | The feet | A hop and stars |
+| **Shake paw** | The feet | A hop, its shadow shrinking below, and stars |
 
-The pet reacts with a short animation and a line describing what it does,
+Every touch closes the pet's eyes in a happy smile and makes it blush.
+The pet reacts with a short springy animation and a line describing what it does,
 which screen readers announce. A pet that's studying or working still reacts,
 then gets back to its lesson or shift. Playing is just for fun: it costs
 nothing and changes nothing in the game. Playing with your own pet isn't saved,
 sent to the server, or shown to other players. With reduced motion turned on,
-only the line appears.
+the pet doesn't move: it only smiles and blushes, and the line appears.
 
 Under the buttons, **Recent visitors** lists the last five players who played
 with your pet, each with their latest touch and when it was, newest first. When
