@@ -7,7 +7,7 @@ import express from "express";
 import { ABILITIES } from "./combat.ts";
 import { COINS, TREASURE_RATES } from './treasure.ts';
 import { readFileSync } from "node:fs";
-import { createServer } from "node:http";
+import { createServer, STATUS_CODES } from "node:http";
 import { marked } from "marked";
 import {
   COURSES, ITEMS, LOCATIONS, MAX_CARE, SCHOOLS, SHIFT_MINUTES, STUDY_COST, STUDY_MINUTES, STUDY_NEEDS,
@@ -24,12 +24,27 @@ import {
 import { TIME_SCALE } from "./clock.ts";
 import { recentFeed } from "./feed.ts";
 import { followUp } from "./followups.ts";
-import { attachRealtime, broadcast } from "./realtime.ts";
+import { attachRealtime, broadcast, clientsInRoom } from "./realtime.ts";
+import { logEvent, ROOM } from "./logging.ts";
+import { logRequest } from "./request-logging.ts";
 import { schedule, scheduleAll } from "./scheduler.ts";
 import { TOUCH_KINDS, isTouchKind, touch, touchesOn } from "./touches.ts";
 
 const app = express();
+app.use((req, res, next) => {
+  if (/^\/api(?:\/|$)/i.test(req.path)) return logRequest(req, res, next);
+  next();
+});
 app.use(express.json());
+// Parser errors can contain the raw request body. Return a safe reason so a
+// malformed password submission cannot spill into Express's default error log.
+app.use(((err, _req, res, next) => {
+  if (err?.status >= 400 && err.status < 500) {
+    res.status(err.status).json({ error: STATUS_CODES[err.status] ?? "Invalid request body" });
+    return;
+  }
+  next(err);
+}) as express.ErrorRequestHandler);
 
 // Rendered on each request so the page never lags behind README.md.
 app.get("/readme/", (_req, res) => {
@@ -80,6 +95,7 @@ async function authenticate(
     res.status(outcome.status).json({ error: outcome.error });
     return;
   }
+  res.locals.logUser = outcome.pet.id;
   // A new pet joins every open arena.
   if (outcome.created) broadcast({ type: "pet:updated", pet: outcome.pet });
   followUp();
@@ -384,7 +400,10 @@ app.post("/api/pets/:id/help/:pet", (req, res) => {
   if (item !== "food" && item !== "soap") return void res.status(400).json({ error: "item must be food or soap" });
   const outcome = help(req.params.id, req.params.pet, item);
   if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
-  console.log(`player=${outcome.helper.id} action=help pet=${outcome.pet.id} item=${outcome.item} amount=${outcome.amount}`);
+  logEvent("action_result", {
+    user: outcome.helper.id, room: ROOM, client_in_room: clientsInRoom(),
+    action: "help", pet: outcome.pet.id, item: outcome.item, amount: outcome.amount,
+  });
   broadcast({ type: "pet:updated", pet: outcome.helper });
   broadcast({ type: "pet:updated", pet: outcome.pet });
   followUp();
@@ -399,7 +418,10 @@ app.post("/api/pets/:id/touch/:pet", (req, res) => {
   if (!isTouchKind(kind)) return void res.status(400).json({ error: `kind must be one of ${TOUCH_KINDS.join(", ")}` });
   const outcome = touch(req.params.id, req.params.pet, kind);
   if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
-  console.log(`player=${outcome.touch.visitor} action=touch pet=${outcome.touch.pet} kind=${outcome.touch.kind}`);
+  logEvent("action_result", {
+    user: outcome.touch.visitor, room: ROOM, client_in_room: clientsInRoom(),
+    action: "touch", pet: outcome.touch.pet, kind: outcome.touch.kind,
+  });
   broadcast({ type: "pet:touched", touch: outcome.touch });
   res.json(outcome.touch);
 });
@@ -435,5 +457,6 @@ matchBot(); // players may have trained since the bot last kept up
 
 const port = Number(process.env.PORT ?? 8080);
 server.listen(port, "0.0.0.0", () => {
-  console.log(`VirtuePets listening on http://0.0.0.0:${port}`);
+  const address = server.address();
+  console.log(`VirtuePets listening on http://0.0.0.0:${typeof address === "object" && address ? address.port : port}`);
 });

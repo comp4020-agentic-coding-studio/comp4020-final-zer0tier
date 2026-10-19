@@ -442,10 +442,36 @@ the built-in `node:sqlite` for storage.
   event whenever a team in the **Team up** window changes or sets off, and a
   `pet:touched` event, carrying the saved touch, whenever a visitor plays with
   someone else's pet. The feed keeps its newest 500 entries in SQLite.
-- **Logs:** each touch or help on another player's pet prints one line naming
-  who did it, e.g. `player=alice action=touch pet=bob kind=pat` or
-  `player=alice action=help pet=bob item=food amount=40`, so `flyctl logs`
-  shows who played with or looked after whose pet.
+- **Logs:** server stdout (also visible in `flyctl logs`) records `join`,
+  `leave`, `action`, `broadcast`, `reject`, and `snapshot` events as one line
+  of `key = value` fields. The game's single shared WebSocket room is `arena`.
+  `client_in_room` counts open sockets, including separate tabs, after each
+  join or leave. A connection ID ties a join to its leave. Socket users come
+  from the session at connection time; sockets opened before sign-in keep a
+  generated `guest_…` identity until reconnecting. HTTP actions use the current
+  authenticated player, or `anonymous` when there is no session.
+  Every mutating API request is logged before parsing its body. Its request ID
+  ties receipt to rejection or response; rejections include the HTTP status
+  and reason, including malformed JSON, authorization failures, and unknown
+  endpoints. Broadcasts name the message type and number of open recipients,
+  including updates from scheduled activities. A `snapshot` records a
+  successful JSON API response sent to its one requester, such as a pet or
+  arena refresh, saved action result, or private Adventure state. Snapshots
+  use HTTP, as they do when the client resyncs after reconnecting.
+  Touch and help also produce `action_result` lines naming the target pet and
+  kind/item/amount. Logs exclude passwords, session cookies, query strings,
+  request bodies and snapshot contents; values containing spaces are quoted.
+
+  Example lines (IDs shortened):
+
+  ```text
+  event = join user = alice room = arena client_in_room = 2 connection = c_12
+  event = action user = alice room = arena client_in_room = 2 request = req_7 action = /api/pets/alice/collect-supplies method = POST
+  event = broadcast user = server room = arena client_in_room = 2 message = pet:updated recipients = 2
+  event = reject user = alice room = arena client_in_room = 2 request = req_8 action = /api/pets/alice/use/food method = POST status = 409 reason = "No food left. Buy some at the shop."
+  event = snapshot user = alice room = arena client_in_room = 2 request = req_9 action = /api/pets/alice method = GET status = 200 recipients = 1 transport = http
+  event = leave user = alice room = arena client_in_room = 1 connection = c_12 code = 1000
+  ```
 
 ## Adventure exploration
 
