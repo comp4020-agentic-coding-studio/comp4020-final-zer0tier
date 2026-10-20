@@ -2,6 +2,29 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { coinEffect, simulateBattle } from '../src/combat.ts';
+
+it.each(['hedgehog', 'lizard', 'panda'])('keeps the saved %s model and coat color in battle playback', (appearance) => {
+  const dom = new JSDOM(readFileSync('public/index.html', 'utf8'), { runScripts: 'outside-only' });
+  const { window } = dom;
+  window.matchMedia = (() => ({ matches: true })) as unknown as typeof window.matchMedia;
+  window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    const pet = { id: 'companion', strength: 5, intelligence: 5, charisma: 5, appearance, color: '#8aa87b' };
+    const battle = simulateBattle(pet, { ...pet, id: 'neighbour', appearance: 'cat' }, [24, 16]);
+    window.document.dispatchEvent(new window.CustomEvent('battle:show', {
+      detail: { key: `new-pet:${appearance}`, battle, viewer: pet.id, result: '' },
+    }));
+    const avatar = window.document.querySelector<SVGElement>('#battle-avatar-0 svg')!;
+    expect(avatar.querySelector('use')?.getAttribute('href')).toBe(`#pet-${appearance}`);
+    expect(avatar.style.color).toBe('rgb(138, 168, 123)');
+    window.document.getElementById('battle-skip')!.click();
+    window.document.getElementById('battle-replay')!.click();
+    expect(window.document.querySelector('#battle-avatar-0 use')?.getAttribute('href')).toBe(`#pet-${appearance}`);
+  } finally { window.close(); }
+});
+
 it('plays saved HP/MP, skips and replays without posting actions, and clears on logout', () => {
   const dom = new JSDOM('<!doctype html><body><button id="start">Fight</button></body>', { runScripts: 'outside-only' });
   const { window }=dom;

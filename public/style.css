@@ -196,14 +196,21 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .pet-hero { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.5rem; }
 .pet { width: clamp(88px, 25vw, 120px); flex: none; color: var(--pet-color, #f59e0b); }
 .pet-hero > div { flex: 1; min-width: 0; }
-.pet-shape { fill: currentColor; stroke: var(--pet-ink); stroke-width: 2; stroke-linejoin: round; filter: url(#pet-3d); }
-.pet-shade { fill: color-mix(in srgb, currentColor 75%, var(--pet-ink)); }
-.pet-belly { fill: var(--pet-belly); }
-.pet-eye-white { fill: #fff; }
-.pet-eye { fill: var(--pet-ink); }
-.pet-eye-shine { fill: #fff; }
-.pet-mouth { fill: none; stroke: var(--pet-ink); stroke-width: 3; stroke-linecap: round; }
-.pet-beak { fill: #fbbf24; stroke: var(--pet-ink); stroke-width: 2; filter: url(#pet-3d); }
+/* Matte, inked companions share the cottage's warm materials. Coat colours
+   come from currentColor; cream markings stay readable in both UI themes. */
+.pet-shape { fill: currentColor; stroke: var(--pet-ink); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+.pet-shade { fill: color-mix(in srgb, currentColor 68%, #68503d); }
+.pet-soft { fill: color-mix(in srgb, currentColor 65%, #fff0d6); }
+.pet-belly, .pet-cream { fill: #fff0d6; }
+.pet-patch { fill: #55463f; }
+.pet-highlight { fill: #fff7df; opacity: 0.22; }
+.pet-detail { fill: none; stroke: #785841; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; opacity: 0.65; }
+.pet-eye-white, .pet-eye-shine { fill: #fff8e8; }
+.pet-eye { fill: #382b26; }
+.pet-nose { fill: #805440; }
+.pet-mouth { fill: none; stroke: #604133; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.pet-beak { fill: #d99b50; stroke: #765337; stroke-width: 1.5; stroke-linejoin: round; }
+.pet-scarf { fill: #8c9e77; stroke: #56634c; stroke-width: 1.3; stroke-linejoin: round; }
 .pet-shadow { fill: var(--pet-ink); opacity: 0.12; }
 .pet-small { width: 2rem; height: 2rem; vertical-align: middle; }
 .pet-inline { width: 1.5rem; height: 1.5rem; margin-right: 0.15rem; }
@@ -213,7 +220,7 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
    for happy ones. */
 .pet-eyes { transform-origin: 60px 54px; transform: scaleY(var(--pet-blink, 1)); opacity: calc(1 - var(--pet-joy, 0)); transition: transform 90ms ease-in; }
 .pet-look { transform: translate(var(--pet-look-x, 0px), var(--pet-look-y, 0px)); transition: transform 180ms var(--ease); }
-.pet-happy-eyes { fill: none; stroke: var(--pet-ink); stroke-width: 3; stroke-linecap: round; opacity: var(--pet-joy, 0); }
+.pet-happy-eyes { fill: none; stroke: #382b26; stroke-width: 2.3; stroke-linecap: round; opacity: var(--pet-joy, 0); }
 .pet-blush { opacity: calc(0.55 + var(--pet-joy, 0) * 0.45); }
 /* Playing with the pet: a touch plays a short reaction on the avatar's
    wrapper (which re-renders never replace), and floats a little effect up. */

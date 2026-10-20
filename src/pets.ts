@@ -9,7 +9,7 @@ import { isCoinId, type CoinId } from "./treasure.ts";
 
 // Keep this literal list identical to public/app.js: the unbundled browser
 // cannot import this server module (which opens SQLite).
-export const APPEARANCES = ["cat", "dog", "bird", "dragon", "blob"] as const;
+export const APPEARANCES = ["cat", "dog", "hedgehog", "lizard", "panda", "bird", "dragon", "blob"] as const;
 export type Appearance = (typeof APPEARANCES)[number];
 export const isAppearance = (value: unknown): value is Appearance => APPEARANCES.some((a) => a === value);
 

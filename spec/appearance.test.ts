@@ -40,24 +40,27 @@ it("appearance controls wait for broadcasts, which update every pet view includi
     await vi.waitFor(() => expect(document.querySelectorAll("#feed .pet")).toHaveLength(2));
     document.getElementById("tab-board")!.click();
     await vi.waitFor(() => expect(document.querySelectorAll("#board .pet")).toHaveLength(1));
-    expect([...shape.options].map((option) => option.value)).toEqual(["cat", "dog", "bird", "dragon", "blob"]);
+    expect([...shape.options].map((option) => option.value)).toEqual([
+      "cat", "dog", "hedgehog", "lizard", "panda", "bird", "dragon", "blob",
+    ]);
     expect(avatar().getAttribute("data-appearance")).toBe("blob");
+    expect(document.querySelector("#feed li:last-child .pet")?.getAttribute("data-appearance")).toBe("bird");
 
     color.value = "#abcdef";
-    shape.value = "dragon";
+    shape.value = "hedgehog";
     color.dispatchEvent(new window.Event("change", { bubbles: true }));
     shape.dispatchEvent(new window.Event("change", { bubbles: true }));
     // Unrelated updates must not erase an unsaved form draft.
     send({ ...pet, stamina: 90 });
     expect(color.value).toBe("#abcdef");
-    expect(shape.value).toBe("dragon");
+    expect(shape.value).toBe("hedgehog");
     expect(avatar().getAttribute("data-appearance")).toBe("blob");
     save.click();
     expect(requests).toHaveBeenCalledWith(`/api/pets/${pet.id}/appearance`, expect.objectContaining({
-      method: "POST", body: JSON.stringify({ color: "#abcdef", appearance: "dragon" }),
+      method: "POST", body: JSON.stringify({ color: "#abcdef", appearance: "hedgehog" }),
     }));
     expect(avatar().getAttribute("data-appearance")).toBe("blob");
-    const changed = { ...pet, color: "#abcdef", appearance: "dragon" };
+    const changed = { ...pet, color: "#abcdef", appearance: "hedgehog" };
     finishPost(Response.json(changed));
     await vi.waitFor(() => expect(save.disabled).toBe(false));
     expect(avatar().getAttribute("data-appearance")).toBe("blob");
@@ -66,11 +69,34 @@ it("appearance controls wait for broadcasts, which update every pet view includi
     send(changed);
     for (const selector of ["#pet-avatar", "#board .pet", "#feed li:first-child .pet"]) {
       const svg = document.querySelector(selector) as SVGElement;
-      expect(svg.dataset.appearance).toBe("dragon");
+      expect(svg.dataset.appearance).toBe("hedgehog");
       expect(svg.style.getPropertyValue("--pet-color")).toBe("#abcdef");
-      expect(svg.querySelector("use")!.getAttribute("href")).toBe("#pet-dragon");
+      expect(svg.querySelector("use")!.getAttribute("href")).toBe("#pet-hedgehog");
     }
     expect(document.getElementById("appearance-status")!.textContent).toBe("Appearance saved.");
+
+    // Each new animal remains a draft until its saved row reaches every view.
+    for (const appearance of ["lizard", "panda"]) {
+      const before = avatar().getAttribute("data-appearance");
+      shape.value = appearance;
+      shape.dispatchEvent(new window.Event("change", { bubbles: true }));
+      save.click();
+      expect(requests).toHaveBeenLastCalledWith(`/api/pets/${pet.id}/appearance`, expect.objectContaining({
+        method: "POST", body: JSON.stringify({ color: "#abcdef", appearance }),
+      }));
+      const saved = { ...changed, appearance };
+      finishPost(Response.json(saved));
+      await vi.waitFor(() => expect(save.disabled).toBe(false));
+      expect(avatar().getAttribute("data-appearance")).toBe(before);
+      send(saved);
+      for (const selector of ["#pet-avatar", "#board .pet", "#feed li:first-child .pet"]) {
+        const svg = document.querySelector(selector) as SVGElement;
+        expect(svg.dataset.appearance).toBe(appearance);
+        expect(svg.style.getPropertyValue("--pet-color")).toBe("#abcdef");
+        expect(svg.querySelector("use")!.getAttribute("href")).toBe(`#pet-${appearance}`);
+      }
+      expect(document.getElementById("appearance-status")!.textContent).toBe("Appearance saved.");
+    }
 
     // This player wasn't in the initial arena list; its feed icon came from GET.
     expect(requests).toHaveBeenCalledWith(`/api/pets/${older.id}`);
@@ -85,7 +111,7 @@ it("appearance controls wait for broadcasts, which update every pet view includi
     save.click();
     finishPost(Response.json({ error: "Couldn't save appearance." }, { status: 400 }));
     await vi.waitFor(() => expect(document.getElementById("appearance-error")!.textContent).toBe("Couldn't save appearance."));
-    expect(avatar().getAttribute("data-appearance")).toBe("dragon");
+    expect(avatar().getAttribute("data-appearance")).toBe("panda");
   } finally {
     window.close();
   }

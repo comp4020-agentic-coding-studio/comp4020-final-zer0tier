@@ -54,7 +54,8 @@ function avatar(fighter, index) {
   svg.setAttribute('viewBox', '0 0 120 110');
   svg.setAttribute('aria-hidden', 'true');
   svg.style.color = /^#[0-9a-f]{6}$/i.test(fighter.color) ? fighter.color : '#f59e0b';
-  const symbol = ['cat', 'dog', 'bird', 'dragon', 'blob'].includes(fighter.appearance) && document.getElementById(`pet-${fighter.appearance}`);
+  const appearance = ['cat', 'dog', 'hedgehog', 'lizard', 'panda', 'bird', 'dragon', 'blob'].includes(fighter.appearance) ? fighter.appearance : 'blob';
+  const symbol = document.getElementById(`pet-${appearance}`);
   const monster = ['slime', 'goblin', 'slime-king'].includes(fighter.monster) && document.getElementById(`monster-${fighter.monster}`);
   if (monster) {
     svg.setAttribute('viewBox', '0 0 24 24');

@@ -331,7 +331,7 @@ function renderMonsters() {
         cell.classList.add('adventure-shared');
         cell.dataset.shared = String(teammatesHere().filter(m => m.x === x && m.y === y).length + 1);
       }
-      const shape = ['blob', 'cat', 'dog', 'bird', 'dragon'].includes(pet?.appearance) ? pet.appearance : 'blob';
+      const shape = ['cat', 'dog', 'hedgehog', 'lizard', 'panda', 'bird', 'dragon', 'blob'].includes(pet?.appearance) ? pet.appearance : 'blob';
       cell.innerHTML = `<svg class="pet-avatar" viewBox="0 0 120 110" aria-hidden="true"><use href="#pet-${shape}" /></svg>`;
       if (pet?.color) cell.style.setProperty('--pet-color', pet.color);
     }
@@ -521,7 +521,7 @@ teamUp.innerHTML = `
 document.body.append(teamUp);
 let lobby = null, lobbyGeneration = 0, lobbyPending = false;
 const avatarFor = member => {
-  const shape = ['blob', 'cat', 'dog', 'bird', 'dragon'].includes(member.appearance) ? member.appearance : 'blob';
+  const shape = ['cat', 'dog', 'hedgehog', 'lizard', 'panda', 'bird', 'dragon', 'blob'].includes(member.appearance) ? member.appearance : 'blob';
   const color = /^#[0-9a-f]{6}$/i.test(member.color) ? member.color : '#f59e0b';
   return `<svg class="pet-avatar team-avatar" viewBox="0 0 120 110" aria-hidden="true" style="--pet-color: ${color}"><use href="#pet-${shape}" /></svg>`;
 };

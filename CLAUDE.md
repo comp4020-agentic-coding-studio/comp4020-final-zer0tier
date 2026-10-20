@@ -42,6 +42,9 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
 - Pet interaction opens a small pop-up with the pet's current status,
   care and play choices, and interaction feedback. Keep extra navigation
   and supplies guidance out of this pop-up; use the furniture for those.
+- Pet artwork should fit the warm, illustrated home, with cute, recognizable
+  animals that also read clearly in small icons. Preserve saved species and
+  colors when updating their artwork.
 - `public/world.js` and `public/world.css` present Sweet Home and the town
   map. Move the existing gameplay controls into scenes and windows; preserve
   their IDs, listeners, and server-driven updates in `app.js` and the other

@@ -126,19 +126,17 @@ it("404s when looking up a pet that doesn't exist", async () => {
   expect((await fetch(new URL(`/api/pets/${freshId()}`, baseUrl))).status).toBe(404);
 });
 
-it("saves every allowed appearance and hex color, preserving them through actions and sign-in", async () => {
+it.each(["cat", "dog", "hedgehog", "lizard", "panda", "bird", "dragon", "blob"])("saves the %s appearance and hex color through actions and sign-in", async (appearance) => {
   const id = freshId();
   const before = await (await signUp(id)).json();
-  for (const appearance of ["cat", "dog", "bird", "dragon", "blob"]) {
-    const change = { color: "#Ab12Ef", appearance };
-    const res = await post(`/api/pets/${id}/appearance`, change);
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ...before, ...change });
-    expect(await getPet(id)).toEqual({ ...before, ...change });
-  }
-  await post(`/api/pets/${id}/study/math`);
-  await finish(id);
-  expect(await (await signIn(id)).json()).toMatchObject({ color: "#Ab12Ef", appearance: "blob", intelligence: 6 });
+  const change = { color: "#Ab12Ef", appearance };
+  const res = await post(`/api/pets/${id}/appearance`, change);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ ...before, ...change });
+  expect(await getPet(id)).toEqual({ ...before, ...change });
+  expect((await post(`/api/pets/${id}/study/math`)).status).toBe(200);
+  expect(await finish(id)).toMatchObject({ ...change, intelligence: 6 });
+  expect(await (await signIn(id)).json()).toMatchObject({ ...change, intelligence: 6 });
 });
 
 it("rejects invalid appearance IDs at the edge, before checking ownership", async () => {
@@ -160,7 +158,7 @@ it("rejects invalid colors or appearances without changing the pet", async () =>
     expect((await res.json()).error).toMatch(/color/i);
     expect(await getPet(id)).toEqual(before);
   }
-  for (const appearance of ["unicorn", "Cat", "", "blob'; DROP TABLE pets;--", null, 1, ["cat"], undefined]) {
+  for (const appearance of ["unicorn", "Cat", "Panda", "hedgehog ", "", "blob'; DROP TABLE pets;--", null, 1, ["cat"], undefined]) {
     const res = await post(`/api/pets/${id}/appearance`, { color: "#123456", appearance });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/appearance/i);
@@ -174,7 +172,7 @@ it("only the owner can customize a pet", async () => {
   const other = freshId();
   const before = await (await signUp(id)).json();
   await signUp(other);
-  const change = { color: "#123456", appearance: "dragon" };
+  const change = { color: "#123456", appearance: "panda" };
   expect((await post(`/api/pets/${id}/appearance`, change, null)).status).toBe(401);
   expect((await post(`/api/pets/${id}/appearance`, change, other)).status).toBe(403);
   expect(await getPet(id)).toEqual(before);

@@ -41,8 +41,8 @@ function battleProgress(won = true) {
   };
 }
 
-it('uses the signed-in pet appearance in Adventure without waiting for a later pet update', async () => {
-  const pet = { ...await (await signUp(freshId())).json(), appearance: 'dragon', color: '#123456' };
+it.each(['dragon', 'hedgehog', 'lizard', 'panda'])('uses the signed-in %s in Adventure without waiting for a later pet update', async (appearance) => {
+  const pet = { ...await (await signUp(freshId())).json(), appearance, color: '#123456' };
   const rules = await getRules();
   const { dom, window, $ } = page();
   window.WebSocket = function () { return new window.EventTarget(); } as unknown as typeof window.WebSocket;
@@ -61,7 +61,7 @@ it('uses the signed-in pet appearance in Adventure without waiting for a later p
     await vi.waitFor(() => expect($('dashboard').hidden).toBe(false));
     $('adventure-open').click();
     await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
-    expect($('adventure-grid').querySelector('.adventure-player use')?.getAttribute('href')).toBe('#pet-dragon');
+    expect($('adventure-grid').querySelector('.adventure-player use')?.getAttribute('href')).toBe(`#pet-${appearance}`);
     expect(($('adventure-grid').querySelector('.adventure-player') as HTMLElement).style.getPropertyValue('--pet-color')).toBe('#123456');
   } finally { dom.window.close(); }
 });
@@ -623,11 +623,11 @@ it('re-enables a coin button instead of leaving it stuck disabled when equip-coi
 it('offers the Team up window before a first adventure, then opens the shared map with teammates once the team sets off', async () => {
   const { dom, window, $ } = page();
   const me = { id: 'explorer', color: '#123456', appearance: 'cat', joined: true, waiting: null };
-  const mate = { id: 'pal', color: '#654321', appearance: 'dog', joined: false, waiting: null };
+  const mate = { id: 'pal', color: '#654321', appearance: 'panda', joined: false, waiting: null };
   let lobby: any = { team: null, invitations: [], run: { team: null, state: 'new' }, size: 4 };
   const fresh = { ...map(), started: false, team: null as unknown };
   // Teammates set off from the same tile.
-  const shared = { ...map(), started: true, team: { id: 7, members: [{ id: 'pal', color: '#654321', appearance: 'dog', floor: 1, x: 2, y: 2, hp: 15, maxHp: 15, status: 'exploring' }] } };
+  const shared = { ...map(), started: true, team: { id: 7, members: [{ id: 'pal', color: '#654321', appearance: 'panda', floor: 1, x: 2, y: 2, hp: 15, maxHp: 15, status: 'exploring' }] } };
   let onMap = fresh;
   const bodies: any[] = [];
   window.fetch = vi.fn(async (url: string, options?: RequestInit) => {
@@ -657,6 +657,7 @@ it('offers the Team up window before a first adventure, then opens the shared ma
     expect(bodies).toEqual([{ action: 'invite', player: 'pal' }]);
     expect([...$('team-members').children].map(row => row.textContent)).toEqual(['explorer (you)Leader · Ready', 'palInvited']);
     expect(($('team-set-off') as HTMLButtonElement).disabled).toBe(true);
+    expect($('team-members').querySelector('li:last-child use')?.getAttribute('href')).toBe('#pet-panda');
     expect($('team-solo').hidden).toBe(true);
     expect($('team-leave').textContent).toBe('Disband team');
     // The invited player joins: a broadcast refreshes the window from the server.
@@ -681,7 +682,7 @@ it('offers the Team up window before a first adventure, then opens the shared ma
     Object.defineProperty(window.document, 'hidden', { value: false });
     await vi.waitFor(() => expect($('adventure-grid').children[2 * 16 + 3].classList.contains('adventure-teammate')).toBe(true), { timeout: 2500 });
     const cell = $('adventure-grid').children[2 * 16 + 3];
-    expect(cell.querySelector('use')?.getAttribute('href')).toBe('#pet-dog');
+    expect(cell.querySelector('use')?.getAttribute('href')).toBe('#pet-panda');
     expect($('adventure-grid').children[2 * 16 + 2].classList.contains('adventure-shared')).toBe(false);
     expect($('adventure-grid').getAttribute('aria-label')).toContain('1 teammate here');
   } finally { dom.window.close(); }

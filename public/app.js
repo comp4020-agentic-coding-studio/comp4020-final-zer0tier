@@ -7,7 +7,7 @@ const LABELS = { strength: "Strength", intelligence: "Intelligence", charisma: "
 const VERBS = { food: "Feed", soap: "Clean", hourglass: "Skip" };
 // Keep this literal list identical to src/pets.ts: this unbundled browser
 // cannot import the server module (which opens SQLite).
-const APPEARANCES = ["cat", "dog", "bird", "dragon", "blob"];
+const APPEARANCES = ["cat", "dog", "hedgehog", "lizard", "panda", "bird", "dragon", "blob"];
 const SVG_NS = "http://www.w3.org/2000/svg";
 let pendingAppearance = null;
 

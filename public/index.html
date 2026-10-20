@@ -33,73 +33,142 @@
       <symbol id="monster-slime" viewBox="0 0 24 24"><path d="M3 18C2 7 8 5 12 7c6-4 10 4 9 11Z" fill="currentColor"/><path d="M8 13v2m8-2v2m-6 3h4"/></symbol>
       <symbol id="monster-goblin" viewBox="0 0 24 24"><path d="m5 9-3-5 7 3h6l7-3-3 5v8l-7 4-7-4Z" fill="currentColor"/><path d="m7 11 3 2m7-2-3 2m-4 4h4"/></symbol>
       <symbol id="monster-slime-king" viewBox="0 0 24 24"><path d="M3 20C2 11 7 9 12 10c5-3 10 3 9 10Z" fill="currentColor"/><path d="m6 9-1-6 5 3 2-4 2 4 5-3-1 6Z" fill="var(--money)"/><path d="M8 14v2m8-2v2m-6 3h4"/></symbol>
-      <!-- Soft light from the upper left, so each pet reads as a rounded toy:
-           the shape's own outline is blurred into a height map, shaded, and
-           given a glossy highlight. Only the body's colour is lit; the face
-           stays crisp on top. -->
-      <filter id="pet-3d" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="height" />
-        <feSpecularLighting in="height" surfaceScale="6" specularConstant="0.9" specularExponent="22" lighting-color="#fff" result="gloss">
-          <fePointLight x="30" y="0" z="90" />
-        </feSpecularLighting>
-        <feComposite in="gloss" in2="SourceAlpha" operator="in" result="glossOnShape" />
-        <feDiffuseLighting in="height" surfaceScale="6" diffuseConstant="1.15" lighting-color="#fff" result="light">
-          <feDistantLight azimuth="235" elevation="55" />
-        </feDiffuseLighting>
-        <feComposite in="SourceGraphic" in2="light" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" result="shaded" />
-        <feComposite in="glossOnShape" in2="shaded" operator="arithmetic" k1="0" k2="0.55" k3="1" k4="0" />
-      </filter>
-      <radialGradient id="pet-belly-light" cx="40%" cy="30%" r="75%">
-        <stop offset="0" stop-color="#fff" stop-opacity="0.85" /><stop offset="1" stop-color="#fff" stop-opacity="0" />
-      </radialGradient>
-      <radialGradient id="pet-blush" r="50%">
-        <stop offset="0" stop-color="#fb7185" stop-opacity="0.75" /><stop offset="1" stop-color="#fb7185" stop-opacity="0" />
-      </radialGradient>
-      <!-- One face for every shape. The pupils sit in .pet-look, which follows
-           the pointer, and the eyes in .pet-eyes, which blink; .pet-happy-eyes
-           replace them while the pet is pleased. -->
+      <!-- Original cottage companions. The shared eyes preserve gaze, blink,
+           and happy reactions inside every <use>; each species has its own
+           silhouette, markings, paws, and small hand-drawn details. -->
       <symbol id="pet-face" viewBox="0 0 120 110">
-        <ellipse class="pet-belly" cx="60" cy="76" rx="24" ry="17" />
-        <ellipse class="pet-belly-light" cx="60" cy="76" rx="24" ry="17" fill="url(#pet-belly-light)" />
-        <ellipse class="pet-blush" cx="36" cy="67" rx="7" ry="4.5" fill="url(#pet-blush)" /><ellipse class="pet-blush" cx="84" cy="67" rx="7" ry="4.5" fill="url(#pet-blush)" />
+        <g class="pet-blush" fill="#de9a83"><ellipse cx="34" cy="62" rx="6" ry="3"/><ellipse cx="86" cy="62" rx="6" ry="3"/></g>
         <g class="pet-eyes">
-          <ellipse class="pet-eye-white" cx="45" cy="53" rx="8" ry="10" /><ellipse class="pet-eye-white" cx="75" cy="53" rx="8" ry="10" />
           <g class="pet-look">
-            <circle class="pet-eye" cx="46" cy="54" r="5" /><circle class="pet-eye" cx="74" cy="54" r="5" />
-            <circle class="pet-eye-shine" cx="48" cy="51" r="2" /><circle class="pet-eye-shine" cx="76" cy="51" r="2" />
-            <circle class="pet-eye-shine" cx="44.5" cy="56.5" r="0.9" /><circle class="pet-eye-shine" cx="72.5" cy="56.5" r="0.9" />
+            <ellipse class="pet-eye" cx="44" cy="53" rx="4.8" ry="6.2"/><ellipse class="pet-eye" cx="76" cy="53" rx="4.8" ry="6.2"/>
+            <ellipse class="pet-eye-shine" cx="42.6" cy="50.6" rx="1.7" ry="2"/><ellipse class="pet-eye-shine" cx="74.6" cy="50.6" rx="1.7" ry="2"/>
+            <circle class="pet-eye-shine" cx="46" cy="55.3" r=".7"/><circle class="pet-eye-shine" cx="78" cy="55.3" r=".7"/>
           </g>
         </g>
-        <path class="pet-happy-eyes" d="M38 55q7-8 14 0M68 55q7-8 14 0" />
-        <path class="pet-mouth" d="M53 72q7 6 14 0" />
+        <path class="pet-happy-eyes" d="M39 54q5-6 10 0m22 0q5-6 10 0"/>
       </symbol>
-      <symbol id="pet-blob" viewBox="0 0 120 110">
-        <path class="pet-shape" d="M20 62C20 39 35 20 56 24c22-12 43 5 43 28 0 13 12 23 4 35-7 12-26 7-43 10C26 102 9 88 20 62Z" />
-        <use href="#pet-face" />
+      <symbol id="pet-muzzle" viewBox="0 0 120 110">
+        <path class="pet-cream" d="M60 58c-12-8-23 1-18 10 3 5 12 6 18 2 6 4 15 3 18-2 5-9-6-18-18-10Z"/>
+        <path class="pet-nose" d="M56 59q4-2 8 0c1 2-1 5-4 5s-5-3-4-5Z"/>
+        <path class="pet-mouth pet-smile" d="M60 64v2m-7 0q3 5 7 0 4 5 7 0"/>
       </symbol>
       <symbol id="pet-cat" viewBox="0 0 120 110">
-        <path class="pet-shape" d="M23 49 23 13 46 30Q60 25 74 30L97 13 97 49C112 80 93 98 60 98S8 80 23 49Z" />
-        <use href="#pet-face" />
-        <path class="pet-mouth" d="m26 63-16-3m16 11-16 3m84-11 16-3m-16 11 16 3M56 64l4 4 4-4" />
+        <path class="pet-shape pet-shade" d="M83 85c16 4 24-2 22-12-1-5-8-5-10-1-3 4 0 7 3 7-3 5-8 3-13 1Z"/>
+        <path class="pet-shape" d="M40 63c-7 8-11 21-8 29 4 8 19 8 28 7 9 1 24 1 28-7 3-8-1-21-8-29Z"/>
+        <ellipse class="pet-cream" cx="60" cy="84" rx="15" ry="14"/>
+        <path class="pet-shape pet-soft" d="M41 81c-4 6-9 17-4 19 5 2 13 0 15-3V82m27-1c4 6 9 17 4 19-5 2-13 0-15-3V82"/>
+        <path class="pet-detail" d="M40 95v4m5-4v4m30-4v4m5-4v4"/>
+        <path class="pet-shape" d="M27 38 27 12q1-3 4-1l20 15q9-2 18 0l20-15q3-2 4 1v26l6 15-5 2 4 7-8 1C84 77 37 79 29 64l-8-1 4-7-5-2Z"/>
+        <path fill="#dc9c85" d="m32 19 1 16 12-6Zm56 0-1 16-12-6Z"/>
+        <path class="pet-highlight" d="M39 37q21-15 42 0c-14-5-28-5-42 0Z"/>
+        <path class="pet-shade" d="m52 29 3 12 3-14m4 0 3 14 3-12M25 46l10 3-11 2m71-5-10 3 11 2"/>
+        <use href="#pet-muzzle"/><use href="#pet-face"/>
+        <path class="pet-detail" d="m29 61-11-2m12 6-10 2m71-6 11-2m-12 6 10 2"/>
+        <path class="pet-scarf" d="M44 73q16 7 32 0l-1 6q-15 5-30 0Z"/>
+        <path class="pet-scarf" d="m68 78 10 2-5 13-7-4Z"/>
+        <path fill="#d4c69e" d="m70 82 5 1-1 3-5-1Z"/>
       </symbol>
       <symbol id="pet-dog" viewBox="0 0 120 110">
-        <ellipse class="pet-shape" cx="60" cy="62" rx="38" ry="36" />
-        <path class="pet-shape pet-shade" d="M30 29C12 24 6 49 12 69q6 11 15-1L39 36Zm60 0c18-5 24 20 18 40q-6 11-15-1L81 36Z" />
-        <use href="#pet-face" />
-        <ellipse class="pet-eye" cx="60" cy="67" rx="7" ry="4" />
+        <path class="pet-shape pet-shade" d="M82 87c16-3 21-16 15-21-4-3-9 0-9 5 0 6-3 9-9 9Z"/>
+        <path class="pet-shape" d="M38 64q22-12 44 0c8 10 10 25 5 31-7 7-47 7-54 0-5-6-3-21 5-31Z"/>
+        <path class="pet-cream" d="M49 71q11 5 22 0l6 17q-17 12-34 0Z"/>
+        <path class="pet-shape pet-soft" d="M39 83c-5 3-9 13-5 16 4 3 15 3 18-1V84m29-1c5 3 9 13 5 16-4 3-15 3-18-1V84"/>
+        <path class="pet-detail" d="M39 96v3m5-3v3m32-3v3m5-3v3"/>
+        <path class="pet-shape" d="M27 43c0-17 13-25 33-25s33 8 33 25v13c0 16-15 23-33 23S27 72 27 56Z"/>
+        <path class="pet-cream" d="M56 21h8l-2 16q-2 9-9 15l-5 1c9-12 8-23 8-32Z"/>
+        <path class="pet-shape pet-shade" d="M31 26C17 24 10 36 13 57c2 14 11 18 16 11 6-8 4-19 8-30Zm58 0c14-2 21 10 18 31-2 14-11 18-16 11-6-8-4-19-8-30Z"/>
+        <path class="pet-highlight" d="M23 32c-7 4-7 16-5 25-1-11 3-17 8-21Zm74 0c7 4 7 16 5 25 1-11-3-17-8-21Z"/>
+        <use href="#pet-muzzle"/><use href="#pet-face"/>
+        <path fill="#d68c7d" d="M57 69h6v4q-3 5-6 0Z"/><path class="pet-mouth" d="M60 70v3"/>
+        <path fill="#a7624c" stroke="#754b38" stroke-width="1.3" d="M41 76q19 8 38 0v6q-19 6-38 0Z"/>
+        <circle cx="60" cy="84" r="4" fill="#d7b768" stroke="#8f723f" stroke-width="1.2"/><path d="M60 82v3" stroke="#fff0c6" stroke-width="1.2"/>
+      </symbol>
+      <symbol id="pet-hedgehog" viewBox="0 0 120 110">
+        <path class="pet-shape pet-shade" d="m25 84-9-8 6-8-9-9 9-7-3-12 11-3 2-13 12 1 8-12 10 8 12-7 6 12 13 1-1 13 12 6-6 11 8 10-9 7 2 12-13 1-8 11H35Z"/>
+        <path class="pet-highlight" d="m28 42 5-11 7 3 8-11 5 5-9 10-7-2-6 10Zm42-17 3 9 10-2-1 11 10 3-3 6-13-5 1-9-8 1-6-11Z"/>
+        <path class="pet-shape pet-soft" d="M37 75c-8 5-14 18-9 22 5 4 14 1 19-3m36-19c8 5 14 18 9 22-5 4-14 1-19-3"/>
+        <path class="pet-shape pet-cream" d="M60 35c-12-15-32-2-32 17 0 9-7 17-4 28 5 24 67 24 72 0 3-11-4-19-4-28 0-19-20-32-32-17Z"/>
+        <path fill="#ead3ac" d="M30 76c8 17 52 20 62-1 2 15-8 21-31 21S29 90 30 76Z"/>
+        <path class="pet-shape pet-soft" d="M41 86c-5 2-10 12-5 14s16 0 17-3m26-11c5 2 10 12 5 14s-16 0-17-3"/>
+        <path class="pet-detail" d="m41 96-1 3m5-3-1 3m32-3 1 3m-5-3 1 3"/>
+        <use href="#pet-face"/>
+        <path fill="#ead5b5" d="M47 62q13-12 26 0-2 12-13 12T47 62Z"/>
+        <ellipse class="pet-nose" cx="60" cy="62" rx="5" ry="3.5"/><path class="pet-mouth pet-smile" d="M60 65v3m-5 0q5 5 10 0"/>
+        <path class="pet-shape pet-soft" d="M31 74q-6 4 1 10l10 2m47-12q6 4-1 10l-10 2"/>
+        <path class="pet-scarf" d="M50 81q10-5 20 0l-3 10q-7 4-14 0Z"/><path d="M60 81v10m-6-6h12" stroke="#c4cc9e" stroke-width="1.2"/>
+        <path class="pet-detail" d="m25 49 5-4m-8 17 6-1m65-15 5 4m-5 12 6 1m-57-41 1 6m34-5-2 6"/>
+      </symbol>
+      <symbol id="pet-lizard" viewBox="0 0 120 110">
+        <path class="pet-shape pet-shade" d="M81 92c24 8 37-7 29-22-5-9-13-9-14-4-1 3 3 4 6 8 5 9-7 13-17 8Z"/>
+        <path class="pet-shape" d="M41 63q19-9 38 0l8 25c1 12-55 16-55 2Z"/>
+        <path class="pet-cream" d="M50 69q10 4 20 0l7 22q-17 7-34 0Z"/>
+        <path class="pet-detail" d="M48 79q12 4 24 0M46 86q14 4 28 0"/>
+        <path class="pet-shape pet-soft" d="M39 83 28 92l-6-1 2 5-4 3 9 2 17-10m35-8 11 9 6-1-2 5 4 3-9 2-17-10"/>
+        <path class="pet-detail" d="m27 96-3 2m7-1-1 3m63-4 3 2m-7-1 1 3"/>
+        <path class="pet-shape" d="M25 44c-3-10 3-20 14-20 8 0 12 6 21 6s13-6 21-6c11 0 17 10 14 20 8 8 7 23-4 29-15 8-47 8-62 0-11-6-12-21-4-29Z"/>
+        <path class="pet-highlight" d="M29 38q1-13 13-8l11 7q-13-6-24 1Zm43-2q13-13 19 1-10-6-19-1Z"/>
+        <path class="pet-cream" d="M31 60q29 10 58 0c-1 10-11 15-29 15S32 70 31 60Z"/>
+        <use href="#pet-face"/>
+        <path class="pet-mouth pet-smile" d="M46 65q14 10 28 0"/><circle class="pet-nose" cx="55" cy="60" r="1.1"/><circle class="pet-nose" cx="65" cy="60" r="1.1"/>
+        <g class="pet-shade"><ellipse cx="59" cy="39" rx="3" ry="2"/><circle cx="29" cy="54" r="2"/><circle cx="91" cy="54" r="2"/><circle cx="35" cy="42" r="1.4"/><circle cx="85" cy="42" r="1.4"/></g>
+        <path class="pet-shape pet-soft" d="M36 72q-6 4-2 10l9 2m41-12q6 4 2 10l-9 2"/>
+      </symbol>
+      <symbol id="pet-panda" viewBox="0 0 120 110">
+        <path class="pet-shape pet-patch" d="M38 66q22-9 44 0c8 8 11 24 3 30-12 7-38 7-50 0-8-6-5-22 3-30Z"/>
+        <ellipse class="pet-cream" cx="60" cy="83" rx="18" ry="15"/>
+        <path class="pet-shape pet-patch" d="M35 84c-7 2-10 11-5 15s18 1 20-3m35-12c7 2 10 11 5 15s-18 1-20-3"/>
+        <ellipse fill="#a58c76" cx="39" cy="94" rx="4.5" ry="3"/><ellipse fill="#a58c76" cx="81" cy="94" rx="4.5" ry="3"/>
+        <circle class="pet-shape pet-patch" cx="31" cy="26" r="13"/><circle class="pet-shape pet-patch" cx="89" cy="26" r="13"/>
+        <circle cx="31" cy="26" r="7" fill="#8d7969"/><circle cx="89" cy="26" r="7" fill="#8d7969"/>
+        <path class="pet-shape pet-cream" d="M24 44c0-18 15-27 36-27s36 9 36 27l4 13c0 17-17 24-40 24S20 74 20 57Z"/>
+        <path class="pet-soft" opacity=".3" d="M24 58c4 12 17 18 36 18s32-6 36-18c-1 15-16 21-36 21S25 73 24 58Z"/>
+        <ellipse class="pet-patch" cx="42" cy="52" rx="11" ry="14" transform="rotate(23 42 52)"/><ellipse class="pet-patch" cx="78" cy="52" rx="11" ry="14" transform="rotate(-23 78 52)"/>
+        <g fill="#fff0d6"><ellipse cx="44" cy="53" rx="6.6" ry="8"/><ellipse cx="76" cy="53" rx="6.6" ry="8"/></g>
+        <use href="#pet-muzzle"/><use href="#pet-face"/>
+        <path class="pet-shape pet-soft" d="M43 77q17 7 34 0l-1 6q-16 6-32 0Z"/>
+        <path class="pet-shape" d="m68 82 10 1-4 13-8-4Z"/>
+        <path class="pet-highlight" d="m70 85 5 1-1 3-5-1Z"/>
       </symbol>
       <symbol id="pet-bird" viewBox="0 0 120 110">
-        <path class="pet-mouth" d="m47 92-4 11m30-11 4 11" />
-        <path class="pet-shape" d="M60 24 51 12 68 17 74 26C95 33 103 61 94 83q-34 28-68 0C17 61 25 30 60 24Z" />
-        <path class="pet-shape pet-shade" d="M29 47Q9 54 13 81q15-1 23-14m55-20q20 7 16 34-15-1-23-14" />
-        <use href="#pet-face" />
-        <path class="pet-beak" d="m51 64 9 10 9-10-9-4Z" />
+        <path class="pet-beak" d="M46 89v8l-9 4h17l-1-12m21 0v8l9 4H66l1-12"/>
+        <path class="pet-shape" d="M29 48c2-14 11-23 24-25-5-6-4-11-4-11 8 0 13 5 13 11 4-8 13-8 13-8s-1 7-7 11c15 4 24 16 25 31 2 18-5 37-33 38S23 78 29 48Z"/>
+        <path class="pet-cream" d="M60 47c-13-8-30 2-30 20 0 17 11 25 30 25s30-8 30-25c0-18-17-28-30-20Z"/>
+        <path class="pet-shape pet-shade" d="M31 56c-15 4-20 18-15 27 5 7 15 0 22-12m51-15c15 4 20 18 15 27-5 7-15 0-22-12"/>
+        <path class="pet-detail" d="m21 73 9-6m-8 13 10-8m67 1-9-6m8 13-10-8"/>
+        <path class="pet-highlight" d="M37 36q11-12 21-7c-9 0-15 3-21 7Z"/>
+        <use href="#pet-face"/>
+        <path class="pet-beak" d="M53 63q7-8 14 0l-7 7Z"/><path class="pet-mouth" d="m55 64 5 1 5-1"/>
+        <path class="pet-detail" d="M49 80q3 3 6 0m10 0q3 3 6 0m-14 6q3 3 6 0"/>
       </symbol>
       <symbol id="pet-dragon" viewBox="0 0 120 110">
-        <path class="pet-shape pet-shade" d="M33 48 5 31 9 74 28 65m59-17 28-17-4 43-19-9" />
-        <path class="pet-shape" d="m31 38-4-25 22 18q11-6 22 0l22-18-4 25c22 27 16 60-29 60S9 65 31 38Z" />
-        <use href="#pet-face" />
-        <path class="pet-belly" d="m52 79 5 8 3-8m2 0 5 8 3-8" />
+        <path class="pet-shape pet-shade" d="M83 88c19 5 29-3 24-11-4-5-8-7-8-7l-5 10-11 1Z"/>
+        <path class="pet-shape pet-shade" d="M35 61 13 40 11 73l9-5 7 10 11-5m47-12 22-21 2 33-9-5-7 10-11-5"/>
+        <path fill="#d8b48c" d="m17 48 14 16-6 8-5-8-6 4Zm86 0L89 64l6 8 5-8 6 4Z"/>
+        <path class="pet-shape" d="M39 64q21-10 42 0l7 28c-1 12-55 12-56 0Z"/>
+        <ellipse class="pet-cream" cx="60" cy="83" rx="16" ry="16"/>
+        <path class="pet-detail" d="M47 80h26M46 87h28M50 94h20"/>
+        <path class="pet-shape pet-soft" d="M39 86c-8 0-12 12-6 14h17l2-11m29-3c8 0 12 12 6 14H70l-2-11"/>
+        <path class="pet-detail" d="M39 96v4m5-4v4m32-4v4m5-4v4"/>
+        <path fill="#ecd6aa" stroke="#785841" stroke-width="1.6" d="M34 32 31 12q12 5 15 19m40 1 3-20q-12 5-15 19"/>
+        <path class="pet-shape" d="M27 42c-1-16 13-20 33-20s34 4 33 20c9 8 10 26-4 32-13 6-45 6-58 0-14-6-13-24-4-32Z"/>
+        <path class="pet-shade" d="m52 25 8 12 8-12-8 3Z"/>
+        <path class="pet-cream" d="M37 59c7-9 39-9 46 0 7 13-5 18-23 18s-30-5-23-18Z"/>
+        <use href="#pet-face"/>
+        <circle class="pet-nose" cx="53" cy="62" r="1.4"/><circle class="pet-nose" cx="67" cy="62" r="1.4"/>
+        <path class="pet-mouth pet-smile" d="M46 68q14 8 28 0"/>
+        <path fill="#fff9e8" d="m48 69 4 6 2-4m12 0 2 4 4-6"/>
+      </symbol>
+      <symbol id="pet-blob" viewBox="0 0 120 110">
+        <path class="pet-shape pet-shade" d="M38 84c-10 1-16 12-9 16 6 3 17-1 21-5m32-11c10 1 16 12 9 16-6 3-17-1-21-5"/>
+        <path class="pet-shape" d="M24 60c0-23 12-36 36-36s36 13 36 36c0 8 10 16 5 26-6 13-24 9-41 11-17-2-35 2-41-11-5-10 5-18 5-26Z"/>
+        <path class="pet-highlight" d="M34 45c5-13 17-16 28-14-14 2-20 6-28 14Z"/>
+        <path class="pet-cream" d="M42 75q18-10 36 0c5 13-9 17-18 17s-23-4-18-17Z"/>
+        <path class="pet-shape pet-soft" d="M28 71q-10 2-6 12l14 1m56-13q10 2 6 12l-14 1"/>
+        <path class="pet-scarf" d="M58 25C44 24 43 12 43 12c14-2 21 4 18 13 1-10 8-15 19-12-2 10-9 15-19 13"/>
+        <path class="pet-detail" d="m48 16 12 10m13-9L61 26"/>
+        <use href="#pet-face"/>
+        <path class="pet-mouth pet-smile" d="M53 66q7 7 14 0"/>
+        <path class="pet-detail" d="m54 83 3 2m6 0 3-2"/>
       </symbol>
     </svg>
 
@@ -196,7 +265,7 @@
           <h3 id="appearance-heading" class="section-label">Pet appearance</h3>
           <div class="appearance-fields">
             <label for="pet-color">Color <input id="pet-color" name="color" type="color" value="#f59e0b" /></label>
-            <label for="pet-appearance">Shape <select id="pet-appearance" name="appearance"></select></label>
+            <label for="pet-appearance">Species <select id="pet-appearance" name="appearance"></select></label>
             <button id="appearance-save" class="chip-btn chip-buy" type="submit">Save appearance</button>
           </div>
           <p id="appearance-status" class="help" role="status"></p>

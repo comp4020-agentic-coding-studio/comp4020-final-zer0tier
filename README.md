@@ -139,25 +139,28 @@ its ID.
 
 ### Pet appearance
 
-Open **Appearance**, or select the pet house at home, to pick a color and a shape:
-**cat, dog, bird, dragon, or blob**. Press **Save appearance**. New and
-existing pets start as an amber (`#f59e0b`) blob until you customize them.
+Open **Appearance**, or select the pet house at home, to pick a color and species:
+**cat, dog, hedgehog, lizard, panda, bird, dragon, or blob**. Press
+**Save appearance**. New pets start as an amber (`#f59e0b`) blob until you
+customize them; existing pets keep their saved species and color.
 Changing appearance is free, and works while studying or working. Only the
 owner can change it, and it stays saved across sign-outs and server
 restarts.
 
-The saved color and shape show up at home, on Arena pets,
-leaderboard, and **Happening now** feed — including older feed entries.
+The saved color and species show up at home, in Adventure and team lobbies,
+in battles, and on Arena pets, the leaderboard, and the **Happening now** feed
+— including older feed entries.
 
-Every pet is softly lit, so it looks like a rounded little toy: a glossy
-highlight, gentle shading, shiny eyes, and rosy cheeks, in any color. The
-home and town use the same warm daylight palette on every device.
+Every pet has a cozy illustrated look, with rounded shapes, expressive
+eyes, soft shading, and recognizable animal details. The selected color
+personalizes the pet while keeping its markings clear. The artwork matches
+the home's warm palette and stays readable in small Arena and feed icons.
 Your companion at home, and a pet you visit, are
 alive. They breathe (a little faster while studying or working), blink every
 few seconds, follow your pointer with their eyes, and turn toward it in 3D.
-With reduced motion turned on, they stay still: lit, but no breathing,
-blinking, or following. The 3D look is drawn in the browser — no extra
-download. Every open window updates from the server's broadcast; picking or
+With reduced motion turned on, they stay still: no breathing, blinking, or
+following. The illustrations are drawn in the browser — no extra download.
+Every open window updates from the server's broadcast; picking or
 saving a setting never previews an unsaved change on the pet.
 
 ### Playing with your pet
@@ -471,9 +474,10 @@ and the built-in `node:sqlite` for storage.
   of the same pet within a second 429.
 - **Appearance** (owner only): `POST /api/pets/:id/appearance` with both
   fields, e.g. `{"color":"#12abef","appearance":"dragon"}`. Color must match
-  `/^#[0-9a-f]{6}$/i`; appearance must be `cat`, `dog`, `bird`, `dragon`, or
-  `blob`. Invalid fields return 400; invalid player IDs return 404, like on
-  other pet routes. The response and the `pet:updated` broadcast carry the
+  `/^#[0-9a-f]{6}$/i`; appearance must be `cat`, `dog`, `hedgehog`, `lizard`,
+  `panda`, `bird`, `dragon`, or `blob`. Invalid fields return 400; invalid
+  player IDs return 404, like on other pet routes. The response and the
+  `pet:updated` broadcast carry the
   complete saved pet, including `color` and `appearance`. Clients wait for
   that broadcast before showing a change. Both columns migrate in place on
   startup.

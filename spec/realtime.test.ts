@@ -32,8 +32,8 @@ it("pet:updated — changing appearance/color and starting Study Math reach ever
   await signUp(id);
   const windows = [await open(), await open()];
   try {
-    const appearance = { color: "#12abEF", appearance: "dragon" };
-    const changed = windows.map((ws) => nextUpdate(ws, id, (pet) => pet.appearance === "dragon"));
+    const appearance = { color: "#12abEF", appearance: "panda" };
+    const changed = windows.map((ws) => nextUpdate(ws, id, (pet) => pet.appearance === "panda"));
     const res = await post(`/api/pets/${id}/appearance`, appearance);
     expect(res.status).toBe(200);
     const saved = await res.json();
