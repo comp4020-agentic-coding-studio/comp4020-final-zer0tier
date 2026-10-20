@@ -38,6 +38,11 @@ function page() {
   const study = vi.fn();
   lesson.addEventListener('click', study);
   $('courses').append(lesson);
+  const play = [...window.document.querySelectorAll<HTMLButtonElement>('[data-touch]')].map(button => {
+    const react = vi.fn();
+    button.addEventListener('click', react);
+    return { button, react };
+  });
   window.eval(readFileSync('public/world.js', 'utf8'));
   const destination = (place: string) => {
     const button = window.document.querySelector<HTMLButtonElement>(`[data-place="${place}"]`);
@@ -57,7 +62,7 @@ function page() {
     advance();
   };
   const position = () => [$('world-avatar').style.left, $('world-avatar').style.top];
-  return { dom, window, $, controls, lesson, study, destination, homeAction, walk, position, advance };
+  return { dom, window, $, controls, lesson, study, play, destination, homeAction, walk, position, advance };
 }
 
 it('keeps the live pet and gameplay controls while navigating between home and town', () => {
@@ -193,6 +198,63 @@ it('uses existing care actions and follows their saved inventory and disabled st
     expect(p.$('home-feed').textContent).toContain('0');
     p.$('home-feed').click();
     expect(feed).toHaveBeenCalledTimes(2);
+  } finally { p.dom.window.close(); }
+});
+
+it('shows the last pet interaction while preserving each action and resets it with the account', async () => {
+  const p = page();
+  try {
+    p.homeAction('pet');
+    expect(p.$('home-interaction-label').textContent).toBe('Choose an interaction');
+    const selected = () => [...p.$('world-dialog').querySelectorAll('[data-selected]')];
+    expect(selected()).toHaveLength(0);
+    for (const { button, react } of p.play) {
+      button.click();
+      expect(react).toHaveBeenCalledOnce();
+      expect(selected()).toEqual([button]);
+      expect(p.$('home-interaction-label').textContent).toBe(`Last interaction: ${button.textContent}`);
+    }
+    p.$('items').innerHTML = '<div data-item="food"><span class="item-count">2</span><button class="chip-use">Feed</button></div>' +
+      '<div data-item="soap"><span class="item-count">3</span><button class="chip-use">Clean</button></div>';
+    for (const [id, kind, label] of [['home-feed', 'food', 'Feed'], ['home-clean', 'soap', 'Clean']]) {
+      const source = p.$('items').querySelector<HTMLButtonElement>(`[data-item="${kind}"] button`)!;
+      const perform = vi.fn();
+      source.addEventListener('click', perform);
+      const button = p.$(id) as HTMLButtonElement;
+      await vi.waitFor(() => expect(button.disabled).toBe(false));
+      button.click();
+      expect(perform).toHaveBeenCalledOnce();
+      expect(selected()).toEqual([button]);
+      expect(p.$('home-interaction-label').textContent).toBe(`Last interaction: ${label}`);
+    }
+    p.window.document.dispatchEvent(new p.window.CustomEvent('adventure:reset'));
+    p.homeAction('pet');
+    expect(selected()).toHaveLength(0);
+    expect(p.$('home-interaction-label').textContent).toBe('Choose an interaction');
+  } finally { p.dom.window.close(); }
+});
+
+it('keeps pet care feedback inside the popup and waits for saved care before reporting success', async () => {
+  const p = page();
+  try {
+    p.$('pet-reaction').textContent = 'Your pet leans into your hand.';
+    await vi.waitFor(() => expect(p.$('home-feedback').hidden).toBe(false));
+    p.homeAction('pet');
+    expect(p.$('home-feedback').hidden).toBe(true);
+    p.$('items').innerHTML = '<div data-item="food"><span class="item-count">2</span><button class="chip-use">Feed</button></div>';
+    await vi.waitFor(() => expect((p.$('home-feed') as HTMLButtonElement).disabled).toBe(false));
+    p.$('home-feed').click();
+    expect(p.$('pet-reaction').textContent).not.toContain('tasty snack');
+    expect(p.$('items').querySelector('.item-count')!.textContent).toBe('2');
+    p.$('items').querySelector('.item-count')!.textContent = '1';
+    await vi.waitFor(() => expect(p.$('pet-reaction').textContent).toBe('Your pet enjoyed a tasty snack.'));
+    expect(p.$('home-feedback').hidden).toBe(true);
+    expect(p.$('pet-reaction').closest('[hidden]')).toBeNull();
+    p.$('care-error').textContent = 'Your pet is busy. Please wait.';
+    await vi.waitFor(() => expect(p.$('pet-reaction').textContent).toBe('Your pet is busy. Please wait.'));
+    expect(p.$('home-feedback').hidden).toBe(true);
+    expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(true);
+    expect(p.$('world-dialog').dataset.place).toBe('pet');
   } finally { p.dom.window.close(); }
 });
 

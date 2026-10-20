@@ -72,6 +72,7 @@ worldShell.innerHTML = `
     <aside class="world-companion" aria-label="Your companion and care">
       <p class="companion-heading world-eyebrow">YOUR LITTLE COMPANION</p>
       <div id="world-pet-summary"></div>
+      <p id="home-interaction-label">Choose an interaction</p>
       <div class="home-care" aria-label="Care for your pet at home"><button type="button" id="home-feed" class="world-button" disabled><svg class="icon" aria-hidden="true"><use href="#i-food" /></svg><span>Feed <small id="home-feed-count">0 left</small></span></button><button type="button" id="home-clean" class="world-button" disabled><svg class="icon" aria-hidden="true"><use href="#i-soap" /></svg><span>Clean <small id="home-clean-count">0 left</small></span></button></div>
       <p id="home-care-hint" class="world-care-hint help"></p><p id="home-care-error" class="error" role="alert"></p>
       <div id="world-play" class="home-play"></div>
@@ -112,7 +113,7 @@ worldPanels.arena.append(original.arena);
 worldPanels.appearance.append(worldById('appearance-settings'));
 worldPanels.pet.classList.add('world-companion');
 worldPanels.menu.innerHTML = '<p class="help">Take your time. Your pet and progress are saved.</p><p><a href="/readme/" target="_blank" rel="noopener">How to play</a></p><button type="button" class="world-button" data-place="backpack">Backpack</button> <button type="button" class="world-button" data-place="journal">Town journal</button>';
-const homePanelMoves = ['#world-pet-summary', '.home-care', '#home-care-hint', '#home-care-error', '#world-play', '.companion-footer'].map(selector => {
+const homePanelMoves = ['#world-pet-summary', '#home-interaction-label', '.home-care', '#home-care-hint', '#home-care-error', '#world-play', '.companion-footer'].map(selector => {
   const node = worldShell.querySelector(selector);
   const anchor = document.createComment('town companion position');
   node.before(anchor);
@@ -161,12 +162,31 @@ let worldNearest = null;
 let worldFeedbackTimer = 0;
 let worldCarePending = null;
 let worldWasVisible = false;
+const worldInteractionButtons = [...original.play.querySelectorAll('[data-touch]'), worldById('home-feed'), worldById('home-clean')];
+function worldSelectInteraction(kind) {
+  let label = '';
+  for (const button of worldInteractionButtons) {
+    const selected = (button.dataset.touch || button.id.replace('home-', '')) === kind;
+    button.toggleAttribute('data-selected', selected);
+    if (selected) label = button.dataset.touch ? button.textContent : kind === 'feed' ? 'Feed' : 'Clean';
+  }
+  worldById('home-interaction-label').textContent = label ? `Last interaction: ${label}` : 'Choose an interaction';
+}
+for (const button of worldInteractionButtons) button.addEventListener('click', () => worldSelectInteraction(button.dataset.touch || button.id.replace('home-', '')));
+new MutationObserver(() => {
+  if (homePet.dataset.reaction) worldSelectInteraction(homePet.dataset.reaction);
+}).observe(homePet, { attributes: true, attributeFilter: ['data-reaction'] });
 
 function worldMessage(text, feedback = true) {
   worldById('world-message').textContent = text;
   if (feedback && worldScene === 'home' && !worldDashboard.hidden && text) {
     clearTimeout(worldFeedbackTimer);
     const message = worldById('home-feedback');
+    if (worldDialog.open && worldDialog.dataset.place === 'pet') {
+      message.hidden = true;
+      worldById('pet-reaction').textContent = text;
+      return;
+    }
     message.textContent = text;
     message.hidden = false;
     worldFeedbackTimer = setTimeout(() => { message.hidden = true; }, 4500);
@@ -180,7 +200,7 @@ function worldArrangeHome(atHome) {
   for (const selector of ['.world-heading', '.world-layout > .world-companion', '.scene-caption', '.world-controls', '.world-nav']) worldShell.querySelector(selector).hidden = atHome;
   worldById('home-controls-tip').hidden = !atHome;
   worldById('home-pet-label').hidden = true;
-  for (const selector of ['.home-care', '.home-play', '#home-care-hint']) document.querySelector(selector).hidden = !atHome;
+  for (const selector of ['.home-care', '.home-play', '#home-care-hint', '#home-interaction-label']) document.querySelector(selector).hidden = !atHome;
   if (atHome && !worldDashboard.hidden) worldPanels.menu.append(worldById('signout'));
   else signoutAnchor.after(worldById('signout'));
   document.body.classList.toggle('world-home', atHome && !worldDashboard.hidden);
@@ -226,6 +246,7 @@ function worldOpenPlace(name, trigger) {
   worldById('world-dialog-title').textContent = worldPlaces[name][0];
   worldById('world-place-intro').textContent = worldPlaces[name][1];
   worldById('world-place-eyebrow').textContent = ['pet', 'menu'].includes(name) ? 'SWEET HOME' : ['backpack', 'appearance'].includes(name) ? 'YOURS TO KEEP' : 'AROUND TOWN';
+  if (name === 'pet') worldById('home-feedback').hidden = true;
   if (!worldDialog.open) worldDialog.showModal();
   worldById('world-dialog-close').focus({ preventScroll: true });
 }
@@ -286,6 +307,7 @@ function worldCare(kind) {
     return;
   }
   worldCarePending = { kind, count: Number(source.closest('[data-item]').querySelector('.item-count').textContent) };
+  worldSelectInteraction(kind === 'food' ? 'feed' : 'clean');
   source.click();
 }
 worldById('home-feed').addEventListener('click', () => worldCare('food'));
@@ -504,7 +526,7 @@ arenaTabs.addEventListener('keydown', (event) => {
   tabs[next].click(); tabs[next].focus();
 });
 
-document.addEventListener('adventure:reset', () => { worldCarePending = null; worldChangeScene('home', false); });
+document.addEventListener('adventure:reset', () => { worldCarePending = null; worldSelectInteraction(null); worldChangeScene('home', false); });
 document.addEventListener('battle:show', worldStop);
 document.addEventListener('confirm:ask', worldStop);
 adventureEntrance.addEventListener('click', worldStop);

@@ -100,8 +100,9 @@ near your pet or a piece of furniture to interact. You can also click or tap
 an empty spot to walk there, or select an object directly. Home and town
 work on desktop and phones.
 
-Touch your pet to play with it. Interact with its rug to open its needs,
-attributes, money, current lesson or shift, and care and play controls.
+Touch your pet or interact with its rug to open a small pop-up showing its
+needs, attributes, money, and current lesson or shift. Choose a care or play
+interaction there and see its response, with the room still visible behind it.
 Use the food bowl to feed it and the bath to clean it. The pet house opens
 **Appearance**, the chest opens your **Backpack**, and the television opens
 the **Journal**. The wall clock opens game help and **Sign out**. Step through
@@ -161,8 +162,9 @@ saving a setting never previews an unsaved change on the pet.
 
 ### Playing with your pet
 
-Tap or click your pet at home to touch it there, or interact with its rug
-and use the buttons under **Play with your pet**. The same four touches work on other players'
+Tap or click your pet at home to touch it there and open its compact pop-up,
+or interact with its rug and choose a play button. The pop-up shows the
+pet's reaction alongside its live status. The same four touches work on other players'
 pets while you visit them (see **Visit, play and steal** below):
 
 | Touch | Where on the pet | Reaction |

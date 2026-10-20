@@ -566,32 +566,151 @@ body.world-playing:not(.world-home) #home-controls-tip,
 body.world-playing:not(.world-home) #home-feedback {
   display: none;
 }
+/* Pet interaction is a small game window, leaving the room in view. */
 body.world-playing #world-dialog[data-place="pet"] {
-  width: min(600px, calc(100vw - 32px));
+  inset: auto 20px 20px auto;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(480px, calc(100dvh - 40px));
+  margin: 0;
+  box-shadow: 0 3px 0 rgb(38 45 29 / 25%), 0 10px 32px rgb(27 39 24 / 20%);
+}
+body.world-playing #world-dialog[data-place="pet"]::backdrop {
+  background: transparent;
+  backdrop-filter: none;
+}
+body.world-playing #world-dialog[data-place="pet"] .place-heading {
+  padding: 8px 12px;
+  gap: 8px;
+}
+body.world-playing #world-dialog[data-place="pet"] .place-heading h2 {
+  font-size: 1rem;
+}
+body.world-playing #world-dialog[data-place="pet"] .place-heading .world-button {
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+}
+body.world-playing #world-dialog[data-place="pet"] .world-eyebrow,
+body.world-playing #world-dialog[data-place="pet"] .place-intro,
+body.world-playing #world-panel-pet .companion-footer,
+body.world-playing #world-panel-pet #home-care-hint,
+body.world-playing #world-panel-pet .play > .help,
+body.world-playing #world-panel-pet #play-heading {
+  display: none;
+}
+body.world-playing #world-dialog[data-place="pet"] .place-body {
+  padding: 12px 14px 14px;
 }
 body.world-playing #world-panel-pet.world-companion {
-  display: block;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
   padding: 0;
   border: 0;
   box-shadow: none;
 }
 body.world-playing #world-panel-pet #world-pet-summary {
   display: block;
+  grid-column: 1 / -1;
 }
 body.world-playing #world-panel-pet .pet-hero {
-  margin: 0 0 20px;
+  margin: 0 0 10px;
+}
+body.world-playing #world-panel-pet #pet-heading {
+  margin: 0;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+body.world-playing #world-panel-pet .activity {
+  margin: 4px 0 10px;
+  font-size: 0.7rem;
+}
+body.world-playing #world-panel-pet .meters {
+  gap: 7px;
+}
+body.world-playing #world-panel-pet .meter {
+  grid-template-columns: 72px minmax(0, 1fr) 24px;
+  gap: 6px;
+  font-size: 0.7rem;
+}
+body.world-playing #world-panel-pet .meter-label,
+body.world-playing #world-panel-pet .meter-track,
+body.world-playing #world-panel-pet .meter-value {
+  grid-column: auto;
+  grid-row: auto;
 }
 body.world-playing #world-panel-pet .stats {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: 0 0 20px;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
 }
-body.world-playing #world-panel-pet .home-play {
-  margin: 20px 0 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+body.world-playing #world-panel-pet .stat {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
-body.world-playing #world-panel-pet .companion-footer {
-  margin-top: 18px;
+body.world-playing #world-panel-pet .stat dt {
+  font-size: 0.6rem;
+}
+body.world-playing #world-panel-pet .stat dt .icon {
+  display: none;
+}
+body.world-playing #world-panel-pet .stat dd {
+  margin-top: 2px;
+  font-size: 1rem;
+}
+body.world-playing #world-panel-pet #home-interaction-label {
+  grid-column: 1 / -1;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+body.world-playing #world-panel-pet .home-care,
+body.world-playing #world-panel-pet .home-play,
+body.world-playing #world-panel-pet .play,
+body.world-playing #world-panel-pet .play-buttons {
+  display: contents;
+  margin: 0;
+}
+body.world-playing #world-panel-pet .home-care button {
+  min-height: 44px;
+  gap: 4px;
+}
+body.world-playing #world-panel-pet .home-care button span {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+body.world-playing #world-panel-pet .home-care .icon {
+  display: none;
+}
+body.world-playing #world-panel-pet .home-care button small {
+  white-space: nowrap;
+}
+body.world-playing #world-panel-pet [data-selected] {
+  background: var(--world-sage);
+  border-color: var(--primary);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+body.world-playing #world-panel-pet #pet-reaction {
+  display: block;
+  grid-column: 1 / -1;
+  min-height: 2.8em;
+  margin: 10px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+body.world-playing #world-panel-pet #home-care-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.75rem;
+}
+body.world-playing #world-panel-pet #home-care-error:empty {
+  display: none;
 }
 @media (max-width: 560px) {
   body.world-playing #home-controls-tip {
@@ -600,7 +719,9 @@ body.world-playing #world-panel-pet .companion-footer {
     padding: 6px 10px;
     font-size: 0.7rem;
   }
-  body.world-playing #world-panel-pet .stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  body.world-playing #world-dialog[data-place="pet"] {
+    right: 12px;
+    bottom: 12px;
+    max-height: min(480px, calc(100dvh - 24px));
   }
 }
