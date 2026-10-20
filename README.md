@@ -92,13 +92,28 @@ come. Each would add interaction, but the first version proves the core loop
 
 ## Playing
 
-On desktop windows at least 1120px wide, the game fills the browser with
-three panels: your pet and quick care, School/Work/Shop tabs, and the Arena
-with Pets/Leaderboard/Activity/Alerts tabs. Long lists scroll within their
-own panel; short windows can still scroll the page. Theft reports appear in
-Alerts. Arrow keys switch tabs; Home/End jump to the first/last tab.
-Narrower windows and phones keep the original stacked layout and controls.
-The selected Pets or Leaderboard tab stays picked when you resize.
+Your pet lives in **Sweet Home**, a furnished room with a television,
+couch, pet bed, fireplace, food bowl, and wash basin. Play with your pet,
+feed it, or clean it at home. Step through the front door, or choose
+**Town map**, to visit the town. The same home and town work on desktop
+and phones.
+
+The town has **Shops**, **Adventure**, **Arena**, **Part-time Jobs**, and
+**School**. Click or tap a destination to open its activities. **Sweet Home**
+returns you to your pet. Your **Backpack** holds supplies, learned abilities, and
+Unfair Coins; the **Journal** keeps recent visitors, activity, fight
+history, and saved theft reports with revenge options. Your pet's needs,
+attributes, money, and current lesson or shift remain available in the
+companion panel beside the scene, or below it on a phone.
+
+Click the scene to walk with **W/A/S/D** or the **arrow keys**, then press
+**E** or **Enter** to interact with something nearby. You can also click or
+tap an empty spot to walk there, or use the on-screen direction pad.
+Every destination and home care action also has a button that works with
+Tab and Enter. Movement
+pauses while a window is open or you are typing. Close a window with its
+Close button or Escape to return to the scene. Walking around home and town
+costs nothing; lessons, work, battles, and adventures keep their usual rules.
 
 **Create an account** with a player ID (letters, digits, `-` or `_`, up to
 32 characters) and a password of at least 8 characters. Each ID has one
@@ -116,19 +131,20 @@ its ID.
 
 ### Pet appearance
 
-Use **Pet appearance** below your pet's header to pick a color and a shape:
+Open **Appearance**, or select the pet bed at home, to pick a color and a shape:
 **cat, dog, bird, dragon, or blob**. Press **Save appearance**. New and
 existing pets start as an amber (`#f59e0b`) blob until you customize them.
 Changing appearance is free, and works while studying or working. Only the
 owner can change it, and it stays saved across sign-outs and server
 restarts.
 
-The saved color and shape show up in the dashboard header, Arena pets,
+The saved color and shape show up at home, on Arena pets,
 leaderboard, and **Happening now** feed — including older feed entries.
 
 Every pet is softly lit, so it looks like a rounded little toy: a glossy
-highlight, gentle shading, shiny eyes, and rosy cheeks, in any color, in
-light and dark mode. Your companion in the header, and a pet you visit, are
+highlight, gentle shading, shiny eyes, and rosy cheeks, in any color. The
+home and town use the same warm daylight palette on every device.
+Your companion at home, and a pet you visit, are
 alive. They breathe (a little faster while studying or working), blink every
 few seconds, follow your pointer with their eyes, and turn toward it in 3D.
 With reduced motion turned on, they stay still: lit, but no breathing,
@@ -138,10 +154,9 @@ saving a setting never previews an unsaved change on the pet.
 
 ### Playing with your pet
 
-Tap or click your pet in its header to touch it there, or use the buttons
-under **Play with your pet** (on desktop, beneath the pet in the left
-column). The same four touches work on other players' pets while you visit
-them (see **Visit, play and steal** below):
+Tap or click your pet at home to touch it there, or use the buttons
+under **Play with your pet**. The same four touches work on other players'
+pets while you visit them (see **Visit, play and steal** below):
 
 | Touch | Where on the pet | Reaction |
 | --- | --- | --- |
@@ -159,14 +174,15 @@ isn't saved, sent to the server, or shown to other players. With reduced
 motion turned on, the pet doesn't move — it only smiles and blushes, and the
 line still appears.
 
-Under the buttons, **Recent visitors** lists the last five players who
+In the Journal, **Recent visitors** lists the last five players who
 played with your pet, each with their latest touch and when it happened,
 newest first. When someone touches your pet while you're signed in, it
-reacts on your dashboard and says who did it.
+reacts at home and says who did it.
 
 ### School
 
-Every pet starts at primary school. There are four courses:
+Visit **School** on the town map to take lessons. Every pet starts at
+primary school. There are four courses:
 
 | Course    | Raises                                         |
 | --------- | ---------------------------------------------- |
@@ -208,7 +224,8 @@ health.
 
 ### Work
 
-There are three places to work, each paying by one attribute. Shifts last
+Open **Part-time Jobs** on the town map. There are three places to work,
+each paying by one attribute. Shifts last
 15 minutes, 30 minutes, 1 hour, 2 hours, or 4 hours. An hour pays the pet's
 rank wage plus **$1 per point** of that attribute, so a strong pet earns
 more on the construction site than at the office. Pay and costs scale with
@@ -226,7 +243,9 @@ rank's requirement, **Upgrade** moves it up for good.
 
 ### Shop
 
-Buy items at the shop with the pet's money, then use them:
+Open **Shops** on the town map to buy items with the pet's money. Use
+**Feed** and **Clean** at home to care for your pet with those supplies;
+the shop also keeps the item-use controls available:
 
 | Item      | Price | Use                                               |
 | --------- | ----- | ------------------------------------------------- |
@@ -241,7 +260,7 @@ only works while the pet is studying or working — the busy banner has a Skip
 button for it. Open the same pet in two windows and both update together.
 
 **Free daily supplies.** Once per UTC calendar day, **Collect 1 Food + 1
-Soap** at the top of Care & shop adds one of each to the pet's stock, free.
+Soap** in Shops or your Backpack adds one of each to the pet's stock, free.
 They're ordinary items — they keep until used, and Adventure's backpack
 shares the same count. Missed days don't add up. After collecting, the
 button reads **Collected today** until midnight UTC (shown in your local
@@ -250,7 +269,8 @@ reset uses real UTC days, even on the accelerated test clock.
 
 ### Other pets and fights
 
-The **Arena** lists other pets: the bot first, then the newest. A player who
+Open **Arena** on the town map to see other pets: the bot first, then the
+newest. A player who
 joins while you're playing shows up in your arena right away. You can also
 look up any pet by its player ID. Each shows its school, what it's doing,
 its attributes, its power, and its wins and losses.
@@ -318,8 +338,9 @@ calendar day, across all players. Protection persists and resets at
 midnight UTC; failed attempts don't use it up. You can't steal from yourself
 or the bot.
 
-Thefts are saved separately from the public feed. When you sign in,
-unresolved reports show who stole from you, when, and how much, with a
+Thefts are saved separately from the public feed. The **Journal** shows a
+report count when unresolved thefts are waiting. Open it to see who stole
+from you, when, and how much, with a
 **Take revenge** button. They also appear live, and survive server restarts
 and public-feed pruning. Each theft allows one completed revenge attempt,
 using the same automatic battle and combat energy as a fight. You must be
@@ -503,8 +524,7 @@ and the built-in `node:sqlite` for storage.
 
 ## Adventure exploration
 
-Choose **Adventure** under **Make their day** on desktop, or the Adventure
-section on a phone, then **Explore the woodland**. Move one block per press
+Leave home for the town map and choose **Adventure**. Move one block per press
 with W/A/S/D, arrow keys, or the on-screen direction buttons. The map takes
 the keyboard as soon as it opens. **Space** acts on the tile your pet stands
 on: it opens an unopened chest, or takes the stairs there (Descend or
@@ -736,7 +756,7 @@ Defeat, restarting, and signing out don't remove inventory.
 The map's **Your backpack** shows items, learned abilities, and coins, each
 with an **Equip**/**Unequip** button. Food restores 40 stamina; soap
 restores 50 hygiene, capped at 100. Hourglasses finish the current lesson
-or shift. These are the same items used in **Care & shop**, with a shared
+or shift. These are the same items used at home and in **Shops**, with a shared
 count — they don't restore Adventure HP/MP or revive a failed run. The
 Adventure section's **Abilities & coins** also shows permanent discoveries
 and the same equip controls, since equipping is global to the pet.
@@ -857,4 +877,4 @@ floors. Chest opening and its inventory grant commit in one database
 transaction; item use and its new revision do too. These actions can't
 award or consume twice when retried. Adventure battle results stay
 private. Inventory changes use the existing `pet:updated` WebSocket event,
-so Care & shop and other open windows stay current.
+so home care, Shops, and other open windows stay current.

@@ -8,10 +8,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Varela+Round&display=swap" />
     <link rel="stylesheet" href="/style.css" />
-    <link rel="stylesheet" href="/desktop.css" />
     <link rel="stylesheet" href="/battle.css" />
     <link rel="stylesheet" href="/adventure.css" />
     <link rel="stylesheet" href="/confirm.css" />
+    <link rel="stylesheet" href="/world.css" />
   </head>
   <body>
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -133,7 +133,8 @@
         </div>
       </div>
       <form id="login" class="card login" hidden>
-        <h1>Raise a pet worth bragging about</h1>
+        <p class="world-eyebrow">WELCOME TO VIRTUEPETS</p>
+        <h1>A little home.<br />A big adventure.</h1>
         <div class="auth-tabs" role="tablist" aria-label="Account">
           <button type="button" role="tab" id="tab-signin" aria-selected="true" aria-controls="login">Sign in</button>
           <button type="button" role="tab" id="tab-signup" aria-selected="false" aria-controls="login">Create account</button>
@@ -179,7 +180,7 @@
 
         <section class="play" aria-labelledby="play-heading">
           <h3 id="play-heading" class="section-label">Play with your pet</h3>
-          <p class="help">Tap or click your pet where you'd like to touch it, or choose:</p>
+          <p class="help">Tap your pet in the room, or choose a little affection:</p>
           <div class="play-buttons">
             <button type="button" class="chip-btn chip-buy" data-touch="pat">Pat head</button>
             <button type="button" class="chip-btn chip-buy" data-touch="tickle">Tickle belly</button>
@@ -260,7 +261,7 @@
         </section>
 
         <section class="block" aria-labelledby="work-heading">
-          <h3 class="section-label" id="work-heading">Work <span class="section-cost" id="work-cost"></span></h3>
+          <h3 class="section-label" id="work-heading">Part-time jobs <span class="section-cost" id="work-cost"></span></h3>
           <fieldset class="shift-picker">
             <legend class="visually-hidden">Shift length</legend>
             <div id="shift-options" class="shift-options"></div>
@@ -370,7 +371,7 @@
         </section>
 
         <section class="block" aria-labelledby="care-heading">
-          <h3 class="section-label" id="care-heading">Care &amp; shop</h3>
+          <h3 class="section-label" id="care-heading">Supplies</h3>
           <div id="free-supplies" class="item item-free">
             <svg class="icon" aria-hidden="true"><use href="#i-gift" /></svg>
             <span class="item-name">Free daily supplies</span>
@@ -385,10 +386,10 @@
 
     <footer class="footer"><a href="/readme/">How to play</a></footer>
     <script type="module" src="/app.js"></script>
-    <script type="module" src="/desktop.js"></script>
     <script type="module" src="/battle.js"></script>
     <script type="module" src="/adventure.js"></script>
     <script type="module" src="/confirm.js"></script>
     <script type="module" src="/interact.js"></script>
+    <script type="module" src="/world.js"></script>
   </body>
 </html>

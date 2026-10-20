@@ -30,6 +30,16 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   else is persistent: no in-memory state may be the only copy of game state.
 - Frontend is plain HTML/CSS/JS in `public/`, with no framework or bundler.
 
+## Home and town interface
+
+- `public/world.js` and `public/world.css` present Sweet Home and the town
+  map. Move the existing gameplay controls into scenes and windows; preserve
+  their IDs, listeners, and server-driven updates in `app.js` and the other
+  gameplay modules.
+- Keep home care, town destinations, and Adventure accessible with both
+  keyboard and touch. World movement must pause while a dialog is open or
+  the player is typing.
+
 ## Rules
 
 1. **Every database query is parameterised.** Use `db.prepare(...)` with `?`
