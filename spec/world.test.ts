@@ -313,8 +313,8 @@ it('moves in the world but leaves keyboard input alone in dialogs and text field
     expect(p.position()).toEqual(typing);
     p.walk('ArrowLeft', input);
     expect(p.position()).toEqual(typing);
-    input.remove();
     p.$('world-stage').focus();
+    input.remove();
     p.walk('ArrowLeft');
     expect(p.position()).not.toEqual(typing);
   } finally { p.dom.window.close(); }
@@ -481,6 +481,94 @@ it.each([30, 60, 120])('walks at a consistent speed from the first frame at %i H
   } finally { p.dom.window.close(); }
 });
 
+it.each([
+  ['w', 'up', 0, -1],
+  ['s', 'down', 0, 1],
+  ['a', 'left', -1, 0],
+  ['d', 'right', 1, 0],
+] as const)('faces the direction of %s movement and returns to idle after releasing the key', (key, facing, dx, dy) => {
+  const p = page();
+  try {
+    p.$('home-door').click();
+    const stage = p.$('world-stage'), avatar = p.$('world-avatar');
+    const start = p.position();
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key, bubbles: true }));
+    p.advance(3);
+    expect(p.position().x - start.x).toBeCloseTo(dx * 190 * .048, 6);
+    expect(p.position().y - start.y).toBeCloseTo(dy * 190 * .048, 6);
+    expect(avatar.dataset.facing).toBe(facing);
+    expect(avatar.dataset.walking).toBe('true');
+    stage.dispatchEvent(new p.window.KeyboardEvent('keyup', { key, bubbles: true }));
+    const stopped = p.position();
+    p.advance(30);
+    expect(p.position()).toEqual(stopped);
+    expect(avatar.dataset.walking).toBe('false');
+    expect(avatar.dataset.facing).toBe(facing);
+  } finally { p.dom.window.close(); }
+});
+
+it.each(['game menu', 'another dialog', 'window blur', 'hidden page'])(
+  'pauses character animation for %s and cancels held keys and clicked routes until new input',
+  async (reason) => {
+    const p = page();
+    try {
+      p.$('home-door').click();
+      const stage = p.$('world-stage'), avatar = p.$('world-avatar');
+      const dialog = p.window.document.createElement('dialog');
+      p.window.document.body.append(dialog);
+      let hidden = false;
+      Object.defineProperty(p.window.document, 'hidden', { configurable: true, get: () => hidden });
+      vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
+      const pause = () => {
+        if (reason === 'game menu') p.openMenu();
+        if (reason === 'another dialog') dialog.showModal();
+        if (reason === 'window blur') p.window.dispatchEvent(new p.window.Event('blur'));
+        if (reason === 'hidden page') {
+          hidden = true;
+          p.window.document.dispatchEvent(new p.window.Event('visibilitychange'));
+        }
+      };
+      const resume = () => {
+        if (reason === 'game menu') p.$('world-dialog-close').click();
+        if (reason === 'another dialog') dialog.close();
+        if (reason === 'window blur') p.window.dispatchEvent(new p.window.Event('focus'));
+        if (reason === 'hidden page') {
+          hidden = false;
+          p.window.document.dispatchEvent(new p.window.Event('visibilitychange'));
+        }
+      };
+      for (const input of ['held key', 'clicked route']) {
+        stage.focus();
+        if (input === 'held key') {
+          stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+        } else {
+          stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: 700, clientY: 580, bubbles: true }));
+        }
+        const start = p.position();
+        p.advance(6);
+        expect(p.position(), input).not.toEqual(start);
+        expect(avatar.dataset.walking, input).toBe('true');
+        pause();
+        await vi.waitFor(() => expect(avatar.dataset.paused, input).toBe('true'));
+        const stopped = p.position();
+        p.advance(30);
+        expect(p.position(), `${input} stays still while paused`).toEqual(stopped);
+        expect(avatar.dataset.walking, input).toBe('false');
+        resume();
+        await vi.waitFor(() => expect(avatar.dataset.paused, input).toBe('false'));
+        p.advance(30);
+        expect(p.position(), `${input} must not resume automatically`).toEqual(stopped);
+        expect(avatar.dataset.walking, input).toBe('false');
+      }
+      const stopped = p.position();
+      p.walk('a');
+      expect(p.position().x).toBeLessThan(stopped.x);
+      expect(avatar.dataset.facing).toBe('left');
+      expect(avatar.dataset.walking).toBe('false');
+    } finally { p.dom.window.close(); }
+  },
+);
+
 it('fills desktop and phone viewports in both scenes while preserving the character position on resize', () => {
   const p = page();
   try {
@@ -557,9 +645,13 @@ it('stops at a building while allowing the character to walk around its edge', (
     expect(stopped.y).toBeLessThan(570);
     p.advance(30);
     expect(p.position()).toEqual(stopped);
+    expect(p.$('world-avatar').dataset.walking).toBe('false');
+    expect(p.$('world-avatar').dataset.facing).toBe('up');
     stage.dispatchEvent(new p.window.KeyboardEvent('keyup', { key: 'w', bubbles: true }));
     stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
     p.advance(35);
+    expect(p.$('world-avatar').dataset.walking).toBe('true');
+    expect(p.$('world-avatar').dataset.facing).toBe('right');
     stage.dispatchEvent(new p.window.KeyboardEvent('keyup', { key: 'd', bubbles: true }));
     const beside = p.position();
     expect(beside.x).toBeGreaterThan(580);

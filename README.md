@@ -108,6 +108,12 @@ or you are typing. Home and town work on desktop and phones. Menus, windows,
 and controls share the sign-in screen's warm orange and cream palette,
 rounded shapes, typefaces, and light or dark appearance.
 
+Your character shares the town's illustrated style and turns to face the
+direction you walk. Alternating footsteps and arm swings animate movement,
+with gentle breathing and blinking while you stand still. Character animation
+pauses while a window is open or the game is in the background; reduced-motion
+settings turn off these decorative animations.
+
 Touch your pet or interact with its rug to open a small pop-up showing its
 needs, attributes, money, and current lesson or shift. Choose a care or play
 interaction there and see its response, with the room still visible behind it.
