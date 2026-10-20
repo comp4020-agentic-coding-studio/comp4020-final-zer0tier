@@ -99,8 +99,8 @@ it('sets off only once everyone joined is ready; each pays a fresh start and sha
   expect(teams.setOff(mate)).toEqual({ status: 409, error: 'Only the team leader can set off.' });
   // A teammate with a run under way must abandon it first; a tired one must rest.
   step(mate, 's');
-  expect(teams.teamFor(lead).team!.members[1]).toMatchObject({ id: mate, waiting: 'has an adventure in progress; abandon it first' });
-  expect(teams.setOff(lead)).toEqual({ status: 409, error: 'so-mate has an adventure in progress; abandon it first.' });
+  expect(teams.teamFor(lead).team!.members[1]).toMatchObject({ id: mate, waiting: 'has an adventure in progress; end it first' });
+  expect(teams.setOff(lead)).toEqual({ status: 409, error: 'so-mate has an adventure in progress; end it first.' });
   ok(adventure.abandonAdventure(mate, adventure.adventureFor(mate).revision));
   db.prepare('UPDATE pets SET stamina = 39 WHERE id = ?').run(mate);
   expect(teams.setOff(lead)).toEqual({ status: 409, error: 'so-mate is too tired; it needs 40 stamina.' });
@@ -133,7 +133,7 @@ it('teammates beside the pet, diagonals included, join its battle; one further a
   let result;
   try { result = step(lead, 'd'); } finally { random.mockRestore(); }
   const battle = result.battle!;
-  expect(battle.playback.fighters.map(f => f.id)).toEqual([lead, near, `monster:${slime.id}`]);
+  expect(battle.playback!.fighters.map(f => f.id)).toEqual([lead, near, `monster:${slime.id}`]);
   expect(battle).toMatchObject({ won: true, pending: true });
   expect(battle.fighter).toBeUndefined();
   // The ally's run saves the same battle, from its own side.
@@ -215,7 +215,7 @@ it('a knocked-out teammate is out of the run while the rest explore on, and reco
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
   let result;
   try { result = step(lead, 'd'); } finally { random.mockRestore(); }
-  expect(result.battle!.playback.turns.map(t => [t.actor, t.target, t.hp])).toEqual([[2, 1, [3, 0, 10]], [0, 2, [3, 0, 0]]]);
+  expect(result.battle!.playback!.turns.map(t => [t.actor, t.target, t.hp])).toEqual([[2, 1, [3, 0, 10]], [0, 2, [3, 0, 0]]]);
   expect(result).toMatchObject({ hp: 3 + 7, failed: false, battle: { won: true, recovery: { hp: 7, mp: 0 } } });
   const knocked = adventure.adventureFor(weak);
   expect(knocked).toMatchObject({ hp: 0, failed: true, battle: { won: true, fighter: 1, recovery: { hp: 0, mp: 0 }, after: { hp: 0 } } });
@@ -270,9 +270,49 @@ it('only the walking teammate starts a surprise battle, with nearby allies and s
   expect(remote.battle).toBeNull();
   expect(remote.enemies.some(e => e.id === slime.id)).toBe(false);
   expect(caught).toMatchObject({ x: slime.x, y: slime.y, battle: { surprise: true, pending: true, won: true } });
-  expect(caught.battle!.playback.fighters.map(f => f.id)).toEqual([mate, near, `monster:${slime.id}`]);
+  expect(caught.battle!.playback!.fighters.map(f => f.id)).toEqual([mate, near, `monster:${slime.id}`]);
   expect(adventure.adventureFor(near).battle).toMatchObject({ id: caught.battle!.id, fighter: 1, surprise: true });
   expect(adventure.patrolAdventure(lead)).toEqual(remote);
   expect(adventure.patrolAdventure(mate)).toEqual(caught);
   expect(step(mate, 'd')).toEqual(caught);
+});
+
+it('joins a fresh team once without charging again and leaves teammates’ map intact when a member reenters', () => {
+  const [lead, mate] = [player('entry-team-lead'), player('entry-team-mate')];
+  const { id } = team(lead, mate);
+  const initial = adventure.adventureFor(lead), paid = pets.getPet(lead);
+  expect(initial.awaitingEntry).toBe(true);
+  const joined = ok(adventure.enterAdventure(lead, initial.revision, 'team-entry-one'));
+  expect(joined).toMatchObject({ team: { id }, entryId: 'team-entry-one', awaitingEntry: false });
+  expect(pets.getPet(lead)).toEqual(paid);
+  expect(adventure.enterAdventure(lead, initial.revision, 'team-entry-one')).toEqual(joined);
+  const mateBefore = adventure.adventureFor(mate), world = db.prepare('SELECT world_json FROM teams WHERE id = ?').get(id);
+  const left = ok(adventure.leaveAdventure(lead, joined.revision));
+  expect(left.abandoned).toBe(true);
+  expect(adventure.adventureFor(mate)).toMatchObject({ revision: mateBefore.revision, abandoned: false, awaitingEntry: true });
+  expect(db.prepare('SELECT world_json FROM teams WHERE id = ?').get(id)).toEqual(world);
+  const mateJoined = ok(adventure.enterAdventure(mate, mateBefore.revision, 'mate-entry-one'));
+  expect(mateJoined).toMatchObject({ team: { id }, awaitingEntry: false, abandoned: false });
+  db.prepare('UPDATE adventures SET cooldown_until = NULL WHERE player_id = ?').run(lead);
+  db.prepare('UPDATE pets SET stamina = ?, hygiene = ? WHERE id = ?').run(100, 100, lead);
+  const solo = ok(adventure.enterAdventure(lead, left.revision, 'team-entry-two'));
+  expect(solo).toMatchObject({ floor: 1, x: 2, y: 2, team: null, entryId: 'team-entry-two' });
+  expect(adventure.adventureFor(mate)).toMatchObject({ revision: mateJoined.revision, team: { id, members: [] }, abandoned: false });
+  expect(db.prepare('SELECT world_json FROM teams WHERE id = ?').get(id)).toEqual(world);
+});
+
+it('saves each teammate’s battle record and reveals it only when that member ends the run', () => {
+  const [lead, mate] = [player('record-team-lead', [100, 100, 100]), player('record-team-mate', [100, 100, 100])];
+  const { id } = team(lead, mate);
+  const enemy = readyEncounter(id, 'f1-enemy-0');
+  place(lead, enemy.x - 1, enemy.y); place(mate, enemy.x - 1, enemy.y + 1);
+  const fought = step(lead, 'd'), ally = adventure.adventureFor(mate);
+  expect(fought).toMatchObject({ records: [], battleCount: 1 });
+  expect(ally).toMatchObject({ records: [], battleCount: 1 });
+  const left = ok(adventure.leaveAdventure(mate, ally.revision));
+  expect(left.records).toEqual([{ ...ally.battle, pending: false }]);
+  expect(left.records[0].fighter).toBe(1);
+  const continued = ok(adventure.continueAdventure(lead, fought.battle!.id, fought.revision));
+  expect(continued).toMatchObject({ records: [], abandoned: false, battle: { pending: false, playback: null } });
+  expect(continued.team!.members).toEqual([expect.objectContaining({ id: mate, status: 'abandoned' })]);
 });

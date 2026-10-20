@@ -65,15 +65,23 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
 ## Adventure interface
 
 - Match home's and town's warm illustrated style with a full-screen woodland
-  and following camera. Keep movement tips small and reveal backpack and team
+  and following camera. Keep persistent controls to a small floor/movement
+  tip, Menu, HP/MP, and the direction pad; reveal backpack, team, and guide
   details only when requested. Support keyboard movement and touch routes.
 - Ordinary monsters hide in tall grass and trigger surprise battles while
   walking. Clear paths and standing still are safe; the final boss remains
-  visible. Preserve saved exploration, battle, treasure, and team progress.
+  visible. Preserve saved progress within a run, but each new entry starts
+  fresh at floor one with full HP/MP, new treasure, monsters, and locked gates.
+  Leaving ends that pet's run without ending teammates' runs. The initial
+  entry after a team sets off joins its prepared shared run only once.
+- Show battle records, replays, and attack logs only after the adventure
+  ends and its pending battle is acknowledged; keep live battle animation.
+  Starting a new run clears its records. Keep the normal start cost and
+  cooldown, with the first solo entry free.
 - New runs lock each downward exit until a monster drops its Floor Key at a
   fixed 5% chance per victory. Keep grass encounters available until the key
   drops. Keys and permanent gate unlocks belong to the shared floor, and saved
-  battle replays never reroll drops. Preserve unlocked exits in existing runs.
+  battle replays never reroll drops. Preserve unlocked exits within a run.
 - Use cute original monster artwork, detailed treasure chests, and subtle
   environmental animation. Respect reduced-motion preferences and pause scene
   animation when hidden or covered by another window.

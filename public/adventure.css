@@ -55,6 +55,7 @@
 @media (prefers-reduced-motion: reduce) {
   #adventure-cooldown-fill { transition: none; }
 }
+
 #adventure-battle-summary { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 #adventure-result { font-size: .85rem; }
 .adventure-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
@@ -344,4 +345,50 @@
 @media (prefers-reduced-motion: reduce) {
   #adventure-map-scene, .adventure-actor { transition: none; }
   #adventure-dialog *, #adventure-dialog *::after { animation: none !important; }
+}
+
+/* Exploration keeps only essential controls on the map. Secondary controls
+   live in Menu; records and restart choices belong to the completed run. */
+.adventure-menu-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.adventure-menu-actions button { min-height: 44px; flex: 1; }
+.adventure-top > div:first-child { padding: 8px 12px; }
+.adventure-top h2 { font-size: 1rem; }
+.adventure-header-actions { max-width: none; }
+#adventure-movement-tip { top: 82px; }
+.adventure-side { top: 72px; max-height: calc(100dvh - 100px); }
+#adventure-status:not(.visually-hidden) {
+  position: absolute; z-index: 9; left: 50%; top: 90px; transform: translateX(-50%);
+  max-width: min(440px, calc(100% - 32px)); margin: 0; padding: 10px 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  color: var(--fg); font-size: .8rem;
+}
+#adventure-battle-summary.adventure-run-summary {
+  position: absolute; z-index: 8; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(440px, calc(100% - 32px)); max-height: calc(100dvh - 160px); overflow-y: auto;
+  padding: 22px; display: grid; gap: 14px; background: var(--surface);
+  border: 2px solid var(--border); border-radius: 20px; box-shadow: var(--shadow);
+}
+.adventure-run-summary h2, .adventure-run-summary p { margin: 0; }
+.adventure-run-summary h2 { font-size: 1.35rem; }
+.adventure-run-summary > p { font-size: .85rem; line-height: 1.5; }
+.adventure-abandoned #adventure-failure { color: var(--muted); font-weight: 400; }
+.adventure-run-summary .adventure-buttons button { flex: 1; min-height: 44px; }
+#adventure-records { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+#adventure-records li { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .8rem; }
+#adventure-records li span { flex: 1; }
+#adventure-records button { min-height: 44px; flex: none; }
+.adventure-continue { position: absolute; z-index: 5; left: 50%; bottom: 120px; transform: translateX(-50%); min-height: 44px; }
+.adventure-ended #adventure-grid { filter: brightness(.8); pointer-events: none; }
+.adventure-ended .adventure-hud, .adventure-ended .adventure-messages,
+.adventure-ended #adventure-movement-tip { display: none; }
+.adventure-entering #adventure-grid, .adventure-entering .adventure-hud,
+.adventure-entering .adventure-messages, .adventure-entering #adventure-movement-tip { visibility: hidden; }
+@media (max-width: 760px) {
+  .adventure-top > div:first-child { max-width: calc(100% - 84px); padding: 8px 10px; }
+  .adventure-top h2 { font-size: .9rem; }
+  .adventure-header-actions { max-width: none; }
+  .adventure-header-actions button { font-size: .75rem; padding: 8px 12px; }
+  #adventure-movement-tip { top: 76px; }
+  .adventure-side { top: 66px; max-height: calc(100dvh - 86px); }
+  #adventure-battle-summary.adventure-run-summary { padding: 16px; max-height: calc(100dvh - 110px); }
 }

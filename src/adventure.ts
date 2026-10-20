@@ -22,11 +22,14 @@ export type AdventureBattle = {
   surprise?: true; // hidden monster encountered by walking into tall grass
   keyDrop?: { floor: number; name: 'Floor Key' };
 };
+export const ADVENTURE_RECORD_LIMIT = 50;
+type BattleRecords = { total: number; battles: AdventureBattle[] };
 type SavedAdventure = {
   x: number; y: number; floor: number; world_json: string | null;
   revision: string | null; battle_json: string | null;
   hp: number | null; mp: number | null; cooldown_until: number | null; abandoned: number; patrolled_at: number | null;
   team_id: number | null; team_world: string | null; started: number;
+  records_json: string | null; entry_id: string | null; awaiting_entry: number;
 };
 type Progress = {
   id: string; pet: Pet;
@@ -36,6 +39,7 @@ type Progress = {
   cooldownUntil: number | null; abandoned: boolean; patrolledAt: number;
   teamId: number | null; // a team run shares its team's map; a solo run keeps its own
   started: boolean; // false until the pet first acts on the map, or sets off with a team
+  records: BattleRecords; entryId: string | null; awaitingEntry: boolean;
   inventory: ReturnType<typeof inventoryView>;
 };
 
@@ -66,7 +70,7 @@ function vacatePlayerTile(floor: Floor, player: Point): void {
 function load(id: string): Progress {
   db.prepare('INSERT OR IGNORE INTO adventures (player_id, x, y) VALUES (?, ?, ?)').run(id, 2, 2);
   const saved = db.prepare(`SELECT a.x, a.y, a.floor, a.world_json, a.revision, a.battle_json, a.hp, a.mp, a.cooldown_until, a.abandoned,
-      a.patrolled_at, a.team_id, t.world_json AS team_world, a.started
+      a.patrolled_at, a.team_id, t.world_json AS team_world, a.started, a.records_json, a.entry_id, a.awaiting_entry
     FROM adventures a LEFT JOIN teams t ON t.id = a.team_id WHERE a.player_id = ?`).get(id) as SavedAdventure;
   const pet = getPet(id)!;
   const maxHp = pet.strength + pet.intelligence + pet.charisma, maxMp = pet.intelligence;
@@ -89,14 +93,17 @@ function load(id: string): Progress {
     vacatePlayerTile(world[saved.floor - 1], saved);
     db.prepare('UPDATE adventures SET world_json = ?, revision = ?, hp = ?, mp = ? WHERE player_id = ?').run(JSON.stringify(world), revision, hp, mp, id);
   }
+  const battle = saved.battle_json ? JSON.parse(saved.battle_json) as AdventureBattle : null;
+  // An older run has only its last battle available; retain that replay.
+  const records = saved.records_json ? JSON.parse(saved.records_json) as BattleRecords
+    : { total: battle ? 1 : 0, battles: battle ? [{ ...battle, pending: false }] : [] };
   return { id, pet, x: saved.x, y: saved.y, floor: saved.floor, world, revision, hp, mp, maxHp, maxMp,
     cooldownUntil: saved.cooldown_until, abandoned: saved.abandoned === 1, patrolledAt: saved.patrolled_at ?? 0,
     teamId: saved.team_id, started: saved.started === 1, inventory: inventoryView(pet),
-    battle: saved.battle_json ? JSON.parse(saved.battle_json) as AdventureBattle : null };
+    battle, records, entryId: saved.entry_id, awaitingEntry: saved.awaiting_entry === 1 };
 }
 
-// A run is over once the pet is defeated or the player abandons it. It is
-// complete, but still explorable, once the Slime King falls.
+// A run ends when the pet falls, the player leaves, or the Slime King falls.
 const over = (saved: Progress) => saved.hp === 0 || saved.abandoned;
 const complete = (saved: Progress) => !over(saved) && !saved.world[FLOOR_COUNT - 1].enemies.some(e => e.kind === 'slime-king');
 
@@ -111,6 +118,7 @@ const floormates = (saved: Progress) => teammates(saved).filter(mate => mate.flo
 
 function view(saved: Progress) {
   const floor = saved.world[saved.floor - 1];
+  const recordsAvailable = (over(saved) || complete(saved)) && !saved.battle?.pending;
   return {
     x: saved.x, y: saved.y, floor: saved.floor, floorCount: FLOOR_COUNT, size: SIZE,
     name: floor.name, tiles: floor.tiles, grass: floor.grass!, chests: floor.chests,
@@ -120,7 +128,10 @@ function view(saved: Progress) {
       hidden: enemy.kind !== 'slime-king', alerted: false,
       moves: MONSTER_ABILITIES.filter(a => MONSTER_MOVES[enemy.kind].includes(a.id)),
     })),
-    up: floor.up, down: floor.down, revision: saved.revision, battle: saved.battle,
+    up: floor.up, down: floor.down, revision: saved.revision,
+    battle: saved.battle ? { ...saved.battle, playback: saved.battle.pending || recordsAvailable ? saved.battle.playback : null } : null,
+    records: recordsAvailable ? saved.records.battles : [], battleCount: saved.records.total, recordLimit: ADVENTURE_RECORD_LIMIT,
+    entryId: saved.entryId, awaitingEntry: saved.awaitingEntry,
     exit: floor.down ? { ...floor.exit!, dropRate: FLOOR_KEY_DROP_RATE } : null,
     inventory: saved.inventory,
     hp: saved.hp, mp: saved.mp, maxHp: saved.maxHp, maxMp: saved.maxMp, failed: saved.hp === 0,
@@ -152,8 +163,9 @@ function busyRefusal(id: string) {
 // A team run's map is the team's, written alongside.
 function save(id: string, saved: Progress) {
   transaction(() => {
-    const written = db.prepare('UPDATE adventures SET x = ?, y = ?, floor = ?, world_json = ?, battle_json = ?, hp = ?, mp = ?, cooldown_until = ?, abandoned = ?, team_id = ?, started = 1, revision = ? WHERE player_id = ? AND revision = ?')
+    const written = db.prepare('UPDATE adventures SET x = ?, y = ?, floor = ?, world_json = ?, battle_json = ?, records_json = ?, entry_id = ?, awaiting_entry = ?, hp = ?, mp = ?, cooldown_until = ?, abandoned = ?, team_id = ?, started = 1, revision = ? WHERE player_id = ? AND revision = ?')
       .run(saved.x, saved.y, saved.floor, saved.teamId === null ? JSON.stringify(saved.world) : null, saved.battle ? JSON.stringify(saved.battle) : null,
+        JSON.stringify(saved.records), saved.entryId, Number(saved.awaitingEntry),
         saved.hp, saved.mp, saved.cooldownUntil, Number(saved.abandoned), saved.teamId, randomUUID(), id, saved.revision);
     if (written.changes === 1 && saved.teamId !== null) {
       db.prepare('UPDATE teams SET world_json = ? WHERE id = ?').run(JSON.stringify(saved.world), saved.teamId);
@@ -217,6 +229,9 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = fal
       after: { hp: fighter.hp, mp: fighter.mp }, ...(index ? { fighter: index } : {}), ...(surprise ? { surprise: true as const } : {}),
       ...(keyDrop ? { keyDrop: { floor: saved.floor, name: 'Floor Key' as const } } : {}),
     };
+    fighter.records.total++;
+    fighter.records.battles.push({ ...fighter.battle, pending: false });
+    fighter.records.battles = fighter.records.battles.slice(-ADVENTURE_RECORD_LIMIT);
   });
   if (won) {
     floor.enemies = floor.enemies.filter(e => e.id !== enemy.id);
@@ -224,8 +239,8 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = fal
   }
   return transaction(() => {
     for (const ally of allies) {
-      db.prepare('UPDATE adventures SET hp = ?, mp = ?, battle_json = ?, revision = ? WHERE player_id = ? AND revision = ?')
-        .run(ally.hp, ally.mp, JSON.stringify(ally.battle), randomUUID(), ally.id, ally.revision);
+      db.prepare('UPDATE adventures SET hp = ?, mp = ?, battle_json = ?, records_json = ?, revision = ? WHERE player_id = ? AND revision = ?')
+        .run(ally.hp, ally.mp, JSON.stringify(ally.battle), JSON.stringify(ally.records), randomUUID(), ally.id, ally.revision);
     }
     return save(id, saved);
   });
@@ -237,7 +252,7 @@ export function moveAdventure(id: string, direction: unknown, revision?: unknown
   }
   if (typeof revision !== 'string') return { error: 'Reload the map before moving.', status: 400 };
   const saved = load(id), floor = saved.world[saved.floor - 1];
-  if (revision !== saved.revision || saved.battle?.pending || over(saved)) return view(saved);
+  if (revision !== saved.revision || saved.battle?.pending || over(saved) || complete(saved)) return view(saved);
   const busy = busyRefusal(id);
   if (busy) return busy;
   const [dx, dy] = directions[direction as keyof typeof directions];
@@ -260,7 +275,7 @@ export function changeFloor(id: string, action: unknown, revision?: unknown) {
   if (action !== 'ascend' && action !== 'descend') return { error: 'Choose ascend or descend.', status: 400 };
   if (typeof revision !== 'string') return { error: 'Reload the map before using the stairs.', status: 400 };
   const saved = load(id), floor = saved.world[saved.floor - 1];
-  if (revision !== saved.revision || saved.battle?.pending || over(saved)) return view(saved);
+  if (revision !== saved.revision || saved.battle?.pending || over(saved) || complete(saved)) return view(saved);
   const busy = busyRefusal(id);
   if (busy) return busy;
   const stair = action === 'descend' ? floor.down : floor.up;
@@ -300,7 +315,65 @@ export function abandonAdventure(id: string, revision: unknown) {
   return save(id, saved);
 }
 
+// Closing the scene ends only this pet's run. A pending battle has already
+// resolved on the server, so leaving acknowledges it without rolling again.
+function endRun(saved: Progress) {
+  const changed = Boolean(saved.battle?.pending) || (!over(saved) && !complete(saved));
+  if (!saved.started || !changed) return view(saved);
+  if (!over(saved) && !complete(saved)) saved.abandoned = true;
+  if (saved.battle) saved.battle.pending = false;
+  saved.awaitingEntry = false;
+  return save(saved.id, saved);
+}
+export function leaveAdventure(id: string, revision: unknown) {
+  if (typeof revision !== 'string') return { error: 'Reload the map before leaving.', status: 400 };
+  const saved = load(id);
+  if (revision !== saved.revision) return view(saved);
+  return endRun(saved);
+}
+
 const restMinutes = (until: number, now: number) => Math.max(1, Math.ceil(((until - now) * TIME_SCALE) / 60_000));
+
+function freshRun(saved: Progress, entryId: string) {
+  const busy = busyRefusal(saved.id);
+  if (busy) return busy;
+  const now = Date.now();
+  if (saved.started) {
+    if (saved.cooldownUntil && saved.cooldownUntil > now) {
+      return { error: `Your pet needs to rest before another adventure; it opens again in ${restMinutes(saved.cooldownUntil, now)} min.`, status: 429 };
+    }
+    const outcome = spendForAdventure(saved.id);
+    if ('error' in outcome) return outcome;
+    saved.cooldownUntil = now + realMs(ADVENTURE_COOLDOWN_MINUTES);
+  }
+  saved.world = createWorld(); saved.floor = 1; saved.x = 2; saved.y = 2; saved.teamId = null;
+  saved.hp = saved.maxHp; saved.mp = saved.maxMp; saved.battle = null; saved.abandoned = false;
+  saved.records = { total: 0, battles: [] }; saved.entryId = entryId; saved.awaitingEntry = false;
+  return save(saved.id, saved);
+}
+
+// A scene opening is explicit, unlike polling or reading the town cooldown.
+// A caller-stable ID makes retrying an accepted entry harmless. A fresh team
+// set-off grants each member one entry without resetting its shared map.
+export function enterAdventure(id: string, revision: unknown, entryId: unknown) {
+  if (typeof revision !== 'string' || typeof entryId !== 'string' || !entryId.length || entryId.length > 100) {
+    return { error: 'Choose a new adventure entry and reload the map before setting off.', status: 400 };
+  }
+  return transaction(() => {
+    let saved = load(id);
+    if (entryId === saved.entryId || revision !== saved.revision) return view(saved);
+    if (saved.awaitingEntry && saved.teamId !== null && !over(saved) && !complete(saved)) {
+      const busy = busyRefusal(id);
+      if (busy) return busy;
+      saved.entryId = entryId; saved.awaitingEntry = false;
+      return save(id, saved);
+    }
+    // Keep this retirement even when a new entry is refused for rest or care:
+    // reopening must never silently resume the old run.
+    if (saved.started) { endRun(saved); saved = load(id); }
+    return freshRun(saved, entryId);
+  });
+}
 
 // Why a pet can't set off with its team right now, if it can't: the checks
 // Start new adventure makes, worded for the Team up window.
@@ -308,7 +381,7 @@ export function setOffRefusal(id: string, now = Date.now()): string | undefined 
   const saved = load(id), pet = saved.pet;
   if (saved.battle?.pending) return 'has to return from its last battle first';
   if (busyNow(pet, now)) return pet.activity === 'studying' ? `is studying ${pet.task}` : `is working at the ${pet.task}`;
-  if (saved.started && !over(saved) && !complete(saved)) return 'has an adventure in progress; abandon it first';
+  if (saved.started && !over(saved) && !complete(saved)) return 'has an adventure in progress; end it first';
   if (saved.cooldownUntil && saved.cooldownUntil > now) return `is resting; its next adventure opens in ${restMinutes(saved.cooldownUntil, now)} min`;
   if (pet.stamina < ADVENTURE_COST.stamina) return `is too tired; it needs ${ADVENTURE_COST.stamina} stamina`;
   if (pet.hygiene < ADVENTURE_COST.hygiene) return `is too dirty; it needs ${ADVENTURE_COST.hygiene} hygiene`;
@@ -325,7 +398,8 @@ export function startTeamRun(teamId: number, ids: readonly string[]): void {
     const outcome = spendForAdventure(id);
     if ('error' in outcome) throw new Error(outcome.error);
     const { strength, intelligence, charisma } = outcome.pet;
-    db.prepare(`UPDATE adventures SET x = ?, y = ?, floor = ?, world_json = NULL, battle_json = NULL, hp = ?, mp = ?, cooldown_until = ?,
+    db.prepare(`UPDATE adventures SET x = ?, y = ?, floor = ?, world_json = NULL, battle_json = NULL, records_json = NULL,
+        entry_id = NULL, awaiting_entry = 1, hp = ?, mp = ?, cooldown_until = ?,
         abandoned = 0, patrolled_at = NULL, team_id = ?, started = 1, revision = ? WHERE player_id = ?`)
       .run(2, 2, 1, strength + intelligence + charisma, intelligence, now + realMs(ADVENTURE_COOLDOWN_MINUTES), teamId, randomUUID(), id);
   }
@@ -338,12 +412,13 @@ export function runFor(id: string) {
   return {
     team: saved.teamId,
     state: !saved.started ? 'new' : over(saved) || complete(saved) ? 'ended' : 'exploring',
+    awaitingEntry: saved.awaitingEntry,
   };
 }
 
 // Starting fresh — after winning, failing, or abandoning a run — costs
 // stamina/hygiene and opens a cooldown, the same way a fight or a shift does.
-// Resuming an unfinished run (just reopening the map) stays free.
+// Kept for old clients; new scene openings use enterAdventure.
 export function restartAdventure(id: string, revision: unknown) {
   if (typeof revision !== 'string') return { error: 'Reload the map before starting again.', status: 400 };
   return transaction(() => {
@@ -351,18 +426,8 @@ export function restartAdventure(id: string, revision: unknown) {
     if (revision !== saved.revision || saved.battle?.pending) return view(saved);
     const busy = busyRefusal(id);
     if (busy) return busy;
-    if (!over(saved) && !complete(saved)) return { error: 'Abandon this adventure before starting a new one.', status: 409 };
-    const now = Date.now();
-    if (saved.cooldownUntil && saved.cooldownUntil > now) {
-      return { error: `Your pet needs to rest before another adventure; it opens again in ${restMinutes(saved.cooldownUntil, now)} min.`, status: 429 };
-    }
-    const outcome = spendForAdventure(id);
-    if ('error' in outcome) return outcome;
-    // A fresh start is always a solo run; teams set off from the Team up window.
-    saved.world = createWorld(); saved.floor = 1; saved.x = 2; saved.y = 2; saved.teamId = null;
-    saved.hp = saved.maxHp; saved.mp = saved.maxMp; saved.battle = null; saved.abandoned = false;
-    saved.cooldownUntil = now + realMs(ADVENTURE_COOLDOWN_MINUTES);
-    return save(id, saved);
+    if (!over(saved) && !complete(saved)) return { error: 'End this adventure before starting a new one.', status: 409 };
+    return freshRun(saved, randomUUID());
   });
 }
 
@@ -383,7 +448,7 @@ export function openAdventureChest(id: string, revision: unknown) {
   if (typeof revision !== 'string') return { error: 'Reload the map before opening a chest.', status: 400 };
   return transaction(() => {
     const saved = load(id);
-    if (revision !== saved.revision || saved.battle?.pending || over(saved)) return view(saved);
+    if (revision !== saved.revision || saved.battle?.pending || over(saved) || complete(saved)) return view(saved);
     const chest = saved.world[saved.floor - 1].chests.find(c => samePoint(c, saved));
     if (!chest) return { error: 'Stand on a treasure chest first.', status: 409 };
     if (chest.reward) return view(saved);

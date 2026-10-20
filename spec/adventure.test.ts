@@ -115,7 +115,7 @@ it('saves exactly one seeded grass encounter for concurrent moves and retries, i
   const continuation = { action: 'continue', battleId: result.battle.id, revision: result.revision };
   const continued = await (await post('/api/adventure', continuation, id)).json();
   expect(continued.battle.pending).toBe(false);
-  expect(continued.battle.playback).toEqual(result.battle.playback);
+  expect(continued.battle.playback).toEqual(continued.failed ? result.battle.playback : null);
   expect(await (await post('/api/adventure', continuation, id)).json()).toEqual(continued);
   expect(await (await post('/api/adventure', request, id)).json()).toEqual(continued);
   expect(await getPet(id)).toEqual(pet);
@@ -183,4 +183,60 @@ it('refuses exploring while the pet works a shift, keeps the map viewable, and a
   expect(await (await post('/api/adventure', {}, id)).json()).toMatchObject({ x: 2, y: 2 });
   await finish(id);
   expect(await (await sendAction(id, { direction: 's' })).json()).toMatchObject({ x: 2, y: 3 });
+});
+
+it('pet:updated — concurrent fresh entries reset once, charge once, and reach both windows within 1s', async () => {
+  const id = freshId(); await signUp(id);
+  const original = await getPet(id), before = await (await post('/api/adventure', {}, id)).json();
+  const firstRequest = { action: 'enter', entryId: 'first-entry', revision: before.revision };
+  const first = await (await post('/api/adventure', firstRequest, id)).json();
+  expect(first).toMatchObject({ started: true, entryId: 'first-entry', x: 2, y: 2 });
+  expect(await getPet(id)).toEqual(original);
+  const moved = await (await sendAction(id, { direction: 'd' })).json();
+  expect(await (await post('/api/adventure', firstRequest, id)).json()).toEqual(moved);
+  const windows = await Promise.all([0, 1].map(() => new Promise<WebSocket>((resolve, reject) => {
+    const ws = new WebSocket(new URL('/ws', baseUrl).href.replace(/^http/, 'ws'));
+    ws.addEventListener('open', () => resolve(ws)); ws.addEventListener('error', reject);
+  })));
+  try {
+    const updates = windows.map(ws => new Promise<any>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('no entry pet:updated within 1s')), 1000);
+      ws.addEventListener('message', ({ data }) => {
+        const event = JSON.parse(String(data));
+        if (event.type === 'pet:updated' && event.pet.id === id) { clearTimeout(timer); resolve(event.pet); }
+      });
+    }));
+    const request = { action: 'enter', revision: moved.revision, entryId: 'second-entry', cost: 0, hp: 9999, floor: 5 };
+    const results = await Promise.all(Array.from({ length: 6 }, async () => {
+      const response = await post('/api/adventure', request, id);
+      expect(response.status).toBe(200); return response.json();
+    }));
+    for (const result of results) expect(result).toEqual(results[0]);
+    const fresh = results[0], pet = await getPet(id);
+    expect(fresh).toMatchObject({ entryId: 'second-entry', floor: 1, x: 2, y: 2, hp: 15, battle: null, records: [], battleCount: 0 });
+    expect(pet).toMatchObject({ stamina: original.stamina - 40, hygiene: original.hygiene - 20 });
+    for (const update of await Promise.all(updates)) expect(update).toEqual(pet);
+    expect(await (await post('/api/adventure', request, id)).json()).toEqual(fresh);
+    expect(await (await post('/api/adventure', { action: 'leave', revision: moved.revision }, id)).json()).toEqual(fresh);
+    const left = await (await post('/api/adventure', { action: 'leave', revision: fresh.revision }, id)).json();
+    expect(left).toMatchObject({ abandoned: true, entryId: 'second-entry' });
+    expect(await (await post('/api/adventure', { action: 'leave', revision: fresh.revision }, id)).json()).toEqual(left);
+  } finally { windows.forEach(ws => ws.close()); }
+});
+
+it('validates entry and departure revisions and never lets a supplied player ID reset another account', async () => {
+  const id = freshId(), other = freshId(); await signUp(id); await signUp(other);
+  const state = await (await post('/api/adventure', {}, id)).json();
+  const otherState = await (await post('/api/adventure', {}, other)).json();
+  for (const body of [
+    { action: 'enter', revision: state.revision },
+    { action: 'enter', entryId: 'missing-revision' },
+    { action: 'enter', revision: state.revision, entryId: '' },
+    { action: 'enter', revision: state.revision, entryId: 'x'.repeat(101) },
+    { action: 'leave' },
+  ]) expect((await post('/api/adventure', body, id)).status).toBe(400);
+  const request = { action: 'enter', revision: state.revision, entryId: 'identity-entry', player_id: id };
+  expect((await post('/api/adventure', request, null)).status).toBe(401);
+  expect(await (await post('/api/adventure', request, other)).json()).toEqual(otherState);
+  expect(await (await post('/api/adventure', {}, id)).json()).toEqual(state);
 });

@@ -1,5 +1,5 @@
 import {
-  abandonAdventure, adventureFor, changeFloor, continueAdventure, moveAdventure, openAdventureChest, patrolAdventure,
+  abandonAdventure, adventureFor, changeFloor, continueAdventure, enterAdventure, leaveAdventure, moveAdventure, openAdventureChest, patrolAdventure,
   restartAdventure, skipAdventureCooldown, useAdventureItem,
 } from "./adventure.ts";
 import { accept, invite, leave, setOff, teamFor, type TeamOutcome } from "./teams.ts";
@@ -136,12 +136,14 @@ app.post("/api/adventure", (req, res) => {
   if (req.body?.direction !== undefined && req.body?.action !== undefined) {
     return void res.status(400).json({ error: "Choose one adventure action at a time." });
   }
-  const inventoryAction = ['open-chest', 'use-item', 'restart', 'skip-cooldown'].includes(req.body?.action);
+  const inventoryAction = ['open-chest', 'use-item', 'restart', 'enter', 'skip-cooldown'].includes(req.body?.action);
   const before = inventoryAction ? getPet(id) : undefined;
   const result = req.body?.action === 'open-chest' ? openAdventureChest(id, req.body.revision)
     : req.body?.action === 'use-item' ? useAdventureItem(id, req.body.item, req.body.revision)
     : req.body?.action === 'continue' ? continueAdventure(id, req.body.battleId, req.body.revision)
     : req.body?.action === 'abandon' ? abandonAdventure(id, req.body.revision)
+    : req.body?.action === 'enter' ? enterAdventure(id, req.body.revision, req.body.entryId)
+    : req.body?.action === 'leave' ? leaveAdventure(id, req.body.revision)
     : req.body?.action === 'restart' ? restartAdventure(id, req.body.revision)
     : req.body?.action === 'skip-cooldown' ? skipAdventureCooldown(id, req.body.revision)
     : req.body?.action === 'patrol' ? patrolAdventure(id)

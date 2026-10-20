@@ -19,7 +19,7 @@ it('refuses Team up requests without a session or with a malformed player ID, ac
   expect((await team(id, { action: 'accept', team: 999_999_999 })).status).toBe(404);
   expect((await team(id, { action: 'invite', player: freshId() })).status).toBe(404);
   // A first visit: no team, no invitations, and a run that hasn't started.
-  expect(await (await team(id)).json()).toEqual({ team: null, invitations: [], run: { team: null, state: 'new' }, size: 4 });
+  expect(await (await team(id)).json()).toEqual({ team: null, invitations: [], run: { team: null, state: 'new', awaitingEntry: false }, size: 4 });
 });
 
 it('two players team up, set off together, and explore one shared map with their own HP', async () => {

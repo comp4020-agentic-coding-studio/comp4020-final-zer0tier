@@ -182,6 +182,9 @@ if (!adventureColumns.has("floor")) db.exec("ALTER TABLE adventures ADD COLUMN f
 if (!adventureColumns.has("world_json")) db.exec("ALTER TABLE adventures ADD COLUMN world_json TEXT");
 if (!adventureColumns.has("revision")) db.exec("ALTER TABLE adventures ADD COLUMN revision TEXT");
 if (!adventureColumns.has("battle_json")) db.exec("ALTER TABLE adventures ADD COLUMN battle_json TEXT");
+if (!adventureColumns.has("records_json")) db.exec("ALTER TABLE adventures ADD COLUMN records_json TEXT");
+if (!adventureColumns.has("entry_id")) db.exec("ALTER TABLE adventures ADD COLUMN entry_id TEXT");
+if (!adventureColumns.has("awaiting_entry")) db.exec("ALTER TABLE adventures ADD COLUMN awaiting_entry INTEGER NOT NULL DEFAULT 0");
 if (!adventureColumns.has("hp")) db.exec("ALTER TABLE adventures ADD COLUMN hp INTEGER");
 if (!adventureColumns.has("mp")) db.exec("ALTER TABLE adventures ADD COLUMN mp INTEGER");
 if (!adventureColumns.has("cooldown_until")) db.exec("ALTER TABLE adventures ADD COLUMN cooldown_until INTEGER");

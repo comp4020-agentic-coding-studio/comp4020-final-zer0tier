@@ -95,3 +95,39 @@ it('shows the saved coin toss, or the coin that replaced it, for the whole battl
     expect($('battle-status').textContent).toBe('Ready. Let the battle begin!');
   } finally { window.close(); }
 });
+
+it('withholds Adventure replay and attack records until the finished-run scene explicitly enables them', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { runScripts: 'outside-only' });
+  const { window } = dom;
+  window.matchMedia = (() => ({ matches: true })) as unknown as typeof window.matchMedia;
+  window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+  const $ = (id: string) => window.document.getElementById(id)!;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    const pet = { id: 'explorer', strength: 5, intelligence: 5, charisma: 5 };
+    const battle = simulateBattle(pet, { ...pet, id: 'monster:slime', name: 'Slime' }, [24, 16]);
+    const detail = { key: 'adventure:live', battle, viewer: pet.id, result: '', allowReplay: false, showLog: false };
+    window.document.dispatchEvent(new window.CustomEvent('battle:show', { detail }));
+    $('battle-skip').focus();
+    $('battle-skip').click();
+    expect($('battle-replay').hidden).toBe(true);
+    expect($('battle-log').closest('details')!.hidden).toBe(true);
+    expect($('battle-log').children).toHaveLength(0);
+    expect(window.document.activeElement?.id).toBe('battle-close');
+    const result = $('battle-status').textContent;
+    $('battle-replay').click();
+    expect($('battle-status').textContent).toBe(result);
+    $('battle-close').click();
+
+    window.document.dispatchEvent(new window.CustomEvent('battle:show', { detail: {
+      ...detail, key: 'adventure:record', allowReplay: true, showLog: true, replay: true,
+    } }));
+    $('battle-skip').click();
+    expect($('battle-replay').hidden).toBe(false);
+    expect($('battle-log').closest('details')!.hidden).toBe(false);
+    expect($('battle-log').children).toHaveLength(battle.turns.length);
+    $('battle-replay').click();
+    expect($('battle-hp-text-1').textContent).toBe('15 / 15');
+  } finally { window.close(); }
+});

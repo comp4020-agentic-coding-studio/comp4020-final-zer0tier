@@ -43,7 +43,7 @@ function buildDialog() {
   document.body.append(dialog);
   $('battle-close').addEventListener('click', () => dialog.close());
   $('battle-skip').addEventListener('click', finish);
-  $('battle-replay').addEventListener('click', () => play(scene));
+  $('battle-replay').addEventListener('click', () => { if (scene?.allowReplay !== false) play(scene); });
   dialog.addEventListener('close', () => {
     if (dialog.open) return;
     clearTimeout(timer);
@@ -132,6 +132,7 @@ function initiativeText(battle) {
   return initiative.coin === 'copper-coin' ? `${toss} ${pet}'s Copper Coin adds +1 to every attribute.` : toss;
 }
 function addLog(step) {
+  if (scene.showLog === false) return;
   const li = document.createElement('li');
   li.textContent = describe(step);
   $('battle-log').append(li);
@@ -162,8 +163,8 @@ function finish() {
   $('battle-status').textContent = `${scene.won ?? scene.battle.winner === scene.viewer ? 'Victory!' : 'Defeat.'} ${scene.result}`;
   const skipped = document.activeElement === $('battle-skip');
   $('battle-skip').hidden = true;
-  $('battle-replay').hidden = false;
-  if (skipped) $('battle-replay').focus();
+  $('battle-replay').hidden = scene.allowReplay === false;
+  if (skipped) $(scene.allowReplay === false ? 'battle-close' : 'battle-replay').focus();
   cards.forEach((_, card) => $(`battle-fighter-${card}`).classList.remove('striking', 'hit'));
 }
 function play(next) {
@@ -176,6 +177,8 @@ function play(next) {
   $('battle-close').textContent = next.returnLabel || 'Close';
   $('battle-close').setAttribute('aria-label', next.returnLabel || 'Close battle');
   $('battle-log').replaceChildren();
+  $('battle-log').parentElement.hidden = next.showLog === false;
+  $('battle-log').parentElement.open = false;
   $('battle-skip').hidden = false;
   $('battle-replay').hidden = true;
   const initiative = initiativeText(next.battle);

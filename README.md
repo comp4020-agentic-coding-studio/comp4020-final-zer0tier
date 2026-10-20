@@ -589,16 +589,17 @@ presses that button instead.
 
 The Adventure fills the whole screen with an illustrated woodland in the
 same warm style as home and town. The camera follows your pet through leafy
-trees, tall grass, flower patches, and stone paths. A slim top bar shows the
-floor, with **Backpack & team**, **Game guide**, and **Leave**. **Abandon run**
-lives inside **Backpack & team**.
+trees, tall grass, flower patches, and stone paths. The persistent controls
+are a small floor and movement tip, **Menu**, HP/MP, and the direction pad.
+**Menu** opens **Backpack & team**, **Game guide**, and **End adventure**
+when needed. Escape opens or closes this menu while exploring.
 At the bottom left, two rings show your pet's **HP (red)** and **MP (blue)**:
 the coloured arc is what's left, and the number inside reads e.g. `12/15`. The
 arrow pad sits at the bottom right. **Open chest**, **Ascend**, and the
 down-stair action appear only while your pet stands on a chest or stairs,
-and the available object is highlighted. **Backpack & team** reveals inventory and teammate
-details when needed, keeping the map clear while exploring. Monsters have
-original woodland artwork, and wooden treasure chests show their open and
+and the available object is highlighted. Battle records and replay controls
+stay off the map until the run ends. Monsters have original woodland
+artwork, and wooden treasure chests show their open and
 closed states. Gentle grass, creature, and treasure animations pause while
 the map is hidden or another window is open and respect reduced-motion
 preferences.
@@ -607,10 +608,9 @@ A small upper-left tip explains movement, Space, and tall grass. Further
 help lives in the **Game guide** window: how to play, the map key, where the
 down stairs are, the remaining monsters' attributes, the treasure odds, and
 what a new run costs. Ordinary monsters' hiding places aren't revealed; the
-visible Slime King's position is listed. The guide opens on its own the first
-time a pet reaches the map (after **Go solo**, or after setting off with a
-team), and from **Game guide** any time after that. Close or Escape returns
-the keyboard to the map. A battle that starts while it's open closes it.
+visible Slime King's position is listed. Open it through **Menu → Game
+guide**. Close or Escape returns the keyboard to the map. A battle that
+starts while it's open closes it.
 
 Each of the five fixed floors starts with a 16 × 16 grid, four regular
 enemies (slimes and goblins), and at least one marked treasure chest. Floor
@@ -640,11 +640,12 @@ Later visits use **Descend** without another key. **Ascend** returns you
 to the previous floor's down stairs and never needs a key. Floor one has
 no up stairs; floor five has no down stairs or Floor Key.
 
-Leave or Escape closes the window. Your floor, position, HP/MP, remaining
-enemies, keys, and unlocked gates are saved privately to your account,
-even across server restarts. Existing saved adventures keep their exits
-unlocked, preserving their progress; starting a new run adds the locked
-gates.
+**Every new entry starts a fresh adventure.** Returning from town or
+reopening Adventure starts at floor one with full HP/MP, new monsters and
+chests, and locked gates with no keys. Leaving ends your current run; it
+cannot be resumed later. Your earned inventory and learned abilities stay
+with your pet. Map updates during the same visit keep the current floor,
+position, HP/MP, keys, and unlocked gates, including across server restarts.
 
 **Monsters hide in tall grass.** Walking through a grass patch can start a
 surprise battle with one of that floor's remaining slimes or goblins.
@@ -657,38 +658,34 @@ Only a successful step into tall grass advances the encounter counter.
 There are two quiet grass steps before another encounter can happen, then
 a chance on each grass step, with an encounter guaranteed by the sixth
 while regular monsters remain. The server saves the random seed and step
-counter with the floor, so closing, refreshing, or reopening the map
-doesn't reroll them. Defeated monsters stay defeated, but fresh ordinary
+counter with the floor, so repeated requests during the same run don't
+reroll them. Defeated monsters stay defeated, but fresh ordinary
 monsters replenish the grass while a locked floor still needs its key.
 After the key is found, or on a floor without a locked exit, clearing the
 remaining regular enemies makes its grass safe. A surprise battle leaves
 the pet on the grass tile it entered.
 
 Trees still block movement, and every stair and chest is reachable.
-Existing runs gain grass without resetting positions, defeated enemies,
-opened chests, HP/MP, or pending battles. Map refreshes use the existing
-`{ "action": "patrol" }` request to read saved progress, including teammates'
-positions. Refreshing never moves monsters or starts a battle.
+Map refreshes use the existing `{ "action": "patrol" }` request to read
+saved progress, including teammates' positions. These background refreshes
+never reset the run, move monsters, or start a battle.
 
 For initial balancing, floor-one slimes have STR/INT/CHA **3/1/2**, and
 goblins have **5/3/2**. Each deeper floor adds **2/1/1**. The floor-five
 Slime King has **18/10/12**. Maximum HP is the sum of attributes; maximum MP
 is Intelligence. A new run starts with full resources. Current HP/MP carry
-between battles and floors — leaving, signing out, or restarting the server
-doesn't refill them. Existing exploration saves got full HP/MP on their
-first visit after this update. Training raises the maximums without
-refilling current HP/MP.
+between battles and floors during one run. A server restart doesn't
+refill them; entering a new adventure does. Training raises the maximums
+without refilling current HP/MP.
 
 ### Teaming up
 
-A pet's first adventure, and any new one after a run has ended, can be
-played alone or with up to three other players. Choosing **Explore the
-woodland** for the first time opens the small **Team up?** window instead
-of the map. Once a run has ended, **Team up** beside **Start new
-adventure** opens it again.
+An adventure can be played alone or with up to three other players.
+The first visit opens **Team up?**, where players choose a solo run or form
+a team. The finished-run panel offers **Team up** for later adventures.
 
-- **Go solo** opens the woodland as before (after an ended run, it starts a
-  fresh one, at the usual cost).
+- **Go solo** starts a fresh woodland run. The first solo adventure is
+  free; later starts use the normal cost and cooldown.
 - **Invite a player by ID** makes your pet a team's leader and invites that
   player. A team holds at most **4 pets**, invitations included. Only
   players with accounts can be invited, and only the leader invites.
@@ -698,8 +695,8 @@ adventure** opens it again.
   team for everyone.
 - **Set off together** (leader only) needs at least one other pet to have
   joined, and every joined pet to be ready. Each pet is checked the way
-  **Start new adventure** would check it: no run in progress (abandon it
-  first), no battle awaiting **Return to map**, not studying or working, no
+  a new adventure would check it: no run in progress (end it first), no
+  battle awaiting **Return to map**, not studying or working, no
   adventure cooldown, and enough stamina and hygiene. The window says what
   each pet is waiting on. Setting off charges every pet **40 stamina and 20
   hygiene**, and opens each pet's 4-hour cooldown — same as starting a new
@@ -736,8 +733,10 @@ its teammates keep exploring. After a victory, every pet still standing
 recovers 20% of its maximum HP and MP, and the monster is removed for
 everyone. Grass encounters keep the pet on its grass tile; a surviving pet
 that challenged the Slime King takes the king's tile after winning. A team's
-run ends for each pet when it's defeated or abandons the run — abandoning
-leaves the rest exploring.
+run ends for each pet when it's defeated or leaves the adventure; the
+rest keep exploring. Opening the map for the first time after a team sets
+off joins that newly created shared run without charging again. Returning
+after leaving starts a new solo run, or players can form a new team.
 **Start new adventure** after that is always solo; to team up again, use
 **Team up**.
 
@@ -767,26 +766,15 @@ tile. Victory restores **20% of maximum HP and MP, rounded up separately**,
 capped at their
 maximums. For example, maximums of 31 HP and 7 MP restore up to 7 HP and 2
 MP after a win. The server applies this recovery once, alongside the
-outcome. Defeating the Slime King marks the woodland complete; you can
-explore remaining paths or choose **Start new adventure**.
+outcome. Defeating the Slime King completes the woodland.
 
-**Defeat fails the adventure.** HP stays at zero, and movement and stairs
-are disabled. Returning to the map shows the result, and a window asks
-**Start a new adventure?** with its cost: **Yes** resets to floor one with
-full HP/MP and a fresh set of monsters, and **No** leaves the failed run on
-screen with **Start new adventure** to choose later. While the pet still
-rests from its last start, the window first asks whether to **use an
-Hourglass to skip the wait**, if it has one, then whether to start — with
-no Hourglass it asks nothing. Leaving or reloading keeps the failed run; it
-doesn't restart automatically.
-
-**Abandon run ends the mini-game immediately.** While exploring (with no
-battle waiting), **Abandon run** asks **Yes** or **No** first, then ends
-the run on the spot, like a defeat, and closes the map. Abandoning is free.
-Reopening Adventure shows **Adventure abandoned**, with movement, stairs,
-and chests disabled — the only way on is **Start new adventure**. A
-finished or failed run can't be abandoned, and the server refuses to start
-a new adventure (409) while a run is still in progress.
+**Defeat ends the adventure.** HP stays at zero, and movement and stairs
+are disabled. Completing the woodland, losing, or choosing **End
+adventure** opens the result panel with battle records, the next-start
+cooldown, **Start new adventure**, **Team up**, and **Return to town**.
+**End adventure** asks for Yes/No confirmation first. Ending a run is free
+and leaves earned inventory intact. A new run begins at floor one
+with full HP/MP and fresh monsters, treasure, and locked gates.
 
 **Every confirmation is a Yes/No window.** Whenever the game needs you to
 confirm something, it opens a small window with the question and **Yes**
@@ -796,30 +784,29 @@ answers No. A battle that starts while the window is open (a teammate's
 encounter, or an Arena fight) answers it No too, since the question no
 longer fits the moment.
 
-**Skip to result**, **Replay battle**, and **Watch last battle** only play
-the saved turns. **Return to map** (or Escape from the battle window)
-acknowledges the saved result and resumes exploration after a win. If that
-request fails, **Continue exploring** lets you retry it. A reload before
-returning to the map reopens the same pending battle. Replays can't reroll
-a result, grant more recovery, reroll a Floor Key drop, or resurrect a
-monster.
+**Battle records unlock after the adventure ends.** Encounters still play
+their live battle animation, with **Skip to result** and **Return to map**,
+but replay and the attack log are unavailable during exploration. Returning
+acknowledges the saved result; if that request fails, **Continue exploring**
+lets you retry it. After the run ends and any pending result is
+acknowledged, the result panel lists its battles and offers replays and
+attack logs. It keeps the latest **50 battles** and shows the total when a
+long run exceeds that limit. Starting a new run clears that run's record.
+Replays use saved turns and cannot reroll an outcome or Floor Key drop,
+grant more recovery, or resurrect a monster.
 
-**Starting a fresh adventure costs 40 stamina and 20 hygiene**, and opens a
-**4-hour cooldown** — whether that fresh start follows a win, a defeat, or
-an abandoned run (reopening the map to continue an unfinished run is still
-free). Starting is refused if the pet doesn't have enough stamina/hygiene
-to spare, or while a cooldown is active — an Hourglass clears the wait
-early, from the same shared count used elsewhere. None of this touches
-Adventure HP/MP, which still carries over normally; it only gates
-*starting again*. The cooldown begins when the fresh run does, so that run
-plays normally, and it can still be abandoned for free. A compact bar on the
-Adventure map fills as the cooldown finishes, showing the percentage completed
-and the time remaining (including seconds during the final minute). Reopening
-the map keeps the correct progress. Once a run ends during the cooldown,
-the map shows how long the pet needs to rest and
-offers **Skip wait (use Hourglass)**. Adventure still doesn't alter Arena
-wins/losses. Monster victories grant recovery and can drop a missing
-Floor Key; chests grant the items below.
+**The first solo adventure is free. Later fresh starts cost 40 stamina and
+20 hygiene**, and open a **4-hour cooldown**. This applies whenever the
+player re-enters, including after leaving an unfinished run. Starting is
+refused if the pet lacks stamina/hygiene or the cooldown is active. The
+old run still ends, so a refused start cannot be used to resume it. An
+Hourglass clears the wait early, from the same shared count used elsewhere.
+The cooldown begins when the fresh run does and doesn't interrupt that run.
+After it ends, the result panel shows a compact progress bar, the time
+remaining, and **Skip wait (use Hourglass)**. Town also shows the saved
+cooldown. Adventure doesn't alter Arena wins/losses. Monster victories
+grant recovery and can drop a missing Floor Key; chests grant the items
+below.
 
 ### Treasure and inventory
 
@@ -835,8 +822,8 @@ Floor Keys come from monster victories, not chests. They belong to their
 adventure floor rather than the pet's backpack; a new run starts with fresh
 locked gates and no keys.
 
-The map's **Your backpack** shows items, learned abilities, and coins, each
-with an **Equip**/**Unequip** button. Food restores 40 stamina; soap
+**Your backpack**, inside **Menu → Backpack & team**, shows items,
+learned abilities, and coins, each with an **Equip**/**Unequip** button. Food restores 40 stamina; soap
 restores 50 hygiene, capped at 100. Hourglasses finish the current lesson
 or shift. These are the same items used at home and in **Shops**, with a shared
 count — they don't restore Adventure HP/MP or revive a failed run. The
@@ -890,10 +877,18 @@ the fight with at most 10 HP (before a victory's recovery). Arena and
 revenge start every fighter at full, so there the bonus simply raises
 HP/MP for that fight.
 
-The private `POST /api/adventure` accepts an empty body to resume. Its
-response includes an opaque `revision`; supply that revision with every
-action:
+The private `POST /api/adventure` accepts an empty body to read the saved
+state without starting or resetting a run. Its response includes an opaque
+`revision`; supply that revision with each mutating action:
 
+- `{ "action": "enter", "entryId": "…", "revision": "…" }` enters a fresh
+  adventure. Use a new entry ID for each visit and reuse it when retrying
+  that entry, so a retry cannot reset or charge twice. The first map entry
+  after a team sets off joins its prepared run instead. A fresh entry ends
+  any earlier run and acknowledges its pending battle before checking the
+  new start's cost and cooldown.
+- `{ "action": "leave", "revision": "…" }` ends the caller's current run
+  without ending teammates' runs.
 - `{ "direction": "w" | "a" | "s" | "d", "revision": "…" }` moves one tile.
 - `{ "action": "ascend" | "descend", "revision": "…" }` uses matching
   stairs. Descending first unlocks a locked exit if its Floor Key has been
@@ -901,13 +896,10 @@ action:
   floor.
 - `{ "action": "continue", "battleId": "…", "revision": "…" }`
   acknowledges a battle.
-- `{ "action": "abandon", "revision": "…" }` ends the run in progress at
-  once, for free (`abandoned: true` in the response). It changes nothing
-  for a run that's already over or has a battle waiting.
-- `{ "action": "restart", "revision": "…" }` starts fresh after failure,
-  completion, or abandoning. Refused with 409 while a run is still in
-  progress or if stamina/hygiene are too low, or 429 while the 4-hour
-  cooldown is active.
+- The older `{ "action": "abandon", "revision": "…" }` and
+  `{ "action": "restart", "revision": "…" }` actions remain supported for
+  compatibility. Abandon ends a run without a pending battle; restart
+  requires an ended run and applies the usual cost and cooldown.
 - `{ "action": "patrol" }` is a read-only refresh of the saved state,
   including shared team progress. It needs no revision and never moves
   monsters, advances grass encounters, or starts a battle.
@@ -920,12 +912,17 @@ action:
 - `{ "action": "use-item", "item": "food" | "soap" | "hourglass",
   "revision": "…" }` uses one backpack item.
 
-Each response also includes `started` (false until the pet first acts on
-its map or sets off with a team) and `team`: `null` on a solo run, or the
-team's `id` and every other teammate's `id`, `color`, `appearance`,
+Each response also includes `started`, `entryId`, and `awaitingEntry`
+(the one-time initial entry to a newly prepared team run), plus `team`:
+`null` on a solo run, or the team's `id` and every other teammate's `id`, `color`, `appearance`,
 `floor`, `x`, `y`, `hp`, `maxHp`, and `status` (`exploring`, `defeated`, or
 `abandoned`). In a team battle, `battle.fighter` gives the pet's place in
 `battle.playback.fighters` (the pets in order, then the monster last).
+`battleCount` is the run's total number of battles, and `recordLimit` is
+50. `records` is empty until the run ends and its pending battle is
+acknowledged, then contains the latest saved battles. During an active run,
+only a pending encounter includes playback for its live animation;
+acknowledged battle playback is withheld until the run ends.
 
 The `grass` array matches the 16 × 16 terrain grid: `g` marks tall grass
 and `.` marks other tiles. Ordinary entries in `enemies` have
@@ -943,9 +940,10 @@ migrate to unlocked exits.
 
 The **Team up** window uses `GET /api/team` (signed in), which returns the
 forming `team` the pet has joined (or `null`), its pending `invitations`,
-its own `run` (`team` id or `null`, and `state`: `new`, `exploring`, or
-`ended`), and the team `size` limit. Each team lists `members` (the leader
-first), each with `joined` and, while forming, `waiting`: why that pet
+its own `run` (`team` id or `null`, `state`: `new`, `exploring`, or
+`ended`, and `awaitingEntry` for a newly prepared team run), and the team
+`size` limit. Each team lists `members` (the leader first), each with
+`joined` and, while forming, `waiting`: why that pet
 can't set off yet, or `null`. `POST /api/team` takes one action and
 answers with the same view:
 

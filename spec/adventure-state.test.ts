@@ -183,9 +183,9 @@ it('loads learned abilities into both monster and Arena battles, spending carrie
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
   try {
     const result = step(id, 'd');
-    expect(result.battle!.playback.turns.find(turn => turn.actor === 0)).toMatchObject({ ability: 'firebolt', mpCost: 3 });
+    expect(result.battle!.playback!.turns.find(turn => turn.actor === 0)).toMatchObject({ ability: 'firebolt', mpCost: 3 });
     expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(result);
-    expect(result.battle!.playback.initialMp![0]).toBe(before.mp);
+    expect(result.battle!.playback!.initialMp![0]).toBe(before.mp);
     pets.getOrCreatePet('learned-opponent');
     const arena = pets.fight(id, 'learned-opponent');
     if ('error' in arena) throw new Error(arena.error);
@@ -202,12 +202,12 @@ it.each(['slime', 'goblin', 'slime-king'] as const)('saves a %s victory, removes
   expect(result.battle).toMatchObject({ won: true, pending: true, floor: before.floor });
   expect(result.enemies).toHaveLength(before.enemies.length - 1);
   expect(result.enemies.some(e => e.id === result.battle!.enemyId)).toBe(false);
-  expect(result.battle!.playback.fighters[1]).toMatchObject({ monster: kind });
+  expect(result.battle!.playback!.fighters[1]).toMatchObject({ monster: kind });
   expect(result.completed).toBe(kind === 'slime-king');
   expect(afterRestart(id)).toEqual(result);
   const continued = continueRun(id);
   expect(afterRestart(id)).toEqual(continued);
-  expect(continued.battle!.playback).toEqual(result.battle!.playback);
+  expect(continued.battle!.playback).toEqual(kind === 'slime-king' ? result.battle!.playback : null);
   expect(pets.getPet(id)).toEqual(pet);
 });
 
@@ -320,9 +320,9 @@ it("the Slime King Bumps for two-thirds of the pet's current HP while that beats
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5); // tails: the king strikes first
   try {
     const result = step(id, 'd');
-    expect(result.battle!.playback.fighters[1].abilities).toEqual(['claw-strike', 'bump']);
+    expect(result.battle!.playback!.fighters[1].abilities).toEqual(['claw-strike', 'bump']);
     // ceil(70 × 2/3) = 47; then ceil(23 × 2/3) = 16 is less than Claw Strike's 18.
-    expect(result.battle!.playback.turns.map(t => [t.actor, t.ability, t.damage, t.hp])).toEqual([
+    expect(result.battle!.playback!.turns.map(t => [t.actor, t.ability, t.damage, t.hp])).toEqual([
       [1, 'bump', 47, [23, 40]], [0, 'claw-strike', 30, [23, 10]], [1, 'claw-strike', 18, [5, 10]], [0, 'claw-strike', 10, [5, 0]],
     ]);
     expect(result).toMatchObject({ completed: true, hp: 19, battle: { won: true } });
@@ -336,8 +336,8 @@ it('carries HP/MP across battles and floors, restoring 20% of maximum rounded up
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
   try {
     const result = step(id, 'd');
-    expect(result.battle!.playback.initialHp).toEqual([17, 6]);
-    expect(result.battle!.playback.initialMp).toEqual([0, 1]);
+    expect(result.battle!.playback!.initialHp).toEqual([17, 6]);
+    expect(result.battle!.playback!.initialMp).toEqual([0, 1]);
     expect(result).toMatchObject({ hp: 21, mp: 2, maxHp: 31, maxMp: 7, battle: { recovery: { hp: 7, mp: 2 } } });
     expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(result);
     expect(adventure.adventureFor(id)).toEqual(result);
@@ -352,8 +352,8 @@ it('carries HP/MP across battles and floors, restoring 20% of maximum rounded up
     db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(9, 5, id);
     readyGrassBattle(id, 'f1-enemy-1');
     const next = step(id, 'd');
-    expect(next.battle!.playback.initialHp![0]).toBe(21);
-    expect(next.battle!.playback.initialMp![0]).toBe(2);
+    expect(next.battle!.playback!.initialHp![0]).toBe(21);
+    expect(next.battle!.playback!.initialMp![0]).toBe(2);
     expect(next).toMatchObject({ hp: 23, mp: 4 });
     continueRun(id);
     db.prepare('UPDATE adventures SET x = ?, y = ?, hp = ?, mp = ? WHERE player_id = ?').run(3, 11, 30, 6, id);
@@ -381,7 +381,7 @@ it('ends the adventure on defeat and requires an explicit fresh run; old retries
   expect(adventure.continueAdventure(id, result.battle!.id, result.revision)).toEqual(restarted);
   // A run in progress has to be abandoned (ending it) before another can start.
   expect(adventure.restartAdventure(id, adventure.adventureFor(id).revision))
-    .toEqual({ status: 409, error: 'Abandon this adventure before starting a new one.' });
+    .toEqual({ status: 409, error: 'End this adventure before starting a new one.' });
   expect(afterRestart(id)).toEqual(restarted);
 });
 
@@ -409,8 +409,8 @@ it("a Silver coin forces the pet to attack first against a much stronger goblin"
   grantCoin(id, 'silver-coin');
   expect(pets.equipCoin(id, 'silver-coin')).not.toHaveProperty('error');
   const result = step(id, 'd');
-  expect(result.battle!.playback.turns[0].actor).toBe(0);
-  expect(result.battle!.playback.initiative).toEqual({ toss: null, coin: 'silver-coin' });
+  expect(result.battle!.playback!.turns[0].actor).toBe(0);
+  expect(result.battle!.playback!.initiative).toEqual({ toss: null, coin: 'silver-coin' });
 });
 
 it("a Gold coin makes the pet attack second but doubles its own first hit", () => {
@@ -421,10 +421,10 @@ it("a Gold coin makes the pet attack second but doubles its own first hit", () =
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5); // luck factor exactly 1.0
   try {
     const result = step(id, 'd');
-    const turns = result.battle!.playback.turns;
+    const turns = result.battle!.playback!.turns;
     expect(turns[0].actor).toBe(1); // the goblin, not the pet, strikes first
     const petTurns = turns.filter(t => t.actor === 0);
-    expect(result.battle!.playback.fighters[0].damage).toBe(3);
+    expect(result.battle!.playback!.fighters[0].damage).toBe(3);
     expect(petTurns[0].damage).toBe(6); // double the base 3
   } finally { random.mockRestore(); }
 });
@@ -439,10 +439,10 @@ it("a Copper coin adds HP/MP to one monster battle as a shield, without changing
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5); // tails: the slime hits first, for exactly 3
   try {
     const result = step(id, 'd');
-    expect(result.battle!.playback.fighters[0]).toMatchObject({ maxHp: 34, maxMp: 8 });
-    expect(result.battle!.playback.initialHp![0]).toBe(34);
-    expect(result.battle!.playback.initialMp![0]).toBe(8);
-    expect(result.battle!.playback.turns[0]).toMatchObject({ actor: 1, damage: 3, hp: [31, 6] });
+    expect(result.battle!.playback!.fighters[0]).toMatchObject({ maxHp: 34, maxMp: 8 });
+    expect(result.battle!.playback!.initialHp![0]).toBe(34);
+    expect(result.battle!.playback!.initialMp![0]).toBe(8);
+    expect(result.battle!.playback!.turns[0]).toMatchObject({ actor: 1, damage: 3, hp: [31, 6] });
     // The shield took the whole hit; its unused MP is gone, and nothing is recovered past full.
     expect(result).toMatchObject({ hp: 31, mp: 7, maxHp: 31, maxMp: 7, battle: { won: true, after: { hp: 31, mp: 7 } } });
   } finally { random.mockRestore(); }
@@ -460,9 +460,9 @@ it("a Copper shield absorbs damage for a hurt pet first but never heals it", () 
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
   try {
     const result = step(id, 'd');
-    expect(result.battle!.playback.initialHp![0]).toBe(13);
-    expect(result.battle!.playback.initialMp![0]).toBe(3);
-    expect(result.battle!.playback.turns[0]).toMatchObject({ actor: 1, damage: 5, hp: [8, 10] });
+    expect(result.battle!.playback!.initialHp![0]).toBe(13);
+    expect(result.battle!.playback!.initialMp![0]).toBe(3);
+    expect(result.battle!.playback!.turns[0]).toMatchObject({ actor: 1, damage: 5, hp: [8, 10] });
     // 3 of the 5 damage came off the shield: 10 → 8, then a victory's 7 HP / 2 MP recovery.
     expect(result).toMatchObject({ hp: 15, mp: 4, battle: { won: true, recovery: { hp: 7, mp: 2 }, after: { hp: 15, mp: 4 } } });
   } finally { random.mockRestore(); }
@@ -663,4 +663,144 @@ it('treats skipping the cooldown as a harmless no-op when none is active', () =>
   const saved = adventure.adventureFor(id);
   expect(saved.cooldownUntil).toBe(null);
   expect(adventure.skipAdventureCooldown(id, saved.revision)).toEqual(saved);
+});
+
+function enter(id: string, entryId: string) {
+  const result = adventure.enterAdventure(id, adventure.adventureFor(id).revision, entryId);
+  if ('error' in result) throw new Error(result.error);
+  return result;
+}
+
+it('starts the first solo entry free and resets progress on later entries exactly once, preserving earned inventory', () => {
+  const id = 'fresh-entries'; pets.getOrCreatePet(id);
+  const original = pets.getPet(id), unread = adventure.adventureFor(id);
+  const first = enter(id, 'entry-one');
+  expect(first).toMatchObject({ started: true, entryId: 'entry-one', awaitingEntry: false, cooldownUntil: null });
+  expect(pets.getPet(id)).toEqual(original);
+  standOnChest(id); openChest(id, 0);
+  grantFloorKey(id);
+  db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(13, 13, id);
+  adventure.changeFloor(id, 'descend', adventure.adventureFor(id).revision);
+  const explored = step(id, 'd');
+  expect(explored.floor).toBe(2);
+  expect(adventure.patrolAdventure(id)).toEqual(explored);
+  expect(adventure.enterAdventure(id, unread.revision, 'entry-one')).toEqual(explored);
+  expect(afterRestart(id)).toEqual(explored);
+  const next = enter(id, 'entry-two');
+  expect(next).toMatchObject({ floor: 1, x: 2, y: 2, hp: 15, mp: 5, battle: null, battleCount: 0, records: [],
+    entryId: 'entry-two', exit: { keyFound: false, unlocked: false }, abandoned: false, team: null });
+  expect(next.chests[0]).not.toHaveProperty('reward');
+  expect(pets.getPet(id)).toMatchObject({ food: 1, stamina: 60, hygiene: 80 });
+  expect(adventure.enterAdventure(id, explored.revision, 'entry-two')).toEqual(next);
+  expect(adventure.enterAdventure(id, explored.revision, 'stale-third-entry')).toEqual(next);
+  expect(adventure.moveAdventure(id, 'd', explored.revision)).toEqual(next);
+  expect(pets.getPet(id)).toMatchObject({ food: 1, stamina: 60, hygiene: 80 });
+  expect(afterRestart(id)).toEqual(next);
+});
+
+it('ends a previous run before refusing a new entry for rest, care, or a busy pet', () => {
+  for (const reason of ['rest', 'care', 'busy'] as const) {
+    const id = `entry-refusal-${reason}`; pets.getOrCreatePet(id); enter(id, 'old-entry');
+    step(id, 'd');
+    if (reason === 'rest') db.prepare('UPDATE adventures SET cooldown_until = ? WHERE player_id = ?').run(Date.now() + 60_000, id);
+    if (reason === 'care') db.prepare('UPDATE pets SET stamina = ? WHERE id = ?').run(0, id);
+    if (reason === 'busy') pets.study(id, 'math');
+    const before = adventure.adventureFor(id), pet = pets.getPet(id);
+    expect(adventure.enterAdventure(id, before.revision, 'new-entry')).toMatchObject({ status: reason === 'rest' ? 429 : 409 });
+    const ended = adventure.adventureFor(id);
+    expect(ended).toMatchObject({ abandoned: true, entryId: 'old-entry', x: 3, y: 2 });
+    expect(adventure.moveAdventure(id, 'd', ended.revision)).toEqual(ended);
+    expect(pets.getPet(id)).toEqual(pet);
+    expect(afterRestart(id)).toEqual(ended);
+  }
+});
+
+it('reveals accumulated exact battle records only after leaving, and a later entry clears that run’s records', () => {
+  const id = 'ended-records'; setupBattle(id, 'slime', [100, 100, 100]);
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  try {
+    const first = step(id, 'd');
+    expect(first).toMatchObject({ records: [], battleCount: 1 });
+    expect(first.battle!.playback).not.toBeNull();
+    const continued = continueRun(id);
+    expect(continued).toMatchObject({ records: [], battleCount: 1, battle: { playback: null, pending: false } });
+    expect(afterRestart(id)).toEqual(continued);
+    db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(9, 5, id);
+    readyGrassBattle(id, 'f1-enemy-1');
+    const second = step(id, 'd');
+    expect(second.records).toEqual([]);
+    const left = adventure.leaveAdventure(id, second.revision);
+    if ('error' in left) throw new Error(left.error);
+    expect(left).toMatchObject({ abandoned: true, battleCount: 2, battle: { pending: false } });
+    expect(left.records).toEqual([{ ...first.battle, pending: false }, { ...second.battle, pending: false }]);
+    expect(adventure.leaveAdventure(id, second.revision)).toEqual(left);
+    expect(adventure.leaveAdventure(id, left.revision)).toEqual(left);
+    expect(afterRestart(id)).toEqual(left);
+    expect(random).toHaveBeenCalledTimes(8);
+    const fresh = enter(id, 'records-next-entry');
+    expect(fresh).toMatchObject({ records: [], battleCount: 0, battle: null, abandoned: false });
+    expect(adventure.leaveAdventure(id, left.revision)).toEqual(fresh);
+  } finally { random.mockRestore(); }
+});
+
+it('reveals defeat and completion records after acknowledging the final encounter', () => {
+  for (const result of ['defeat', 'completion'] as const) {
+    const id = `records-${result}`;
+    setupBattle(id, result === 'completion' ? 'slime-king' : 'goblin', result === 'completion' ? [100, 100, 100] : [1, 1, 1]);
+    const fought = step(id, 'd');
+    expect(fought.records).toEqual([]);
+    const ended = continueRun(id);
+    expect(ended.records).toEqual([{ ...fought.battle, pending: false }]);
+    expect(ended.battle!.playback).toEqual(fought.battle!.playback);
+    expect(adventure.moveAdventure(id, 'd', ended.revision)).toEqual(ended);
+    expect(adventure.openAdventureChest(id, ended.revision)).toEqual(ended);
+    expect(adventure.changeFloor(id, 'ascend', ended.revision)).toEqual(ended);
+    expect(afterRestart(id)).toEqual(ended);
+  }
+});
+
+it('retains the last saved replay when migrating a run without a battle record list', () => {
+  const id = 'legacy-battle-record'; setupBattle(id, 'slime', [100, 100, 100]);
+  const fought = step(id, 'd');
+  db.prepare('UPDATE adventures SET records_json = NULL WHERE player_id = ?').run(id);
+  expect(adventure.adventureFor(id)).toMatchObject({ records: [], battleCount: 1 });
+  const left = adventure.leaveAdventure(id, fought.revision);
+  if ('error' in left) throw new Error(left.error);
+  expect(left.records).toEqual([{ ...fought.battle, pending: false }]);
+  expect(afterRestart(id)).toEqual(left);
+});
+
+it('bounds saved replays during an unlimited key search while retaining the full battle count', () => {
+  const id = 'bounded-records'; setupBattle(id, 'slime', [100, 100, 100]);
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  const battles: string[] = [];
+  try {
+    for (let i = 0; i < 57; i++) {
+      db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(5, 2, id);
+      readyGrassBattle(id, 'f1-enemy-0');
+      const fought = step(id, 'd');
+      expect(fought.battle!.pending).toBe(true);
+      battles.push(fought.battle!.id);
+      continueRun(id);
+    }
+    const hidden = adventure.adventureFor(id);
+    expect(hidden).toMatchObject({ records: [], battleCount: 57, recordLimit: 50 });
+    const left = adventure.leaveAdventure(id, hidden.revision);
+    if ('error' in left) throw new Error(left.error);
+    expect(left.records.map(battle => battle.id)).toEqual(battles.slice(-50));
+    expect(left.battleCount).toBe(57);
+    expect(afterRestart(id)).toEqual(left);
+    const stored = db.prepare('SELECT records_json FROM adventures WHERE player_id = ?').get(id) as { records_json: string };
+    expect(JSON.parse(stored.records_json).battles).toHaveLength(50);
+  } finally { random.mockRestore(); }
+});
+
+it('rolls back entry charges and retired progress together if creating the fresh run fails', () => {
+  const id = 'atomic-entry'; pets.getOrCreatePet(id); enter(id, 'atomic-first'); step(id, 'd');
+  const before = adventure.adventureFor(id), pet = pets.getPet(id);
+  db.exec("CREATE TRIGGER reject_entry BEFORE UPDATE OF entry_id ON adventures WHEN NEW.entry_id <> OLD.entry_id BEGIN SELECT RAISE(ABORT, 'test entry disk failure'); END");
+  try { expect(() => enter(id, 'atomic-next')).toThrow('test entry disk failure'); }
+  finally { db.exec('DROP TRIGGER reject_entry'); }
+  expect(adventure.adventureFor(id)).toEqual(before);
+  expect(pets.getPet(id)).toEqual(pet);
 });

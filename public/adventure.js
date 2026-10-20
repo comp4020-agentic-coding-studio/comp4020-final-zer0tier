@@ -7,12 +7,14 @@ adventure.setAttribute('aria-labelledby', 'adventure-title');
 adventure.innerHTML = `
   <header class="adventure-top"><div><p class="section-label" id="adventure-floor">ADVENTURE · FLOOR 1 / 5</p><h2 id="adventure-title">Woodland clearing</h2></div>
     <div class="adventure-header-actions">
-      <button type="button" id="adventure-pack-toggle" class="chip-btn chip-buy" aria-expanded="false" aria-controls="adventure-pack-panel">Backpack & team</button>
-      <button type="button" id="adventure-guide-open" class="chip-btn chip-buy" aria-haspopup="dialog">Game guide</button>
-      <button type="button" id="adventure-close" class="chip-btn">Leave</button>
+      <button type="button" id="adventure-pack-toggle" class="chip-btn chip-buy" aria-expanded="false" aria-controls="adventure-pack-panel">Menu</button>
     </div></header>
   <div class="adventure-stage">
     <div class="adventure-side" id="adventure-pack-panel" hidden>
+      <div class="adventure-menu-actions">
+        <button type="button" id="adventure-guide-open" class="chip-btn chip-buy" aria-haspopup="dialog">Game guide</button>
+        <button type="button" id="adventure-close" class="chip-btn">End adventure</button>
+      </div>
       <section id="adventure-team" aria-labelledby="adventure-team-heading" hidden>
         <h3 id="adventure-team-heading">Your team</h3>
         <ul id="adventure-team-list"></ul>
@@ -25,7 +27,8 @@ adventure.innerHTML = `
         <h4>Learned abilities</h4><ul id="adventure-abilities"></ul>
         <h4>Unfair coins</h4><ul id="adventure-coins"></ul>
       </details>
-      <button type="button" id="adventure-abandon" class="chip-btn chip-buy" hidden>Abandon run</button>
+      <button type="button" id="adventure-abandon" class="chip-btn chip-buy" hidden>End adventure</button>
+      <div id="adventure-menu-cooldown"></div>
     </div>
     <div class="adventure-board">
       <div id="adventure-grid" role="img" aria-label="Woodland map" aria-describedby="adventure-movement-tip" tabindex="0"></div>
@@ -34,8 +37,16 @@ adventure.innerHTML = `
       <div class="adventure-messages">
         <p id="adventure-notice" role="status"></p>
         <p id="adventure-treasure" role="status"></p>
-        <p id="adventure-completion" role="status" hidden>Slime King defeated! Keep exploring if you like.</p>
-        <p id="adventure-failure" role="status" hidden>Adventure failed. Start a new adventure to try again.</p>
+      </div>
+      <section id="adventure-battle-summary" class="adventure-run-summary" aria-labelledby="adventure-summary-title" hidden>
+        <p class="section-label">RUN FINISHED</p>
+        <h2 id="adventure-summary-title">Adventure over</h2>
+        <p id="adventure-completion" role="status" hidden>The Slime King is defeated!</p>
+        <p id="adventure-failure" role="status" hidden></p>
+        <p id="adventure-result" role="status"></p>
+        <button type="button" id="adventure-replay" class="chip-btn chip-buy" aria-expanded="false" aria-controls="adventure-records">Battle records</button>
+        <ol id="adventure-records" hidden></ol>
+        <div id="adventure-finish-cooldown">
         <div id="adventure-cooldown-panel" hidden>
           <div class="adventure-cooldown-heading"><span id="adventure-cooldown-label">Next adventure</span><span id="adventure-cooldown-percent">0%</span></div>
           <div id="adventure-cooldown-progress" class="progress" role="progressbar" aria-labelledby="adventure-cooldown-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -43,19 +54,15 @@ adventure.innerHTML = `
           </div>
           <p id="adventure-cooldown" role="status" hidden></p>
         </div>
-        <section id="adventure-battle-summary" aria-label="Last monster battle" hidden>
-          <p id="adventure-result" role="status"></p>
-          <div class="adventure-buttons">
-            <button type="button" id="adventure-replay" class="chip-btn chip-buy">Watch last battle</button>
-            <button type="button" id="adventure-continue" class="chip-btn" hidden>Continue exploring</button>
-          </div>
-        </section>
+        </div>
         <div class="adventure-buttons">
           <button type="button" id="adventure-skip-cooldown" class="chip-btn" hidden>Skip wait (use Hourglass)</button>
           <button type="button" id="adventure-restart" class="chip-btn" hidden>Start new adventure</button>
           <button type="button" id="adventure-team-up" class="chip-btn chip-buy" hidden>Team up</button>
+          <button type="button" id="adventure-return-town" class="chip-btn chip-buy">Return to town</button>
         </div>
-      </div>
+      </section>
+      <button type="button" id="adventure-continue" class="chip-btn adventure-continue" hidden>Return to exploration</button>
     </div>
   </div>
   <footer class="adventure-hud">
@@ -131,14 +138,19 @@ const cooldownProgress = adventure.querySelector('#adventure-cooldown-progress')
 const cooldownFill = adventure.querySelector('#adventure-cooldown-fill');
 const cooldownPercent = adventure.querySelector('#adventure-cooldown-percent');
 let pending = false, generation = 0, state = null, pet = null, shownBattle = null;
+let entryReady = false, acceptedEntryId = null, openingAdventure = false, openingVersion = 0;
+const runEnded = () => Boolean(state?.failed || state?.completed || state?.abandoned);
+const recordsAvailable = () => runEnded() && !state?.battle?.pending;
+const newEntryId = () => globalThis.crypto?.randomUUID?.() ?? `entry-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 // Order of map requests sent and of the last one shown, so an older answer
 // never replaces a newer one.
 let sent = 0, shown = 0, patrolling = false;
-// Whether this opening of the map has already decided to show the guide.
-let guideOffered = false;
 function openGuide() {
   if (guide.open || !adventure.open) return;
   stopWalking();
+  packPanel.hidden = true;
+  packToggle.hidden = false;
+  packToggle.setAttribute('aria-expanded', 'false');
   guide.showModal();
   guide.querySelector('#adventure-guide-close').focus({ preventScroll: true });
 }
@@ -185,7 +197,7 @@ const busyText = () => pet?.activity === 'studying' ? `Your pet is busy studying
   : pet?.activity === 'working' ? `Your pet is busy working at the ${pet.task}. Explore once it's done.` : '';
 function syncControls() {
   const busy = Boolean(busyText());
-  const blocked = pending || Boolean(state?.battle?.pending) || Boolean(state?.failed || state?.abandoned) || busy;
+  const blocked = !entryReady || pending || Boolean(state?.battle?.pending) || runEnded() || busy || !packPanel.hidden;
   function disable(button, value) {
     // Keep keyboard input inside the map when the active control is disabled.
     if (value && document.activeElement === button) grid.focus({ preventScroll: true });
@@ -202,6 +214,7 @@ function syncControls() {
   disable(adventure.querySelector('#adventure-restart'), pending || Boolean(state?.battle?.pending) || busy);
   disable(adventure.querySelector('#adventure-team-up'), pending || Boolean(state?.battle?.pending));
   disable(adventure.querySelector('#adventure-abandon'), pending || Boolean(state?.battle?.pending) || busy);
+  disable(adventure.querySelector('#adventure-close'), pending);
   const hourglasses = state?.inventory?.items.find(item => item.id === 'hourglass')?.quantity ?? 0;
   disable(adventure.querySelector('#adventure-skip-cooldown'), pending || hourglasses < 1);
   const chest = state?.chests.find(at);
@@ -209,7 +222,7 @@ function syncControls() {
   open.textContent = chest?.reward ? 'Chest opened' : 'Open chest';
   disable(open, blocked || !chest || Boolean(chest.reward));
   adventure.querySelectorAll('[data-use-item]').forEach(button => disable(button,
-    pending || Boolean(state?.battle?.pending) || !state?.inventory?.items.find(item => item.id === button.dataset.useItem)?.usable));
+    !entryReady || pending || Boolean(state?.battle?.pending) || !state?.inventory?.items.find(item => item.id === button.dataset.useItem)?.usable));
   if (terrain) for (const cell of terrain.querySelectorAll('.adventure-marker-chest, .adventure-marker-up, .adventure-marker-down')) {
     const here = state && Number(cell.dataset.x) === state.x && Number(cell.dataset.y) === state.y;
     cell.classList.toggle('is-interactable', Boolean(here && !blocked && cell.dataset.opened !== 'true' &&
@@ -218,8 +231,10 @@ function syncControls() {
 }
 function clearMap() {
   resetScene();
-  state = null; shownBattle = null; guideOffered = false;
+  entryReady = false; acceptedEntryId = null;
+  state = null; shownBattle = null;
   packPanel.hidden = true;
+  packToggle.hidden = false;
   packToggle.setAttribute('aria-expanded', 'false');
   if (guide.open) guide.close();
   grid.replaceChildren();
@@ -234,6 +249,10 @@ function clearMap() {
   adventure.querySelector('#adventure-floor-key').replaceChildren();
   adventure.querySelector('#adventure-notice').textContent = '';
   adventure.querySelector('#adventure-battle-summary').hidden = true;
+  adventure.querySelector('#adventure-records').replaceChildren();
+  delete adventure.querySelector('#adventure-records').dataset.records;
+  adventure.querySelector('#adventure-records').hidden = true;
+  adventure.querySelector('#adventure-replay').setAttribute('aria-expanded', 'false');
   adventure.querySelector('#adventure-result').textContent = '';
   adventure.querySelector('#adventure-continue').hidden = true;
   adventure.querySelector('#adventure-completion').hidden = true;
@@ -276,6 +295,8 @@ function renderCooldown() {
   if (!state) return;
   const active = cooldownActive(), ended = state.failed || state.completed || state.abandoned;
   cooldownPanel.hidden = !active;
+  const cooldownHost = adventure.querySelector(ended ? '#adventure-finish-cooldown' : '#adventure-menu-cooldown');
+  if (cooldownPanel.parentElement !== cooldownHost) cooldownHost.append(cooldownPanel);
   const message = adventure.querySelector('#adventure-cooldown');
   message.hidden = !active;
   if (active) {
@@ -294,13 +315,22 @@ function renderCooldown() {
   adventure.querySelector('#adventure-skip-cooldown').hidden = !active || !ended;
   adventure.querySelector('#adventure-restart').hidden = active || !ended;
   adventure.querySelector('#adventure-team-up').hidden = active || !ended;
-  adventure.querySelector('#adventure-abandon').hidden = ended || Boolean(state.battle?.pending);
+  adventure.querySelector('#adventure-abandon').hidden = true;
+  adventure.querySelector('#adventure-close').textContent = ended ? 'Return to town' : 'End adventure';
   syncControls();
 }
 setInterval(() => { if (adventure.open) renderCooldown(); }, 1000);
 
 function renderMap() {
   if (!state) return;
+  if (!entryReady && !runEnded()) return;
+  adventure.classList.toggle('adventure-ended', recordsAvailable());
+  adventure.classList.toggle('adventure-abandoned', Boolean(state.abandoned));
+  packToggle.hidden = recordsAvailable();
+  if (recordsAvailable()) {
+    packPanel.hidden = true;
+    packToggle.setAttribute('aria-expanded', 'false');
+  }
   adventure.querySelector('#adventure-title').textContent = state.name;
   adventure.querySelector('#adventure-floor').textContent = `ADVENTURE · FLOOR ${state.floor} / ${state.floorCount}`;
   guide.querySelector('#adventure-stair-hint').textContent = state.down
@@ -309,22 +339,28 @@ function renderMap() {
   adventure.querySelector('#adventure-completion').hidden = !state.completed;
   adventure.querySelector('#adventure-failure').hidden = !state.failed && !state.abandoned;
   adventure.querySelector('#adventure-failure').textContent =
-    `Adventure ${state.abandoned ? 'abandoned' : 'failed'}. Start a new adventure to try again.`;
+    state.abandoned ? 'You left the woodland. Your next visit starts a fresh adventure.' : 'Your pet was defeated. Your next adventure starts fresh.';
   guide.querySelector('#adventure-restart-cost').textContent =
     `A new run costs ${state.restartCost.stamina} stamina and ${state.restartCost.hygiene} hygiene. The next one opens ${state.cooldownMinutes / 60} hours later.`;
   renderCooldown();
   adventure.querySelector('#adventure-resources').textContent = `HP ${state.hp} / ${state.maxHp} · MP ${state.mp} / ${state.maxMp}`;
   gauge('hp', state.hp, state.maxHp);
   gauge('mp', state.mp, state.maxMp);
-  adventure.querySelector('#adventure-battle-summary').hidden = !state.battle;
-  adventure.querySelector('#adventure-result').textContent = state.battle ? battleResult(state.battle) : '';
+  const records = state.records ?? [];
+  adventure.querySelector('#adventure-battle-summary').hidden = !recordsAvailable();
+  adventure.querySelector('#adventure-summary-title').textContent = state.completed ? 'Adventure complete' : 'Adventure over';
+  const total = state.battleCount ?? records.length;
+  adventure.querySelector('#adventure-result').textContent = `${total} ${total === 1 ? 'battle' : 'battles'} · Reached floor ${state.floor}${total > records.length ? ` · Showing the latest ${records.length} records` : ''}`;
+  adventure.querySelector('#adventure-replay').hidden = !recordsAvailable() || records.length === 0;
+  renderRecords();
   adventure.querySelector('#adventure-continue').hidden = !state.battle?.pending;
   const opened = state.chests.find(chest => chest.reward);
-  adventure.querySelector('#adventure-treasure').textContent = opened ? rewardText(opened.reward) : '';
+  adventure.querySelector('#adventure-treasure').textContent = opened && at(opened) ? rewardText(opened.reward) : '';
   renderInventory();
   renderMonsters();
   status.textContent = `Column ${state.x + 1} · Row ${state.y + 1}`;
   syncControls();
+  syncAdventureMotion();
 }
 // Teammates still exploring this floor stand on the map with your pet.
 const teammatesHere = () => (state?.team?.members ?? []).filter(m => m.floor === state.floor && m.status === 'exploring');
@@ -516,7 +552,7 @@ function renderMonsters() {
     }
     const interactable = at(point) && ((chest && !chest.reward) || cell.classList.contains('adventure-marker-up') ||
       (cell.classList.contains('adventure-marker-down') && exitReady()));
-    cell.classList.toggle('is-interactable', Boolean(interactable) && !state.battle?.pending && !pending && !busyText());
+    cell.classList.toggle('is-interactable', Boolean(interactable) && entryReady && packPanel.hidden && !runEnded() && !state.battle?.pending && !pending && !busyText());
     cell.classList.toggle('is-rustling', onGrass(point.x, point.y) && Math.abs(point.x - state.x) <= 1 && Math.abs(point.y - state.y) <= 1);
   }
   const mates = teammatesHere(), sharing = mates.filter(m => m.x === state.x && m.y === state.y).map(m => m.id);
@@ -565,7 +601,7 @@ function renderInventory() {
     button.type = 'button'; button.className = 'chip-btn'; button.dataset.useItem = item.id;
     button.textContent = { food: 'Feed', soap: 'Clean', hourglass: 'Skip activity' }[item.id];
     button.setAttribute('aria-label', `Use ${item.name}`);
-    button.disabled = pending || Boolean(state.battle?.pending) || !item.usable;
+    button.disabled = !entryReady || pending || Boolean(state.battle?.pending) || !item.usable;
     button.addEventListener('click', () => request({ action: 'use-item', item: item.id }));
     row.append(label, effect, button); items.append(row);
     if (focused === item.id) (button.disabled ? grid : button).focus({ preventScroll: true });
@@ -585,13 +621,13 @@ function renderInventory() {
     effect.textContent = coin.effect;
     button.type = 'button'; button.className = 'chip-btn'; button.setAttribute('aria-pressed', String(Boolean(coin.equipped)));
     button.textContent = coin.equipped ? 'Unequip' : 'Equip';
-    button.disabled = coin.quantity < 1 && !coin.equipped;
+    button.disabled = !entryReady || (coin.quantity < 1 && !coin.equipped);
     button.addEventListener('click', () => { button.disabled = true; equipCoin(button, coin.equipped ? null : coin.id); });
     row.append(label, effect, button); coins.append(row);
   }
 }
 async function equipCoin(button, coinId) {
-  if (!pet) return;
+  if (!pet || !entryReady) return;
   try {
     const res = await fetch(`/api/pets/${encodeURIComponent(pet.id)}/equip-coin/${encodeURIComponent(coinId ?? 'none')}`, { method: 'POST' });
     if (!res.ok) button.disabled = false;
@@ -602,17 +638,35 @@ async function equipCoin(button, coinId) {
 // In a team battle the team can win while this pet is knocked out.
 function battleResult(battle) {
   const knockedOut = battle.after?.hp === 0;
-  const team = battle.playback.fighters.length > 2 ? 'Your team' : 'You';
+  const team = (battle.playback?.fighters.length ?? 0) > 2 ? 'Your team' : 'You';
   const keyDrop = battle.keyDrop ? ` Found a Floor Key! The stairs on floor ${battle.keyDrop.floor} can now be unlocked.` : '';
   if (battle.won && knockedOut) return `${team} defeated ${battle.enemyName} on floor ${battle.floor}, but your pet was knocked out. Its adventure is over; your teammates explore on.${keyDrop}`;
   return battle.won
     ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${keyDrop}${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}`
     : `${battle.enemyName} defeated ${team === 'You' ? 'you' : 'your team'}. Adventure failed. Start a new adventure to try again.`;
 }
-function showBattle(replay = false) {
-  const battle = state?.battle;
-  if (!battle || (!replay && shownBattle === battle.id)) return;
-  shownBattle = battle.id;
+function renderRecords() {
+  const list = adventure.querySelector('#adventure-records');
+  const records = recordsAvailable() ? state.records ?? [] : [];
+  const signature = records.map(battle => battle.id).join(',');
+  if (list.dataset.records === signature) return;
+  list.dataset.records = signature;
+  list.replaceChildren();
+  for (const battle of records) {
+    const row = document.createElement('li'), text = document.createElement('span'), button = document.createElement('button');
+    text.textContent = `Floor ${battle.floor} · ${battle.enemyName} · ${battle.won ? 'Victory' : 'Defeat'}${battle.keyDrop ? ' · Floor Key' : ''}`;
+    button.type = 'button'; button.className = 'chip-btn chip-buy'; button.dataset.recordId = battle.id;
+    button.textContent = 'Replay';
+    button.setAttribute('aria-label', `Replay ${battle.enemyName} battle on floor ${battle.floor}`);
+    button.addEventListener('click', () => showBattle(true, battle));
+    row.append(text, button); list.append(row);
+  }
+}
+function showBattle(replay = false, battle = state?.battle) {
+  if (!battle?.playback || (replay && !recordsAvailable()) || (!replay && (!entryReady || shownBattle === battle.id))) return;
+  if (!replay) shownBattle = battle.id;
+  packPanel.hidden = true;
+  packToggle.setAttribute('aria-expanded', 'false');
   const last = battle.playback.turns.at(-1), mine = battle.fighter ?? 0;
   // What the pet carries back to the map (a Copper shield's leftover is gone).
   const hp = [...last.hp], mp = [...last.mp];
@@ -622,14 +676,26 @@ function showBattle(replay = false) {
     key: `adventure:${battle.id}`, battle: battle.playback, viewer: battle.playback.fighters[mine].id,
     title: battle.surprise ? `Surprise in the grass! · ${battle.enemyName}` : `Floor ${battle.floor} · ${battle.enemyName}${battle.attacked ? ' attacks!' : ''}`,
     encounter: battle.surprise ? 'grass' : 'woodland', result: battleResult(battle), won: battle.won,
-    replay: true, returnLabel: 'Return to map', resultResources: { hp, mp },
+    replay: true, allowReplay: replay, showLog: replay,
+    returnLabel: replay ? 'Back to records' : 'Return to map', resultResources: { hp, mp },
   } }));
 }
+function matchesCurrentEntry(result) {
+  if (!acceptedEntryId || result.entryId === acceptedEntryId) return true;
+  entryReady = false;
+  stopWalking();
+  adventure.classList.add('adventure-entering');
+  status.textContent = 'This adventure was restarted in another window. Return to town and enter again.';
+  status.classList.remove('visually-hidden');
+  syncControls();
+  return false;
+}
 async function request(payload = {}) {
-  if (pending) return;
+  if (pending) return false;
   if (payload.direction || payload.action) payload = { ...payload, revision: state?.revision };
   const version = generation, order = ++sent;
   pending = true;
+  status.classList.add('visually-hidden');
   grid.setAttribute('aria-busy', 'true');
   syncControls();
   try {
@@ -638,14 +704,28 @@ async function request(payload = {}) {
       body: JSON.stringify(payload),
     });
     const result = await response.json();
-    if (version !== generation) return;
+    if (version !== generation) return false;
     if (!response.ok) throw new Error(result.error || 'Could not explore. Try again.');
+    if (payload.action !== 'enter' && !matchesCurrentEntry(result)) return false;
     state = result; shown = order;
+    if (payload.action === 'enter') {
+      entryReady = state.entryId === payload.entryId;
+      if (!entryReady) throw new Error('The adventure changed in another window. Enter again to start fresh.');
+      acceptedEntryId = state.entryId;
+      adventure.querySelector('#adventure-records').hidden = true;
+      adventure.querySelector('#adventure-replay').setAttribute('aria-expanded', 'false');
+      packPanel.hidden = true;
+      packToggle.setAttribute('aria-expanded', 'false');
+    }
     renderMap();
-    if (state.battle?.pending) showBattle();
-    else offerGuide();
+    if (entryReady && state.battle?.pending) showBattle();
+    return true;
   } catch (error) {
-    if (version === generation) status.textContent = error.message || 'Connection lost. Try again.';
+    if (version === generation) {
+      status.textContent = error.message || 'Connection lost. Try again.';
+      status.classList.remove('visually-hidden');
+    }
+    return false;
   } finally {
     if (version === generation) {
       pending = false;
@@ -657,8 +737,8 @@ async function request(payload = {}) {
 // Refresh shared progress while exploring. This legacy action name now reads
 // the saved map only; standing still never rolls an encounter.
 async function patrol() {
-  if (!adventure.open || document.hidden || patrolling || pending || !state || state.battle?.pending
-    || state.failed || state.abandoned || busyText()) return;
+  if (!entryReady || !adventure.open || document.hidden || patrolling || pending || !state || state.battle?.pending
+    || runEnded() || busyText()) return;
   const version = generation, order = ++sent;
   patrolling = true;
   try {
@@ -669,6 +749,7 @@ async function patrol() {
     const result = await response.json();
     // A move sent since then answers with fresher news; this step shows next time.
     if (!response.ok || version !== generation || pending || order < shown) return;
+    if (!matchesCurrentEntry(result)) return;
     const changed = result.revision !== state.revision;
     state = result; shown = order;
     if (!changed) return renderMonsters();
@@ -796,10 +877,9 @@ async function teamRequest(body) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Could not update the team. Try again.');
     ++lobbyGeneration;
-    const wasNew = lobby?.run.state === 'new';
     lobby = result;
     if (body.action === 'invite') teamUp.querySelector('#team-invite-id').value = '';
-    if (lobby.run.state === 'exploring' && lobby.run.team) { firstRun = wasNew; return openMap(); }
+    if (lobby.run.state === 'exploring' && lobby.run.team) return openMap();
   } catch (error) {
     teamUp.querySelector('#team-error').textContent = error.message || 'Connection lost. Try again.';
   } finally {
@@ -807,28 +887,55 @@ async function teamRequest(body) {
     renderLobby();
   }
 }
-// A pet that has never made a move gets the guide once, as it reaches the
-// map. Opening from the Adventure button waits: a first visit goes to the
-// Team up window, and the guide follows Go solo or setting off together.
-// Setting off counts as starting, so a pet's first team run is remembered
-// from the Team up window it set off from.
-let holdGuide = false, firstRun = false;
-function offerGuide() {
-  if (guideOffered || holdGuide || !state) return;
-  guideOffered = true;
-  if (state.started === false || firstRun) openGuide();
-  firstRun = false;
+// Every actual entry uses a new ID. Reads and retries never create extra runs.
+async function enterMap() {
+  if (!adventure.open || !state || pending) return;
+  entryReady = false; acceptedEntryId = null;
+  adventure.classList.add('adventure-entering');
+  adventure.querySelector('#adventure-battle-summary').hidden = true;
+  const version = generation;
+  const entryId = newEntryId();
+  const accepted = await request({ action: 'enter', entryId });
+  if (!accepted && version === generation && adventure.open) {
+    const error = status.textContent;
+    // Entry can end the previous run even when the next entry needs rest.
+    // Read its final result, never resume movement or an old pending replay.
+    const refreshed = await request();
+    if (version !== generation) return;
+    if (refreshed && state?.entryId === entryId) {
+      // The server may have accepted entry before its response was lost.
+      // Recover that same entry instead of charging for another fresh run.
+      entryReady = true; acceptedEntryId = entryId;
+      renderMap();
+      if (state.battle?.pending) showBattle();
+    } else {
+      status.textContent = error;
+      status.classList.remove('visually-hidden');
+    }
+  }
+  if (version === generation && adventure.open) {
+    adventure.classList.toggle('adventure-entering', !entryReady && !runEnded());
+    syncControls();
+    (recordsAvailable() ? adventure.querySelector('#adventure-return-town') : grid).focus({ preventScroll: true });
+  }
 }
-function openMap(payload, { guideLater = false } = {}) {
+async function openMap(payload, { prepareOnly = false } = {}) {
   if (teamUp.open) teamUp.close();
-  holdGuide = guideLater;
-  if (adventure.open) return request(payload);
-  clearMap();
-  adventure.showModal();
+  if (!adventure.open) {
+    clearMap();
+    adventure.classList.remove('adventure-ended');
+    adventure.showModal();
+  }
+  entryReady = false;
+  adventure.classList.add('adventure-entering');
   // The map takes focus, so the keyboard plays at once and Space never
   // presses Leave by accident.
   grid.focus({ preventScroll: true });
-  return request(payload);
+  const version = generation;
+  const read = await request(payload);
+  if (version !== generation || !adventure.open) return;
+  if (read && !prepareOnly) await enterMap();
+  if (!read) adventure.classList.remove('adventure-entering');
 }
 function openLobby() {
   teamUp.querySelector('#team-error').textContent = '';
@@ -840,12 +947,17 @@ function openLobby() {
     : lobby.team?.leader === pet?.id || !lobby.team ? '#team-invite-id' : '#team-leave').focus({ preventScroll: true });
 }
 document.getElementById('adventure-open').addEventListener('click', async () => {
-  if (adventure.open || teamUp.open) return;
-  await openMap(undefined, { guideLater: true });
-  // A pet that hasn't set off yet chooses: alone, or with a team.
-  if (adventure.open && state?.started === false) await chooseTeam();
-  // Still on the map (a returning pet, or Team up couldn't open): no wait.
-  if (adventure.open) { holdGuide = false; offerGuide(); }
+  if (openingAdventure || adventure.open || teamUp.open) return;
+  openingAdventure = true;
+  const opening = ++openingVersion;
+  try {
+    await openMap(undefined, { prepareOnly: true });
+    if (opening !== openingVersion) return;
+    // A pet that hasn't set off yet chooses: alone, or with a team.
+    if (adventure.open && state?.started === false) await chooseTeam();
+    if (opening !== openingVersion) return;
+    if (adventure.open && state) await enterMap();
+  } finally { if (opening === openingVersion) openingAdventure = false; }
 });
 // Swaps the map for the Team up window, if the server can show it.
 async function chooseTeam() {
@@ -867,15 +979,9 @@ teamUp.querySelector('#team-set-off').addEventListener('click', () => teamReques
 teamUp.querySelector('#team-leave').addEventListener('click', () => {
   if (lobby?.team) teamRequest({ action: 'leave', team: lobby.team.id });
 });
-// Going solo opens the pet's own map: a first run starts with its first
-// move, and after a run has ended, solo starts a fresh one.
+// Going solo always enters a fresh run.
 teamUp.querySelector('#team-solo').addEventListener('click', async () => {
-  const ended = lobby?.run.state === 'ended';
   await openMap();
-  if (ended && adventure.open && (state?.failed || state?.abandoned || state?.completed)) {
-    await request({ action: 'restart' });
-    if (adventure.open) grid.focus({ preventScroll: true });
-  }
 });
 teamUp.querySelector('#team-close').addEventListener('click', () => teamUp.close());
 teamUp.addEventListener('close', () => {
@@ -891,26 +997,49 @@ document.addEventListener('team:updated', async ({ detail: team }) => {
   if (!lobby || !pet) return;
   const mine = lobby.team?.id === team.id || lobby.invitations.some(i => i.id === team.id) || team.members.some(m => m.id === pet.id);
   if (!mine) return;
-  const wasNew = lobby.run.state === 'new';
   try { await loadLobby(); } catch { return; }
-  if (teamUp.open && lobby.run.state === 'exploring' && lobby.run.team) { firstRun = wasNew; return openMap(); }
+  if (teamUp.open && lobby.run.state === 'exploring' && lobby.run.team) return openMap();
   if (teamUp.open) renderLobby();
 });
-adventure.querySelector('#adventure-close').addEventListener('click', () => adventure.close());
+function returnToTown() {
+  adventure.close();
+  document.getElementById('adventure-open').focus({ preventScroll: true });
+}
+async function endAdventure() {
+  if (pending) return;
+  if (runEnded() || !entryReady) return returnToTown();
+  stopWalking();
+  if (!await ask('End this adventure?', 'Leaving ends this run. Your next visit starts from floor 1, with the usual entry cost and wait.')) return;
+  if (!adventure.open || !entryReady || state?.battle?.pending) return;
+  const saved = await request({ action: 'leave' });
+  if (saved && runEnded()) {
+    packPanel.hidden = true;
+    packToggle.setAttribute('aria-expanded', 'false');
+    adventure.querySelector('#adventure-return-town').focus({ preventScroll: true });
+  }
+}
+adventure.querySelector('#adventure-close').addEventListener('click', endAdventure);
+adventure.querySelector('#adventure-return-town').addEventListener('click', returnToTown);
+adventure.addEventListener('cancel', event => {
+  event.preventDefault();
+  if (pending) return;
+  if (recordsAvailable()) return returnToTown();
+  packToggle.click();
+});
 adventure.addEventListener('close', () => {
   stopWalking();
-  generation++; pending = false; state = null;
+  generation++; pending = false; state = null; entryReady = false;
   if (guide.open) guide.close();
 });
 adventure.querySelectorAll('[data-direction]').forEach(button => button.addEventListener('click', () => {
   stopWalking();
-  if (state) request({ direction: button.dataset.direction });
-  else request();
+  if (entryReady && state) request({ direction: button.dataset.direction });
 }));
 // Space acts on what the pet stands on: it opens the chest, or takes the
 // stairs. On a focused button or summary, Space presses that instead.
 function interact() {
   stopWalking();
+  if (!entryReady || !packPanel.hidden || runEnded()) return;
   const chest = state?.chests.find(at);
   const control = chest && !chest.reward ? '#adventure-open-chest'
     : at(state?.down) ? '#adventure-descend' : at(state?.up) ? '#adventure-ascend' : null;
@@ -930,7 +1059,7 @@ adventure.addEventListener('keydown', event => {
   if (!['w', 'a', 's', 'd'].includes(direction)) return;
   event.preventDefault();
   stopWalking();
-  if (state && !state.battle?.pending && !state.failed && !state.abandoned && !busyText() &&
+  if (entryReady && state && !state.battle?.pending && !runEnded() && !busyText() && packPanel.hidden &&
     (!event.repeat || performance.now() - lastWalkKey > 170)) {
     lastWalkKey = performance.now();
     request({ direction });
@@ -944,10 +1073,12 @@ packToggle.addEventListener('click', () => {
   packPanel.hidden = !packPanel.hidden;
   packToggle.setAttribute('aria-expanded', String(!packPanel.hidden));
   if (!packPanel.hidden) packPanel.querySelector('details').open = true;
+  syncControls();
+  syncAdventureMotion();
 });
 window.addEventListener('resize', () => drawCamera(true));
 function syncAdventureMotion() {
-  const paused = !adventure.open || document.hidden || [...document.querySelectorAll('dialog[open]')].some(dialog => dialog !== adventure);
+  const paused = !adventure.open || document.hidden || !packPanel.hidden || recordsAvailable() || [...document.querySelectorAll('dialog[open]')].some(dialog => dialog !== adventure);
   adventure.classList.toggle('adventure-motion-paused', paused);
   if (paused) stopWalking();
 }
@@ -959,7 +1090,7 @@ window.addEventListener('focus', syncAdventureMotion);
 // failed request, or floor change cancels the remaining route.
 grid.addEventListener('click', event => {
   const cell = event.target.closest('.adventure-tile');
-  if (!cell || !state || pending || state.battle?.pending || state.failed || state.abandoned || busyText()) return;
+  if (!cell || !entryReady || !packPanel.hidden || !state || pending || state.battle?.pending || runEnded() || busyText()) return;
   const goal = { x: Number(cell.dataset.x), y: Number(cell.dataset.y) };
   stopWalking();
   if (at(goal)) return interact();
@@ -979,7 +1110,7 @@ grid.addEventListener('click', event => {
   const routeGeneration = walkingGeneration;
   async function step() {
     if (routeGeneration !== walkingGeneration) return;
-    if (!walkingPath.length || !state || pending || state.failed || state.abandoned || busyText() ||
+    if (!walkingPath.length || !entryReady || !state || pending || runEnded() || busyText() ||
       !adventure.open || document.hidden || state.battle?.pending ||
       [...document.querySelectorAll('dialog[open]')].some(dialog => dialog !== adventure)) return stopWalking();
     const before = `${state.floor}:${state.x},${state.y}`, floor = state.floor;
@@ -993,54 +1124,32 @@ grid.addEventListener('click', event => {
 for (const action of ['ascend', 'descend']) {
   adventure.querySelector(`#adventure-${action}`).addEventListener('click', () => request({ action }));
 }
-adventure.querySelector('#adventure-replay').addEventListener('click', () => showBattle(true));
+adventure.querySelector('#adventure-replay').addEventListener('click', () => {
+  if (!recordsAvailable()) return;
+  const list = adventure.querySelector('#adventure-records');
+  list.hidden = !list.hidden;
+  adventure.querySelector('#adventure-replay').setAttribute('aria-expanded', String(!list.hidden));
+});
 adventure.querySelector('#adventure-open-chest').addEventListener('click', () => request({ action: 'open-chest' }));
 adventure.querySelector('#adventure-restart').addEventListener('click', async () => {
-  await request({ action: 'restart' });
-  if (adventure.open) grid.focus({ preventScroll: true });
+  await enterMap();
 });
 // Once a run is over, the next can be a team's instead.
 adventure.querySelector('#adventure-team-up').addEventListener('click', chooseTeam);
 // Asks Yes or No in the game's confirmation window (public/confirm.js).
 const ask = (title, message) => new Promise(answer =>
   document.dispatchEvent(new CustomEvent('confirm:ask', { detail: { title, message, answer } })));
-// Abandoning ends the mini-game at once: the run is over and the map closes.
-adventure.querySelector('#adventure-abandon').addEventListener('click', async () => {
-  const cost = state?.restartCost;
-  if (!await ask('Abandon this adventure?', `It ends now${cost ? `, and starting a new one costs ${cost.stamina} stamina and ${cost.hygiene} hygiene` : ''}.`)) return;
-  await request({ action: 'abandon' });
-  if (adventure.open && state?.abandoned) {
-    adventure.close();
-    document.getElementById('adventure-open').focus({ preventScroll: true });
-  }
-});
+// The old action ID shares the same end-of-run flow for keyboard shortcuts.
+adventure.querySelector('#adventure-abandon').addEventListener('click', endAdventure);
 adventure.querySelector('#adventure-skip-cooldown').addEventListener('click', () => request({ action: 'skip-cooldown' }));
 async function continueExploring() {
   if (!state?.battle?.pending) return;
   await request({ action: 'continue', battleId: state.battle.id });
   if (!adventure.open || document.querySelector('#battle-dialog')?.open) return;
-  if (!state?.failed) return grid.focus({ preventScroll: true });
+  if (!runEnded()) return grid.focus({ preventScroll: true });
   // The way on: Start new adventure, or Skip wait while the pet rests.
   const next = [...adventure.querySelectorAll('#adventure-restart, #adventure-skip-cooldown')].find(button => !button.hidden && !button.disabled);
   (next ?? grid).focus({ preventScroll: true });
-  offerFreshStart();
-}
-// After a defeat, ask whether to go again. While the pet still rests, first
-// ask whether to spend an Hourglass on the wait, then whether to start. No
-// leaves the failed run on screen, with its buttons, to decide later.
-async function offerFreshStart() {
-  const cost = state.restartCost, hourglasses = state.inventory?.items.find(item => item.id === 'hourglass')?.quantity ?? 0;
-  const resting = cooldownActive();
-  if (resting && hourglasses < 1) return;
-  const yes = await ask('Your pet was defeated', resting
-    ? `${cooldownText(true)} Use an Hourglass to skip the wait?`
-    : `Start a new adventure? It costs ${cost.stamina} stamina and ${cost.hygiene} hygiene, and opens a ${state.cooldownMinutes / 60}-hour wait before the next one.`);
-  if (!yes || !adventure.open || !state?.failed) return;
-  await request({ action: resting ? 'skip-cooldown' : 'restart' });
-  if (!adventure.open) return;
-  if (!state?.failed) return grid.focus({ preventScroll: true });
-  adventure.querySelector('#adventure-restart').focus({ preventScroll: true });
-  if (resting && !cooldownActive()) offerFreshStart();
 }
 adventure.querySelector('#adventure-continue').addEventListener('click', continueExploring);
 document.addEventListener('battle:closed', ({ detail }) => {
@@ -1064,9 +1173,9 @@ document.addEventListener('adventure:pet', event => {
   if (adventure.open) renderMap();
 });
 document.addEventListener('adventure:reset', () => {
+  openingVersion++; openingAdventure = false;
   generation++; pending = false; state = null; pet = null;
   lobbyGeneration++; lobbyPending = false; lobby = null;
-  holdGuide = false; firstRun = false;
   if (adventure.open) adventure.close();
   if (teamUp.open) teamUp.close();
   clearMap();
