@@ -109,8 +109,9 @@ and controls share the sign-in screen's warm orange and cream palette,
 rounded shapes, typefaces, and light or dark appearance.
 
 Your character shares the town's illustrated style and turns to face the
-direction you walk. Alternating footsteps and arm swings animate movement,
-with gentle breathing and blinking while you stand still. Character animation
+direction you walk, with a steady facing direction during diagonal steps.
+Alternating footsteps and arm swings animate movement, with gentle breathing
+and blinking while you stand still. Character animation
 pauses while a window is open or the game is in the background; reduced-motion
 settings turn off these decorative animations.
 
@@ -129,7 +130,8 @@ the front door to visit town.
 
 The town shares home's warm illustrated style, with tiled roofs, timber
 shopfronts, leafy gardens, a stone fountain, and a riverside footbridge.
-It has **Shops**, **Adventure**, **Arena**, **Part-time Jobs**, and
+The garden fences block movement; use the front opening or walk around the rails.
+Destinations include **Shops**, **Adventure**, **Arena**, **Part-time Jobs**, and
 **School**. Walk near a building to see its outline, then press **Space**,
 or click or tap the building to open its activities. **Sweet Home**
 returns you to your pet. Your **Backpack** holds supplies, learned abilities, and
@@ -142,7 +144,8 @@ head home to feed, clean, and play with your pet.
 Town uses the same movement and **Space** interaction controls as home.
 Every destination and home object also works with Tab and Enter, and the
 camera brings focused objects into view. Close a window with its Close
-button or Escape to return to the scene. Walking around home and town costs
+button or Escape to return to the scene. Movement keys work immediately when
+focus returns to a building or home object. Walking around home and town costs
 nothing; lessons, work, battles, and adventures keep their usual rules.
 
 **Create an account** with a player ID (letters, digits, `-` or `_`, up to

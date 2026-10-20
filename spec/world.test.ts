@@ -320,6 +320,95 @@ it('moves in the world but leaves keyboard input alone in dialogs and text field
   } finally { p.dom.window.close(); }
 });
 
+it('resumes walking from focused scene objects while preserving their native activation keys', () => {
+  const p = page();
+  try {
+    const stage = p.$('world-stage');
+    p.$('home-door').click();
+    // Adventure returns focus to its entrance when its dialog closes.
+    for (const id of ['adventure-open', 'chest', 'pet-touch']) {
+      if (id === 'chest') p.$('town-home').click();
+      const object = id === 'chest' ? p.window.document.querySelector<HTMLButtonElement>('[data-home-action="chest"]')! : p.$(id);
+      object.focus();
+      const start = p.position();
+      for (const key of [' ', 'Enter']) {
+        const event = new p.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+        object.dispatchEvent(event);
+        expect(event.defaultPrevented, `${id} keeps native ${key} activation`).toBe(false);
+        p.advance();
+        expect(p.position()).toEqual(start);
+        expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(false);
+      }
+      p.walk('d', object);
+      expect(p.window.document.activeElement, `${id} restores walking focus`).toBe(stage);
+      expect(p.position().x - start.x).toBeCloseTo(190 * .096, 6);
+    }
+    const input = p.window.document.createElement('input');
+    stage.append(input);
+    input.focus();
+    const start = p.position();
+    for (const key of ['d', 'ArrowLeft', ' ', 'Enter']) {
+      const event = new p.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      input.dispatchEvent(event);
+      p.advance();
+      input.dispatchEvent(new p.window.KeyboardEvent('keyup', { key, bubbles: true }));
+      expect(event.defaultPrevented, `${key} remains available to the field`).toBe(false);
+      expect(p.position()).toEqual(start);
+      expect(p.window.document.activeElement).toBe(input);
+    }
+  } finally { p.dom.window.close(); }
+});
+
+it('keeps walking when a delayed Team up close event arrives after movement resumes', async () => {
+  const p = page();
+  try {
+    p.window.eval(readFileSync('public/adventure.js', 'utf8'));
+    p.$('home-door').click();
+    const stage = p.$('world-stage'), entrance = p.$('adventure-open');
+    const team = p.$('team-dialog') as HTMLDialogElement;
+    entrance.focus();
+    team.showModal();
+    p.$('team-close').focus();
+    await Promise.resolve();
+    // Native dialog closure restores focus before its queued close event.
+    team.open = false;
+    entrance.focus();
+    const start = p.position();
+    entrance.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    expect(p.window.document.activeElement).toBe(stage);
+    team.dispatchEvent(new p.window.Event('close'));
+    expect(p.window.document.activeElement).toBe(stage);
+    p.advance(3);
+    expect(p.position().x).toBeCloseTo(start.x - 190 * .048, 6);
+    expect(p.position().y).toBeCloseTo(start.y, 6);
+    expect(p.$('world-avatar').dataset.walking).toBe('true');
+  } finally { p.dom.window.close(); }
+});
+
+it('restores focus stranded by Team up closure without taking focus from an open Adventure', () => {
+  const p = page();
+  try {
+    p.window.eval(readFileSync('public/adventure.js', 'utf8'));
+    p.$('home-door').click();
+    const team = p.$('team-dialog') as HTMLDialogElement;
+    const close = p.$('team-close'), entrance = p.$('adventure-open');
+    for (const stranded of ['closed dialog', 'document body']) {
+      team.showModal();
+      close.focus();
+      team.open = false;
+      if (stranded === 'document body') close.blur();
+      expect(p.window.document.activeElement).toBe(stranded === 'closed dialog' ? close : p.window.document.body);
+      team.dispatchEvent(new p.window.Event('close'));
+      expect(p.window.document.activeElement, stranded).toBe(entrance);
+    }
+    const adventure = p.$('adventure-dialog') as HTMLDialogElement;
+    adventure.showModal();
+    p.$('adventure-grid').focus();
+    team.dispatchEvent(new p.window.Event('close'));
+    expect(p.window.document.activeElement).toBe(p.$('adventure-grid'));
+  } finally { p.dom.window.close(); }
+});
+
 it('uses the same movement and Space interaction controls at home and in town', () => {
   const p = page();
   try {
@@ -507,6 +596,60 @@ it.each([
   } finally { p.dom.window.close(); }
 });
 
+it.each([
+  ['30 Hz', [1000 / 30], 30],
+  ['60 Hz', [1000 / 60], 60],
+  ['120 Hz', [1000 / 120], 120],
+  ['uneven frames', [16.2, 17.1, 16.6, 16.8], 60],
+] as const)('keeps diagonal walking animation steady across coordinate boundaries at %s', (_, durations, frames) => {
+  const p = page();
+  try {
+    p.$('home-door').click();
+    const stage = p.$('world-stage'), avatar = p.$('world-avatar');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
+    stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: 600, clientY: 580, bubbles: true }));
+    p.advance(100);
+    expect(p.position().x).toBeCloseTo(600, 6);
+    expect(p.position().y).toBeCloseTo(580, 6);
+    for (const key of ['w', 'd']) stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key, bubbles: true }));
+    let elapsed = 0;
+    for (let frame = 0; frame < frames; frame++) {
+      const milliseconds = durations[frame % durations.length];
+      elapsed += milliseconds;
+      p.advance(1, milliseconds);
+      expect(avatar.dataset.facing, `frame ${frame} must not switch poses on a straight diagonal`).toBe('up');
+      expect(avatar.dataset.walking).toBe('true');
+    }
+    const travel = 190 * elapsed / 1000 / Math.SQRT2;
+    expect(p.position().x).toBeCloseTo(600 + travel, 6);
+    expect(p.position().y).toBeCloseTo(580 - travel, 6);
+    expect(p.position().y).toBeLessThan(512);
+  } finally { p.dom.window.close(); }
+});
+
+it('faces the unblocked direction when diagonal walking slides along a wall', () => {
+  const p = page();
+  try {
+    p.$('home-door').click();
+    const stage = p.$('world-stage'), avatar = p.$('world-avatar');
+    for (const key of ['w', 'd']) stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key, bubbles: true }));
+    p.advance(3);
+    expect(avatar.dataset.facing).toBe('up');
+    p.advance(17);
+    const beside = p.position();
+    expect(beside.x).toBeGreaterThan(520);
+    expect(beside.y).toBeGreaterThanOrEqual(566);
+    expect(beside.y).toBeLessThan(570);
+    expect(avatar.dataset.facing).toBe('right');
+    expect(avatar.dataset.walking).toBe('true');
+    p.advance(35);
+    expect(p.position().x).toBeGreaterThan(572);
+    expect(p.position().y).toBeLessThan(beside.y);
+    expect(avatar.dataset.facing).toBe('up');
+    expect(avatar.dataset.walking).toBe('true');
+  } finally { p.dom.window.close(); }
+});
+
 it.each(['game menu', 'another dialog', 'window blur', 'hidden page'])(
   'pauses character and scenery animation for %s and cancels movement until new input',
   async (reason) => {
@@ -663,6 +806,82 @@ it('stops at a building while allowing the character to walk around its edge', (
     p.advance();
     stage.dispatchEvent(new p.window.KeyboardEvent('keyup', { key: 'w', bubbles: true }));
     expect(p.position().y).toBeLessThan(beside.y - 15);
+  } finally { p.dom.window.close(); }
+});
+
+it.each([
+  ['back rail', 240, 'w'],
+  ['left front rail', 180, 's'],
+  ['right front rail', 300, 's'],
+] as const)('stops held movement at the farm %s', (_, x, key) => {
+  const p = page();
+  try {
+    p.$('home-door').click();
+    const stage = p.$('world-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
+    stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: x, clientY: 540, bubbles: true }));
+    p.advance(300);
+    expect(p.position().x).toBeCloseTo(x, 6);
+    expect(p.position().y).toBeCloseTo(540, 6);
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key, bubbles: true }));
+    p.advance(30);
+    const stopped = p.position();
+    if (key === 'w') {
+      expect(stopped.y).toBeGreaterThanOrEqual(520);
+      expect(stopped.y).toBeLessThan(524);
+    } else {
+      expect(stopped.y).toBeLessThanOrEqual(577);
+      expect(stopped.y).toBeGreaterThan(573);
+    }
+    p.advance(30);
+    expect(p.position()).toEqual(stopped);
+    expect(p.$('world-avatar').dataset.walking).toBe('false');
+  } finally { p.dom.window.close(); }
+});
+
+it('routes through the farm gate and around its rails while keeping the shops reachable', () => {
+  const p = page();
+  try {
+    p.$('home-door').click();
+    const stage = p.$('world-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
+    const click = (x: number, y: number) => stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: x, clientY: y, bubbles: true }));
+    click(240, 600);
+    p.advance(300);
+    expect(p.position().x).toBeCloseTo(240, 6);
+    expect(p.position().y).toBeCloseTo(600, 6);
+    click(240, 500);
+    p.advance(30);
+    expect(p.$('world-message').textContent).toMatch(/occupied/i);
+    expect(p.position().x).toBeCloseTo(240, 6);
+    expect(p.position().y).toBeCloseTo(600, 6);
+    click(240, 460);
+    let usedGate = false, roundedBackRail = false;
+    for (let frame = 0; frame < 300; frame++) {
+      const previous = p.position();
+      p.advance(1);
+      const current = p.position();
+      if (previous.y >= 577 && current.y < 577) {
+        expect(current.x).toBeGreaterThanOrEqual(220);
+        expect(current.x).toBeLessThanOrEqual(261);
+        usedGate = true;
+      }
+      if (previous.y >= 520 && current.y < 520) {
+        expect(current.x <= 141 || current.x >= 337).toBe(true);
+        roundedBackRail = true;
+      }
+    }
+    expect(usedGate).toBe(true);
+    expect(roundedBackRail).toBe(true);
+    expect(p.position().x).toBeCloseTo(240, 6);
+    expect(p.position().y).toBeCloseTo(460, 6);
+    click(200, 380);
+    p.advance(100);
+    expect(p.position().x).toBeCloseTo(200, 6);
+    expect(p.position().y).toBeCloseTo(380, 6);
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(true);
+    expect(p.$('world-dialog').dataset.place).toBe('shop');
   } finally { p.dom.window.close(); }
 });
 

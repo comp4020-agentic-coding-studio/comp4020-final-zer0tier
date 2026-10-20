@@ -682,7 +682,12 @@ teamUp.querySelector('#team-solo').addEventListener('click', async () => {
 });
 teamUp.querySelector('#team-close').addEventListener('click', () => teamUp.close());
 teamUp.addEventListener('close', () => {
-  if (!adventure.open) document.getElementById('adventure-open').focus({ preventScroll: true });
+  // Native close restores focus before queuing this event. The player may
+  // already be walking or in another window when it arrives; keep that focus.
+  const focused = document.activeElement;
+  if (!adventure.open && (focused === document.body || teamUp.contains(focused))) {
+    document.getElementById('adventure-open').focus({ preventScroll: true });
+  }
 });
 // Another player's change to a team this player is on, or invited to.
 document.addEventListener('team:updated', async ({ detail: team }) => {

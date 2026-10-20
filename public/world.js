@@ -688,7 +688,11 @@ const worldObstacles = {
     // leave enough space below the pet for the character's head and body.
     [428, 300, 104, 128],
   ],
-  town: [[401, 421, 162, 135], [112, 237, 184, 126], [162, 51, 176, 126], [399, 71, 166, 145], [659, 291, 186, 134], [428, 287, 88, 60], [714, 97, 13, 80], [777, 97, 13, 80]],
+  town: [
+    [401, 421, 162, 135], [112, 237, 184, 126], [162, 51, 176, 126], [399, 71, 166, 145], [659, 291, 186, 134], [428, 287, 88, 60], [714, 97, 13, 80], [777, 97, 13, 80],
+    // Garden rails are solid, with the front gate and soil left walkable.
+    [150, 488, 178, 22], [150, 582, 61, 22], [270, 582, 58, 22],
+  ],
 };
 function worldWalkable(x, y) {
   const bounds = worldScene === 'home' ? [76, 174, 884, 570] : [44, 30, 870, 614];
@@ -797,7 +801,10 @@ function worldTick(now) {
   dx = worldPosition.x - previous.x; dy = worldPosition.y - previous.y;
   const moved = dx !== 0 || dy !== 0;
   if (moved) {
-    const facing = Math.abs(dx) > Math.abs(dy) ? dx < 0 ? 'left' : 'right' : dy < 0 ? 'up' : 'down';
+    // Subtracting positions introduces tiny rounding differences in equal
+    // diagonal steps. Keep ties stable so views and walk cycles do not flicker.
+    // Use actual travel so sliding along a wall still faces the unblocked axis.
+    const facing = Math.abs(dx) > Math.abs(dy) + .000001 ? dx < 0 ? 'left' : 'right' : dy < 0 ? 'up' : 'down';
     if (worldAvatar.dataset.facing !== facing) worldAvatar.dataset.facing = facing;
     worldDraw();
     if (worldScene === 'home' && worldPosition.y > 558 && Math.abs(worldPosition.x - 480) < 55) return worldChangeScene('town');
@@ -821,6 +828,14 @@ document.addEventListener('keydown', (event) => {
   if (worldIsPaused() || event.altKey || event.ctrlKey || event.metaKey) return;
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
   if (key === 'Escape' && worldStage.contains(event.target)) { event.preventDefault(); worldOpenPlace('menu'); return; }
+  // Adventure dialogs restore focus to their entrance. Direction keys should
+  // resume walking from focused scene objects; Space/Enter still activate them.
+  if (worldDirections[key] && worldStage.contains(event.target) && event.target.closest?.('.home-hotspot, .town-stop, #pet-touch')) {
+    event.preventDefault();
+    worldStage.focus({ preventScroll: true });
+    worldStartWalk(key);
+    return;
+  }
   if (event.target !== worldStage) return;
   if (worldDirections[key]) { event.preventDefault(); worldStartWalk(key); }
   if (['e', 'Enter', ' '].includes(key)) { event.preventDefault(); if (!event.repeat) worldById('world-interact').click(); }
