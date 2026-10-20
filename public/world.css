@@ -42,6 +42,124 @@ body.world-playing .world-stage:focus-visible { outline-offset: -5px; }
 body.world-playing #home-scene, body.world-playing #town-scene { position: absolute; inset: 0; }
 body.world-playing .scene-art { display: block; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; user-select: none; pointer-events: none; image-rendering: auto; }
 
+/* Small, clipped effect layers keep animation work local to each object.
+   Scene art, collision geometry, and interaction targets stay independent. */
+body.world-playing .scene-effect {
+  position: absolute;
+  left: var(--effect-x);
+  top: var(--effect-y);
+  width: var(--effect-w);
+  height: var(--effect-h);
+  z-index: 0;
+  overflow: hidden;
+  contain: layout paint;
+  pointer-events: none;
+  user-select: none;
+}
+/* Small, independently clipped details; the room artwork remains a single static image. */
+body.world-playing .env-home-flame-outer,
+body.world-playing .env-home-flame-inner,
+body.world-playing .env-home-flame-heart {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+body.world-playing .env-home-flame-outer { animation: ambient-home-flame-outer 2.8s ease-in-out infinite; }
+body.world-playing .env-home-flame-inner { animation: ambient-home-flame-inner 2.1s ease-in-out -.7s infinite; }
+body.world-playing .env-home-flame-heart { animation: ambient-home-flame-heart 1.7s ease-in-out -.3s infinite; }
+body.world-playing .env-home-embers { animation: ambient-home-embers 4.6s ease-in-out -1.4s infinite; }
+body.world-playing .env-home-tv-clouds { animation: ambient-home-tv-clouds 12s ease-in-out -3s infinite alternate; }
+body.world-playing .env-home-tv-meadow { animation: ambient-home-tv-meadow 9s ease-in-out -2s infinite alternate; }
+body.world-playing .env-home-tv-reflection { animation: ambient-home-tv-reflection 8s ease-in-out -1s infinite alternate; }
+body.world-playing .env-home-bath-ripple {
+  transform-box: fill-box;
+  transform-origin: 78% 20%;
+  animation: ambient-home-bath-ripple 4.4s ease-out infinite;
+}
+body.world-playing .env-home-bath-ripple-late { animation-delay: -2.2s; }
+body.world-playing .env-home-bath-glint { animation: ambient-home-bath-glint 5.8s ease-in-out -1s infinite alternate; }
+@keyframes ambient-home-flame-outer {
+  0%, 100% { transform: scale(.97, .94) skewX(-1deg); }
+  35% { transform: scale(1.02, 1.02) skewX(1.5deg); }
+  70% { transform: scale(.98, .98) skewX(-.5deg); }
+}
+@keyframes ambient-home-flame-inner {
+  0%, 100% { transform: scale(.98, .88) skewX(2deg); }
+  45% { transform: scale(1.04, 1.04) skewX(-2deg); }
+  75% { transform: scale(.95, .96); }
+}
+@keyframes ambient-home-flame-heart {
+  0%, 100% { transform: scale(.9, .92); opacity: .86; }
+  50% { transform: scale(1.08, 1.08); opacity: 1; }
+}
+@keyframes ambient-home-embers {
+  0% { transform: translate(0, 3px); opacity: 0; }
+  28% { opacity: .65; }
+  78% { opacity: .35; }
+  100% { transform: translate(1px, -10px); opacity: 0; }
+}
+@keyframes ambient-home-tv-clouds {
+  from { transform: translate(-4px, .5px); }
+  to { transform: translate(5px, -.5px); }
+}
+@keyframes ambient-home-tv-meadow {
+  from { transform: translateX(-2px); }
+  to { transform: translateX(2px); }
+}
+@keyframes ambient-home-tv-reflection {
+  from { transform: translateX(-2px); opacity: .13; }
+  to { transform: translateX(3px); opacity: .21; }
+}
+@keyframes ambient-home-bath-ripple {
+  0% { transform: scale(.65, .7); opacity: 0; }
+  18% { opacity: .52; }
+  70% { opacity: .22; }
+  100% { transform: scale(1.35, 1.2); opacity: 0; }
+}
+@keyframes ambient-home-bath-glint {
+  from { transform: translateX(-1.5px); opacity: .25; }
+  to { transform: translateX(1.5px); opacity: .55; }
+}
+
+/* Thin currents stay within the open water, clear of bridge and tree silhouettes. */
+body.world-playing .env-river-current {
+  opacity: .38;
+  animation: ambient-river-current 6.4s linear infinite;
+}
+body.world-playing .env-river-current-later { animation-delay: -3.2s; }
+@keyframes ambient-river-current {
+  0% { transform: translateY(-5px); opacity: 0; }
+  22% { opacity: .52; }
+  72% { opacity: .38; }
+  100% { transform: translateY(9px); opacity: 0; }
+}
+body.world-playing .env-fountain-ripple {
+  opacity: .3;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ambient-fountain-ripple 3.8s ease-out infinite;
+}
+body.world-playing .env-fountain-ripple-later { animation-delay: -1.9s; }
+@keyframes ambient-fountain-ripple {
+  0% { transform: scale(.42); opacity: 0; }
+  18% { opacity: .72; }
+  75% { opacity: .32; }
+  100% { transform: scale(1.13); opacity: 0; }
+}
+body.world-playing .env-fountain-flow {
+  opacity: .62;
+  animation: ambient-fountain-flow 1.8s ease-in-out infinite;
+}
+@keyframes ambient-fountain-flow {
+  0%, 100% { transform: translateY(-.65px); opacity: .43; }
+  50% { transform: translateY(.9px); opacity: .84; }
+}
+
+body.world-playing #world-shell[data-paused="true"] .ambient-motion { animation-play-state: paused !important; }
+/* Hidden SVG descendants can retain timelines unless explicitly canceled. */
+body:not(.world-playing) .ambient-motion,
+body.world-playing #home-scene[hidden] .ambient-motion,
+body.world-playing #town-scene[hidden] .ambient-motion { animation: none !important; }
+
 /* Furniture stays visible beneath generous, keyboard-accessible hit areas. */
 body.world-playing .home-hotspot {
   position: absolute;
@@ -402,6 +520,7 @@ body.world-playing .attacked { z-index: 21; left: auto; right: 24px; bottom: 24p
 }
 
 @media (prefers-reduced-motion: reduce) {
+  body.world-playing .ambient-motion { animation: none !important; }
   body.world-playing .world-avatar > svg, body.world-playing .world-avatar svg *, body.world-playing .home-pet .pet-body, body.world-playing .home-pet .pet-shadow { animation: none !important; }
   body.world-playing .hotspot-label, body.world-playing .world-button, body.world-playing .home-pet .pet { transition: none; }
 }

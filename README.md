@@ -114,6 +114,11 @@ with gentle breathing and blinking while you stand still. Character animation
 pauses while a window is open or the game is in the background; reduced-motion
 settings turn off these decorative animations.
 
+The room and town have gentle environmental animation: the fireplace flickers,
+the TV shows a moving landscape, bath water ripples, and the river and fountain
+flow. These effects also pause while a window is open or the game is in the
+background, and stay still with reduced-motion settings.
+
 Touch your pet or interact with its rug to open a small pop-up showing its
 needs, attributes, money, and current lesson or shift. Choose a care or play
 interaction there and see its response, with the room still visible behind it.

@@ -28,6 +28,53 @@ worldShell.innerHTML = `
       <div id="world-stage" class="world-stage" data-scene="home" tabindex="0" role="group" aria-label="Your home. Move with W A S D or arrow keys. Press Space near an object to interact." aria-describedby="home-controls-tip">
         <div id="home-scene">
           <img class="scene-art" src="/scenes/home.svg" alt="A cozy wooden room with a television, couch, fireplace, pet house, food bowl, bathtub, storage chest, wall clock, and a door leading into town." draggable="false" />
+          <!-- Local ambient details stay aligned to the original 960 × 640 room artwork. -->
+          <svg class="scene-effect" data-effect="fire" aria-hidden="true" focusable="false" viewBox="713 135 74 58" style="--effect-x:74.270833%; --effect-y:21.09375%; --effect-w:7.708333%; --effect-h:9.0625%">
+            <defs>
+              <clipPath id="env-home-hearth-clip"><path d="M713 193v-31a37 27 0 0 1 74 0v31Z"/></clipPath>
+              <linearGradient id="env-home-fire-color" x2="0" y2="1"><stop stop-color="#ffd87e"/><stop offset=".55" stop-color="#ee9a43"/><stop offset="1" stop-color="#b95332"/></linearGradient>
+              <radialGradient id="env-home-ember-color"><stop stop-color="#ef9d4f" stop-opacity=".68"/><stop offset="1" stop-color="#cc6937" stop-opacity="0"/></radialGradient>
+            </defs>
+            <g clip-path="url(#env-home-hearth-clip)">
+              <path d="M713 193v-31a37 27 0 0 1 74 0v31Z" fill="#3b3430"/>
+              <path d="M713 183h74v10h-74Z" fill="#8f4b32"/>
+              <ellipse cx="750" cy="179" rx="38" ry="20" fill="url(#env-home-ember-color)"/>
+              <path class="ambient-motion env-home-flame-outer" d="M725 185c-12-17 4-23 4-37 10 7 8 14 10 19 2-15 16-21 12-35 18 12 8 22 18 33 3-8 7-8 7-14 14 14 14 24 1 34Z" fill="url(#env-home-fire-color)"/>
+              <path class="ambient-motion env-home-flame-inner" d="M738 185c-11-10 0-18 0-27 8 6 4 9 10 13 6-8 3-17 9-24 2 14 14 20 11 29-1 4-5 7-7 9Z" fill="#ffd37a"/>
+              <path class="ambient-motion env-home-flame-heart" d="M745 185c-5-6 4-11 6-19 0 9 10 11 7 19Z" fill="#fff0b0"/>
+              <g class="ambient-motion env-home-embers" fill="#ffdf8b" opacity=".65"><circle cx="734" cy="168" r=".8"/><circle cx="760" cy="160" r=".7"/><circle cx="750" cy="147" r=".6"/></g>
+              <path d="m720 185 53 5m-49 3 53-11" fill="none" stroke="#594334" stroke-width="6" stroke-linecap="round"/>
+              <path d="m723 183 47 5m-42 3 46-9" fill="none" stroke="#b47743" stroke-width="1.5"/>
+              <path d="M723 197v-7m53 7v-7m-50 3h48" fill="none" stroke="#423c34" stroke-width="3"/>
+              <circle cx="737" cy="187" r="1.5" fill="#ffbd60"/><circle cx="760" cy="186" r="1.2" fill="#ffd080"/>
+            </g>
+          </svg>
+          <svg class="scene-effect" data-effect="tv" aria-hidden="true" focusable="false" viewBox="179 105 70 41" style="--effect-x:18.645833%; --effect-y:16.40625%; --effect-w:7.291667%; --effect-h:6.40625%">
+            <defs>
+              <clipPath id="env-home-tv-clip"><rect x="179" y="105" width="70" height="41" rx="6"/></clipPath>
+              <linearGradient id="env-home-tv-sky" x2=".8" y2="1"><stop stop-color="#c4d8c2"/><stop offset=".45" stop-color="#9ebfab"/><stop offset="1" stop-color="#587f73"/></linearGradient>
+              <linearGradient id="env-home-tv-glass" x2="1" y2="0"><stop stop-color="#f4f6d9" stop-opacity=".1"/><stop offset=".45" stop-color="#f4f6d9" stop-opacity=".7"/><stop offset="1" stop-color="#f4f6d9" stop-opacity="0"/></linearGradient>
+            </defs>
+            <g clip-path="url(#env-home-tv-clip)">
+              <rect x="179" y="105" width="70" height="41" fill="url(#env-home-tv-sky)"/>
+              <circle cx="235" cy="114" r="4.3" fill="#e2dca7" opacity=".88"/>
+              <g class="ambient-motion env-home-tv-clouds" fill="#edf0d7" opacity=".72"><path d="M181 115c-2-3 2-5 4-4 0-5 8-6 10-1 4-2 9 2 6 5Z"/><path d="M217 111c-1-2 2-4 4-3 2-4 7-3 8 0 4-1 6 2 4 3Z"/></g>
+              <path d="m171 139 23-17 13 9 14-18 19 18 17-12v29h-86Z" fill="#698b72"/>
+              <path d="m221 113-7 9 7-3 4 3Z" fill="#b4c3a2" opacity=".7"/>
+              <g class="ambient-motion env-home-tv-meadow"><path d="M172 139q20-14 41-3t45-5v18h-86Z" fill="#9ab28a"/><path d="M171 144q22-9 42-3t45-2v10h-87Z" fill="#83a17c"/><path d="M224 136q-6 2-3 5t-5 7" fill="none" stroke="#c8cfab" stroke-width="2.4" opacity=".8"/></g>
+              <path class="ambient-motion env-home-tv-reflection" d="M185 106h34l-28 40h-18Z" fill="url(#env-home-tv-glass)" opacity=".2"/>
+              <path d="M183 116h61m-62 12h64m-62 12h60" fill="none" stroke="#e6efdb" stroke-width=".5" opacity=".12"/>
+              <rect x="179.5" y="105.5" width="69" height="40" rx="5.5" fill="none" stroke="#335e58" stroke-width="1" opacity=".25"/>
+            </g>
+          </svg>
+          <svg class="scene-effect" data-effect="bath" aria-hidden="true" focusable="false" viewBox="748 455 119 22" style="--effect-x:77.916667%; --effect-y:71.09375%; --effect-w:12.395833%; --effect-h:3.4375%">
+            <defs><clipPath id="env-home-bath-clip"><ellipse cx="807.5" cy="466" rx="59" ry="11"/></clipPath></defs>
+            <g clip-path="url(#env-home-bath-clip)" fill="none" stroke="#f0f7e7" stroke-linecap="round">
+              <g class="ambient-motion env-home-bath-ripple" opacity=".4" stroke-width=".8"><ellipse cx="831" cy="460" rx="10" ry="2.6"/><path d="M777 470q12 3 25 0"/></g>
+              <g class="ambient-motion env-home-bath-ripple env-home-bath-ripple-late" opacity=".4" stroke-width=".75"><ellipse cx="831" cy="460" rx="10" ry="2.6"/><path d="M777 470q12 3 25 0"/></g>
+              <path class="ambient-motion env-home-bath-glint" d="M754 467q8 2 15 0m35-5 9-1m25 9q9-1 14-3" stroke-width=".9" opacity=".45"/>
+            </g>
+          </svg>
           <svg id="home-interaction-outline" viewBox="0 0 960 640" aria-hidden="true" focusable="false" hidden>
             <use class="interaction-outline-edge" />
             <use class="interaction-outline-light" />
@@ -46,6 +93,45 @@ worldShell.innerHTML = `
         </div>
         <div id="town-scene" hidden>
           <img class="scene-art" src="/scenes/town.svg" alt="A warm illustrated village with tiled roofs, leafy gardens, a fountain, and a riverside footbridge. Winding paths connect the shops, school, job board, arena, your home, and woodland adventure trail." draggable="false" />
+          <!-- The river overlay leaves the bridge (y=441..508) and overhanging trees clear. -->
+          <svg class="scene-effect" data-effect="river" aria-hidden="true" focusable="false" viewBox="910 0 50 640" style="--effect-x:94.791667%;--effect-y:0%;--effect-w:5.208333%;--effect-h:100%">
+            <defs>
+              <clipPath id="env-town-river-clear">
+                <path d="M914 0H960V178H914ZM934 178H960V290H934ZM914 290H960V441H914ZM934 508H960V602H934ZM928 602H960V640H928Z"/>
+              </clipPath>
+            </defs>
+            <g clip-path="url(#env-town-river-clear)" fill="none" stroke-linecap="round">
+              <g class="ambient-motion env-river-current">
+                <path d="M919 48q8-3 16 0t16 0M925 125q6-2 12 0t12 0M936 218q7-2 14 0t14 0M919 326q8-3 16 0t16 0M925 404q6-2 12 0t12 0M937 539q7-2 14 0t14 0M932 619q6-2 12 0t12 0" stroke="#e5efd8" stroke-width="1.25"/>
+                <path d="M925 53h14M931 130h10M941 223h12M925 331h15M931 409h10M943 544h11M937 624h12" stroke="#b9d8c6" stroke-width=".9"/>
+              </g>
+              <g class="ambient-motion env-river-current env-river-current-later">
+                <path d="M925 15q7-2 14 0t14 0M919 89q8-3 16 0t16 0M925 160q6-2 12 0t12 0M937 265q6-2 12 0t12 0M923 365q7-2 14 0t14 0M936 580q7-2 14 0t14 0" stroke="#e5efd8" stroke-width="1.15"/>
+                <path d="M931 20h12M925 94h14M931 165h10M943 270h11M929 370h12M942 585h12" stroke="#bddfce" stroke-width=".9"/>
+              </g>
+            </g>
+          </svg>
+          <!-- Only the inner water is animated: stone edges, pedestal and bowl stay crisp. -->
+          <svg class="scene-effect" data-effect="fountain" aria-hidden="true" focusable="false" viewBox="430 280 84 56" style="--effect-x:44.791667%;--effect-y:43.75%;--effect-w:8.75%;--effect-h:8.75%">
+            <defs>
+              <clipPath id="env-town-fountain-water">
+                <ellipse cx="472" cy="321" rx="32.5" ry="10.6"/>
+              </clipPath>
+              <clipPath id="env-town-fountain-pedestal">
+                <path d="M430 280H514V336H430Z M460 280H484V324H460Z" clip-rule="evenodd"/>
+              </clipPath>
+            </defs>
+            <g clip-path="url(#env-town-fountain-water)">
+              <g clip-path="url(#env-town-fountain-pedestal)" fill="none" stroke="#e5efd5" stroke-width="1.1">
+                <ellipse class="ambient-motion env-fountain-ripple" cx="472" cy="321" rx="29" ry="9"/>
+                <ellipse class="ambient-motion env-fountain-ripple env-fountain-ripple-later" cx="472" cy="321" rx="29" ry="9"/>
+              </g>
+            </g>
+            <g class="ambient-motion env-fountain-flow" fill="none" stroke="#e3f1da" stroke-width="1.3" stroke-linecap="round">
+              <path d="M472 290v-6m-2 4q-3-4-6-1m10 1q3-4 6-1"/>
+              <path d="m463 301-1.6 5m19.5-4 1.4 4.5m-23 4-.8 1.7m25.2-1 .8 1.8"/>
+            </g>
+          </svg>
           <svg id="town-interaction-outline" viewBox="0 0 960 640" aria-hidden="true" focusable="false" hidden>
             <use class="interaction-outline-edge" />
             <use class="interaction-outline-light" />
@@ -451,6 +537,7 @@ function worldSyncAnimation() {
   const paused = worldIsPaused();
   const value = String(paused);
   if (worldAvatar.dataset.paused !== value) worldAvatar.dataset.paused = value;
+  if (worldShell.dataset.paused !== value) worldShell.dataset.paused = value;
   if (paused) worldStop();
 }
 function worldOpenPlace(name) {

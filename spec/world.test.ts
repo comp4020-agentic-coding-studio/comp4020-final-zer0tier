@@ -508,12 +508,13 @@ it.each([
 });
 
 it.each(['game menu', 'another dialog', 'window blur', 'hidden page'])(
-  'pauses character animation for %s and cancels held keys and clicked routes until new input',
+  'pauses character and scenery animation for %s and cancels movement until new input',
   async (reason) => {
     const p = page();
     try {
       p.$('home-door').click();
       const stage = p.$('world-stage'), avatar = p.$('world-avatar');
+      const environment = p.$('world-shell');
       const dialog = p.window.document.createElement('dialog');
       p.window.document.body.append(dialog);
       let hidden = false;
@@ -550,12 +551,14 @@ it.each(['game menu', 'another dialog', 'window blur', 'hidden page'])(
         expect(avatar.dataset.walking, input).toBe('true');
         pause();
         await vi.waitFor(() => expect(avatar.dataset.paused, input).toBe('true'));
+        expect(environment.dataset.paused, `${input} also pauses the scenery`).toBe('true');
         const stopped = p.position();
         p.advance(30);
         expect(p.position(), `${input} stays still while paused`).toEqual(stopped);
         expect(avatar.dataset.walking, input).toBe('false');
         resume();
         await vi.waitFor(() => expect(avatar.dataset.paused, input).toBe('false'));
+        expect(environment.dataset.paused, `${input} restores the scenery`).toBe('false');
         p.advance(30);
         expect(p.position(), `${input} must not resume automatically`).toEqual(stopped);
         expect(avatar.dataset.walking, input).toBe('false');
