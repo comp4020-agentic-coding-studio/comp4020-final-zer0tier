@@ -32,13 +32,15 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
 
 ## Home and town interface
 
-- Preserve the original sign-in and create-account theme. World styles
-  belong to the signed-in game, not the account screens.
-- Sweet Home shows the furnished scene and a small upper-left tip:
-  W/A/S/D to move, Space bar to interact. Keep persistent dashboard,
-  navigation, and stats panels out of the home view. Reach care, pet details,
-  appearance, supplies, the journal, and account controls through the pet
-  and furniture; show their windows only when requested.
+- Preserve the original sign-in and create-account theme and use its colors,
+  typefaces, rounded controls, and light/dark appearance throughout the game.
+  Scope world styles to the signed-in game rather than restyling account screens.
+- Sweet Home and town fill the screen with a following camera and a small
+  upper-left tip: W/A/S/D to move, Space bar to interact. Keep persistent
+  dashboard, navigation, and stats panels out of both scenes. Reach activities
+  through the pet, furniture, and town buildings; Escape opens the game menu
+  for pet details, appearance, supplies, the journal, help, and account controls.
+  Show these windows only when requested and keep pet care at home.
 - Pet interaction opens a small pop-up with the pet's current status,
   care and play choices, and interaction feedback. Keep extra navigation
   and supplies guidance out of this pop-up; use the furniture for those.
@@ -55,7 +57,7 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   the pet's space while keeping nearby pet interaction reachable.
 - Highlight the available object that Space will interact with. Keep the
   indicator tied to the current interaction range and clear it while a
-  dialog is open, without adding persistent home panels or animated effects.
+  dialog is open, without adding persistent scene panels or animated effects.
 
 ## Rules
 

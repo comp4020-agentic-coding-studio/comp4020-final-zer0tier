@@ -1,97 +1,8 @@
-/* World styles apply only after sign-in. Authentication keeps the original
-   colours, type, rounded cards, and light/dark theme from style.css. */
-body.world-playing {
-  color-scheme: light;
-  --bg: #f8f3e5;
-  --bg-glow: #eee5cf;
-  --surface: #fffcf3;
-  --fg: #3e4633;
-  --muted: #6b6c59;
-  --border: #d7cdb6;
-  --primary: #3e6249;
-  --primary-hover: #2d4c37;
-  --on-primary: #fffcf3;
-  --ring: #315f87;
-  --error: #a43832;
-  --pet: #c68b4d;
-  --pet-belly: #f8e2b6;
-  --pet-ink: #493a2c;
-  --strength: #ab5140;
-  --intelligence: #386582;
-  --charisma: #805477;
-  --money: #3e6249;
-  --stamina: #98661e;
-  --hygiene: #35717b;
-  --radius: 8px;
-  --radius-sm: 5px;
-  --shadow: 0 3px 0 #d7cdb6, 0 12px 28px rgb(76 68 39 / 7%);
-  --shadow-inset: inset 0 -2px 0 rgb(34 51 32 / 13%);
-  --world-ink: #514b35;
-  --world-honey: #dfb85f;
-  --world-sage: #e3e9d9;
-  --world-tile: #f1ead9;
-}
-
-body.world-playing {
-  background: var(--bg);
-  background-image: radial-gradient(#cfc5ac 0.65px, transparent 0.65px);
-  background-size: 12px 12px;
-  color: var(--fg);
-  font-family: "Nunito Sans", system-ui, sans-serif;
-}
-
-body.world-playing h1, body.world-playing h2, body.world-playing h3, body.world-playing .brand {
-  font-family: "Nunito Sans", system-ui, sans-serif;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-}
-
-body.world-playing .topbar {
-  width: min(1320px, 100%);
-  max-width: 1320px;
-  min-height: 76px;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border);
-}
-
-body.world-playing .brand { gap: 10px; font-size: 1.35rem; font-weight: 900; letter-spacing: -0.045em; }
-body.world-playing .brand-mark { width: 32px; height: 32px; fill: var(--primary); }
-body.world-playing .brand-mark .eye { fill: var(--surface); }
-body.world-playing .topbar-right { gap: 12px; }
-body.world-playing .topbar-right .chip-btn { min-height: 44px; padding-inline: 14px; }
-body.world-playing .live { padding: 4px 0; border: 0; border-radius: 0; background: transparent; font-size: 0.75rem; }
-body.world-playing .live::before { width: 6px; height: 6px; border-radius: 1px; }
-
-body.world-playing main { max-width: 1320px; padding: 26px 24px 12px; }
+/* The game shares the account screens' colours, rounded controls, type, and
+   light/dark tokens from style.css. Scene artwork keeps its illustrated palette. */
 body.world-playing #dashboard.card { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; animation: none; }
-body.world-playing .footer { padding: 20px 24px 24px; font-size: 0.8rem; }
-body.world-playing .footer a { color: var(--muted); text-underline-offset: 4px; }
-
-/* A small, consistent vocabulary of tactile buttons and parchment panels. */
 body.world-playing button, body.world-playing input, body.world-playing select { font-family: inherit; }
-body.world-playing .btn, body.world-playing .chip-btn, body.world-playing .course, body.world-playing .world-button {
-  border-radius: 5px;
-  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
-}
-body.world-playing .btn { min-height: 48px; border: 1px solid var(--primary-hover); box-shadow: inset 0 1px 0 rgb(255 255 255 / 14%), 0 3px 0 #284130; }
-body.world-playing .btn:active, body.world-playing .chip-btn:active, body.world-playing .course:active { transform: none; box-shadow: inset 0 2px 0 rgb(34 51 32 / 15%); }
-body.world-playing .chip-btn { border: 1px solid var(--border); background: var(--surface); color: var(--fg); }
-body.world-playing .chip-use, body.world-playing .rival .fight-btn { background: var(--primary); color: var(--on-primary); border: 1px solid var(--primary-hover); }
-body.world-playing .chip-buy:hover:not(:disabled), body.world-playing .chip-btn:hover:not(:disabled) { background: var(--world-sage); border-color: #839273; }
-body.world-playing .chip-use:hover:not(:disabled), body.world-playing .rival .fight-btn:hover:not(:disabled) { background: var(--primary-hover); }
-body.world-playing .btn:disabled, body.world-playing .chip-btn:disabled, body.world-playing .world-button:disabled { opacity: 0.48; cursor: not-allowed; box-shadow: none; }
-body.world-playing input, body.world-playing select { min-width: 0; border-width: 1px; border-radius: 5px; background: var(--surface); }
-body.world-playing input:hover, body.world-playing select:hover { border-color: #899571; }
-body.world-playing :focus-visible { outline: 3px solid var(--ring); outline-offset: 4px; }
-body.world-playing .auth-tabs, body.world-playing .tabs { gap: 4px; padding: 4px; border-radius: 5px; background: var(--world-tile); border: 1px solid var(--border); }
-body.world-playing .auth-tabs button, body.world-playing .tabs button { border-radius: 3px; }
-body.world-playing .auth-tabs button[aria-selected="true"], body.world-playing .tabs button[aria-selected="true"] { color: var(--on-primary); background: var(--primary); box-shadow: 0 2px 0 #2c4733; }
-body.world-playing .section-label { font-weight: 800; font-size: 0.72rem; letter-spacing: 0.1em; }
-body.world-playing .progress, body.world-playing .meter-track, body.world-playing .progress-fill, body.world-playing .meter-fill { border-radius: 2px; }
-body.world-playing .progress-fill { background: var(--primary); }
-body.world-playing .shift-options label, body.world-playing .tag { border-radius: 4px; }
-body.world-playing .school, body.world-playing .location, body.world-playing .item, body.world-playing .rival, body.world-playing .visit, body.world-playing .appearance-settings { border-width: 1px; }
-body.world-playing .fight-news, body.world-playing .fight-log li, body.world-playing .board li, body.world-playing .feed li, body.world-playing .visitors li { border-radius: 4px; }
+body.world-playing .world-button:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 
 /* World heading and main game frame. */
 body.world-playing #world-shell { width: 100%; min-width: 0; }
@@ -108,23 +19,25 @@ body.world-playing .world-button {
   gap: 7px;
   min-height: 44px;
   padding: 9px 15px;
-  border: 1px solid #aeb69b;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--primary);
   background: var(--surface);
-  box-shadow: 0 2px 0 #d2d6c1;
-  font: 800 0.8rem/1.3 "Nunito Sans", system-ui, sans-serif;
+  box-shadow: var(--shadow-inset);
+  font: 700 0.8rem/1.3 "Nunito Sans", system-ui, sans-serif;
+  transition: background-color 150ms var(--ease), border-color 150ms var(--ease);
   text-decoration: none;
   cursor: var(--cursor-pointer);
   touch-action: manipulation;
 }
-body.world-playing .world-button:hover:not(:disabled) { background: var(--world-sage); border-color: var(--primary); }
-body.world-playing .world-button:active:not(:disabled) { box-shadow: inset 0 2px 0 rgb(62 98 73 / 12%); }
+body.world-playing .world-button:hover:not(:disabled) { background: var(--bg-glow); border-color: var(--primary); }
+body.world-playing .world-button:active:not(:disabled) { background: var(--bg-glow); }
 body.world-playing .world-button .icon { width: 17px; height: 17px; }
-body.world-playing .world-button.primary, body.world-playing #world-interact { color: var(--on-primary); border-color: var(--primary-hover); background: var(--primary); box-shadow: 0 2px 0 #284130; }
+body.world-playing .world-button.primary, body.world-playing #world-interact { color: var(--on-primary); border-color: var(--primary-hover); background: var(--primary); box-shadow: var(--shadow-inset); }
 body.world-playing .world-button.primary:hover, body.world-playing #world-interact:hover { background: var(--primary-hover); }
 body.world-playing .world-layout { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 20px; align-items: start; }
-body.world-playing .world-main { min-width: 0; overflow: hidden; border: 2px solid var(--world-ink); border-radius: 7px; background: var(--surface); box-shadow: 0 4px 0 #c5bba1; }
-body.world-playing .world-stage { position: relative; isolation: isolate; width: 100%; aspect-ratio: 960 / 640; overflow: hidden; background: #a4bb84; outline-offset: -5px; touch-action: manipulation; }
+body.world-playing .world-main { min-width: 0; overflow: hidden; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); box-shadow: var(--shadow); }
+body.world-playing .world-stage { position: relative; isolation: isolate; width: 100%; aspect-ratio: 960 / 640; overflow: hidden; background: var(--bg); outline-offset: -5px; touch-action: manipulation; }
 body.world-playing .world-stage:focus-visible { outline-offset: -5px; }
 body.world-playing #home-scene, body.world-playing #town-scene { position: absolute; inset: 0; }
 body.world-playing .scene-art { display: block; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; user-select: none; pointer-events: none; image-rendering: auto; }
@@ -142,11 +55,12 @@ body.world-playing .home-hotspot {
   min-height: 28px;
   padding: 0;
   border: 2px solid transparent;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: var(--fg);
   background: transparent;
   cursor: var(--cursor-pointer);
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 body.world-playing .home-hotspot:hover, body.world-playing .home-hotspot:focus-visible { background: rgb(255 249 219 / 13%); border-color: rgb(255 249 219 / 80%); }
 body.world-playing .hotspot-label {
@@ -155,11 +69,11 @@ body.world-playing .hotspot-label {
   left: 50%;
   transform: translateX(-50%);
   padding: 4px 8px;
-  border: 1px solid #79664a;
-  border-radius: 3px;
-  background: #fff9e9;
-  box-shadow: 0 2px 0 rgb(62 50 28 / 22%);
-  color: #4a4834;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--fg);
   white-space: nowrap;
   font: 800 clamp(0.62rem, 1vw, 0.75rem)/1.3 "Nunito Sans", system-ui, sans-serif;
   opacity: 0;
@@ -167,34 +81,52 @@ body.world-playing .hotspot-label {
   transition: opacity 120ms ease;
 }
 body.world-playing .home-hotspot:focus-visible .hotspot-label { opacity: 1; }
-body.world-playing #home-door .hotspot-label { bottom: 2px; color: var(--on-primary); background: var(--primary); border-color: #24462d; }
+body.world-playing #home-door .hotspot-label { bottom: 2px; color: var(--on-primary); background: var(--primary); border-color: var(--primary-hover); }
+/* A building remains a large tap target; its small label leaves the art visible. */
 body.world-playing .town-stop {
   position: absolute;
   z-index: 3;
   left: var(--x);
   top: var(--y);
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  width: var(--w);
+  height: var(--h);
+  min-width: 44px;
   min-height: 44px;
-  max-width: 29%;
-  padding: 6px 11px;
-  border: 2px solid #3e5034;
-  border-radius: 3px;
-  color: #fffbe9;
-  background: #3e6249;
-  box-shadow: 0 3px 0 #2e402c, inset 0 1px 0 rgb(255 255 255 / 20%);
+  transform: translate(-50%, -50%);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  background: transparent;
   font-family: inherit;
   cursor: var(--cursor-pointer);
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
-body.world-playing .town-stop:hover, body.world-playing .town-stop:focus-visible { background: #2d4c37; border-color: #fff4cc; }
-body.world-playing .town-stop::before { content: ""; position: absolute; bottom: 90%; left: -15%; right: -15%; height: 160%; }
-body.world-playing .town-stop:disabled { opacity: 0.65; cursor: not-allowed; box-shadow: none; }
-body.world-playing .stop-name { font-size: clamp(0.68rem, 1.1vw, 0.85rem); font-weight: 900; line-height: 1.2; }
-body.world-playing .stop-detail { margin-top: 2px; color: #e0e7cf; font-size: clamp(0.59rem, 0.9vw, 0.68rem); line-height: 1.3; }
+body.world-playing .town-stop:focus-visible { outline: 3px solid var(--ring); outline-offset: 4px; }
+body.world-playing .town-stop:disabled { cursor: not-allowed; }
+body.world-playing .stop-name {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 5px);
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: clamp(0.68rem, 1.1vw, 0.85rem);
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+body.world-playing .town-stop:hover:not(:disabled) .stop-name,
+body.world-playing .town-stop:focus-visible .stop-name,
+body.world-playing .town-stop.is-interactable .stop-name { color: var(--primary); border-color: var(--primary); }
+body.world-playing .town-stop:disabled .stop-name { color: var(--muted); background: var(--bg); }
+body.world-playing .stop-detail { display: none; }
 body.world-playing .world-avatar { position: absolute; left: 0; top: 0; z-index: 4; width: 4.5%; min-width: 22px; max-width: 46px; transform: translate(-50%, -100%); will-change: transform; pointer-events: none; user-select: none; image-rendering: auto; }
 body.world-playing #world-stage[data-scene="town"] .world-avatar { z-index: 2; }
 body.world-playing .world-avatar > svg { display: block; width: 100%; height: auto; overflow: visible; }
@@ -204,41 +136,41 @@ body.world-playing .world-avatar[data-walking="true"] > svg { animation: world-w
 @keyframes world-walk { 0%, 100% { translate: 0 0; } 50% { translate: 0 -1.5px; } }
 body.world-playing #pet-touch.home-pet { position: absolute; z-index: 5; left: 50%; top: 55%; transform: translate(-50%, -70%); width: 12%; max-width: 120px; min-width: 44px; }
 body.world-playing .home-pet .pet { display: block; width: 100%; height: auto; filter: drop-shadow(0 4px 0 rgb(75 53 33 / 8%)); }
-body.world-playing .home-pet-label { position: absolute; top: -9px; left: 50%; transform: translate(-50%, -100%); max-width: 50%; overflow: hidden; text-overflow: ellipsis; padding: 4px 9px; color: var(--fg); background: #fff9e9; border: 1px solid #a9946f; border-radius: 4px; box-shadow: 0 2px 0 rgb(73 58 44 / 15%); font-size: clamp(0.6rem, 1vw, 0.72rem); font-weight: 800; white-space: nowrap; pointer-events: none; }
-body.world-playing .home-pet-label::after { content: ""; position: absolute; left: calc(50% - 3px); bottom: -4px; width: 6px; height: 6px; background: #fff9e9; border-right: 1px solid #a9946f; border-bottom: 1px solid #a9946f; transform: rotate(45deg); }
+body.world-playing .home-pet-label { position: absolute; top: -9px; left: 50%; transform: translate(-50%, -100%); max-width: 50%; overflow: hidden; text-overflow: ellipsis; padding: 4px 9px; color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow); font-size: clamp(0.6rem, 1vw, 0.72rem); font-weight: 800; white-space: nowrap; pointer-events: none; }
+body.world-playing .home-pet-label::after { content: ""; position: absolute; left: calc(50% - 3px); bottom: -4px; width: 6px; height: 6px; background: var(--surface); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); transform: rotate(45deg); }
 body.world-playing #home-pet-label { top: 42%; z-index: 5; }
-body.world-playing .world-adventure-hint:not(:empty) { position: absolute; z-index: 6; right: 10px; bottom: 10px; left: 10px; margin: 0; padding: 7px 10px; border: 1px solid #7d8867; border-radius: 3px; background: #fff9e9; color: var(--fg); font-size: clamp(0.65rem, 1vw, 0.78rem); box-shadow: 0 2px 0 rgb(62 50 28 / 15%); }
-body.world-playing .scene-caption { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 68px; padding: 12px 18px; border-top: 2px solid var(--world-ink); font-size: 0.82rem; background: var(--surface); }
+body.world-playing .world-adventure-hint:not(:empty) { position: absolute; z-index: 6; top: 32%; left: 79.9%; width: max-content; max-width: min(200px, 22%); transform: translateX(-50%); margin: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--fg); font-size: clamp(0.65rem, 1vw, 0.78rem); box-shadow: var(--shadow); pointer-events: none; }
+body.world-playing .scene-caption { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 68px; padding: 12px 18px; border-top: 2px solid var(--border); font-size: 0.82rem; background: var(--surface); }
 body.world-playing .scene-caption > p, body.world-playing .scene-caption > span { margin: 0; min-width: 0; }
 body.world-playing .scene-caption .world-button { flex: none; }
-body.world-playing .world-controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--world-tile); }
+body.world-playing .world-controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--bg-glow); }
 body.world-playing .movement-pad { display: grid; flex: none; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 44px); gap: 3px; }
-body.world-playing .movement-pad button { display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0; border: 1px solid #b3ad94; border-radius: 4px; color: var(--fg); background: #fffcf1; box-shadow: 0 2px 0 #c9c0a8; font-size: 1.1rem; font-weight: 800; cursor: var(--cursor-pointer); touch-action: none; }
-body.world-playing .movement-pad button:hover, body.world-playing .movement-pad button:active { background: var(--world-sage); border-color: var(--primary); }
+body.world-playing .movement-pad button { display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0; border: 2px solid var(--border); border-radius: var(--radius-sm); color: var(--fg); background: var(--surface); box-shadow: var(--shadow-inset); font-size: 1.1rem; font-weight: 800; cursor: var(--cursor-pointer); touch-action: none; }
+body.world-playing .movement-pad button:hover, body.world-playing .movement-pad button:active { background: var(--bg-glow); border-color: var(--primary); }
 body.world-playing .movement-pad [data-world-direction="up"] { grid-column: 2; grid-row: 1; }
 body.world-playing .movement-pad [data-world-direction="left"] { grid-column: 1; grid-row: 2; }
 body.world-playing .movement-pad [data-world-direction="down"] { grid-column: 2; grid-row: 2; }
 body.world-playing .movement-pad [data-world-direction="right"] { grid-column: 3; grid-row: 2; }
 body.world-playing .movement-help { margin: 0; max-width: 29rem; color: var(--muted); font-size: 0.75rem; line-height: 1.8; }
-body.world-playing .movement-help kbd { display: inline-block; min-width: 20px; padding: 0 4px; border: 1px solid #c0b79e; border-radius: 3px; background: var(--surface); box-shadow: 0 1px 0 #c0b79e; color: var(--fg); font-family: inherit; font-size: 0.72rem; font-weight: 700; line-height: 1.5; text-align: center; }
+body.world-playing .movement-help kbd { display: inline-block; min-width: 20px; padding: 0 4px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); box-shadow: var(--shadow-inset); color: var(--fg); font-family: inherit; font-size: 0.72rem; font-weight: 700; line-height: 1.5; text-align: center; }
 
 /* The companion panel is deliberately quiet so the room remains the focus. */
-body.world-playing .world-companion { min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); box-shadow: 0 3px 0 #ded5bf; }
+body.world-playing .world-companion { min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); box-shadow: var(--shadow); }
 body.world-playing .companion-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); font-size: 0.67rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.13em; color: var(--muted); }
 body.world-playing .companion-heading > * { margin: 0; font: inherit; }
 body.world-playing .world-companion .pet-hero { margin: 0 0 18px; }
 body.world-playing .world-companion #pet-heading { font-size: 1.25rem; line-height: 1.2; }
 body.world-playing .world-companion .activity { margin: 6px 0 16px; font-size: 0.75rem; }
-body.world-playing .world-companion #activity { padding: 2px 6px; border-radius: 3px; color: var(--primary); background: var(--world-sage); font-size: 0.7rem; }
+body.world-playing .world-companion #activity { padding: 2px 6px; border-radius: var(--radius-sm); color: var(--primary); background: var(--bg-glow); font-size: 0.7rem; }
 body.world-playing .world-companion .meters { gap: 10px; }
 body.world-playing .world-companion .meter { grid-template-columns: 80px minmax(0, 1fr) 25px; gap: 6px; font-size: 0.72rem; }
 body.world-playing .world-companion .meter-label { gap: 4px; }
 body.world-playing .world-companion .meter-track { height: 7px; }
 body.world-playing .world-companion .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 20px; }
-body.world-playing .world-companion .stat { padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--tone) 17%, var(--border)); border-radius: 4px; background: color-mix(in srgb, var(--tone) 4%, var(--surface)); }
+body.world-playing .world-companion .stat { padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--tone) 17%, var(--border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--tone) 4%, var(--surface)); }
 body.world-playing .world-companion .stat dt { gap: 4px; font-size: 0.65rem; }
 body.world-playing .world-companion .stat dt .icon { width: 14px; height: 14px; }
-body.world-playing .world-companion .stat dd { margin-top: 4px; font: 800 1.5rem/1.2 "Nunito Sans", system-ui, sans-serif; overflow-wrap: anywhere; }
+body.world-playing .world-companion .stat dd { margin-top: 4px; font: 400 1.5rem/1.2 "Varela Round", "Nunito Sans", system-ui, sans-serif; overflow-wrap: anywhere; }
 body.world-playing .world-companion .busy { flex-wrap: wrap; gap: 8px; margin: 0 0 16px; padding: 10px; border-width: 1px; }
 body.world-playing .world-companion .busy-icon { width: 20px; height: 20px; }
 body.world-playing .world-companion .busy-what, body.world-playing .world-companion .busy-left { font-size: 0.73rem; }
@@ -261,12 +193,12 @@ body.world-playing .companion-footer { display: flex; gap: 8px; margin-top: 18px
 body.world-playing .companion-footer button { flex: 1; padding-inline: 8px; font-size: 0.73rem; }
 body.world-playing #world-shell[data-scene="town"] .home-care, body.world-playing #world-shell[data-scene="town"] .home-play { display: none; }
 body.world-playing .world-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; padding: 12px 0 0; border-top: 1px solid var(--border); }
-body.world-playing .world-nav button { display: inline-flex; align-items: center; justify-content: center; min-width: 100px; min-height: 44px; padding: 9px 15px; border: 1px solid transparent; border-radius: 4px; background: transparent; box-shadow: none; color: var(--muted); font: 800 0.8rem/1.3 "Nunito Sans", system-ui, sans-serif; cursor: var(--cursor-pointer); touch-action: manipulation; }
-body.world-playing .world-nav button:hover { background: var(--world-sage); }
-body.world-playing .world-nav button[aria-current="page"] { color: var(--on-primary); background: var(--primary); border-color: var(--primary-hover); box-shadow: 0 2px 0 #284130; }
+body.world-playing .world-nav button { display: inline-flex; align-items: center; justify-content: center; min-width: 100px; min-height: 44px; padding: 9px 15px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; box-shadow: none; color: var(--muted); font: 800 0.8rem/1.3 "Nunito Sans", system-ui, sans-serif; cursor: var(--cursor-pointer); touch-action: manipulation; }
+body.world-playing .world-nav button:hover { background: var(--bg-glow); }
+body.world-playing .world-nav button[aria-current="page"] { color: var(--on-primary); background: var(--primary); border-color: var(--primary-hover); box-shadow: var(--shadow-inset); }
 body.world-playing .world-nav button[aria-current="page"]:hover { background: var(--primary-hover); }
-body.world-playing .world-nav button.has-alerts { color: #8d382d; border-color: #bd7f65; background: #fae5d9; }
-body.world-playing .world-nav button.has-alerts:hover { background: #f4d7c5; }
+body.world-playing .world-nav button.has-alerts { color: var(--error); border-color: var(--error); background: var(--bg-glow); }
+body.world-playing .world-nav button.has-alerts:hover { background: var(--bg); }
 body.world-playing #world-message { margin: 0; color: var(--fg); font-size: 0.82rem; font-weight: 600; }
 body.world-playing #world-message:empty { display: none; }
 
@@ -274,13 +206,13 @@ body.world-playing #world-message:empty { display: none; }
 body.world-playing #world-dialog, body.world-playing #battle-dialog, body.world-playing #confirm-dialog, body.world-playing #team-dialog, body.world-playing #adventure-guide {
   color: var(--fg);
   background: var(--surface);
-  border: 2px solid var(--world-ink);
-  border-radius: 7px;
-  box-shadow: 0 6px 0 rgb(38 45 29 / 30%), 0 24px 80px rgb(27 39 24 / 25%);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
-body.world-playing #world-dialog::backdrop, body.world-playing #battle-dialog::backdrop, body.world-playing #confirm-dialog::backdrop, body.world-playing #team-dialog::backdrop, body.world-playing #adventure-guide::backdrop { background: rgb(36 47 31 / 58%); backdrop-filter: blur(3px); }
+body.world-playing #world-dialog::backdrop, body.world-playing #battle-dialog::backdrop, body.world-playing #confirm-dialog::backdrop, body.world-playing #team-dialog::backdrop, body.world-playing #adventure-guide::backdrop { background: rgb(28 20 16 / 58%); backdrop-filter: blur(3px); }
 body.world-playing #world-dialog { width: min(850px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); padding: 0; overflow-y: auto; overscroll-behavior: contain; }
-body.world-playing .place-heading { position: sticky; z-index: 8; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 26px 18px; border-bottom: 1px solid var(--border); background: var(--world-tile); }
+body.world-playing .place-heading { position: sticky; z-index: 8; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 26px 18px; border-bottom: 1px solid var(--border); background: var(--bg-glow); }
 body.world-playing .place-heading h2 { margin: 0; font-size: 1.8rem; }
 body.world-playing .place-heading .world-button { flex: none; }
 body.world-playing .place-intro { margin: 0; padding: 18px 26px 0; color: var(--muted); font-size: 0.9rem; }
@@ -303,12 +235,11 @@ body.world-playing .world-panel .arena-tabs { grid-template-columns: repeat(2, m
 body.world-playing .world-panel .arena-tabs button { padding: 8px 6px; font-size: 0.82rem; }
 body.world-playing #world-dialog[data-place="backpack"] .item-actions .chip-buy { display: none; }
 body.world-playing #world-dialog[data-place="backpack"] .item-actions { grid-template-columns: minmax(0, 1fr); }
-body.world-playing #battle-dialog .battle-stage { border: 1px solid var(--border); border-radius: 4px; background: var(--world-sage); }
-body.world-playing .battle-ally, body.world-playing .battle-ability, body.world-playing .adventure-backpack, body.world-playing #adventure-battle-summary { border-radius: 4px; }
+body.world-playing #battle-dialog .battle-stage { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-glow); }
 body.world-playing #adventure-dialog { background: var(--bg); }
 body.world-playing .adventure-top { padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-body.world-playing #adventure-grid { border-color: #7f9272; border-radius: 4px; background: #ebe4c9; }
-body.world-playing .adventure-controls button { border-radius: 4px; border-color: #b3ad94; box-shadow: 0 2px 0 #c9c0a8; }
+body.world-playing #adventure-grid { border-color: var(--border); background: var(--bg-glow); }
+body.world-playing .adventure-controls button { border-color: var(--border); box-shadow: var(--shadow-inset); }
 body.world-playing #notice:not(:empty) { position: fixed; z-index: 20; right: 24px; bottom: 24px; width: min(400px, calc(100vw - 48px)); margin: 0; border: 1px solid var(--primary); background: var(--surface); box-shadow: var(--shadow); font-size: 0.85rem; }
 body.world-playing .attacked { z-index: 21; left: auto; right: 24px; bottom: 24px; width: min(400px, calc(100vw - 48px)); max-width: 400px; }
 
@@ -377,11 +308,9 @@ body.world-playing .attacked { z-index: 21; left: auto; right: 24px; bottom: 24p
   body.world-playing #world-description { max-width: 24rem; font-size: 0.78rem; line-height: 1.5; }
   body.world-playing .world-heading-actions { gap: 6px; }
   body.world-playing .world-heading-actions .world-button { min-width: 44px; max-width: 86px; padding: 7px 10px; font-size: 0.7rem; }
-  body.world-playing .world-main { border-radius: 5px; }
+  body.world-playing .world-main { border-radius: var(--radius-sm); }
   body.world-playing .home-hotspot { min-width: 44px; min-height: 44px; }
   body.world-playing .hotspot-label { padding: 3px 6px; font-size: 0.6rem; }
-  body.world-playing .town-stop { min-height: 44px; padding: 5px 6px; border-width: 1px; box-shadow: 0 2px 0 #2e402c; }
-  body.world-playing .town-stop::before { height: 90%; }
   body.world-playing .stop-name { font-size: 0.66rem; }
   body.world-playing .stop-detail { display: none; }
   body.world-playing .home-pet-label { top: -5px; padding: 3px 6px; font-size: 0.6rem; }
@@ -439,30 +368,30 @@ body.world-playing .attacked { z-index: 21; left: auto; right: 24px; bottom: 24p
   body.world-playing .hotspot-label, body.world-playing .world-button, body.world-playing .home-pet .pet { transition: none; }
 }
 
-/* Sweet Home is the room itself. Gameplay panels appear only when requested. */
-body.world-playing.world-home {
+/* Home and town fill the screen. Gameplay panels appear only when requested. */
+body.world-playing {
   position: fixed;
   inset: 0;
   width: 100%;
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
-  background: #755139;
+  background: var(--bg);
 }
-body.world-playing.world-home > .topbar,
-body.world-playing.world-home > .footer,
-body.world-playing.world-home .world-heading,
-body.world-playing.world-home .scene-caption,
-body.world-playing.world-home .world-controls,
-body.world-playing.world-home .world-nav,
-body.world-playing.world-home .world-layout > .world-companion,
-body.world-playing.world-home .home-pet-label {
+body.world-playing > .topbar,
+body.world-playing > .footer,
+body.world-playing .world-heading,
+body.world-playing .scene-caption,
+body.world-playing .world-controls,
+body.world-playing .world-nav,
+body.world-playing .world-layout > .world-companion,
+body.world-playing .home-pet-label {
   display: none;
 }
-body.world-playing.world-home main,
-body.world-playing.world-home #dashboard.card,
-body.world-playing.world-home #world-shell,
-body.world-playing.world-home .world-layout {
+body.world-playing main,
+body.world-playing #dashboard.card,
+body.world-playing #world-shell,
+body.world-playing .world-layout {
   display: block;
   width: 100%;
   max-width: none;
@@ -472,7 +401,7 @@ body.world-playing.world-home .world-layout {
   border: 0;
   border-radius: 0;
 }
-body.world-playing.world-home .world-main {
+body.world-playing .world-main {
   position: fixed;
   inset: 0;
   width: 100%;
@@ -480,10 +409,10 @@ body.world-playing.world-home .world-main {
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background: #755139;
+  background: var(--bg);
   box-shadow: none;
 }
-body.world-playing.world-home .world-stage {
+body.world-playing .world-stage {
   position: absolute;
   left: 0;
   top: 0;
@@ -491,12 +420,12 @@ body.world-playing.world-home .world-stage {
   height: var(--scene-height, 100dvh);
   aspect-ratio: 960 / 640;
   will-change: transform;
-  background: #755139;
+  background: var(--bg);
 }
-body.world-playing.world-home .world-stage:focus-visible {
+body.world-playing .world-stage:focus-visible {
   outline: none;
 }
-body.world-playing.world-home .world-avatar {
+body.world-playing .world-avatar {
   width: 4.5%;
   min-width: 0;
   max-width: none;
@@ -522,7 +451,8 @@ body.world-playing.world-home #pet-touch:focus-visible {
 }
 /* The warm outline marks exactly the object that Space will interact with.
    Keep it static: proximity feedback should not add work to the walk loop. */
-body.world-playing #home-interaction-outline {
+body.world-playing #home-interaction-outline,
+body.world-playing #town-interaction-outline {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -533,14 +463,10 @@ body.world-playing #home-interaction-outline {
   stroke-linejoin: round;
   pointer-events: none;
 }
-body.world-playing #home-interaction-outline[hidden] { display: none; }
+body.world-playing #home-interaction-outline[hidden],
+body.world-playing #town-interaction-outline[hidden] { display: none; }
 body.world-playing .interaction-outline-edge { stroke: #63492f; stroke-width: 4px; }
 body.world-playing .interaction-outline-light { stroke: #ffe5a4; stroke-width: 2px; }
-body.world-playing .town-stop.is-interactable {
-  border-color: #ffe5a4;
-  background: #4b633d;
-  box-shadow: 0 0 0 1px #63492f, 0 3px 0 #2e402c;
-}
 /* The pet is a separate live sprite above its invisible interaction target. */
 body.world-playing.world-home .home-hotspot[data-home-action="pet"].is-interactable ~ #pet-touch::before {
   content: "";
@@ -560,11 +486,11 @@ body.world-playing #home-feedback {
   position: fixed;
   z-index: 10;
   margin: 0;
-  color: #fff8e4;
-  background: rgb(38 28 20 / 68%);
-  border: 1px solid rgb(255 239 198 / 12%);
-  border-radius: 5px;
-  text-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+  color: var(--fg);
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
   pointer-events: none;
 }
 body.world-playing #home-controls-tip {
@@ -597,17 +523,13 @@ body.world-playing #home-feedback {
   line-height: 1.5;
   text-align: center;
 }
-body.world-playing:not(.world-home) #home-controls-tip,
-body.world-playing:not(.world-home) #home-feedback {
-  display: none;
-}
 /* Pet interaction is a small game window, leaving the room in view. */
 body.world-playing #world-dialog[data-place="pet"] {
   inset: auto 20px 20px auto;
   width: min(360px, calc(100vw - 24px));
   max-height: min(480px, calc(100dvh - 40px));
   margin: 0;
-  box-shadow: 0 3px 0 rgb(38 45 29 / 25%), 0 10px 32px rgb(27 39 24 / 20%);
+  box-shadow: var(--shadow);
 }
 body.world-playing #world-dialog[data-place="pet"]::backdrop {
   background: transparent;
@@ -647,6 +569,11 @@ body.world-playing #world-panel-pet.world-companion {
 body.world-playing #world-panel-pet #world-pet-summary {
   display: block;
   grid-column: 1 / -1;
+}
+body.world-playing #world-panel-pet #town-care-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.75rem;
 }
 body.world-playing #world-panel-pet .pet-hero {
   margin: 0 0 10px;
@@ -726,7 +653,7 @@ body.world-playing #world-panel-pet .home-care button small {
   white-space: nowrap;
 }
 body.world-playing #world-panel-pet [data-selected] {
-  background: var(--world-sage);
+  background: var(--bg-glow);
   border-color: var(--primary);
   box-shadow: inset 3px 0 0 var(--primary);
 }

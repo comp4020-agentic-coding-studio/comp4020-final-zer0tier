@@ -44,9 +44,17 @@ function page() {
     return { button, react };
   });
   window.eval(readFileSync('public/world.js', 'utf8'));
+  const openMenu = () => {
+    $('world-stage').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(($('world-dialog') as HTMLDialogElement).open).toBe(true);
+    expect($('world-dialog').dataset.place).toBe('menu');
+  };
   const destination = (place: string) => {
-    const button = window.document.querySelector<HTMLButtonElement>(`[data-place="${place}"]`);
-    expect(button, `${place} must be reachable`).not.toBeNull();
+    const visibleButton = () => [...window.document.querySelectorAll<HTMLButtonElement>(`[data-place="${place}"]`)]
+      .find(button => !button.closest('[hidden], dialog:not([open])'));
+    if (!visibleButton()) openMenu();
+    const button = visibleButton();
+    expect(button, `${place} must be reachable`).toBeDefined();
     button!.click();
   };
   const homeAction = (action: string) => {
@@ -64,14 +72,10 @@ function page() {
   const position = () => {
     const translation = $('world-avatar').style.transform.match(/translate3d\(([-\d.e+]+)px,\s*([-\d.e+]+)px,/i);
     if (!translation) throw new Error('The character must have a rendered position');
-    if ($('world-stage').dataset.scene === 'home') {
-      const scale = Math.max(window.innerWidth / 960, window.innerHeight / 640);
-      return { x: Number(translation[1]) / scale, y: Number(translation[2]) / scale };
-    }
-    const { width, height } = $('world-stage').getBoundingClientRect();
-    return { x: Number(translation[1]) * 960 / (width || 960), y: Number(translation[2]) * 640 / (height || 640) };
+    const scale = Math.max(window.innerWidth / 960, window.innerHeight / 640);
+    return { x: Number(translation[1]) / scale, y: Number(translation[2]) / scale };
   };
-  return { dom, window, $, controls, lesson, study, play, destination, homeAction, walk, position, advance };
+  return { dom, window, $, controls, lesson, study, play, destination, homeAction, openMenu, walk, position, advance };
 }
 
 it('keeps the live pet and gameplay controls while navigating between home and town', () => {
@@ -94,9 +98,10 @@ it('keeps the live pet and gameplay controls while navigating between home and t
     expect(p.$('home-scene').hidden).toBe(true);
     expect(p.$('town-scene').hidden).toBe(false);
     expect(p.window.document.body.classList.contains('world-home')).toBe(false);
-    expect(p.$('home-controls-tip').hidden).toBe(true);
+    expect(p.$('home-controls-tip').closest('[hidden]')).toBeNull();
+    expect(p.$('world-stage').getAttribute('aria-describedby')).toBe('home-controls-tip');
     for (const selector of ['.world-heading', '.world-companion', '.scene-caption', '.world-controls', '.world-nav']) {
-      expect(p.window.document.querySelector(selector)!.hasAttribute('hidden'), selector).toBe(false);
+      expect(p.window.document.querySelector(selector)!.hasAttribute('hidden'), selector).toBe(true);
     }
     p.$('town-home').click();
     expect(p.$('world-stage').dataset.scene).toBe('home');
@@ -165,8 +170,20 @@ it('opens pet care and account controls through home objects without replacing t
     expect(pat).toHaveBeenCalledOnce();
     expect(signOut).toHaveBeenCalledOnce();
     p.$('home-door').click();
-    expect(p.$('pet-name').closest('.world-companion')).not.toBeNull();
+    expect(p.$('pet-name').closest('[hidden]')).not.toBeNull();
+    expect(p.$('world-panel-menu').contains(p.$('signout'))).toBe(true);
+    expect(p.$('signout').closest('dialog:not([open])')).not.toBeNull();
+    p.openMenu();
+    expect(p.$('signout').closest('[hidden]')).toBeNull();
+    p.destination('pet');
+    expect(p.$('world-dialog').dataset.place).toBe('pet');
     expect(p.$('pet-name').closest('[hidden]')).toBeNull();
+    expect(p.$('home-feed').closest('[hidden]')).not.toBeNull();
+    expect(p.$('home-clean').closest('[hidden]')).not.toBeNull();
+    expect(p.$('world-play').closest('[hidden]')).not.toBeNull();
+    expect(p.$('town-care-hint').closest('[hidden]')).toBeNull();
+    p.$('world-dialog-close').click();
+    expect(p.$('pet-name').closest('dialog:not([open])')).not.toBeNull();
     p.$('town-home').click();
     p.homeAction('pet');
     for (const [id, original] of p.controls) {
@@ -303,7 +320,7 @@ it('moves in the world but leaves keyboard input alone in dialogs and text field
   } finally { p.dom.window.close(); }
 });
 
-it('uses Space to interact at home and walks with the town direction pad', () => {
+it('uses the same movement and Space interaction controls at home and in town', () => {
   const p = page();
   try {
     p.$('world-stage').focus();
@@ -318,9 +335,8 @@ it('uses Space to interact at home and walks with the town direction pad', () =>
     expect((p.$('world-interact') as HTMLButtonElement).disabled).toBe(false);
     p.$('world-stage').dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
     expect(p.$('world-stage').dataset.scene).toBe('town');
-    const left = p.window.document.querySelector<HTMLButtonElement>('[data-world-direction="left"]')!;
     const start = p.position();
-    left.click();
+    p.walk('a');
     expect(p.position()).not.toEqual(start);
     p.$('world-stage').dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
     expect(p.$('world-stage').dataset.scene).toBe('home');
@@ -374,13 +390,19 @@ it('highlights only the active scene and follows a nearby Adventure entrance bei
   const p = page();
   try {
     const highlighted = () => [...p.window.document.querySelectorAll('.is-interactable')];
+    const townOutline = p.$('town-interaction-outline');
+    const outlineTarget = () => [...townOutline.querySelectorAll('use')].map(stroke => stroke.getAttribute('href'));
+    expect(townOutline.hasAttribute('hidden')).toBe(true);
     p.walk('w');
     expect(highlighted()).toEqual([p.window.document.querySelector('[data-home-action="pet"]')]);
     p.$('home-door').click();
     expect(highlighted()).toEqual([p.$('town-home')]);
     expect(highlighted()[0].closest('[hidden]')).toBeNull();
+    expect(townOutline.hasAttribute('hidden')).toBe(false);
+    expect(outlineTarget()).toEqual(['/scenes/town-highlights.svg#home', '/scenes/town-highlights.svg#home']);
     p.$('town-home').click();
     expect(highlighted()).toEqual([]);
+    expect(townOutline.hasAttribute('hidden')).toBe(true);
     p.$('home-door').click();
     const stage = p.$('world-stage');
     vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
@@ -388,10 +410,23 @@ it('highlights only the active scene and follows a nearby Adventure entrance bei
     p.advance(500);
     const entrance = p.$('adventure-open') as HTMLButtonElement;
     expect(highlighted()).toEqual([entrance]);
+    expect(townOutline.hasAttribute('hidden')).toBe(false);
+    expect(outlineTarget()).toEqual(['/scenes/town-highlights.svg#adventure', '/scenes/town-highlights.svg#adventure']);
+    p.openMenu();
+    await vi.waitFor(() => expect(highlighted()).toEqual([]));
+    expect(townOutline.hasAttribute('hidden')).toBe(true);
+    const paused = p.position();
+    p.walk('s');
+    expect(p.position()).toEqual(paused);
+    p.$('world-dialog-close').click();
+    await vi.waitFor(() => expect(highlighted()).toEqual([entrance]));
+    expect(townOutline.hasAttribute('hidden')).toBe(false);
+    expect(p.window.document.activeElement).toBe(stage);
     const enter = vi.fn();
     entrance.addEventListener('click', enter);
     entrance.disabled = true;
     await vi.waitFor(() => expect(highlighted()).toEqual([]));
+    expect(townOutline.hasAttribute('hidden')).toBe(true);
     expect((p.$('world-interact') as HTMLButtonElement).disabled).toBe(true);
     stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
     expect(enter).not.toHaveBeenCalled();
@@ -446,32 +481,39 @@ it.each([30, 60, 120])('walks at a consistent speed from the first frame at %i H
   } finally { p.dom.window.close(); }
 });
 
-it('preserves the character position when resizing a town map with fractional dimensions', () => {
+it('fills desktop and phone viewports in both scenes while preserving the character position on resize', () => {
   const p = page();
   try {
     const stage = p.$('world-stage');
-    const bounds = new p.window.DOMRect(0, 0, 753.375, 502.25);
-    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(bounds);
-    vi.spyOn(stage, 'clientWidth', 'get').mockReturnValue(Math.round(bounds.width));
-    vi.spyOn(stage, 'clientHeight', 'get').mockReturnValue(Math.round(bounds.height));
-    p.$('home-door').click();
-    expect(p.position().x).toBeCloseTo(480, 6);
-    expect(p.position().y).toBeCloseTo(585, 6);
-    p.walk('d');
-    const before = p.position();
-    const rendered = p.$('world-avatar').style.transform;
-    expect(before.x).toBeCloseTo(480 + 190 * .096, 6);
-
-    // A wider viewport can leave a max-width town map at exactly the same
-    // fractional size, so no element-resize notification follows this event.
-    Object.defineProperty(p.window, 'innerWidth', { configurable: true, value: 1600 });
-    p.window.dispatchEvent(new p.window.Event('resize'));
-    expect(p.position().x).toBeCloseTo(before.x, 6);
-    expect(p.position().y).toBeCloseTo(before.y, 6);
-    expect(p.$('world-avatar').style.transform).toBe(rendered);
-    p.walk('a');
-    expect(p.position().x).toBeCloseTo(480, 6);
-    expect(p.position().y).toBeCloseTo(585, 6);
+    for (const scene of ['home', 'town']) {
+      if (scene === 'town') p.$('home-door').click();
+      const start = p.position();
+      p.walk('d');
+      const before = p.position();
+      expect(before.x).toBeCloseTo(start.x + 190 * .096, 6);
+      for (const [width, height] of [[1600, 900], [375, 812], [812, 375]]) {
+        Object.defineProperty(p.window, 'innerWidth', { configurable: true, value: width });
+        Object.defineProperty(p.window, 'innerHeight', { configurable: true, value: height });
+        p.window.dispatchEvent(new p.window.Event('resize'));
+        expect(p.position().x).toBeCloseTo(before.x, 6);
+        expect(p.position().y).toBeCloseTo(before.y, 6);
+        const sceneWidth = parseFloat(stage.style.getPropertyValue('--scene-width'));
+        const sceneHeight = parseFloat(stage.style.getPropertyValue('--scene-height'));
+        const scale = Math.max(width / 960, height / 640);
+        expect(sceneWidth).toBeCloseTo(960 * scale, 6);
+        expect(sceneHeight).toBeCloseTo(640 * scale, 6);
+        const camera = stage.style.transform.match(/translate3d\(([-\d.e+]+)px,\s*([-\d.e+]+)px,/i);
+        expect(camera, `${scene} camera at ${width}×${height}`).not.toBeNull();
+        const x = Number(camera![1]), y = Number(camera![2]);
+        expect(x).toBeLessThanOrEqual(0);
+        expect(y).toBeLessThanOrEqual(0);
+        expect(x + sceneWidth).toBeGreaterThanOrEqual(width - .000001);
+        expect(y + sceneHeight).toBeGreaterThanOrEqual(height - .000001);
+      }
+      p.walk('a');
+      expect(p.position().x).toBeCloseTo(start.x, 6);
+      expect(p.position().y).toBeCloseTo(start.y, 6);
+    }
   } finally { p.dom.window.close(); }
 });
 
@@ -642,6 +684,7 @@ it('shows an Hourglass action error while the player is in town', async () => {
   try {
     p.$('home-door').click();
     p.$('busy').hidden = false;
+    p.destination('pet');
     p.$('skip').addEventListener('click', () => { p.$('care-error').textContent = 'No hourglasses left.'; });
     p.$('skip').click();
     await vi.waitFor(() => expect(p.$('home-care-error').textContent).toBe('No hourglasses left.'));

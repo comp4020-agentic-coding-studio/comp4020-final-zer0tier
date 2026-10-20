@@ -46,12 +46,16 @@ worldShell.innerHTML = `
         </div>
         <div id="town-scene" hidden>
           <img class="scene-art" src="/scenes/town.svg" alt="A green village connected by winding paths, with shops, a school, a job board, an arena, your home, and a woodland adventure trail." draggable="false" />
-          <button type="button" class="town-stop" data-place="work" style="--x:26%;--y:31%"><span class="stop-name">Part-time Jobs</span><span class="stop-detail">Earn a little extra</span></button>
-          <button type="button" class="town-stop" data-place="school" style="--x:50%;--y:35%"><span class="stop-name">School</span><span class="stop-detail">Learn &amp; grow</span></button>
+          <svg id="town-interaction-outline" viewBox="0 0 960 640" aria-hidden="true" focusable="false" hidden>
+            <use class="interaction-outline-edge" />
+            <use class="interaction-outline-light" />
+          </svg>
+          <button type="button" class="town-stop" data-place="work" data-town-action="work" style="--x:26.72%;--y:18.52%;--w:19.69%;--h:21.09%"><span class="stop-name">Part-time Jobs</span><span class="stop-detail">Earn a little extra</span></button>
+          <button type="button" class="town-stop" data-place="school" data-town-action="school" style="--x:50.21%;--y:21.64%;--w:17.29%;--h:24.53%"><span class="stop-name">School</span><span class="stop-detail">Learn &amp; grow</span></button>
           <span id="town-adventure-slot"></span>
-          <button type="button" class="town-stop" data-place="shop" style="--x:21.4%;--y:60%"><span class="stop-name">Shops</span><span class="stop-detail">Stock up on supplies</span></button>
-          <button type="button" class="town-stop" data-place="arena" style="--x:78.6%;--y:68%"><span class="stop-name">Arena</span><span class="stop-detail">Meet, visit &amp; battle</span></button>
-          <button type="button" id="town-home" class="town-stop" style="--x:50%;--y:87%"><span class="stop-name">Sweet Home</span><span class="stop-detail">Your cozy corner</span></button>
+          <button type="button" class="town-stop" data-place="shop" data-town-action="shop" style="--x:21.25%;--y:46.88%;--w:19.17%;--h:19.69%"><span class="stop-name">Shops</span><span class="stop-detail">Stock up on supplies</span></button>
+          <button type="button" class="town-stop" data-place="arena" data-town-action="arena" style="--x:78.33%;--y:55.31%;--w:19.38%;--h:22.19%"><span class="stop-name">Arena</span><span class="stop-detail">Meet, visit &amp; battle</span></button>
+          <button type="button" id="town-home" class="town-stop" data-town-action="home" style="--x:50.21%;--y:76.33%;--w:16.88%;--h:21.09%"><span class="stop-name">Sweet Home</span><span class="stop-detail">Your cozy corner</span></button>
         </div>
         <div id="world-avatar" class="world-avatar" aria-hidden="true" data-facing="down">
           <svg viewBox="0 0 32 44" shape-rendering="crispEdges" aria-hidden="true"><ellipse cx="16" cy="41" rx="11" ry="3" fill="#353b2b" opacity=".22"/>
@@ -91,6 +95,8 @@ const worldStage = worldById('world-stage');
 const worldAvatar = worldById('world-avatar');
 const homeInteractionOutline = worldById('home-interaction-outline');
 const homeOutlineStrokes = homeInteractionOutline.querySelectorAll('use');
+const townInteractionOutline = worldById('town-interaction-outline');
+const townOutlineStrokes = townInteractionOutline.querySelectorAll('use');
 const homePet = worldById('pet-touch');
 homePet.classList.add('home-pet');
 worldById('home-scene').append(homePet);
@@ -118,13 +124,10 @@ worldPanels.shop.append(original.supplies, original.adventure);
 worldPanels.arena.append(original.arena);
 worldPanels.appearance.append(worldById('appearance-settings'));
 worldPanels.pet.classList.add('world-companion');
-worldPanels.menu.innerHTML = '<p class="help">Take your time. Your pet and progress are saved.</p><p><a href="/readme/" target="_blank" rel="noopener">How to play</a></p><button type="button" class="world-button" data-place="backpack">Backpack</button> <button type="button" class="world-button" data-place="journal">Town journal</button>';
-const homePanelMoves = ['#world-pet-summary', '#home-interaction-label', '.home-care', '#home-care-hint', '#home-care-error', '#world-play', '.companion-footer'].map(selector => {
-  const node = worldShell.querySelector(selector);
-  const anchor = document.createComment('town companion position');
-  node.before(anchor);
-  return { node, anchor };
-});
+worldPanels.menu.innerHTML = '<p class="help">Take your time. Your pet and progress are saved.</p><p><a href="/readme/" target="_blank" rel="noopener">How to play</a></p><button type="button" class="world-button" id="world-pet-details" data-place="pet">Pet details</button> <button type="button" class="world-button" data-place="backpack">Backpack</button> <button type="button" class="world-button" data-place="journal">Town journal</button> <button type="button" class="world-button" data-place="appearance">Appearance</button>';
+for (const selector of ['#world-pet-summary', '#home-interaction-label', '.home-care', '#home-care-hint', '#home-care-error', '#world-play', '#town-care-hint', '.companion-footer']) {
+  worldPanels.pet.append(worldShell.querySelector(selector));
+}
 const signoutAnchor = document.createComment('sign out position');
 worldById('signout').before(signoutAnchor);
 for (const node of [worldById('visitors-heading'), worldById('visitors'), worldById('visitors-empty'), worldById('theft-notifications'), worldById('fight-log').previousElementSibling, worldById('fight-log'), worldById('feed-heading'), worldById('feed')]) worldPanels.journal.append(node);
@@ -136,7 +139,9 @@ worldById('theft-notifications').before(journalEmpty);
 
 const adventureEntrance = worldById('adventure-open');
 adventureEntrance.className = 'town-stop';
-adventureEntrance.style.cssText = '--x:78.3%;--y:31%';
+adventureEntrance.dataset.townAction = 'adventure';
+adventureEntrance.style.cssText = '--x:79.90%;--y:21.95%;--w:13.13%;--h:18.28%';
+adventureEntrance.setAttribute('aria-describedby', 'adventure-hint');
 adventureEntrance.innerHTML = '<span class="stop-name">Adventure</span><span class="stop-detail">Into the woodland</span>';
 worldById('town-adventure-slot').replaceWith(adventureEntrance);
 worldById('adventure-hint').classList.add('world-adventure-hint');
@@ -158,7 +163,6 @@ const worldPlaces = {
   menu: ['Make yourself at home', ''],
 };
 let worldScene = 'home';
-let worldReturnFocus = null;
 let worldFrame = 0;
 let worldLastFrame = 0;
 let worldKeys = new Set();
@@ -189,7 +193,7 @@ new MutationObserver(() => {
 
 function worldMessage(text, feedback = true) {
   worldById('world-message').textContent = text;
-  if (feedback && worldScene === 'home' && !worldDashboard.hidden && text) {
+  if (feedback && !worldDashboard.hidden && text) {
     clearTimeout(worldFeedbackTimer);
     const message = worldById('home-feedback');
     if (worldDialog.open && worldDialog.dataset.place === 'pet') {
@@ -202,22 +206,18 @@ function worldMessage(text, feedback = true) {
     worldFeedbackTimer = setTimeout(() => { message.hidden = true; }, 4500);
   }
 }
-function worldArrangeHome(atHome) {
-  for (const { node, anchor } of homePanelMoves) {
-    if (atHome) worldPanels.pet.append(node);
-    else anchor.after(node);
-  }
-  for (const selector of ['.world-heading', '.world-layout > .world-companion', '.scene-caption', '.world-controls', '.world-nav']) worldShell.querySelector(selector).hidden = atHome;
-  worldById('home-controls-tip').hidden = !atHome;
+function worldArrangeScene(atHome) {
+  for (const selector of ['.world-heading', '.world-layout > .world-companion', '.scene-caption', '.world-controls', '.world-nav']) worldShell.querySelector(selector).hidden = true;
+  worldById('home-controls-tip').hidden = false;
   worldById('home-pet-label').hidden = true;
   for (const selector of ['.home-care', '.home-play', '#home-care-hint', '#home-interaction-label']) document.querySelector(selector).hidden = !atHome;
-  if (atHome && !worldDashboard.hidden) worldPanels.menu.append(worldById('signout'));
+  if (!worldDashboard.hidden) worldPanels.menu.append(worldById('signout'));
   else signoutAnchor.after(worldById('signout'));
   document.body.classList.toggle('world-home', atHome && !worldDashboard.hidden);
-  worldStage.setAttribute('aria-describedby', atHome ? 'home-controls-tip' : 'world-movement-help');
+  worldStage.setAttribute('aria-describedby', 'home-controls-tip');
 }
 function worldCamera(point = worldPosition) {
-  if (worldScene !== 'home' || worldDashboard.hidden) return;
+  if (worldDashboard.hidden) return;
   const { width, height, viewportWidth, viewportHeight } = worldView;
   const offsetX = Math.max(viewportWidth - width, Math.min(0, viewportWidth / 2 - point.x * width / 960));
   const offsetY = Math.max(viewportHeight - height, Math.min(0, viewportHeight / 2 - point.y * height / 640));
@@ -231,7 +231,7 @@ function worldCamera(point = worldPosition) {
 // without laying out the room or invalidating inherited styles on its children.
 function worldResize() {
   const viewportWidth = window.innerWidth, viewportHeight = window.innerHeight;
-  if (worldScene === 'home' && !worldDashboard.hidden) {
+  if (!worldDashboard.hidden) {
     const scale = Math.max(viewportWidth / 960, viewportHeight / 640);
     worldView = { width: 960 * scale, height: 640 * scale, viewportWidth, viewportHeight };
     worldStage.style.setProperty('--scene-width', `${worldView.width}px`);
@@ -246,16 +246,9 @@ function worldResize() {
   }
 }
 window.addEventListener('resize', () => { worldResize(); worldDraw(); });
-if (typeof ResizeObserver !== 'undefined') new ResizeObserver(([entry]) => {
-  if (worldScene !== 'town' || worldDashboard.hidden) return;
-  const { width, height } = entry.contentRect;
-  if (!width || !height || (width === worldView.width && height === worldView.height)) return;
-  worldView = { ...worldView, width, height };
-  worldDraw();
-}).observe(worldStage);
 worldStage.addEventListener('focusin', event => {
-  const object = event.target.closest('.home-hotspot');
-  // Keyboard users can reach furniture outside the camera. Pointer focus
+  const object = event.target.closest('.home-hotspot, .town-stop');
+  // Keyboard users can reach objects outside the camera. Pointer focus
   // must not move a hotspot away between pressing and releasing it.
   if (object?.matches(':focus-visible')) worldCamera({ x: parseFloat(object.style.getPropertyValue('--x')) * 9.6, y: parseFloat(object.style.getPropertyValue('--y')) * 6.4 });
 });
@@ -272,18 +265,15 @@ function worldSetWalking(walking) {
   if (worldAvatar.dataset.walking !== value) worldAvatar.dataset.walking = value;
 }
 function worldModalOpen() { return Boolean(document.querySelector('dialog[open]')); }
-function worldOpenPlace(name, trigger) {
+function worldOpenPlace(name) {
   if (worldDashboard.hidden || !worldPlaces[name]) return;
   worldStop();
-  const source = trigger ?? document.activeElement;
-  // Switching panels must not return focus to a now-closed modal.
-  if (!worldDialog.contains(source)) worldReturnFocus = source;
   const panelName = name === 'backpack' ? 'shop' : name;
   for (const [key, panel] of Object.entries(worldPanels)) panel.hidden = key !== panelName;
   worldDialog.dataset.place = name;
   worldById('world-dialog-title').textContent = worldPlaces[name][0];
   worldById('world-place-intro').textContent = worldPlaces[name][1];
-  worldById('world-place-eyebrow').textContent = ['pet', 'menu'].includes(name) ? 'SWEET HOME' : ['backpack', 'appearance'].includes(name) ? 'YOURS TO KEEP' : 'AROUND TOWN';
+  worldById('world-place-eyebrow').textContent = ['pet', 'menu'].includes(name) && worldScene === 'home' ? 'SWEET HOME' : ['backpack', 'appearance'].includes(name) ? 'YOURS TO KEEP' : 'AROUND TOWN';
   if (name === 'pet') worldById('home-feedback').hidden = true;
   if (!worldDialog.open) worldDialog.showModal();
   worldById('world-dialog-close').focus({ preventScroll: true });
@@ -291,8 +281,7 @@ function worldOpenPlace(name, trigger) {
 worldById('world-dialog-close').addEventListener('click', () => worldDialog.close());
 worldDialog.addEventListener('close', () => {
   if (worldDialog.open || worldDashboard.hidden || worldModalOpen()) return;
-  const back = worldScene === 'home' ? worldStage : worldReturnFocus?.isConnected && !worldReturnFocus.closest('[hidden]') ? worldReturnFocus : worldStage;
-  back.focus({ preventScroll: true });
+  worldStage.focus({ preventScroll: true });
   worldCamera();
 });
 worldDialog.addEventListener('click', (event) => {
@@ -301,9 +290,9 @@ worldDialog.addEventListener('click', (event) => {
 });
 document.addEventListener('click', event => {
   const button = event.target.closest('button[data-place]');
-  if (button && (worldShell.contains(button) || worldDialog.contains(button))) worldOpenPlace(button.dataset.place, button);
+  if (button && (worldShell.contains(button) || worldDialog.contains(button))) worldOpenPlace(button.dataset.place);
 });
-homePet.addEventListener('click', () => worldOpenPlace('pet', homePet));
+homePet.addEventListener('click', () => worldOpenPlace('pet'));
 
 function worldChangeScene(scene, focus = true) {
   worldStop();
@@ -316,7 +305,7 @@ function worldChangeScene(scene, focus = true) {
   const atHome = scene === 'home';
   clearTimeout(worldFeedbackTimer);
   worldById('home-feedback').hidden = true;
-  worldArrangeHome(atHome);
+  worldArrangeScene(atHome);
   worldPosition = atHome ? { x: 480, y: 475 } : { x: 480, y: 585 };
   worldById('world-title').textContent = atHome ? 'Home, sweet home.' : 'A little town. A lot to discover.';
   worldById('world-eyebrow').textContent = atHome ? 'A PLACE TO CALL YOUR OWN' : 'WELCOME TO THE NEIGHBOURHOOD';
@@ -354,10 +343,10 @@ worldById('home-clean').addEventListener('click', () => worldCare('soap'));
 for (const button of worldShell.querySelectorAll('[data-home-action]')) {
   button.addEventListener('click', () => {
     const action = button.dataset.homeAction;
-    if (action === 'tv') worldOpenPlace('journal', button);
-    if (action === 'bed') worldOpenPlace('appearance', button);
-    if (action === 'chest') worldOpenPlace('backpack', button);
-    if (action === 'menu') worldOpenPlace('menu', button);
+    if (action === 'tv') worldOpenPlace('journal');
+    if (action === 'bed') worldOpenPlace('appearance');
+    if (action === 'chest') worldOpenPlace('backpack');
+    if (action === 'menu') worldOpenPlace('menu');
     if (action === 'feed') worldCare('food');
     if (action === 'clean') worldCare('soap');
     if (action === 'couch') {
@@ -456,6 +445,11 @@ function worldHighlight(destination) {
   if (outline) {
     for (const stroke of homeOutlineStrokes) stroke.setAttribute('href', `/scenes/home-highlights.svg#${action}`);
   }
+  const townAction = target?.dataset.townAction;
+  townInteractionOutline.toggleAttribute('hidden', !townAction);
+  if (townAction) {
+    for (const stroke of townOutlineStrokes) stroke.setAttribute('href', `/scenes/town-highlights.svg#${townAction}`);
+  }
 }
 function worldDraw() {
   const transform = `translate3d(${worldPosition.x * worldView.width / 960}px, ${worldPosition.y * worldView.height / 640}px, 0) translate(-50%, -100%)`;
@@ -547,11 +541,12 @@ function worldStartWalk(key) {
   worldScheduleWalk();
 }
 document.addEventListener('keydown', (event) => {
-  if (worldDashboard.hidden || worldModalOpen() || event.target !== worldStage || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (worldDashboard.hidden || worldModalOpen() || event.altKey || event.ctrlKey || event.metaKey) return;
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  if (key === 'Escape' && worldStage.contains(event.target)) { event.preventDefault(); worldOpenPlace('menu'); return; }
+  if (event.target !== worldStage) return;
   if (worldDirections[key]) { event.preventDefault(); worldStartWalk(key); }
   if (['e', 'Enter', ' '].includes(key)) { event.preventDefault(); if (!event.repeat) worldById('world-interact').click(); }
-  if (key === 'Escape' && worldScene === 'home') { event.preventDefault(); worldOpenPlace('menu', worldStage); }
 });
 document.addEventListener('keyup', (event) => {
   worldKeys.delete(event.key.length === 1 ? event.key.toLowerCase() : event.key);

@@ -93,9 +93,10 @@ come. Each would add interaction, but the first version proves the core loop
 ## Playing
 
 Your pet lives in **Sweet Home**, a furnished room with a television,
-couch, pet house, fireplace, food bowl, bath, and storage chest. Home fills
-the screen, with just a small movement and interaction tip in the upper-left
-corner. Walk with **W/A/S/D** or the **arrow keys**, then press **Space**
+couch, pet house, fireplace, food bowl, bath, and storage chest. Home and town
+fill the screen, with a camera that follows you and a small movement and
+interaction tip in the upper-left corner. Walk with **W/A/S/D** or the
+**arrow keys**, then press **Space**
 near your pet or a piece of furniture to interact. The nearby object that
 Space will interact with gets a thin outline matching its shape; your pet gets
 a small ring at its feet. These static highlights follow your position
@@ -103,7 +104,9 @@ and disappear when you move out of range or open a window. You can also
 click or tap an empty spot to walk there, or select an object directly. Clicked routes
 continue smoothly around furniture and your pet, and walking keeps the same
 speed across display refresh rates. Movement pauses while a window is open
-or you are typing. Home and town work on desktop and phones.
+or you are typing. Home and town work on desktop and phones. Menus, windows,
+and controls share the sign-in screen's warm orange and cream palette,
+rounded shapes, typefaces, and light or dark appearance.
 
 Touch your pet or interact with its rug to open a small pop-up showing its
 needs, attributes, money, and current lesson or shift. Choose a care or play
@@ -114,19 +117,20 @@ the **Journal**. The wall clock opens game help and **Sign out**. Step through
 the front door to visit town.
 
 The town has **Shops**, **Adventure**, **Arena**, **Part-time Jobs**, and
-**School**. Click or tap a destination to open its activities. **Sweet Home**
+**School**. Walk near a building to see its outline, then press **Space**,
+or click or tap the building to open its activities. **Sweet Home**
 returns you to your pet. Your **Backpack** holds supplies, learned abilities, and
 Unfair Coins; the **Journal** keeps recent visitors, activity, fight
-history, and saved theft reports with revenge options. In town, your pet's
-needs, attributes, money, and current lesson or shift remain available in
-the companion panel beside the scene, or below it on a phone.
+history, and saved theft reports with revenge options. Press **Escape** in
+either scene to open the game menu for your pet's details, Backpack,
+Journal, Appearance, help, and Sign out. Pet details open in a compact window;
+head home to feed, clean, and play with your pet.
 
-Town uses the same movement and **Space** interaction controls, with an
-on-screen direction pad as well. Every destination and home object also
-works with Tab and Enter. Movement pauses while a window is open or you are
-typing. Close a window with its Close button or Escape to return to the
-scene. Walking around home and town costs nothing; lessons, work, battles,
-and adventures keep their usual rules.
+Town uses the same movement and **Space** interaction controls as home.
+Every destination and home object also works with Tab and Enter, and the
+camera brings focused objects into view. Close a window with its Close
+button or Escape to return to the scene. Walking around home and town costs
+nothing; lessons, work, battles, and adventures keep their usual rules.
 
 **Create an account** with a player ID (letters, digits, `-` or `_`, up to
 32 characters) and a password of at least 8 characters. Each ID has one
