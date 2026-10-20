@@ -93,27 +93,34 @@ come. Each would add interaction, but the first version proves the core loop
 ## Playing
 
 Your pet lives in **Sweet Home**, a furnished room with a television,
-couch, pet bed, fireplace, food bowl, and wash basin. Play with your pet,
-feed it, or clean it at home. Step through the front door, or choose
-**Town map**, to visit the town. The same home and town work on desktop
-and phones.
+couch, pet house, fireplace, food bowl, bath, and storage chest. Home fills
+the screen, with just a small movement and interaction tip in the upper-left
+corner. Walk with **W/A/S/D** or the **arrow keys**, then press **Space**
+near your pet or a piece of furniture to interact. You can also click or tap
+an empty spot to walk there, or select an object directly. Home and town
+work on desktop and phones.
+
+Touch your pet to play with it. Interact with its rug to open its needs,
+attributes, money, current lesson or shift, and care and play controls.
+Use the food bowl to feed it and the bath to clean it. The pet house opens
+**Appearance**, the chest opens your **Backpack**, and the television opens
+the **Journal**. The wall clock opens game help and **Sign out**. Step through
+the front door to visit town.
 
 The town has **Shops**, **Adventure**, **Arena**, **Part-time Jobs**, and
 **School**. Click or tap a destination to open its activities. **Sweet Home**
 returns you to your pet. Your **Backpack** holds supplies, learned abilities, and
 Unfair Coins; the **Journal** keeps recent visitors, activity, fight
-history, and saved theft reports with revenge options. Your pet's needs,
-attributes, money, and current lesson or shift remain available in the
-companion panel beside the scene, or below it on a phone.
+history, and saved theft reports with revenge options. In town, your pet's
+needs, attributes, money, and current lesson or shift remain available in
+the companion panel beside the scene, or below it on a phone.
 
-Click the scene to walk with **W/A/S/D** or the **arrow keys**, then press
-**E** or **Enter** to interact with something nearby. You can also click or
-tap an empty spot to walk there, or use the on-screen direction pad.
-Every destination and home care action also has a button that works with
-Tab and Enter. Movement
-pauses while a window is open or you are typing. Close a window with its
-Close button or Escape to return to the scene. Walking around home and town
-costs nothing; lessons, work, battles, and adventures keep their usual rules.
+Town uses the same movement and **Space** interaction controls, with an
+on-screen direction pad as well. Every destination and home object also
+works with Tab and Enter. Movement pauses while a window is open or you are
+typing. Close a window with its Close button or Escape to return to the
+scene. Walking around home and town costs nothing; lessons, work, battles,
+and adventures keep their usual rules.
 
 **Create an account** with a player ID (letters, digits, `-` or `_`, up to
 32 characters) and a password of at least 8 characters. Each ID has one
@@ -131,7 +138,7 @@ its ID.
 
 ### Pet appearance
 
-Open **Appearance**, or select the pet bed at home, to pick a color and a shape:
+Open **Appearance**, or select the pet house at home, to pick a color and a shape:
 **cat, dog, bird, dragon, or blob**. Press **Save appearance**. New and
 existing pets start as an amber (`#f59e0b`) blob until you customize them.
 Changing appearance is free, and works while studying or working. Only the
@@ -154,8 +161,8 @@ saving a setting never previews an unsaved change on the pet.
 
 ### Playing with your pet
 
-Tap or click your pet at home to touch it there, or use the buttons
-under **Play with your pet**. The same four touches work on other players'
+Tap or click your pet at home to touch it there, or interact with its rug
+and use the buttons under **Play with your pet**. The same four touches work on other players'
 pets while you visit them (see **Visit, play and steal** below):
 
 | Touch | Where on the pet | Reaction |

@@ -32,6 +32,13 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
 
 ## Home and town interface
 
+- Preserve the original sign-in and create-account theme. World styles
+  belong to the signed-in game, not the account screens.
+- Sweet Home shows the furnished scene and a small upper-left tip:
+  W/A/S/D to move, Space bar to interact. Keep persistent dashboard,
+  navigation, and stats panels out of the home view. Reach care, pet details,
+  appearance, supplies, the journal, and account controls through the pet
+  and furniture; show their windows only when requested.
 - `public/world.js` and `public/world.css` present Sweet Home and the town
   map. Move the existing gameplay controls into scenes and windows; preserve
   their IDs, listeners, and server-driven updates in `app.js` and the other

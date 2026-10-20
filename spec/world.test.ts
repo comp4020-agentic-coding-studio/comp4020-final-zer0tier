@@ -29,8 +29,10 @@ function page() {
     }
   };
   $('dashboard').hidden = false;
+  $('signout').hidden = false;
   const controls = new Map(['pet-touch', 'pet-avatar', 'courses', 'items', 'locations',
-    'appearance-settings', 'adventure-open', 'theft-notifications'].map(id => [id, $(id)]));
+    'appearance-settings', 'adventure-open', 'theft-notifications', 'pet-name',
+    'meter-stamina', 'busy', 'signout'].map(id => [id, $(id)]));
   const lesson = window.document.createElement('button');
   lesson.textContent = 'Take a lesson';
   const study = vi.fn();
@@ -42,6 +44,12 @@ function page() {
     expect(button, `${place} must be reachable`).not.toBeNull();
     button!.click();
   };
+  const homeAction = (action: string) => {
+    const button = window.document.querySelector<HTMLButtonElement>(`[data-home-action="${action}"]`);
+    expect(button, `${action} must be reachable at home`).not.toBeNull();
+    expect(button!.closest('[hidden]')).toBeNull();
+    button!.click();
+  };
   const walk = (key = 'ArrowRight', target: HTMLElement = $('world-stage')) => {
     target.dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true }));
     advance();
@@ -49,7 +57,7 @@ function page() {
     advance();
   };
   const position = () => [$('world-avatar').style.left, $('world-avatar').style.top];
-  return { dom, window, $, controls, lesson, study, destination, walk, position, advance };
+  return { dom, window, $, controls, lesson, study, destination, homeAction, walk, position, advance };
 }
 
 it('keeps the live pet and gameplay controls while navigating between home and town', () => {
@@ -58,14 +66,27 @@ it('keeps the live pet and gameplay controls while navigating between home and t
     expect(p.$('world-stage').dataset.scene).toBe('home');
     expect(p.$('home-scene').hidden).toBe(false);
     expect(p.$('town-scene').hidden).toBe(true);
+    expect(p.window.document.body.classList.contains('world-home')).toBe(true);
+    expect(p.$('home-controls-tip').closest('[hidden]')).toBeNull();
+    expect(p.$('home-controls-tip').textContent).toMatch(/W\s*\/\s*A\s*\/\s*S\s*\/\s*D.*move/is);
+    expect(p.$('home-controls-tip').textContent).toMatch(/Space\s+bar.*interact/is);
+    for (const selector of ['.world-heading', '.world-companion', '.scene-caption', '.world-controls', '.world-nav']) {
+      expect(p.window.document.querySelector(selector)!.hasAttribute('hidden'), selector).toBe(true);
+    }
+    expect(p.$('home-feedback').hidden).toBe(true);
     expect(p.$('home-scene').contains(p.controls.get('pet-touch')!)).toBe(true);
     p.$('home-door').click();
     expect(p.$('world-stage').dataset.scene).toBe('town');
     expect(p.$('home-scene').hidden).toBe(true);
     expect(p.$('town-scene').hidden).toBe(false);
+    expect(p.window.document.body.classList.contains('world-home')).toBe(false);
+    expect(p.$('home-controls-tip').hidden).toBe(true);
+    for (const selector of ['.world-heading', '.world-companion', '.scene-caption', '.world-controls', '.world-nav']) {
+      expect(p.window.document.querySelector(selector)!.hasAttribute('hidden'), selector).toBe(false);
+    }
     p.$('town-home').click();
     expect(p.$('world-stage').dataset.scene).toBe('home');
-    p.$('world-map').click();
+    p.$('home-door').click();
     expect(p.$('world-stage').dataset.scene).toBe('town');
     p.$('world-home').click();
     expect(p.$('world-stage').dataset.scene).toBe('home');
@@ -79,7 +100,7 @@ it('keeps the live pet and gameplay controls while navigating between home and t
 it('opens every destination with its existing working controls and restores focus on close', () => {
   const p = page();
   try {
-    p.$('world-map').click();
+    p.$('home-door').click();
     for (const [place, control] of [['shop', 'items'], ['work', 'locations'], ['school', 'courses'],
       ['arena', 'lookup'], ['backpack', 'coins'], ['journal', 'visitors'], ['appearance', 'appearance-settings']]) {
       p.destination(place);
@@ -99,6 +120,48 @@ it('opens every destination with its existing working controls and restores focu
   } finally { p.dom.window.close(); }
 });
 
+it('opens pet care and account controls through home objects without replacing their live controls', () => {
+  const p = page();
+  try {
+    const signOut = vi.fn();
+    const pat = vi.fn();
+    p.$('signout').addEventListener('click', signOut);
+    p.window.document.querySelector('[data-touch="pat"]')!.addEventListener('click', pat);
+    expect(p.$('pet-name').closest('[hidden]')).not.toBeNull();
+    for (const [action, place, control] of [['pet', 'pet', 'pet-name'], ['bed', 'appearance', 'appearance-settings'],
+      ['chest', 'backpack', 'coins'], ['tv', 'journal', 'visitors'], ['menu', 'menu', 'signout']]) {
+      p.homeAction(action);
+      expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(true);
+      expect(p.$('world-dialog').dataset.place).toBe(place);
+      expect(p.$('world-dialog').contains(p.$(control))).toBe(true);
+      expect(p.$(control).closest('[hidden]')).toBeNull();
+      if (action === 'pet') {
+        expect(p.$('home-feed').closest('[hidden]')).toBeNull();
+        expect(p.$('home-clean').closest('[hidden]')).toBeNull();
+        expect(p.$('home-scene').contains(p.$('pet-touch'))).toBe(true);
+        p.window.document.querySelector<HTMLButtonElement>('[data-touch="pat"]')!.click();
+      }
+      if (action === 'menu') {
+        expect(p.$('world-dialog').querySelector('a[href="/readme/"]')).not.toBeNull();
+        p.$('signout').click();
+      }
+      p.$('world-dialog-close').click();
+      expect(p.window.document.activeElement?.closest('[hidden]')).toBeNull();
+    }
+    expect(pat).toHaveBeenCalledOnce();
+    expect(signOut).toHaveBeenCalledOnce();
+    p.$('home-door').click();
+    expect(p.$('pet-name').closest('.world-companion')).not.toBeNull();
+    expect(p.$('pet-name').closest('[hidden]')).toBeNull();
+    p.$('town-home').click();
+    p.homeAction('pet');
+    for (const [id, original] of p.controls) {
+      expect(p.$(id)).toBe(original);
+      expect(p.window.document.querySelectorAll(`#${id}`)).toHaveLength(1);
+    }
+  } finally { p.dom.window.close(); }
+});
+
 it('uses existing care actions and follows their saved inventory and disabled state at home', async () => {
   const p = page();
   try {
@@ -114,16 +177,22 @@ it('uses existing care actions and follows their saved inventory and disabled st
     await vi.waitFor(() => expect((p.$('home-feed') as HTMLButtonElement).disabled).toBe(false));
     expect(p.$('home-feed').textContent).toContain('2');
     expect(p.$('home-clean').textContent).toContain('3');
-    p.$('home-feed').click();
-    p.$('home-clean').click();
+    p.homeAction('feed');
+    p.homeAction('clean');
     expect(feed).toHaveBeenCalledOnce();
     expect(clean).toHaveBeenCalledOnce();
+    expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(false);
+    p.homeAction('pet');
+    p.$('home-feed').click();
+    p.$('home-clean').click();
+    expect(feed).toHaveBeenCalledTimes(2);
+    expect(clean).toHaveBeenCalledTimes(2);
     food.disabled = true;
     p.$('items').querySelector('[data-item="food"] .item-count')!.textContent = '0';
     await vi.waitFor(() => expect((p.$('home-feed') as HTMLButtonElement).disabled).toBe(true));
     expect(p.$('home-feed').textContent).toContain('0');
     p.$('home-feed').click();
-    expect(feed).toHaveBeenCalledOnce();
+    expect(feed).toHaveBeenCalledTimes(2);
   } finally { p.dom.window.close(); }
 });
 
@@ -134,7 +203,16 @@ it('moves in the world but leaves keyboard input alone in dialogs and text field
     const start = p.position();
     p.walk();
     expect(p.position()).not.toEqual(start);
-    p.destination('shop');
+    for (const action of ['feed', 'clean', 'couch', 'fire']) {
+      const hotspot = p.window.document.querySelector<HTMLButtonElement>(`[data-home-action="${action}"]`)!;
+      hotspot.focus();
+      p.homeAction(action);
+      expect(p.window.document.activeElement, `walking focus after ${action}`).toBe(p.$('world-stage'));
+      const beforeWalk = p.position();
+      p.walk('d', p.window.document.activeElement as HTMLElement);
+      expect(p.position(), `walking resumes after ${action}`).not.toEqual(beforeWalk);
+    }
+    p.homeAction('pet');
     const paused = p.position();
     p.walk();
     expect(p.position()).toEqual(paused);
@@ -154,17 +232,44 @@ it('moves in the world but leaves keyboard input alone in dialogs and text field
   } finally { p.dom.window.close(); }
 });
 
-it('walks with the direction pad and uses the nearby doorway from the keyboard', () => {
+it('uses Space to interact at home and walks with the town direction pad', () => {
   const p = page();
   try {
-    const down = p.window.document.querySelector<HTMLButtonElement>('[data-world-direction="down"]')!;
-    for (let step = 0; step < 8 && !p.$('world-interact').textContent?.includes('Leave'); step++) down.click();
+    p.$('world-stage').focus();
+    p.walk('w');
+    p.$('world-stage').dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+    expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(true);
+    expect(p.$('world-dialog').dataset.place).toBe('pet');
+    p.$('world-dialog-close').click();
+    expect(p.window.document.activeElement).toBe(p.$('world-stage'));
+    for (let step = 0; step < 5 && !p.$('world-interact').textContent?.includes('Leave'); step++) p.walk('s');
     expect(p.$('world-stage').dataset.scene).toBe('home');
     expect((p.$('world-interact') as HTMLButtonElement).disabled).toBe(false);
-    p.$('world-stage').focus();
-    p.$('world-stage').dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'e', bubbles: true }));
+    p.$('world-stage').dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
     expect(p.$('world-stage').dataset.scene).toBe('town');
-    p.$('world-stage').dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const left = p.window.document.querySelector<HTMLButtonElement>('[data-world-direction="left"]')!;
+    const start = p.position();
+    left.click();
+    expect(p.position()).not.toEqual(start);
+    p.$('world-stage').dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+    expect(p.$('world-stage').dataset.scene).toBe('home');
+  } finally { p.dom.window.close(); }
+});
+
+it('announces pet reactions and failed care at home while the pet panel is closed', async () => {
+  const p = page();
+  try {
+    p.$('pet-reaction').textContent = 'Your pet leans into your hand.';
+    await vi.waitFor(() => expect(p.$('home-feedback').textContent).toBe('Your pet leans into your hand.'));
+    expect(p.$('home-feedback').hidden).toBe(false);
+    p.$('items').innerHTML = '<div data-item="food"><span class="item-count">1</span><button class="chip-use">Feed</button></div>';
+    p.$('items').querySelector('button')!.addEventListener('click', () => {
+      p.$('care-error').textContent = 'Your pet is busy. Please wait.';
+    });
+    p.homeAction('feed');
+    await vi.waitFor(() => expect(p.$('home-feedback').textContent).toBe('Your pet is busy. Please wait.'));
+    expect(p.$('home-feedback').closest('[hidden]')).toBeNull();
+    expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(false);
     expect(p.$('world-stage').dataset.scene).toBe('home');
   } finally { p.dom.window.close(); }
 });
@@ -172,7 +277,7 @@ it('walks with the direction pad and uses the nearby doorway from the keyboard',
 it('can walk to a clear spot after stopping beside a building with the keyboard', () => {
   const p = page();
   try {
-    p.$('world-map').click();
+    p.$('home-door').click();
     p.walk('ArrowUp');
     const stage = p.$('world-stage');
     vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
@@ -193,7 +298,7 @@ it('can walk to a clear spot after stopping beside a building with the keyboard'
 it('shows an Hourglass action error while the player is in town', async () => {
   const p = page();
   try {
-    p.$('world-map').click();
+    p.$('home-door').click();
     p.$('busy').hidden = false;
     p.$('skip').addEventListener('click', () => { p.$('care-error').textContent = 'No hourglasses left.'; });
     p.$('skip').click();
@@ -209,20 +314,23 @@ it('surfaces saved theft reports and clears the open world view when the account
     p.$('theft-list').innerHTML = '<div>neighbour stole $20 <button>Take revenge</button></div>';
     p.$('theft-notifications').hidden = false;
     await vi.waitFor(() => expect(p.$('world-journal').textContent).toMatch(/1 report/i));
-    p.destination('journal');
+    p.homeAction('tv');
     expect(p.$('world-dialog').contains(p.$('theft-notifications'))).toBe(true);
     expect(p.$('theft-notifications').closest('[hidden]')).toBeNull();
     p.window.document.dispatchEvent(new p.window.CustomEvent('adventure:reset'));
     expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(false);
     expect(p.$('world-stage').dataset.scene).toBe('home');
-    p.$('world-map').click();
+    p.$('home-door').click();
     p.destination('arena');
     p.$('dashboard').hidden = true;
     await vi.waitFor(() => expect(p.window.document.body.classList.contains('world-playing')).toBe(false));
+    expect(p.window.document.body.classList.contains('world-home')).toBe(false);
     expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(false);
     expect(p.$('world-stage').dataset.scene).toBe('home');
     p.$('dashboard').hidden = false;
     await vi.waitFor(() => expect(p.window.document.body.classList.contains('world-playing')).toBe(true));
+    expect(p.window.document.body.classList.contains('world-home')).toBe(true);
+    expect(p.window.document.activeElement).toBe(p.$('world-stage'));
     expect(p.$('world-stage').dataset.scene).toBe('home');
   } finally { p.dom.window.close(); }
 });
