@@ -20,9 +20,9 @@ function page() {
   window.requestAnimationFrame = (callback) => { frames.set(++frameId, callback); return frameId; };
   window.cancelAnimationFrame = (id) => { frames.delete(id); };
   vi.spyOn(window.performance, 'now').mockImplementation(() => clock);
-  const advance = () => {
-    for (let step = 0; step < 6; step++) {
-      clock += 16;
+  const advance = (steps = 6, milliseconds = 16) => {
+    for (let step = 0; step < steps; step++) {
+      clock += milliseconds;
       const pending = [...frames.values()];
       frames.clear();
       pending.forEach(callback => callback(clock));
@@ -61,7 +61,16 @@ function page() {
     target.dispatchEvent(new window.KeyboardEvent('keyup', { key, bubbles: true }));
     advance();
   };
-  const position = () => [$('world-avatar').style.left, $('world-avatar').style.top];
+  const position = () => {
+    const translation = $('world-avatar').style.transform.match(/translate3d\(([-\d.e+]+)px,\s*([-\d.e+]+)px,/i);
+    if (!translation) throw new Error('The character must have a rendered position');
+    if ($('world-stage').dataset.scene === 'home') {
+      const scale = Math.max(window.innerWidth / 960, window.innerHeight / 640);
+      return { x: Number(translation[1]) / scale, y: Number(translation[2]) / scale };
+    }
+    const { width, height } = $('world-stage').getBoundingClientRect();
+    return { x: Number(translation[1]) * 960 / (width || 960), y: Number(translation[2]) * 640 / (height || 640) };
+  };
   return { dom, window, $, controls, lesson, study, play, destination, homeAction, walk, position, advance };
 }
 
@@ -318,6 +327,110 @@ it('uses Space to interact at home and walks with the town direction pad', () =>
   } finally { p.dom.window.close(); }
 });
 
+it.each([30, 60, 120])('walks at a consistent speed from the first frame at %i Hz', (refreshRate) => {
+  const p = page();
+  try {
+    for (const scene of ['home', 'town']) {
+      if (scene === 'town') p.$('home-door').click();
+      const stage = p.$('world-stage');
+      stage.focus();
+      const start = p.position();
+      stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+      p.advance(1, 1000 / refreshRate);
+      expect(p.position().x - start.x).toBeCloseTo(190 / refreshRate, 6);
+      p.advance(refreshRate - 1, 1000 / refreshRate);
+      expect(p.position().x - start.x).toBeCloseTo(190, 6);
+      expect(p.position().y).toBeCloseTo(start.y, 6);
+      stage.dispatchEvent(new p.window.KeyboardEvent('keyup', { key: 'd', bubbles: true }));
+      p.advance(1, 1000 / refreshRate);
+      expect(p.position().x - start.x).toBeCloseTo(190, 6);
+    }
+  } finally { p.dom.window.close(); }
+});
+
+it('preserves the character position when resizing a town map with fractional dimensions', () => {
+  const p = page();
+  try {
+    const stage = p.$('world-stage');
+    const bounds = new p.window.DOMRect(0, 0, 753.375, 502.25);
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(bounds);
+    vi.spyOn(stage, 'clientWidth', 'get').mockReturnValue(Math.round(bounds.width));
+    vi.spyOn(stage, 'clientHeight', 'get').mockReturnValue(Math.round(bounds.height));
+    p.$('home-door').click();
+    expect(p.position().x).toBeCloseTo(480, 6);
+    expect(p.position().y).toBeCloseTo(585, 6);
+    p.walk('d');
+    const before = p.position();
+    const rendered = p.$('world-avatar').style.transform;
+    expect(before.x).toBeCloseTo(480 + 190 * .096, 6);
+
+    // A wider viewport can leave a max-width town map at exactly the same
+    // fractional size, so no element-resize notification follows this event.
+    Object.defineProperty(p.window, 'innerWidth', { configurable: true, value: 1600 });
+    p.window.dispatchEvent(new p.window.Event('resize'));
+    expect(p.position().x).toBeCloseTo(before.x, 6);
+    expect(p.position().y).toBeCloseTo(before.y, 6);
+    expect(p.$('world-avatar').style.transform).toBe(rendered);
+    p.walk('a');
+    expect(p.position().x).toBeCloseTo(480, 6);
+    expect(p.position().y).toBeCloseTo(585, 6);
+  } finally { p.dom.window.close(); }
+});
+
+it('walks continuously across clicked route waypoints and stops at the destination', () => {
+  const p = page();
+  try {
+    p.$('home-door').click();
+    const stage = p.$('world-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
+    stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: 700, clientY: 580, bubbles: true }));
+    for (let frame = 0; frame < 50; frame++) {
+      const previous = p.position();
+      p.advance(1);
+      const current = p.position();
+      expect(Math.hypot(current.x - previous.x, current.y - previous.y), `route frame ${frame}`).toBeGreaterThan(0);
+      if (frame > 1) expect(current.x - previous.x).toBeCloseTo(190 * .016, 6);
+    }
+    // Five pixels reach the path; the remaining travel continues east.
+    expect(p.position().x).toBeCloseTo(480 + 190 * .8 - 5, 6);
+    expect(p.position().y).toBeCloseTo(580, 6);
+    p.advance(40);
+    expect(p.position().x).toBeCloseTo(700, 6);
+    expect(p.position().y).toBeCloseTo(580, 6);
+    expect(p.$('world-avatar').dataset.walking).toBe('false');
+    const arrived = p.position();
+    p.advance();
+    expect(p.position()).toEqual(arrived);
+  } finally { p.dom.window.close(); }
+});
+
+it('stops at a building while allowing the character to walk around its edge', () => {
+  const p = page();
+  try {
+    p.$('home-door').click();
+    const stage = p.$('world-stage');
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'w', bubbles: true }));
+    p.advance(30);
+    const stopped = p.position();
+    expect(stopped.x).toBeCloseTo(480, 6);
+    expect(stopped.y).toBeGreaterThanOrEqual(566);
+    expect(stopped.y).toBeLessThan(570);
+    p.advance(30);
+    expect(p.position()).toEqual(stopped);
+    stage.dispatchEvent(new p.window.KeyboardEvent('keyup', { key: 'w', bubbles: true }));
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    p.advance(35);
+    stage.dispatchEvent(new p.window.KeyboardEvent('keyup', { key: 'd', bubbles: true }));
+    const beside = p.position();
+    expect(beside.x).toBeGreaterThan(580);
+    expect(beside.y).toBeCloseTo(stopped.y, 6);
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'w', bubbles: true }));
+    p.advance();
+    stage.dispatchEvent(new p.window.KeyboardEvent('keyup', { key: 'w', bubbles: true }));
+    expect(p.position().y).toBeLessThan(beside.y - 15);
+  } finally { p.dom.window.close(); }
+});
+
 it('announces pet reactions and failed care at home while the pet panel is closed', async () => {
   const p = page();
   try {
@@ -343,16 +456,12 @@ it('can walk to a clear spot after stopping beside a building with the keyboard'
     p.walk('ArrowUp');
     const stage = p.$('world-stage');
     vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
-    const point = () => ({
-      x: parseFloat(p.$('world-avatar').style.left) * 960 / 100,
-      y: parseFloat(p.$('world-avatar').style.top) * 640 / 100,
-    });
-    const stopped = point();
+    const stopped = p.position();
     stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: 600, clientY: 580, bubbles: true }));
     for (let frame = 0; frame < 4; frame++) p.advance();
-    expect(point().x).toBeGreaterThan(stopped.x);
+    expect(p.position().x).toBeGreaterThan(stopped.x);
     for (let frame = 0; frame < 20; frame++) p.advance();
-    expect(Math.hypot(point().x - 600, point().y - 580)).toBeLessThan(7);
+    expect(Math.hypot(p.position().x - 600, p.position().y - 580)).toBeLessThan(7);
     expect(p.$('world-stage').dataset.scene).toBe('town');
   } finally { p.dom.window.close(); }
 });

@@ -158,6 +158,9 @@ let worldLastFrame = 0;
 let worldKeys = new Set();
 let worldPath = [];
 let worldPosition = { x: 480, y: 475 };
+let worldView = { width: 960, height: 640, viewportWidth: 960, viewportHeight: 640 };
+let worldCameraTransform = '';
+let worldAvatarTransform = '';
 let worldNearest = null;
 let worldFeedbackTimer = 0;
 let worldCarePending = null;
@@ -207,18 +210,42 @@ function worldArrangeHome(atHome) {
   worldStage.setAttribute('aria-describedby', atHome ? 'home-controls-tip' : 'world-movement-help');
 }
 function worldCamera(point = worldPosition) {
-  if (worldScene !== 'home' || worldDashboard.hidden) {
-    for (const key of ['--scene-width', '--scene-height', '--camera-x', '--camera-y']) worldStage.style.removeProperty(key);
-    return;
+  if (worldScene !== 'home' || worldDashboard.hidden) return;
+  const { width, height, viewportWidth, viewportHeight } = worldView;
+  const offsetX = Math.max(viewportWidth - width, Math.min(0, viewportWidth / 2 - point.x * width / 960));
+  const offsetY = Math.max(viewportHeight - height, Math.min(0, viewportHeight / 2 - point.y * height / 640));
+  const transform = `translate3d(${offsetX}px, ${offsetY}px, 0)`;
+  if (worldCameraTransform !== transform) {
+    worldStage.style.transform = transform;
+    worldCameraTransform = transform;
   }
-  const width = window.innerWidth, height = window.innerHeight;
-  const scale = Math.max(width / 960, height / 640);
-  const sceneWidth = 960 * scale, sceneHeight = 640 * scale;
-  const offsetX = Math.max(width - sceneWidth, Math.min(0, width / 2 - point.x * scale));
-  const offsetY = Math.max(height - sceneHeight, Math.min(0, height / 2 - point.y * scale));
-  for (const [key, value] of Object.entries({ '--scene-width': sceneWidth, '--scene-height': sceneHeight, '--camera-x': offsetX, '--camera-y': offsetY })) worldStage.style.setProperty(key, `${value}px`);
 }
-window.addEventListener('resize', () => worldCamera());
+// Measure only when the layout changes. Walking moves two composited layers,
+// without laying out the room or invalidating inherited styles on its children.
+function worldResize() {
+  const viewportWidth = window.innerWidth, viewportHeight = window.innerHeight;
+  if (worldScene === 'home' && !worldDashboard.hidden) {
+    const scale = Math.max(viewportWidth / 960, viewportHeight / 640);
+    worldView = { width: 960 * scale, height: 640 * scale, viewportWidth, viewportHeight };
+    worldStage.style.setProperty('--scene-width', `${worldView.width}px`);
+    worldStage.style.setProperty('--scene-height', `${worldView.height}px`);
+  } else {
+    worldStage.style.removeProperty('--scene-width');
+    worldStage.style.removeProperty('--scene-height');
+    worldStage.style.removeProperty('transform');
+    worldCameraTransform = '';
+    const { width, height } = worldStage.getBoundingClientRect();
+    worldView = { width: width || 960, height: height || 640, viewportWidth, viewportHeight };
+  }
+}
+window.addEventListener('resize', () => { worldResize(); worldDraw(); });
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(([entry]) => {
+  if (worldScene !== 'town' || worldDashboard.hidden) return;
+  const { width, height } = entry.contentRect;
+  if (!width || !height || (width === worldView.width && height === worldView.height)) return;
+  worldView = { ...worldView, width, height };
+  worldDraw();
+}).observe(worldStage);
 worldStage.addEventListener('focusin', event => {
   const object = event.target.closest('.home-hotspot');
   // Keyboard users can reach furniture outside the camera. Pointer focus
@@ -231,7 +258,11 @@ function worldStop() {
   cancelAnimationFrame(worldFrame);
   worldFrame = 0;
   worldLastFrame = 0;
-  worldAvatar.dataset.walking = 'false';
+  worldSetWalking(false);
+}
+function worldSetWalking(walking) {
+  const value = String(walking);
+  if (worldAvatar.dataset.walking !== value) worldAvatar.dataset.walking = value;
 }
 function worldModalOpen() { return Boolean(document.querySelector('dialog[open]')); }
 function worldOpenPlace(name, trigger) {
@@ -290,6 +321,7 @@ function worldChangeScene(scene, focus = true) {
   worldById('town-care-hint').hidden = atHome;
   worldStage.setAttribute('aria-label', `${atHome ? 'Your home' : 'Town map'}. Move with W A S D or arrow keys. Press Space near an object to interact.`);
   worldMessage(atHome ? '' : 'The day is yours. Select a building, or walk over and press Space.', false);
+  worldResize();
   worldDraw();
   if (focus && !worldDashboard.hidden) worldStage.focus({ preventScroll: true });
 }
@@ -397,14 +429,19 @@ function worldTargets() {
   return [[250, 194, 'Browse part-time jobs', '[data-place="work"]'], [482, 233, 'Visit school', '[data-place="school"]'], [751, 189, 'Enter the woodland', '#adventure-open'], [204, 379, 'Visit the shops', '[data-place="shop"]'], [752, 440, 'Enter the arena', '[data-place="arena"]'], [482, 571, 'Go home', '#town-home']];
 }
 function worldDraw() {
-  worldAvatar.style.left = `${worldPosition.x / 9.6}%`;
-  worldAvatar.style.top = `${worldPosition.y / 6.4}%`;
+  const transform = `translate3d(${worldPosition.x * worldView.width / 960}px, ${worldPosition.y * worldView.height / 640}px, 0) translate(-50%, -100%)`;
+  if (worldAvatarTransform !== transform) {
+    worldAvatar.style.transform = transform;
+    worldAvatarTransform = transform;
+  }
   const choices = worldTargets().map((target) => ({ target, distance: Math.hypot(target[0] - worldPosition.x, target[1] - worldPosition.y) })).sort((a, b) => a.distance - b.distance);
   worldNearest = choices[0]?.distance <= 82 ? choices[0].target : null;
   const control = worldById('world-interact');
   const destination = worldNearest && worldShell.querySelector(worldNearest[3]);
-  control.disabled = !destination || destination.disabled;
-  control.textContent = worldNearest ? `${worldNearest[2]} · Space` : 'Move closer to interact';
+  const disabled = !destination || destination.disabled;
+  const label = worldNearest ? `${worldNearest[2]} · Space` : 'Move closer to interact';
+  if (control.disabled !== disabled) control.disabled = disabled;
+  if (control.textContent !== label) control.textContent = label;
   worldCamera();
 }
 worldById('world-interact').addEventListener('click', () => {
@@ -412,37 +449,59 @@ worldById('world-interact').addEventListener('click', () => {
 });
 
 const worldDirections = { ArrowUp: [0, -1], w: [0, -1], ArrowDown: [0, 1], s: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0], ArrowRight: [1, 0], d: [1, 0] };
+function worldMove(dx, dy) {
+  if (worldWalkable(worldPosition.x + dx, worldPosition.y)) worldPosition.x += dx;
+  if (worldWalkable(worldPosition.x, worldPosition.y + dy)) worldPosition.y += dy;
+}
 function worldTick(now) {
   worldFrame = 0;
   if (worldDashboard.hidden || worldModalOpen()) return worldStop();
-  const seconds = Math.min((now - (worldLastFrame || now - 16)) / 1000, .04);
+  const seconds = Math.min(Math.max((now - worldLastFrame) / 1000, 0), .04);
   worldLastFrame = now;
+  const previous = { ...worldPosition };
   let dx = 0, dy = 0;
   for (const key of worldKeys) { dx += worldDirections[key][0]; dy += worldDirections[key][1]; }
-  if (!worldKeys.size && worldPath.length) {
-    const next = worldPath[0];
-    dx = next.x - worldPosition.x; dy = next.y - worldPosition.y;
-    if (Math.hypot(dx, dy) < 5) { worldPath.shift(); dx = 0; dy = 0; }
-  }
   const distance = Math.hypot(dx, dy);
-  const step = Math.min(190 * seconds, worldKeys.size ? Infinity : distance);
-  if (distance) {
-    dx = dx / distance * step; dy = dy / distance * step;
-    if (worldWalkable(worldPosition.x + dx, worldPosition.y)) worldPosition.x += dx;
-    if (worldWalkable(worldPosition.x, worldPosition.y + dy)) worldPosition.y += dy;
-    worldAvatar.dataset.facing = Math.abs(dx) > Math.abs(dy) ? dx < 0 ? 'left' : 'right' : dy < 0 ? 'up' : 'down';
+  if (distance) worldMove(dx / distance * 190 * seconds, dy / distance * 190 * seconds);
+  if (!worldKeys.size && worldPath.length) {
+    // Spend the whole frame's travel, including across route corners. Stopping
+    // for a frame at every grid node made floor-click walking visibly stutter.
+    let remaining = 190 * seconds;
+    while (worldPath.length && remaining > 0) {
+      const next = worldPath[0];
+      const dx = next.x - worldPosition.x, dy = next.y - worldPosition.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < .000001) { worldPath.shift(); continue; }
+      const step = Math.min(remaining, distance);
+      const before = { ...worldPosition };
+      worldMove(dx / distance * step, dy / distance * step);
+      if (worldPosition.x === before.x && worldPosition.y === before.y) { worldPath = []; break; }
+      remaining -= step;
+      if (step === distance) worldPath.shift();
+    }
+  }
+  dx = worldPosition.x - previous.x; dy = worldPosition.y - previous.y;
+  const moved = dx !== 0 || dy !== 0;
+  if (moved) {
+    const facing = Math.abs(dx) > Math.abs(dy) ? dx < 0 ? 'left' : 'right' : dy < 0 ? 'up' : 'down';
+    if (worldAvatar.dataset.facing !== facing) worldAvatar.dataset.facing = facing;
     worldDraw();
     if (worldScene === 'home' && worldPosition.y > 558 && Math.abs(worldPosition.x - 480) < 55) return worldChangeScene('town');
   }
-  worldAvatar.dataset.walking = String(Boolean(distance));
+  worldSetWalking(moved);
   if (worldKeys.size || worldPath.length) worldFrame = requestAnimationFrame(worldTick);
   else worldStop();
+}
+function worldScheduleWalk() {
+  if (worldFrame) return;
+  worldLastFrame = performance.now();
+  worldFrame = requestAnimationFrame(worldTick);
 }
 function worldStartWalk(key) {
   if (worldDashboard.hidden || worldModalOpen()) return;
   worldPath = [];
   worldKeys.add(key);
-  if (!worldFrame) worldFrame = requestAnimationFrame(worldTick);
+  worldScheduleWalk();
 }
 document.addEventListener('keydown', (event) => {
   if (worldDashboard.hidden || worldModalOpen() || event.target !== worldStage || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -511,7 +570,7 @@ worldStage.addEventListener('click', (event) => {
   }
   if (!found) return worldMessage('There is no clear path there. Try another spot.');
   for (let point = end; point; point = visited.get(`${point.x},${point.y}`)) worldPath.unshift({ x: point.x * 20, y: point.y * 20 });
-  worldFrame = requestAnimationFrame(worldTick);
+  worldScheduleWalk();
 });
 
 // Preserve normal arrow-key navigation in the Arena's actual tabs.

@@ -195,13 +195,13 @@ body.world-playing .town-stop::before { content: ""; position: absolute; bottom:
 body.world-playing .town-stop:disabled { opacity: 0.65; cursor: not-allowed; box-shadow: none; }
 body.world-playing .stop-name { font-size: clamp(0.68rem, 1.1vw, 0.85rem); font-weight: 900; line-height: 1.2; }
 body.world-playing .stop-detail { margin-top: 2px; color: #e0e7cf; font-size: clamp(0.59rem, 0.9vw, 0.68rem); line-height: 1.3; }
-body.world-playing .world-avatar { position: absolute; z-index: 4; width: 4.5%; min-width: 22px; max-width: 46px; transform: translate(-50%, -100%); pointer-events: none; user-select: none; image-rendering: auto; }
+body.world-playing .world-avatar { position: absolute; left: 0; top: 0; z-index: 4; width: 4.5%; min-width: 22px; max-width: 46px; transform: translate(-50%, -100%); will-change: transform; pointer-events: none; user-select: none; image-rendering: auto; }
 body.world-playing #world-stage[data-scene="town"] .world-avatar { z-index: 2; }
 body.world-playing .world-avatar > svg { display: block; width: 100%; height: auto; overflow: visible; }
 body.world-playing .world-avatar[data-facing="left"] > svg { transform: scaleX(-1); }
 body.world-playing .world-avatar[data-facing="up"] .walker-face { visibility: hidden; }
-body.world-playing .world-avatar[data-walking="true"] > svg { animation: world-walk 180ms steps(2, end) infinite; }
-@keyframes world-walk { 50% { translate: 0 -2px; } }
+body.world-playing .world-avatar[data-walking="true"] > svg { animation: world-walk 280ms ease-in-out infinite; }
+@keyframes world-walk { 0%, 100% { translate: 0 0; } 50% { translate: 0 -1.5px; } }
 body.world-playing #pet-touch.home-pet { position: absolute; z-index: 5; left: 50%; top: 55%; transform: translate(-50%, -70%); width: 12%; max-width: 120px; min-width: 44px; }
 body.world-playing .home-pet .pet { display: block; width: 100%; height: auto; filter: drop-shadow(0 4px 0 rgb(75 53 33 / 8%)); }
 body.world-playing .home-pet-label { position: absolute; top: -9px; left: 50%; transform: translate(-50%, -100%); max-width: 50%; overflow: hidden; text-overflow: ellipsis; padding: 4px 9px; color: var(--fg); background: #fff9e9; border: 1px solid #a9946f; border-radius: 4px; box-shadow: 0 2px 0 rgb(73 58 44 / 15%); font-size: clamp(0.6rem, 1vw, 0.72rem); font-weight: 800; white-space: nowrap; pointer-events: none; }
@@ -490,7 +490,7 @@ body.world-playing.world-home .world-stage {
   width: var(--scene-width, 100vw);
   height: var(--scene-height, 100dvh);
   aspect-ratio: 960 / 640;
-  transform: translate(var(--camera-x, 0px), var(--camera-y, 0px));
+  will-change: transform;
   background: #755139;
 }
 body.world-playing.world-home .world-stage:focus-visible {
