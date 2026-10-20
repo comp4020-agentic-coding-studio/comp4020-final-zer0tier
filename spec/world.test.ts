@@ -431,6 +431,79 @@ it('stops at a building while allowing the character to walk around its edge', (
   } finally { p.dom.window.close(); }
 });
 
+it('stops the character before the home pet and keeps Space interaction available', () => {
+  const p = page();
+  try {
+    const stage = p.$('world-stage');
+    stage.focus();
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'w', bubbles: true }));
+    p.advance(60);
+    const stopped = p.position();
+    expect(stopped.x).toBeCloseTo(480, 6);
+    expect(stopped.y).toBeGreaterThanOrEqual(438);
+    expect(stopped.y).toBeLessThan(442);
+    p.advance(60);
+    expect(p.position()).toEqual(stopped);
+    stage.dispatchEvent(new p.window.KeyboardEvent('keyup', { key: 'w', bubbles: true }));
+    p.advance();
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+    expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(true);
+    expect(p.$('world-dialog').dataset.place).toBe('pet');
+  } finally { p.dom.window.close(); }
+});
+
+it.each([16, 40])('lets the character walk around the pet and interact from its other sides with %i ms frames', (milliseconds) => {
+  const p = page();
+  try {
+    const stage = p.$('world-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
+    for (const approach of [
+      { x: 480, y: 260, key: 's', side: 'above' },
+      { x: 400, y: 360, key: 'd', side: 'left' },
+      { x: 560, y: 360, key: 'a', side: 'right' },
+    ]) {
+      stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: approach.x, clientY: approach.y, bubbles: true }));
+      p.advance(250, milliseconds);
+      expect(p.position().x, `${approach.side} approach`).toBeCloseTo(approach.x, 6);
+      expect(p.position().y, `${approach.side} approach`).toBeCloseTo(approach.y, 6);
+      stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: approach.key, bubbles: true }));
+      p.advance(30, milliseconds);
+      const stopped = p.position();
+      if (approach.side === 'above') expect(stopped.y).toBeLessThanOrEqual(295);
+      if (approach.side === 'left') expect(stopped.x).toBeLessThanOrEqual(419);
+      if (approach.side === 'right') expect(stopped.x).toBeGreaterThanOrEqual(541);
+      p.advance(30, milliseconds);
+      expect(p.position(), `${approach.side} collision`).toEqual(stopped);
+      stage.dispatchEvent(new p.window.KeyboardEvent('keyup', { key: approach.key, bubbles: true }));
+      p.advance(6, milliseconds);
+      stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+      expect((p.$('world-dialog') as HTMLDialogElement).open, `${approach.side} interaction`).toBe(true);
+      expect(p.$('world-dialog').dataset.place).toBe('pet');
+      p.$('world-dialog-close').click();
+    }
+  } finally { p.dom.window.close(); }
+});
+
+it('routes floor clicks around the pet without entering its occupied space', () => {
+  const p = page();
+  try {
+    const stage = p.$('world-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
+    stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: 480, clientY: 260, bubbles: true }));
+    let wentAround = false;
+    for (let frame = 0; frame < 200; frame++) {
+      p.advance(1);
+      const { x, y } = p.position();
+      expect(x > 419 && x < 541 && y > 295 && y < 438, `pet overlap at frame ${frame}`).toBe(false);
+      if (Math.abs(x - 480) > 61) wentAround = true;
+    }
+    expect(wentAround).toBe(true);
+    expect(p.position().x).toBeCloseTo(480, 6);
+    expect(p.position().y).toBeCloseTo(260, 6);
+    expect(p.$('world-avatar').dataset.walking).toBe('false');
+  } finally { p.dom.window.close(); }
+});
+
 it('announces pet reactions and failed care at home while the pet panel is closed', async () => {
   const p = page();
   try {

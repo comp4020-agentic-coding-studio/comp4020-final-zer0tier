@@ -98,9 +98,9 @@ the screen, with just a small movement and interaction tip in the upper-left
 corner. Walk with **W/A/S/D** or the **arrow keys**, then press **Space**
 near your pet or a piece of furniture to interact. You can also click or tap
 an empty spot to walk there, or select an object directly. Clicked routes
-continue smoothly around furniture, and walking keeps the same speed across
-display refresh rates. Movement pauses while a window is open or you are
-typing. Home and town work on desktop and phones.
+continue smoothly around furniture and your pet, and walking keeps the same
+speed across display refresh rates. Movement pauses while a window is open
+or you are typing. Home and town work on desktop and phones.
 
 Touch your pet or interact with its rug to open a small pop-up showing its
 needs, attributes, money, and current lesson or shift. Choose a care or play

@@ -51,7 +51,8 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   gameplay modules.
 - Keep home care, town destinations, and Adventure accessible with both
   keyboard and touch. World movement must pause while a dialog is open or
-  the player is typing.
+  the player is typing. Home movement and floor-click routes must respect
+  the pet's space while keeping nearby pet interaction reachable.
 
 ## Rules
 

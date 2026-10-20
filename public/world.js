@@ -410,7 +410,12 @@ worldAlertsObserver.observe(worldById('theft-notifications'), { subtree: true, c
 // Positions are cosmetic navigation only. They do not create a second copy of
 // pet state or change stamina, money, timers, or any Adventure coordinates.
 const worldObstacles = {
-  home: [[148, 164, 140, 64], [91, 215, 43, 48], [124, 268, 182, 107], [681, 174, 140, 48], [684, 252, 126, 123], [610, 409, 87, 30], [735, 430, 145, 97], [855, 315, 35, 108], [101, 473, 44, 71], [330, 461, 72, 41]],
+  home: [
+    [148, 164, 140, 64], [91, 215, 43, 48], [124, 268, 182, 107], [681, 174, 140, 48], [684, 252, 126, 123], [610, 409, 87, 30], [735, 430, 145, 97], [855, 315, 35, 108], [101, 473, 44, 71], [330, 461, 72, 41],
+    // The pet occupies the rug too. Player coordinates are their feet, so
+    // leave enough space below the pet for the character's head and body.
+    [428, 300, 104, 128],
+  ],
   town: [[401, 421, 162, 135], [112, 237, 184, 126], [162, 51, 176, 126], [399, 71, 166, 145], [659, 291, 186, 134], [428, 287, 88, 60], [714, 97, 13, 80], [777, 97, 13, 80]],
 };
 function worldWalkable(x, y) {
@@ -423,7 +428,7 @@ function worldTargets() {
     [220, 241, 'Watch town TV', '[data-home-action="tv"]'], [215, 390, 'Sit on the couch', '[data-home-action="couch"]'],
     [748, 237, 'Warm up by the fire', '[data-home-action="fire"]'], [748, 391, "Visit your pet's nook", '[data-home-action="bed"]'],
     [649, 458, 'Feed your pet', '[data-home-action="feed"]'], [808, 540, 'Clean your pet', '[data-home-action="clean"]'],
-    [480, 390, 'Spend time with your pet', '[data-home-action="pet"]'], [480, 565, 'Leave for town', '#home-door'],
+    [480, 375, 'Spend time with your pet', '[data-home-action="pet"]', 90], [480, 565, 'Leave for town', '#home-door'],
     [366, 525, 'Open your backpack', '[data-home-action="chest"]'], [350, 220, 'Game menu', '[data-home-action="menu"]'],
   ];
   return [[250, 194, 'Browse part-time jobs', '[data-place="work"]'], [482, 233, 'Visit school', '[data-place="school"]'], [751, 189, 'Enter the woodland', '#adventure-open'], [204, 379, 'Visit the shops', '[data-place="shop"]'], [752, 440, 'Enter the arena', '[data-place="arena"]'], [482, 571, 'Go home', '#town-home']];
@@ -435,7 +440,10 @@ function worldDraw() {
     worldAvatarTransform = transform;
   }
   const choices = worldTargets().map((target) => ({ target, distance: Math.hypot(target[0] - worldPosition.x, target[1] - worldPosition.y) })).sort((a, b) => a.distance - b.distance);
-  worldNearest = choices[0]?.distance <= 82 ? choices[0].target : null;
+  const nearest = choices[0];
+  // The pet's wider body clearance must still allow interaction from every
+  // side, including when a slower frame stops a few pixels before its edge.
+  worldNearest = nearest?.distance <= (nearest?.target[4] ?? 82) ? nearest.target : null;
   const control = worldById('world-interact');
   const destination = worldNearest && worldShell.querySelector(worldNearest[3]);
   const disabled = !destination || destination.disabled;
