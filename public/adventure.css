@@ -43,6 +43,18 @@
 .adventure-messages p:empty { display: none; }
 #adventure-treasure { font-weight: 700; }
 #adventure-failure { color: var(--error); font-weight: 700; }
+#adventure-cooldown-panel {
+  width: 100%; padding: 10px 12px; display: grid; gap: 6px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); text-align: left;
+}
+.adventure-cooldown-heading { display: flex; justify-content: space-between; gap: 12px; font-weight: 700; }
+#adventure-cooldown-percent { color: var(--primary); font-variant-numeric: tabular-nums; }
+#adventure-cooldown-progress { height: 10px; }
+#adventure-cooldown { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  #adventure-cooldown-fill { transition: none; }
+}
 #adventure-battle-summary { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 #adventure-result { font-size: .85rem; }
 .adventure-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }

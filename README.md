@@ -774,9 +774,11 @@ to spare, or while a cooldown is active — an Hourglass clears the wait
 early, from the same shared count used elsewhere. None of this touches
 Adventure HP/MP, which still carries over normally; it only gates
 *starting again*. The cooldown begins when the fresh run does, so that run
-plays normally, and it can still be abandoned for free. While it's in
-progress, the map only says when the next adventure would open. Once a run
-ends during the cooldown, the map shows how long the pet needs to rest and
+plays normally, and it can still be abandoned for free. A compact bar on the
+Adventure map fills as the cooldown finishes, showing the percentage completed
+and the time remaining (including seconds during the final minute). Reopening
+the map keeps the correct progress. Once a run ends during the cooldown,
+the map shows how long the pet needs to rest and
 offers **Skip wait (use Hourglass)**. Adventure still doesn't alter Arena
 wins/losses. Monster victories grant recovery; chests grant the items
 below.

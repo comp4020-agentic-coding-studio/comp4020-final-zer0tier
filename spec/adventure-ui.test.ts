@@ -378,6 +378,101 @@ it('ends the mini-game at once on Abandon run: the map closes, and reopening off
   } finally { dom.window.close(); }
 });
 
+it('shows cooldown progress from the saved deadline on a scaled clock, keeps exploring available, and resumes after reopening', async () => {
+  const { dom, window, $ } = page();
+  const started = 1_800_000_000_000;
+  let now = started + 120_000;
+  const clock = vi.spyOn(window.Date, 'now').mockImplementation(() => now);
+  let saved = { ...map(), timeScale: 60, cooldownUntil: started + 240_000 };
+  const requests = vi.fn(async (_url: string, options: RequestInit) => {
+    if (JSON.parse(options.body as string).direction === 'd') saved = { ...saved, x: 3, revision: 'walked' };
+    return Response.json(saved);
+  });
+  window.fetch = requests as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-cooldown-panel').hidden).toBe(false));
+    const progress = $('adventure-cooldown-progress');
+    expect(progress.getAttribute('role')).toBe('progressbar');
+    expect(progress.getAttribute('aria-labelledby')).toBe('adventure-cooldown-label');
+    expect(progress.getAttribute('aria-valuemin')).toBe('0');
+    expect(progress.getAttribute('aria-valuemax')).toBe('100');
+    expect(progress.getAttribute('aria-valuenow')).toBe('50');
+    expect(progress.getAttribute('aria-valuetext')).toBe('50% complete. If you abandon this run, the next adventure opens in 2 h.');
+    expect($('adventure-cooldown-percent').textContent).toBe('50%');
+    expect(Number($('adventure-cooldown-fill').style.getPropertyValue('--fill'))).toBe(0.5);
+    expect($('adventure-skip-cooldown').hidden).toBe(true);
+    expect(($('adventure-dialog').querySelector('[data-direction="d"]') as HTMLButtonElement).disabled).toBe(false);
+    $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    await vi.waitFor(() => expect($('adventure-status').textContent).toBe('Column 4 · Row 3'));
+    expect(requests).toHaveBeenCalledTimes(2);
+
+    $('adventure-close').click();
+    now += 60_000;
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(progress.getAttribute('aria-valuenow')).toBe('75'));
+    expect($('adventure-cooldown-percent').textContent).toBe('75%');
+    expect($('adventure-cooldown').textContent).toBe('If you abandon this run, the next adventure opens in 1 h.');
+    expect(Number($('adventure-cooldown-fill').style.getPropertyValue('--fill'))).toBe(0.75);
+
+    window.document.dispatchEvent(new window.CustomEvent('adventure:reset'));
+    expect(($('adventure-dialog') as HTMLDialogElement).open).toBe(false);
+    expect($('adventure-cooldown-panel').hidden).toBe(true);
+    expect(progress.getAttribute('aria-valuenow')).toBe('0');
+    expect(Number($('adventure-cooldown-fill').style.getPropertyValue('--fill'))).toBe(0);
+  } finally { clock.mockRestore(); dom.window.close(); }
+});
+
+it('counts down the final cooldown seconds and unlocks a new run without replacing map tiles or moving keyboard focus', async () => {
+  const { dom, window, $ } = page();
+  let now = 1_800_000_000_000;
+  const clock = vi.spyOn(window.Date, 'now').mockImplementation(() => now);
+  let tick: () => void = () => { throw new Error('The cooldown clock was not registered.'); };
+  const interval = vi.spyOn(window, 'setInterval').mockImplementation(callback => {
+    tick = callback as () => void;
+    return 1;
+  });
+  const saved = { ...map(), abandoned: true, timeScale: 60, cooldownUntil: now + 750 };
+  const requests = vi.fn(async () => Response.json(saved));
+  window.fetch = requests as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-cooldown-panel').hidden).toBe(false));
+    const grid = $('adventure-grid'), tile = grid.firstElementChild;
+    grid.focus();
+    expect($('adventure-cooldown').textContent).toBe('Your pet needs to rest. Next adventure in 45 s.');
+    expect($('adventure-restart').hidden).toBe(true);
+    expect($('adventure-cooldown-progress').getAttribute('aria-valuenow')).toBe('99');
+
+    // A local clock behind the server must never produce a negative bar.
+    now -= 240_000;
+    tick();
+    expect($('adventure-cooldown-progress').getAttribute('aria-valuenow')).toBe('0');
+    expect(Number($('adventure-cooldown-fill').style.getPropertyValue('--fill'))).toBe(0);
+
+    now = saved.cooldownUntil - 250;
+    tick();
+    expect($('adventure-cooldown').textContent).toBe('Your pet needs to rest. Next adventure in 15 s.');
+    expect($('adventure-cooldown-progress').getAttribute('aria-valuetext')).toBe('99% complete. Your pet needs to rest. Next adventure in 15 s.');
+    expect(grid.firstElementChild).toBe(tile);
+    expect(window.document.activeElement).toBe(grid);
+
+    now += 250;
+    tick();
+    expect($('adventure-cooldown-panel').hidden).toBe(true);
+    expect($('adventure-cooldown').hidden).toBe(true);
+    expect($('adventure-skip-cooldown').hidden).toBe(true);
+    expect($('adventure-restart').hidden).toBe(false);
+    expect(($('adventure-restart') as HTMLButtonElement).disabled).toBe(false);
+    expect($('adventure-team-up').hidden).toBe(false);
+    expect(grid.firstElementChild).toBe(tile);
+    expect(window.document.activeElement).toBe(grid);
+    expect(requests).toHaveBeenCalledTimes(1);
+  } finally { interval.mockRestore(); clock.mockRestore(); dom.window.close(); }
+});
+
 it('keeps keyboard movement focused on the map when using stairs disables the selected button', async () => {
   const { dom, window, $ } = page();
   const requests: { body: unknown; finish: (response: Response) => void }[] = [];
@@ -471,10 +566,12 @@ it('after a defeat while the pet rests, asks to spend an Hourglass on the wait, 
     $('battle-close').click();
     await vi.waitFor(() => expect(($('confirm-dialog') as HTMLDialogElement | null)?.open).toBe(true));
     expect($('confirm-message').textContent).toBe('Your pet needs to rest. Next adventure in 4 h. Use an Hourglass to skip the wait?');
+    expect($('adventure-cooldown-panel').hidden).toBe(false);
     $('confirm-yes').click();
     // The wait is gone, so the next question is whether to start.
     await vi.waitFor(() => expect($('confirm-message').textContent).toMatch(/^Start a new adventure\?/));
     expect(bodies.at(-1)).toEqual({ action: 'skip-cooldown', revision: 'returned' });
+    expect($('adventure-cooldown-panel').hidden).toBe(true);
     expect(($('confirm-dialog') as HTMLDialogElement).open).toBe(true);
     $('confirm-yes').click();
     await vi.waitFor(() => expect($('adventure-failure').hidden).toBe(true));

@@ -33,7 +33,13 @@ adventure.innerHTML = `
         <p id="adventure-treasure" role="status"></p>
         <p id="adventure-completion" role="status" hidden>Slime King defeated! Keep exploring if you like.</p>
         <p id="adventure-failure" role="status" hidden>Adventure failed. Start a new adventure to try again.</p>
-        <p id="adventure-cooldown" role="status" hidden></p>
+        <div id="adventure-cooldown-panel" hidden>
+          <div class="adventure-cooldown-heading"><span id="adventure-cooldown-label">Next adventure</span><span id="adventure-cooldown-percent">0%</span></div>
+          <div id="adventure-cooldown-progress" class="progress" role="progressbar" aria-labelledby="adventure-cooldown-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="adventure-cooldown-fill" class="progress-fill"></div>
+          </div>
+          <p id="adventure-cooldown" role="status" hidden></p>
+        </div>
         <section id="adventure-battle-summary" aria-label="Last monster battle" hidden>
           <p id="adventure-result" role="status"></p>
           <div class="adventure-buttons">
@@ -115,6 +121,10 @@ guide.innerHTML = `
 document.body.append(guide);
 const grid = adventure.querySelector('#adventure-grid');
 const status = adventure.querySelector('#adventure-status');
+const cooldownPanel = adventure.querySelector('#adventure-cooldown-panel');
+const cooldownProgress = adventure.querySelector('#adventure-cooldown-progress');
+const cooldownFill = adventure.querySelector('#adventure-cooldown-fill');
+const cooldownPercent = adventure.querySelector('#adventure-cooldown-percent');
 let pending = false, generation = 0, state = null, pet = null, shownBattle = null;
 // Order of map requests sent and of the last one shown, so an older answer
 // never replaces a newer one.
@@ -212,6 +222,11 @@ function clearMap() {
   adventure.querySelector('#adventure-team-up').hidden = true;
   adventure.querySelector('#adventure-abandon').hidden = true;
   adventure.querySelector('#adventure-cooldown').hidden = true;
+  cooldownPanel.hidden = true;
+  cooldownFill.style.setProperty('--fill', '0');
+  cooldownProgress.setAttribute('aria-valuenow', '0');
+  cooldownProgress.removeAttribute('aria-valuetext');
+  cooldownPercent.textContent = '0%';
   adventure.querySelector('#adventure-skip-cooldown').hidden = true;
   guide.querySelector('#adventure-restart-cost').textContent = '';
   adventure.querySelector('#adventure-resources').textContent = '';
@@ -228,19 +243,34 @@ function cooldownActive() {
   return Boolean(state?.cooldownUntil) && state.cooldownUntil > Date.now();
 }
 function cooldownText(ended) {
-  const minutes = Math.max(1, Math.ceil(((state.cooldownUntil - Date.now()) * state.timeScale) / 60_000));
+  const seconds = Math.max(1, Math.ceil(((state.cooldownUntil - Date.now()) * state.timeScale) / 1000));
+  const minutes = Math.ceil(seconds / 60);
   const h = Math.floor(minutes / 60), m = minutes % 60;
-  const wait = [h && `${h} h`, (m || !h) && `${m} min`].filter(Boolean).join(' ');
+  const wait = seconds < 60 ? `${seconds} s` : [h && `${h} h`, (m || !h) && `${m} min`].filter(Boolean).join(' ');
   return ended ? `Your pet needs to rest. Next adventure in ${wait}.` : `If you abandon this run, the next adventure opens in ${wait}.`;
 }
-// Only the cooldown message/buttons, so the 1 s tick doesn't rebuild the map.
+// Only the cooldown indicator/buttons, so the 1 s tick doesn't rebuild the map.
 // The wait only gates starting over, so a run in progress plays on as normal,
 // and abandoning (which is free) stays available.
 function renderCooldown() {
   if (!state) return;
   const active = cooldownActive(), ended = state.failed || state.completed || state.abandoned;
-  adventure.querySelector('#adventure-cooldown').hidden = !active;
-  if (active) adventure.querySelector('#adventure-cooldown').textContent = cooldownText(ended);
+  cooldownPanel.hidden = !active;
+  const message = adventure.querySelector('#adventure-cooldown');
+  message.hidden = !active;
+  if (active) {
+    // Match the server's scaled duration; reopening must not restart the bar.
+    const total = Math.max(1, Math.round(state.cooldownMinutes * 60_000 / state.timeScale));
+    const done = Math.max(0, Math.min(1, 1 - (state.cooldownUntil - Date.now()) / total));
+    const percent = Math.floor(done * 100), text = cooldownText(ended);
+    cooldownFill.style.setProperty('--fill', String(done));
+    cooldownProgress.setAttribute('aria-valuenow', String(percent));
+    cooldownProgress.setAttribute('aria-valuetext', `${percent}% complete. ${text}`);
+    cooldownPercent.textContent = `${percent}%`;
+    // Keep the changing percentage out of the live region, and only announce
+    // the remaining time when its readable value actually changes.
+    if (message.textContent !== text) message.textContent = text;
+  }
   adventure.querySelector('#adventure-skip-cooldown').hidden = !active || !ended;
   adventure.querySelector('#adventure-restart').hidden = active || !ended;
   adventure.querySelector('#adventure-team-up').hidden = active || !ended;
