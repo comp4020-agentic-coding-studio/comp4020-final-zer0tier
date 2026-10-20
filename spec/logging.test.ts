@@ -226,8 +226,9 @@ it("logs an action_result naming who did what for sign-in, fights, theft, reveng
   await bobUp.json();
   cookies.set(bob, bobUp.headers.getSetCookie().find((cookie) => cookie.startsWith("session="))!.split(";")[0]);
 
-  // Alice studies, then works, so her finished lesson and shift both log, and
-  // she ends up with enough money to pay back double when Bob takes revenge.
+  // Alice studies, then works, so her finished lesson and shift both log.
+  // A two-hour shift funds Bob's double-theft reward for every theft amount,
+  // even if Alice loses money in the fight below.
   const studySince = logs().length;
   const studied = await post(`/api/pets/${alice}/study/math`, undefined, alice);
   expect(studied.status).toBe(200);
@@ -235,7 +236,7 @@ it("logs an action_result naming who did what for sign-in, fights, theft, reveng
   await logged({ event: "action_result", user: alice, action: "studying_finished", task: "Math" }, studySince);
 
   const aliceWorkSince = logs().length;
-  const aliceWorked = await post(`/api/pets/${alice}/work/office`, { minutes: 60 }, alice);
+  const aliceWorked = await post(`/api/pets/${alice}/work/office`, { minutes: 120 }, alice);
   expect(aliceWorked.status).toBe(200);
   await aliceWorked.json();
   await logged({ event: "action_result", user: alice, action: "working_finished", task: "Office" }, aliceWorkSince);
