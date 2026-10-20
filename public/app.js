@@ -74,8 +74,10 @@ const lengthText = (minutes) => (minutes < 60 ? `${minutes} min` : `${minutes / 
 
 // Game time left, from real time left and the app's clock speed.
 function timeLeftText(busyUntil) {
-  const minutes = Math.ceil(((busyUntil - Date.now()) * rules.timeScale) / 60_000);
-  if (minutes <= 0) return "finishing…";
+  const seconds = Math.ceil(((busyUntil - Date.now()) * rules.timeScale) / 1000);
+  if (seconds <= 0) return "finishing…";
+  if (seconds < 60) return `${seconds} s left`;
+  const minutes = Math.ceil(seconds / 60);
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return `${h ? `${h} h ` : ""}${m || !h ? `${m} min ` : ""}left`;
@@ -276,9 +278,21 @@ function renderSchool(pet, previous) {
 const busyText = (pet) =>
   pet.activity === "studying" ? `Studying ${pet.task}` : `Working at the ${pet.task}`;
 
+function resetTownActivity() {
+  $("town-activity").hidden = true;
+  $("town-activity-label").textContent = "";
+  $("town-activity-left").textContent = "";
+  $("town-activity-percent").textContent = "";
+  $("town-activity-fill").style.setProperty("--fill", "0");
+  $("town-activity-progress").setAttribute("aria-valuenow", "0");
+  $("town-activity-progress").removeAttribute("aria-valuetext");
+}
+
 function renderBusy(pet) {
   $("busy").hidden = pet.activity === "idle";
-  if (pet.activity === "idle") return;
+  if (pet.activity === "idle") return resetTownActivity();
+  $("town-activity").hidden = false;
+  $("town-activity-label").textContent = busyText(pet);
   const reward = pet.reward;
   const gains = ["strength", "intelligence", "charisma"]
     .filter((a) => reward[a] > 0)
@@ -295,10 +309,19 @@ function renderBusy(pet) {
 // How far through its activity the pet is: the bar and the time left.
 function renderBusyClock(pet) {
   const total = pet.busyUntil - pet.busySince;
-  const done = Math.min(1, Math.max(0, (Date.now() - pet.busySince) / total));
+  const now = Date.now();
+  const done = total > 0 ? Math.min(1, Math.max(0, (now - pet.busySince) / total)) : Number(now >= pet.busyUntil);
+  const left = timeLeftText(pet.busyUntil), percent = Math.floor(done * 100);
   $("busy-progress-fill").style.setProperty("--fill", done);
   $("busy-progress").setAttribute("aria-valuenow", Math.round(done * 100));
-  $("busy-left").textContent = timeLeftText(pet.busyUntil);
+  $("busy-left").textContent = left;
+  // The town indicator shares this clock and the saved activity deadline.
+  // At zero, wait for the server's idle update before hiding it.
+  $("town-activity-fill").style.setProperty("--fill", done);
+  $("town-activity-progress").setAttribute("aria-valuenow", percent);
+  $("town-activity-progress").setAttribute("aria-valuetext", `${percent}% complete · ${left}`);
+  $("town-activity-left").textContent = left;
+  $("town-activity-percent").textContent = `${percent}%`;
 }
 
 // Free daily supplies, collectable again from the next UTC midnight. Checked
@@ -1201,6 +1224,7 @@ function showSignIn(message = "") {
   hideAttacked();
   closeVisit();
   current = null;
+  resetTownActivity();
   pendingAppearance = null;
   feedPets = new Map();
   rivals = new Map();

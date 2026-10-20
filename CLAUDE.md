@@ -41,6 +41,9 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   through the pet, furniture, and town buildings; Escape opens the game menu
   for pet details, appearance, supplies, the journal, help, and account controls.
   Show these windows only when requested and keep pet care at home.
+- While the pet works or studies, show a compact progress bar and time remaining
+  on the town map. Keep it hidden at home and when the pet is idle, and use the
+  saved activity timing and server-confirmed completion.
 - Pet interaction opens a small pop-up with the pet's current status,
   care and play choices, and interaction feedback. Keep extra navigation
   and supplies guidance out of this pop-up; use the furniture for those.

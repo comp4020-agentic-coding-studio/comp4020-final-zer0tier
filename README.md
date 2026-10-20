@@ -141,6 +141,13 @@ either scene to open the game menu for your pet's details, Backpack,
 Journal, Appearance, help, and Sign out. Pet details open in a compact window;
 head home to feed, clean, and play with your pet.
 
+While your pet works or studies, the town map shows a compact activity bar in
+the upper-right corner with its current task, percentage completed, and time
+remaining. It stays accurate when you return to town and disappears when the
+activity finishes or you use an Hourglass. The final minute counts down in
+seconds; “finishing…” means the timer has ended and the server is confirming
+the result. The indicator stays out of the home scene.
+
 Town uses the same movement and **Space** interaction controls as home.
 Every destination and home object also works with Tab and Enter, and the
 camera brings focused objects into view. Close a window with its Close

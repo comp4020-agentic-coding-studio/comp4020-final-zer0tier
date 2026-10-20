@@ -357,6 +357,8 @@ worldDashboard.append(worldShell);
 
 const worldStage = worldById('world-stage');
 const worldAvatar = worldById('world-avatar');
+// Keep the activity indicator fixed to the viewport, outside the moving map.
+worldShell.querySelector('.world-main').append(worldById('town-activity'));
 const homeInteractionOutline = worldById('home-interaction-outline');
 const homeOutlineStrokes = homeInteractionOutline.querySelectorAll('use');
 const townInteractionOutline = worldById('town-interaction-outline');
