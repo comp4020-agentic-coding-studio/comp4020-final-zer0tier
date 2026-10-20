@@ -1,8 +1,12 @@
-// Plays only server-saved turns. Replay and Skip never send gameplay requests.
+// Live battles wait for an explicit skill choice. Animations and replays only
+// show saved server turns; they never decide damage or advance gameplay.
 let dialog;
 let timer;
 let scene = null;
 let turn = 0;
+let submitting = false;
+let confirming = false;
+let animating = false;
 const seen = new Set();
 const queue = [];
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -14,7 +18,7 @@ function buildDialog() {
   dialog.setAttribute('aria-labelledby', 'battle-title');
   dialog.setAttribute('aria-describedby', 'battle-mode battle-initiative');
   dialog.innerHTML = `
-    <header class="battle-heading"><div><p id="battle-mode">Automatic battle</p><h2 id="battle-title">Claws at the ready</h2></div>
+    <header class="battle-heading"><div><p id="battle-mode">Turn-based battle</p><h2 id="battle-title">Claws at the ready</h2></div>
       <button type="button" id="battle-close" class="chip-btn chip-buy" aria-label="Close battle">Close</button></header>
     <p id="battle-initiative" class="battle-initiative" hidden></p>
     <div class="battle-stage">
@@ -35,18 +39,26 @@ function buildDialog() {
     </div>
     <section class="battle-allies" id="battle-allies" aria-label="Teammates in this battle" hidden></section>
     <div class="battle-ability"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 4-5 24M18 4l-5 24M27 4l-5 24"/></svg>
-      <div><strong id="battle-ability-name">Automatic attacks</strong><span id="battle-ability-cost">Strongest affordable attack each turn</span></div></div>
+      <div><strong id="battle-ability-name">Choose a skill</strong><span id="battle-ability-cost">Your pet is ready</span></div></div>
     <p id="battle-status" role="status" aria-live="polite"></p>
+    <div id="battle-skills" class="battle-skills" role="group" aria-label="Choose your pet's skill" hidden></div>
+    <p id="battle-error" class="error" role="alert"></p>
     <details class="battle-log"><summary>Attack log</summary><ol id="battle-log"></ol></details>
     <footer class="battle-actions"><button type="button" id="battle-skip" class="chip-btn chip-buy">Skip to result</button>
       <button type="button" id="battle-replay" class="chip-btn chip-buy" hidden>Replay battle</button></footer>`;
   document.body.append(dialog);
-  $('battle-close').addEventListener('click', () => dialog.close());
+  $('battle-close').addEventListener('click', closeBattle);
+  dialog.addEventListener('cancel', event => {
+    if (!scene?.manual || scene.battle.status !== 'active') return;
+    event.preventDefault();
+    closeBattle();
+  });
   $('battle-skip').addEventListener('click', finish);
-  $('battle-replay').addEventListener('click', () => { if (scene?.allowReplay !== false) play(scene); });
+  $('battle-replay').addEventListener('click', () => { if (!scene?.manual && scene?.allowReplay !== false) play(scene); });
   dialog.addEventListener('close', () => {
     if (dialog.open) return;
     clearTimeout(timer);
+    submitting = false;
     const closed = scene;
     scene = null;
     if (closed) document.dispatchEvent(new CustomEvent('battle:closed', { detail: { key: closed.key } }));
@@ -114,8 +126,10 @@ function describe(step) {
   return `${actor} used ${step.name || 'Claw Strike'}${step.hits > 1 ? ` ×${step.hits}` : ''}: ${step.damage} damage to ${target}${step.mpCost ? ` (${step.mpCost} MP)` : ''}.`;
 }
 function abilityLabel(step) {
+  if (!step) return;
   $('battle-ability-name').textContent = step.name || 'Claw Strike';
-  $('battle-ability-cost').textContent = `${step.mpCost || 0} MP · Both fighters attack automatically`;
+  $('battle-ability-cost').textContent = `${step.mpCost || 0} MP · ${step.damage} damage`;
+  dialog.dataset.ability = step.ability || 'claw-strike';
 }
 const fighterName = fighter => fighter.name || fighter.id;
 // The saved pre-battle coin toss, or the acting pet's coin that replaced it.
@@ -124,7 +138,10 @@ function initiativeText(battle) {
   if (!initiative) return '';
   // The first pet's toss or coin decides; in a team battle its whole team
   // goes first or second together, against the monster listed last.
-  const pet = fighterName(battle.fighters[0]), other = fighterName(battle.fighters.at(-1));
+  const provider = battle.coinProvider ?? initiative.provider ?? 0;
+  const pet = fighterName(battle.fighters[provider]);
+  const opponent = battle.monsterIndex ?? (provider === 0 ? battle.fighters.length - 1 : 0);
+  const other = fighterName(battle.fighters[opponent]);
   const side = battle.fighters.length > 2 ? `${pet}'s team` : pet;
   if (initiative.coin === 'silver-coin') return `${pet}'s Silver Coin: ${side} attacks first.`;
   if (initiative.coin === 'gold-coin') return `${pet}'s Gold Coin: ${other} attacks first, but ${pet}'s first hit deals double damage.`;
@@ -132,20 +149,25 @@ function initiativeText(battle) {
   return initiative.coin === 'copper-coin' ? `${toss} ${pet}'s Copper Coin adds +1 to every attribute.` : toss;
 }
 function addLog(step) {
-  if (scene.showLog === false) return;
+  if (scene.manual || scene.showLog === false) return;
   const li = document.createElement('li');
   li.textContent = describe(step);
   $('battle-log').append(li);
 }
 function advance() {
   if (!dialog.open || !scene) return;
-  if (turn === scene.battle.turns.length) return finish();
+  if (turn === scene.battle.turns.length) {
+    if (scene.manual && scene.battle.status === 'active') return awaitChoice();
+    return finish();
+  }
   const step = scene.battle.turns[turn++];
+  animating = true;
+  dialog.dataset.waiting = 'false';
   abilityLabel(step);
   meters(step.hp, step.mp);
   addLog(step);
   $('battle-status').textContent = describe(step);
-  cards.forEach((_, card) => $(`battle-fighter-${card}`).classList.remove('striking', 'hit'));
+  cards.forEach((_, card) => $(`battle-fighter-${card}`).classList.remove('striking', 'hit', 'taking-turn'));
   if (!reducedMotion.matches) {
     void $('battle-fighter-0').offsetWidth;
     $(`battle-fighter-${cards.indexOf(step.actor)}`).classList.add('striking');
@@ -155,38 +177,131 @@ function advance() {
 }
 function finish() {
   clearTimeout(timer);
+  animating = false;
   if (!scene) return;
+  if (scene.manual && scene.battle.status === 'active') return awaitChoice();
   while (turn < scene.battle.turns.length) addLog(scene.battle.turns[turn++]);
   const last = scene.battle.turns.at(-1);
   abilityLabel(last);
-  meters(scene.resultResources?.hp ?? last.hp, scene.resultResources?.mp ?? last.mp);
+  meters(scene.resultResources?.hp ?? scene.battle.hp ?? last?.hp ?? scene.battle.initialHp,
+    scene.resultResources?.mp ?? scene.battle.mp ?? last?.mp ?? scene.battle.initialMp);
   $('battle-status').textContent = `${scene.won ?? scene.battle.winner === scene.viewer ? 'Victory!' : 'Defeat.'} ${scene.result}`;
   const skipped = document.activeElement === $('battle-skip');
   $('battle-skip').hidden = true;
-  $('battle-replay').hidden = scene.allowReplay === false;
+  $('battle-skills').hidden = true;
+  dialog.dataset.waiting = 'false';
+  $('battle-close').disabled = false;
+  $('battle-close').textContent = scene.returnLabel || 'Close';
+  $('battle-close').setAttribute('aria-label', scene.returnLabel || 'Close battle');
+  $('battle-replay').hidden = scene.manual || scene.allowReplay === false;
   if (skipped) $(scene.allowReplay === false ? 'battle-close' : 'battle-replay').focus();
-  cards.forEach((_, card) => $(`battle-fighter-${card}`).classList.remove('striking', 'hit'));
+  cards.forEach((_, card) => $(`battle-fighter-${card}`).classList.remove('striking', 'hit', 'taking-turn'));
+}
+function awaitChoice() {
+  clearTimeout(timer);
+  animating = false;
+  if (!scene?.manual || scene.battle.status !== 'active') return;
+  const battle = scene.battle;
+  meters(battle.hp, battle.mp);
+  cards.forEach((_, card) => {
+    $(`battle-fighter-${card}`).classList.remove('striking', 'hit');
+    $(`battle-fighter-${card}`).classList.toggle('taking-turn', cards[card] === battle.actor);
+  });
+  const mine = battle.fighters.findIndex(fighter => fighter.id === scene.viewer);
+  const myTurn = battle.actor === mine;
+  dialog.dataset.waiting = 'true';
+  const fighter = battle.fighters[battle.actor];
+  $('battle-mode').textContent = `Turn ${battle.turns.length + 1} · ${myTurn ? 'Your move' : 'Waiting'}`;
+  $('battle-status').textContent = myTurn ? 'What will your pet do?' : `Waiting for ${fighter ? fighterName(fighter) : 'the next player'} to choose a skill…`;
+  $('battle-ability-name').textContent = myTurn ? 'Choose a skill' : 'Their turn';
+  $('battle-ability-cost').textContent = myTurn ? 'Skills use MP. Claw Strike is always free.' : 'Your pet will wait for your next choice.';
+  $('battle-skills').hidden = false;
+  const choices = battle.attacks?.[mine] ?? [];
+  const focused = document.activeElement?.dataset.skill;
+  $('battle-skills').replaceChildren(...choices.map(attack => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'battle-skill';
+    button.dataset.skill = attack.id;
+    const name = document.createElement('strong'), cost = document.createElement('span');
+    name.textContent = attack.name;
+    const affordable = attack.mpCost <= battle.mp[mine];
+    cost.textContent = `${attack.mpCost} MP${!affordable ? ' · Not enough MP' : ''}`;
+    button.append(name, cost);
+    button.disabled = submitting || !myTurn || !affordable || battle.hp[mine] <= 0;
+    button.addEventListener('click', () => chooseSkill(attack.id));
+    return button;
+  }));
+  $('battle-skills').setAttribute('aria-busy', String(submitting));
+  $('battle-close').disabled = submitting || confirming;
+  $('battle-close').textContent = 'Forfeit';
+  $('battle-close').setAttribute('aria-label', 'Forfeit battle');
+  if (focused) [...$('battle-skills').children].find(button => button.dataset.skill === focused && !button.disabled)?.focus();
+}
+async function chooseSkill(ability) {
+  if (submitting || !scene?.manual || scene.battle.status !== 'active' || turn < scene.battle.turns.length) return;
+  if (scene.battle.fighters[scene.battle.actor]?.id !== scene.viewer) return;
+  const active = scene;
+  submitting = true;
+  $('battle-error').textContent = '';
+  awaitChoice();
+  try {
+    await active.onChoose(ability, active.battle.revision);
+  } catch (error) {
+    if (scene?.key === active.key) $('battle-error').textContent = error.message || 'Could not save your move. Try again.';
+  } finally {
+    submitting = false;
+    if (scene?.key === active.key && !animating && turn >= scene.battle.turns.length && scene.battle.status === 'active') awaitChoice();
+  }
+}
+async function closeBattle() {
+  if (!scene?.manual || scene.battle.status !== 'active') return dialog.close();
+  if (submitting || confirming) return;
+  const active = scene;
+  confirming = true;
+  $('battle-close').disabled = true;
+  const yes = await new Promise(answer => document.dispatchEvent(new CustomEvent('confirm:ask', {
+    detail: { title: 'Forfeit this battle?', message: 'Your pet will withdraw. In a team battle, your teammates can keep fighting.', answer },
+  })));
+  confirming = false;
+  if (scene?.key !== active.key) return;
+  if (!yes) { $('battle-close').disabled = false; return; }
+  submitting = true;
+  try {
+    await scene.onForfeit(scene.battle.revision);
+  } catch (error) {
+    if (scene?.key === active.key) $('battle-error').textContent = error.message || 'Could not forfeit. Try again.';
+  } finally {
+    submitting = false;
+    if (scene?.key === active.key && !animating && turn >= scene.battle.turns.length && scene.battle.status === 'active') awaitChoice();
+  }
 }
 function play(next) {
   clearTimeout(timer);
+  animating = false;
   scene = next;
   turn = 0;
   if (!dialog) buildDialog();
+  submitting = false;
+  $('battle-error').textContent = '';
+  $('battle-skills').hidden = true;
   dialog.dataset.encounter = next.encounter || '';
+  dialog.dataset.manual = String(Boolean(next.manual));
   $('battle-title').textContent = next.title || 'Arena battle';
   $('battle-close').textContent = next.returnLabel || 'Close';
   $('battle-close').setAttribute('aria-label', next.returnLabel || 'Close battle');
   $('battle-log').replaceChildren();
-  $('battle-log').parentElement.hidden = next.showLog === false;
+  $('battle-log').parentElement.hidden = next.manual || next.showLog === false;
   $('battle-log').parentElement.open = false;
-  $('battle-skip').hidden = false;
+  $('battle-skip').hidden = Boolean(next.manual);
   $('battle-replay').hidden = true;
   const initiative = initiativeText(next.battle);
   $('battle-initiative').textContent = initiative;
   $('battle-initiative').hidden = !initiative;
   $('battle-status').textContent = 'Ready. Let the battle begin!';
-  $('battle-ability-name').textContent = 'Automatic attacks';
-  $('battle-ability-cost').textContent = 'Strongest affordable attack each turn';
+  $('battle-mode').textContent = next.manual ? 'Turn-based battle' : 'Battle replay';
+  $('battle-ability-name').textContent = next.manual ? 'Choose a skill' : 'Battle replay';
+  $('battle-ability-cost').textContent = next.manual ? 'Your pet waits for your choice.' : 'Playing the saved battle.';
   // A team battle (pets, then the monster last) shows the viewer's pet against
   // the monster, with its teammates beside them.
   const fighters = next.battle.fighters, last = fighters.length - 1;
@@ -200,10 +315,30 @@ function play(next) {
   });
   meters(next.battle.initialHp ?? next.battle.fighters.map(f => f.maxHp), next.battle.initialMp ?? next.battle.fighters.map(f => f.maxMp));
   if (!dialog.open) dialog.showModal();
-  timer = setTimeout(advance, reducedMotion.matches ? 350 : 750);
+  if (next.manual && !next.battle.turns.length) advance();
+  else timer = setTimeout(advance, reducedMotion.matches ? 150 : 650);
 }
 document.addEventListener('battle:show', ({ detail }) => {
-  if (!detail?.battle?.turns?.length) return;
+  if (!detail?.battle || (!detail.manual && !detail.battle.turns?.length && !detail.battle.status)) return;
+  // A new saved turn updates the open scene, without replaying earlier moves.
+  if (scene?.manual && detail.key === scene.key && detail.manual) {
+    if (detail.battle.revision < scene.battle.revision) return;
+    const duplicate = detail.battle.revision === scene.battle.revision && detail.battle.status === scene.battle.status;
+    const finishedAnimating = !animating && turn >= scene.battle.turns.length;
+    scene = detail;
+    if (duplicate) return;
+    if (finishedAnimating) {
+      clearTimeout(timer);
+      $('battle-skills').hidden = true;
+      advance();
+    }
+    return;
+  }
+  const queued = queue.findIndex(next => next.manual && detail.manual && next.key === detail.key);
+  if (queued >= 0) {
+    if (detail.battle.revision >= queue[queued].battle.revision) queue[queued] = detail;
+    return;
+  }
   if (seen.has(detail.key) && !detail.replay) return;
   seen.add(detail.key);
   if (seen.size > 100) seen.delete(seen.values().next().value);
@@ -215,5 +350,10 @@ document.addEventListener('battle:reset', () => {
   queue.length = 0;
   seen.clear();
   scene = null;
+  submitting = false;
+  confirming = false;
   if (dialog?.open) dialog.close();
+});
+document.addEventListener('battle:dismiss', ({ detail }) => {
+  if (scene?.key === detail?.key && dialog?.open) dialog.close();
 });

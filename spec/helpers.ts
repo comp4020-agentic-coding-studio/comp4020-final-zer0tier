@@ -24,6 +24,20 @@ export async function post(path: string, body?: unknown, as?: string | null): Pr
   });
 }
 
+// Explicitly play each owner's turn when a test is interested in the finished
+// reward/history. Tests for live battles use the raw endpoints instead.
+export async function finishBattle(result: any, send = post): Promise<any> {
+  for (let turns = 0; result.session?.battle.status === "active"; turns++) {
+    if (turns > 1000) throw new Error("Battle did not finish after 1000 selected attacks");
+    const { session } = result, battle = session.battle;
+    const owner = battle.fighters[battle.actor].id;
+    const response = await send(`/api/battles/${session.id}/turn`, { ability: "claw-strike", revision: battle.revision }, owner);
+    if (!response.ok) throw new Error(`Battle turn refused: ${(await response.json()).error}`);
+    result = await response.json();
+  }
+  return { ...result, ...result.session?.result };
+}
+
 // Signs up (or in) and keeps the session cookie for later requests.
 async function authenticate(path: string, id: string, password: string): Promise<Response> {
   const res = await post(path, { id, password }, null);

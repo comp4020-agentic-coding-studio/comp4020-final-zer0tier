@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { WebSocket } from "ws";
-import { baseUrl, freshId, post, sessionFor, signIn, signUp, workHour } from "./helpers.ts";
+import { baseUrl, finishBattle, freshId, post, sessionFor, signIn, signUp, workHour } from "./helpers.ts";
 
 async function setup() {
   const victim = freshId(), thief = freshId();
@@ -53,8 +53,9 @@ it("pet:updated and feed:added reach both windows within 1s; simultaneous reveng
     }));
     const responses = await Promise.all([0, 1].map(() => post(`/api/pets/${victim}/revenge/${theft.id}`)));
     expect(responses.map((r) => r.status).sort()).toEqual([200, 409]);
-    const outcome = await responses.find((r) => r.ok)!.json();
-    for (const messages of await Promise.all(events)) {
+    const outcome = await finishBattle(await responses.find((r) => r.ok)!.json());
+    for (const received of await Promise.all(events)) {
+      const messages = received.slice(-3);
       expect(messages).toHaveLength(3);
       expect(messages[0].pet).toEqual(outcome.victim);
       expect(messages[1].pet).toEqual(outcome.thief);

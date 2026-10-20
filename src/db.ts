@@ -95,6 +95,19 @@ db.exec(`
     spoils         INTEGER NOT NULL DEFAULT 0,
     fought_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
+  CREATE TABLE IF NOT EXISTS manual_battles (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL CHECK (kind IN ('arena', 'revenge')),
+    player_a TEXT NOT NULL REFERENCES pets (id),
+    player_b TEXT NOT NULL REFERENCES pets (id),
+    source_id INTEGER,
+    status TEXT NOT NULL CHECK (status IN ('active', 'finished')),
+    state_json TEXT NOT NULL,
+    meta_json TEXT NOT NULL,
+    result_json TEXT
+  );
+  CREATE INDEX IF NOT EXISTS manual_battles_by_a ON manual_battles (player_a, status);
+  CREATE INDEX IF NOT EXISTS manual_battles_by_b ON manual_battles (player_b, status);
   CREATE TABLE IF NOT EXISTS feed (
     id     INTEGER PRIMARY KEY AUTOINCREMENT,
     kind   TEXT    NOT NULL,
@@ -162,6 +175,7 @@ if (!columns.has("appearance")) db.exec("ALTER TABLE pets ADD COLUMN appearance 
 if (!columns.has("steal_available_at")) db.exec("ALTER TABLE pets ADD COLUMN steal_available_at INTEGER");
 if (!columns.has("supplies_available_at")) db.exec("ALTER TABLE pets ADD COLUMN supplies_available_at INTEGER");
 if (!columns.has("equipped_coin")) db.exec("ALTER TABLE pets ADD COLUMN equipped_coin TEXT");
+if (!columns.has("equipped_abilities")) db.exec("ALTER TABLE pets ADD COLUMN equipped_abilities TEXT NOT NULL DEFAULT '[\"claw-strike\"]'");
 const fightColumns = new Set(
   (db.prepare("SELECT name FROM pragma_table_info('fights')").all() as { name: string }[]).map((c) => c.name),
 );

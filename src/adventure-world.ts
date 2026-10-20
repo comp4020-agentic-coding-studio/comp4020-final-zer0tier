@@ -132,7 +132,7 @@ function nextSeed(seed: number): number {
 // each encounter, then a seeded chance, with an encounter guaranteed by six.
 // Until the key drops, fresh monsters replace an exhausted ordinary roster.
 // Refill only while walking in grass, never on a read or a safe path.
-export function grassEncounter(floor: Floor, point: Point): Enemy | undefined {
+export function grassEncounter(floor: Floor, point: Point, reserved: readonly string[] = []): Enemy | undefined {
   if (!inGrass(floor, point)) return;
   let hidden = floor.enemies.filter(enemy => enemy.kind !== 'slime-king');
   if (!hidden.length && floor.down && floor.exit && !floor.exit.keyFound && !floor.exit.unlocked) {
@@ -140,6 +140,7 @@ export function grassEncounter(floor: Floor, point: Point): Enemy | undefined {
     hidden = ordinaryEnemies(floor.number, floor.spawnWave);
     floor.enemies.push(...hidden);
   }
+  hidden = hidden.filter(enemy => !reserved.includes(enemy.id));
   if (!hidden.length) return;
   const encounter = floor.encounter!;
   encounter.steps++;

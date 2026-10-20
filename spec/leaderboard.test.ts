@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { baseUrl, freshId, getRules, post, signUp, studyTimes } from "./helpers.ts";
+import { baseUrl, finishBattle, freshId, getRules, post, signUp, studyTimes } from "./helpers.ts";
 
 const board = async (query = ""): Promise<{ status: number; body: any }> => {
   const res = await fetch(new URL(`/api/leaderboard${query}`, baseUrl));
@@ -65,7 +65,7 @@ it("a fight's winner climbs the wins board", async () => {
   const defender = freshId();
   await signUp(attacker);
   await signUp(defender);
-  const { fight } = await (await post(`/api/pets/${attacker}/fight/${defender}`)).json();
+  const { fight } = await finishBattle(await (await post(`/api/pets/${attacker}/fight/${defender}`)).json());
   const top = (await board()).body;
   const last = top[top.length - 1];
   // One win puts a pet on the board unless ten players already have more.

@@ -1,3 +1,4 @@
+import { finishBattle } from './helpers.ts';
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -250,7 +251,7 @@ it("logs an action_result naming who did what for sign-in, fights, theft, reveng
   const fightSince = logs().length;
   const fought = await post(`/api/pets/${alice}/fight/${bob}`, undefined, alice);
   expect(fought.status).toBe(200);
-  const fightResult = await fought.json();
+  const fightResult = await finishBattle(await fought.json(), (path, body, as) => post(path, body, as ?? undefined));
   await logged({ event: "action_result", user: alice, action: "fight", opponent: bob, winner: fightResult.fight.winner }, fightSince);
 
   const stealSince = logs().length;
@@ -263,7 +264,7 @@ it("logs an action_result naming who did what for sign-in, fights, theft, reveng
   const revengeSince = logs().length;
   const avenged = await post(`/api/pets/${bob}/revenge/${theft.id}`, undefined, bob);
   expect(avenged.status).toBe(200);
-  const revengeResult = await avenged.json();
+  const revengeResult = await finishBattle(await avenged.json(), (path, body, as) => post(path, body, as ?? undefined));
   await logged({ event: "action_result", user: bob, action: "revenge", thief: alice, won: String(revengeResult.won) }, revengeSince);
 
   const teamSince = logs().length;

@@ -392,6 +392,7 @@ body.world-playing .world-panel .arena-tabs button { padding: 8px 6px; font-size
 body.world-playing #world-dialog[data-place="backpack"] .item-actions .chip-buy { display: none; }
 body.world-playing #world-dialog[data-place="backpack"] .item-actions { grid-template-columns: minmax(0, 1fr); }
 body.world-playing #battle-dialog .battle-stage { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-glow); }
+body.world-playing #battle-dialog .battle-stage :is(h3, label, .battle-versus) { color: var(--fg); }
 body.world-playing #adventure-dialog { background: var(--bg); }
 body.world-playing .adventure-top { padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 body.world-playing #adventure-grid { border-color: var(--border); background: var(--bg-glow); }
@@ -895,3 +896,10 @@ body.world-playing #world-panel-pet #home-care-error:empty {
     max-height: min(480px, calc(100dvh - 24px));
   }
 }
+.home-skill-list { display: grid; gap: 10px; }
+.home-skill { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; }
+.home-skill > div { min-width: 0; }
+.home-skill strong, .home-skill small { display: block; }
+.home-skill small { margin-top: 4px; color: var(--muted); line-height: 1.45; }
+.home-skill button { min-height: 44px; flex-shrink: 0; }
+.home-skill[data-equipped="true"] { border-color: var(--primary); }

@@ -135,7 +135,8 @@ Destinations include **Shops**, **Adventure**, **Arena**, **Part-time Jobs**, an
 **School**. Walk near a building to see its outline, then press **Space**,
 or click or tap the building to open its activities. **Sweet Home**
 returns you to your pet. Your **Backpack** holds supplies, learned abilities, and
-Unfair Coins; the **Journal** keeps recent visitors, activity, fight
+Unfair Coins. At home's storage chest, choose **Battle skills** to equip
+learned moves before heading out. The **Journal** keeps recent visitors, activity, fight
 history, and saved theft reports with revenge options. Press **Escape** in
 either scene to open the game menu for your pet's details, Backpack,
 Journal, Appearance, help, and Sign out. Pet details open in a compact window;
@@ -334,7 +335,7 @@ moment any pet's change moves the median. So the bot is always an even match
 for a typical player — beating it reliably means your pet is ahead of the
 pack.
 
-Press **Fight** to open an automatic battle in a small window. Every pet
+Press **Fight** to open a turn-based battle in a small window. Every pet
 starts out knowing only **Claw Strike**, which costs **0 MP**. Each Arena
 fight starts with full **HP = Strength + Intelligence + Charisma** and
 **MP = Intelligence**. These are battle resources, not stamina or hygiene,
@@ -344,27 +345,28 @@ encounters — see below.
 Power is 2 × Strength + Intelligence + Charisma. Each pet rolls a luck
 factor between 0.8 and 1.2; Strength × luck, rounded to at least 1, is that
 pet's Claw Strike damage for the battle. Before the fight, a coin toss
-decides who strikes first — a fair 50/50 by default, unless the acting
-side's equipped Unfair Coin overrides it (see below). Pets alternate
-attacks until one reaches 0 HP, using the strongest affordable learned
-ability (lower MP cost breaks a damage tie). Claw Strike stays free; learned
-attacks spend MP. The surviving pet wins; going first alone no longer
+decides who strikes first — a fair 50/50 by default, unless the coin
+provider's equipped Unfair Coin overrides it (see below). Pets alternate
+turns until one reaches 0 HP. **Each player chooses an equipped skill on
+their own turn**; their pet never chooses or attacks automatically.
+Claw Strike stays free, while other skills spend MP. Unaffordable skills
+are disabled. The surviving pet wins; going first alone no longer
 guarantees victory. The winner gets a win and the loser a loss.
 
-The coin toss, and any equipped coin's effect, work the same way in Arena
-fights and revenge as they do in Adventure monster battles: in a fight, the
-**attacker's** equipped coin applies; in revenge, the **victim's** does. The
-opponent's equipped coin is always ignored, so only one side's coin ever
-affects a given battle.
+In Arena and revenge, the pet with the higher **Strength + Intelligence +
+Charisma** supplies the coin; the initiating pet wins a tie. This comparison
+uses permanent attributes before any Copper bonus. Only the provider's
+equipped coin applies. In cooperative Adventure, the strongest participating
+teammate supplies it; in solo Adventure, the player always supplies it.
 
-The window shows saved HP/MP changes, attack effects, and an expandable log.
-**Skip to result**, **Replay battle**, and **Watch battle** in recent fights
-only control playback — they never charge energy or award money again.
-Closing the window doesn't cancel the saved result. Both players can watch,
-and recent fights keep their replay after a restart. Very long battles group
-identical middle rounds without changing the outcome. Older fights stay
-readable but lose their replay. Motion effects respect reduced-motion
-settings.
+The window animates each accepted move and shows the saved HP/MP. It waits
+for the other player when it is their turn, including while they are
+offline. Battles survive reconnects and server restarts. **Forfeit** or
+Escape asks for confirmation before withdrawing. The training bot and
+monsters choose their own responses; human pets always wait for their
+players. Finished Arena fights offer **Watch battle** with a saved attack
+log and replay. Replay controls never charge energy, advance a live turn,
+or award money again. Motion effects respect reduced-motion settings.
 
 **The winner takes 10% of the loser's money** (rounded down, at most $50),
 whichever side attacked — an attacker who loses pays the defender. Fights
@@ -377,10 +379,11 @@ message pops up wherever you are on the page, saying who it was, how it
 went, and what money changed hands, with a **Revenge** button to fight them
 straight back.
 
-Fighting is instant and costs the attacker 10 stamina and 5 hygiene. Like
+Starting a fight costs the attacker 10 stamina and 5 hygiene once. Like
 studying, it needs enough left for an hour's shift afterward (20 stamina and
-25 hygiene), and a busy pet can't start a fight. The defender pays nothing,
-and can be attacked while busy. Both players see the result right away.
+25 hygiene). Both pets must be available, and a pet can take part in only one
+live battle at a time. The defender pays nothing. Wins, losses, spoils, and
+the finished fight record are saved once the battle ends.
 
 ### Theft notifications and revenge
 
@@ -395,8 +398,9 @@ report count when unresolved thefts are waiting. Open it to see who stole
 from you, when, and how much, with a
 **Take revenge** button. They also appear live, and survive server restarts
 and public-feed pruning. Each theft allows one completed revenge attempt,
-using the same automatic battle and combat energy as a fight. You must be
-idle — ordinary fight cooldowns don't block theft revenge. On a win, the
+using the same turn-based skill selection and combat energy as a fight.
+Both participants must be available — ordinary fight cooldowns don't block
+theft revenge. On a win, the
 thief pays **twice the stolen amount**, and you gain **+1 Strength, +1
 Intelligence, and +1 Charisma**. If the thief can't afford the full reward,
 no attempt or energy is spent — try later. A loss spends the attempt and
@@ -497,6 +501,10 @@ and the built-in `node:sqlite` for storage.
   429. Equipping is global to the pet and reusable — never consumed — and
   applies to Adventure, Arena, and revenge alike. Equipping a coin the pet
   doesn't own, or an unknown coin, returns 409.
+  `POST /api/pets/:id/equip-skills` takes `{ "abilities":
+  ["claw-strike", "firebolt"] }` and saves up to four different learned
+  skills, including Claw Strike. The home chest exposes these controls;
+  loadout changes are refused during a live battle.
   Stealing returns `{ thief, victim, amount }`; both pets include
   `stealAvailableAt` (epoch milliseconds, or `null` before any theft). The
   server locks and checks the target before transferring money, saving
@@ -528,6 +536,14 @@ and the built-in `node:sqlite` for storage.
   game (newest first), `GET /api/leaderboard?by=wins` (or `power`) the top
   10 players, and `GET /api/rules` the schools, courses, work locations,
   items, and costs.
+- **Live battles** (participants only): `GET /api/battles` lists the signed-in
+  pet's active Arena/revenge sessions; `GET /api/battles/:battle` reads one
+  saved session. `POST /api/battles/:battle/turn` takes
+  `{ "ability": "claw-strike", "revision": 0 }`; `POST
+  /api/battles/:battle/forfeit` takes `{ "revision": 0 }`. A session holds
+  its persisted battle, current actor, HP/MP, selected skills, and numeric
+  turn revision. Wrong-player, stale, unknown-skill, and insufficient-MP
+  actions cannot advance the fight.
 - **Real time:** the server broadcasts a `pet:updated` event over the
   socket after every change, a `fight:finished` event after each fight
   (with the `spoils` the winner took), a `feed:added` event for each new
@@ -535,7 +551,8 @@ and the built-in `node:sqlite` for storage.
   `team:updated` event whenever a team in the **Team up** window changes or
   sets off, and a `pet:touched` event, carrying the saved touch, whenever a
   visitor plays with someone else's pet. The feed keeps its newest 500
-  entries in SQLite.
+  entries in SQLite. A private `battle:updated` event sends saved
+  Arena/revenge session changes only to its participants.
 - **Logs:** server stdout (also visible in `flyctl logs`) records `join`,
   `leave`, `action`, `broadcast`, `reject`, and `snapshot` events, each as
   one line of `key = value` fields. The game's single shared WebSocket room
@@ -718,14 +735,16 @@ not a separate drop for each pet.
 monster in grass or walks into the Slime King, every teammate exploring
 within 1 block of that pet (diagonals included) fights alongside it — unless
 that teammate is busy, already has a battle waiting, or is out of the run.
-A team battle is one automatic battle scene: each standing pet strikes the
-monster in turn (the pet that triggered the encounter goes first), then
-the monster strikes whichever pet has the most HP left. The coin toss (and
-only that first pet's equipped coin) decides whether the pets or the
-monster go first. Each pet uses its own learned abilities, carried HP/MP,
-and a Copper shield only if it's the first pet's. Every pet in the battle
-sees the same saved battle from its own side and returns to the map
-separately.
+A team battle waits for each standing pet's owner to choose an equipped
+skill. Pets take their turns in encounter order, then the monster strikes
+whichever pet has the most HP left. The teammate with the highest raw
+Strength + Intelligence + Charisma supplies the coin, with encounter order
+breaking ties. That coin decides whether the pet team or monster goes
+first; only its provider receives Copper's bonus or Gold's doubled first
+hit. Each pet uses its own equipped skills and carried HP/MP. Every player
+sees the same saved battle from their own side and returns to the map
+separately. A player who forfeits withdraws only their own pet; the remaining
+teammates continue taking their turns.
 
 **A knocked-out pet is out; the team plays on.** A pet at 0 HP after a
 battle (won or lost) has failed its run, exactly like a solo defeat, while
@@ -746,18 +765,18 @@ them.
 
 ### Monster battles
 
-Encounters use the Arena's automatic battle scene, with the monster's own
+Encounters use the Arena's turn-based battle scene, with the monster's own
 appearance, name, and attributes. Monsters use **Claw Strike**, which costs
-**0 MP**; pets also use their learned abilities, and damage uses the same
+**0 MP**; players choose their pets' equipped skills, and damage uses the same
 power and luck rolls as Arena. The **Slime King** also knows **Bump** (5
 MP), which deals two-thirds of the pet's *current* HP, rounded up: a pet at
-70 HP takes 47. Like every fighter, the king picks whichever affordable
+70 HP takes 47. On its own turn, the king picks whichever affordable
 attack hits harder that turn. Bump wins while the pet's HP is high; Claw
 Strike takes over as it falls. Its 10 MP allow at most two Bumps per
 battle. The Game guide's **Monster attributes** lists Bump beside the Slime King. Pets can't
-learn it. Initiative uses the same coin toss as Arena: a fair 50/50 unless
-the pet's own equipped Unfair Coin overrides it — monsters never carry
-coins. The scene starts at the pet's saved HP/MP (plus any Copper shield),
+learn it. A solo player's coin always applies, even against a stronger
+monster. In a team battle, the strongest participating pet supplies the
+coin. Monsters never supply coins. The scene starts at the pet's saved HP/MP (plus any Copper shield),
 and each monster starts at full HP/MP.
 
 On victory, the monster stays defeated. A grass encounter keeps the pet on
@@ -784,9 +803,10 @@ answers No. A battle that starts while the window is open (a teammate's
 encounter, or an Arena fight) answers it No too, since the question no
 longer fits the moment.
 
-**Battle records unlock after the adventure ends.** Encounters still play
-their live battle animation, with **Skip to result** and **Return to map**,
-but replay and the attack log are unavailable during exploration. Returning
+**Battle records unlock after the adventure ends.** Encounters show live
+skill choices and animate the resulting turns. A live fight cannot be
+skipped; replay and the attack log are unavailable during exploration.
+**Return to map** appears after the fight finishes. Returning
 acknowledges the saved result; if that request fails, **Continue exploring**
 lets you retry it. After the run ends and any pending result is
 acknowledged, the result panel lists its battles and offers replays and
@@ -823,15 +843,18 @@ adventure floor rather than the pet's backpack; a new run starts with fresh
 locked gates and no keys.
 
 **Your backpack**, inside **Menu → Backpack & team**, shows items,
-learned abilities, and coins, each with an **Equip**/**Unequip** button. Food restores 40 stamina; soap
+learned abilities, and coins. Coins have **Equip**/**Unequip** controls.
+Food restores 40 stamina; soap
 restores 50 hygiene, capped at 100. Hourglasses finish the current lesson
 or shift. These are the same items used at home and in **Shops**, with a shared
 count — they don't restore Adventure HP/MP or revive a failed run. The
 Adventure section's **Abilities & coins** also shows permanent discoveries
-and the same equip controls, since equipping is global to the pet.
+and coin equipment. Change battle skills at the storage chest in Sweet Home.
 
-Ability rewards are learned immediately and permanently, and work in
-Adventure, Arena, and revenge. Duplicate drops say **already learned**,
+Ability rewards are learned immediately and permanently. **Learning a skill
+does not equip it**: at home's storage chest, equip up to four skills,
+including the permanently available Claw Strike. That loadout works in
+Adventure, Arena, and revenge and is fixed for a live battle. Duplicate drops say **already learned**,
 without stacking the ability or rerolling the reward.
 
 | Ability | MP cost | Damage |
@@ -840,17 +863,21 @@ without stacking the ability or rerolling the reward.
 | Firebolt | 3 | Intelligence × 1.5 × battle luck, rounded, at least 1 |
 | Heavy Strike | 2 | Claw Strike damage × 1.5, rounded up |
 
-Each turn uses the learned attack with the greatest damage the fighter can
-afford, preferring lower MP cost when damage ties. At low MP the pet falls
-back to Claw Strike. Saved playback includes each ability, MP spent, and
+Choose one equipped skill on each of your pet's turns. At low MP you can
+still choose free Claw Strike; the game never chooses it for you.
+Saved playback includes each selected ability, MP spent, and
 remaining resources; replaying doesn't spend MP again.
 
 ### Unfair coins
 
 A coin toss decides initiative before every monster battle, Arena fight,
 and revenge attempt: a fair 50/50 by default, where **heads** means the
-acting pet (the attacker, the revenge victim, or the exploring pet) strikes
-first, and **tails** means its opponent does. The battle scene shows the
+coin provider's side strikes first, and **tails** means its opponent does.
+In PvP, the higher sum of Strength, Intelligence, and Charisma chooses the
+provider. In cooperative monster battles, compare participating teammates.
+In solo monster battles, the player is always the provider. Attribute ties
+keep the initiating pet or earlier teammate; Copper's bonus is excluded
+from this comparison. The battle scene shows the
 result above the fighters for the whole battle, and replays show the same
 saved toss. Equipping an Unfair Coin can change that for the pet wearing
 it, and the scene then names the coin instead:
@@ -863,9 +890,8 @@ it, and the scene then names the coin instead:
 
 Coins are **reusable equipment, never consumed**: equip one (or none) from
 the backpack, and it stays equipped — in Adventure, Arena, and revenge
-alike — until changed. In Arena and revenge, only the **acting side's**
-equipped coin applies (the attacker in a fight, the victim in revenge); the
-opponent's equipped coin, if any, is ignored. Copper's bonus never
+alike — until changed. Only the **coin provider's** equipped coin applies;
+other participants' coins are ignored. Copper's bonus never
 persists: the pet's real attributes, and its saved maximum HP/MP, are
 unchanged once the battle ends.
 
@@ -895,7 +921,12 @@ state without starting or resetting a run. Its response includes an opaque
   found; without the key, it returns 409 and the pet stays on the current
   floor.
 - `{ "action": "continue", "battleId": "…", "revision": "…" }`
-  acknowledges a battle.
+  acknowledges a finished battle.
+- `{ "action": "battle-skill", "battleId": "…", "turnRevision": 0,
+  "ability": "claw-strike" }` selects the caller's equipped skill on their
+  current turn. The numeric turn revision is distinct from the map revision.
+- `{ "action": "battle-forfeit", "battleId": "…", "turnRevision": 0 }`
+  withdraws only the caller's pet, allowing remaining teammates to continue.
 - The older `{ "action": "abandon", "revision": "…" }` and
   `{ "action": "restart", "revision": "…" }` actions remain supported for
   compatibility. Abandon ends a run without a pending battle; restart
@@ -921,7 +952,7 @@ Each response also includes `started`, `entryId`, and `awaitingEntry`
 `battleCount` is the run's total number of battles, and `recordLimit` is
 50. `records` is empty until the run ends and its pending battle is
 acknowledged, then contains the latest saved battles. During an active run,
-only a pending encounter includes playback for its live animation;
+only a pending encounter includes battle state for live skill selection and animation;
 acknowledged battle playback is withheld until the run ends.
 
 The `grass` array matches the 16 × 16 terrain grid: `g` marks tall grass

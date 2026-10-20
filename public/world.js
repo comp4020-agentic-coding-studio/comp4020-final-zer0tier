@@ -85,7 +85,7 @@ worldShell.innerHTML = `
           <button type="button" class="home-hotspot" data-home-action="bed" style="--x:78.1%;--y:49%;--w:17%;--h:20%" aria-label="Pet's little home: customize appearance"><span class="hotspot-label">Your pet's nook</span></button>
           <button type="button" class="home-hotspot" data-home-action="feed" style="--x:67.7%;--y:64.1%;--w:10%;--h:10%" aria-label="Food bowl: feed your pet"><span class="hotspot-label">Food bowl</span></button>
           <button type="button" class="home-hotspot" data-home-action="clean" style="--x:85.4%;--y:75%;--w:16%;--h:16%" aria-label="Bath: clean your pet"><span class="hotspot-label">Bath time</span></button>
-          <button type="button" class="home-hotspot" data-home-action="chest" style="--x:38.1%;--y:75%;--w:9%;--h:9%" aria-label="Storage chest: open your backpack"><span class="hotspot-label">Backpack</span></button>
+          <button type="button" class="home-hotspot" data-home-action="chest" style="--x:38.1%;--y:75%;--w:9%;--h:9%" aria-label="Storage chest: backpack and battle skills"><span class="hotspot-label">Backpack &amp; skills</span></button>
           <button type="button" class="home-hotspot" data-home-action="menu" style="--x:37%;--y:14.1%;--w:7%;--h:10%" aria-label="Wall clock: game menu and sign out"><span class="hotspot-label">Game menu</span></button>
           <button type="button" class="home-hotspot" data-home-action="pet" data-place="pet" style="--x:50%;--y:55%;--w:13%;--h:16%" aria-label="Spend time with your pet: care and details"><span class="hotspot-label">Your companion</span></button>
           <button type="button" id="home-door" class="home-hotspot" data-home-action="door" style="--x:50%;--y:91%;--w:15%;--h:14%" aria-label="Leave home for the town map"><span class="hotspot-label">Go to town ↗</span></button>
@@ -415,11 +415,11 @@ worldById('town-scene').append(worldById('adventure-hint'));
 worldById('adventure-heading').textContent = 'Abilities & equipment';
 original.adventure.querySelector('.help').textContent = 'Your woodland discoveries travel with you. Equipped coins work in Adventure, Arena, and revenge.';
 original.adventure.querySelector('.treasure-inventory').open = true;
-original.adventure.querySelector('.treasure-inventory > .help:nth-of-type(2)').textContent = 'Chest items join your supplies. Equip a coin to use its effect in your next battle.';
+original.adventure.querySelector('.treasure-inventory > .help:nth-of-type(2)').textContent = 'Solo battles use your coin. In PvP and team battles, the pet with the highest total attributes supplies the coin.';
 
 const worldPlaces = {
   shop: ['Village shops', 'A few essentials for a very good day. Buy food, soap, and hourglasses, or collect your free daily supplies.'],
-  backpack: ['Your backpack', 'Your supplies, learned abilities, and lucky finds. Visit the shops in town when you need to restock.'],
+  backpack: ['Your backpack', 'Prepare battle skills at home, check your supplies, and choose a lucky coin.'],
   school: ['A little learning', 'Every lesson brings your pet a little further. Choose a course and watch them grow.'],
   work: ['Part-time jobs', 'Find a shift that suits your pet. Build skills, earn money, and work your way up.'],
   arena: ['The town arena', 'Meet your neighbours, visit their pets, or challenge someone to a friendly rivalry.'],
@@ -481,6 +481,7 @@ function worldArrangeScene(atHome) {
   if (!worldDashboard.hidden) worldPanels.menu.append(worldById('signout'));
   else signoutAnchor.after(worldById('signout'));
   document.body.classList.toggle('world-home', atHome && !worldDashboard.hidden);
+  document.dispatchEvent(new CustomEvent('world:scene', { detail: { home: atHome } }));
   worldStage.setAttribute('aria-describedby', 'home-controls-tip');
 }
 function worldCamera(point = worldPosition) {

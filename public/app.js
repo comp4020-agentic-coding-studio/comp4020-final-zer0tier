@@ -10,6 +10,71 @@ const VERBS = { food: "Feed", soap: "Clean", hourglass: "Skip" };
 const APPEARANCES = ["cat", "dog", "hedgehog", "lizard", "panda", "bird", "dragon", "blob"];
 const SVG_NS = "http://www.w3.org/2000/svg";
 let pendingAppearance = null;
+let atHome = true;
+let savingSkills = false;
+let activeSocket = null;
+document.addEventListener("world:scene", event => {
+  atHome = event.detail.home;
+  renderSkills();
+});
+
+function renderSkills() {
+  if (!current || !rules) return;
+  const selected = current.equippedAbilities || ["claw-strike"];
+  $("home-skills-hint").textContent = atHome
+    ? "Equip up to four skills before heading out. Claw Strike is always ready."
+    : "Return to your storage chest at home to change battle skills.";
+  const focus = document.activeElement?.dataset.equipSkill;
+  $("home-skill-list").replaceChildren(...rules.fight.abilities.map(ability => {
+    const learned = (current.abilities || ["claw-strike"]).includes(ability.id);
+    const equipped = selected.includes(ability.id);
+    const row = document.createElement("div"), content = document.createElement("div");
+    row.className = "home-skill";
+    row.dataset.equipped = String(equipped);
+    const title = document.createElement("strong"), hint = document.createElement("small");
+    title.textContent = `${ability.name} · ${ability.mpCost} MP`;
+    hint.textContent = learned ? ability.description : "Find this skill in a woodland treasure chest.";
+    content.append(title, hint);
+    const button = document.createElement("button");
+    button.type = "button"; button.className = "chip-btn chip-buy"; button.dataset.equipSkill = ability.id;
+    button.textContent = ability.id === "claw-strike" ? "Always ready" : !learned ? "Not learned" : equipped ? "Unequip" : "Equip";
+    button.setAttribute("aria-pressed", String(equipped));
+    button.disabled = savingSkills || !atHome || !learned || ability.id === "claw-strike" || (!equipped && selected.length >= 4);
+    button.addEventListener("click", () => saveSkills(equipped ? selected.filter(id => id !== ability.id) : [...selected, ability.id]));
+    row.append(content, button);
+    return row;
+  }));
+  $("home-skill-list").setAttribute("aria-busy", String(savingSkills));
+  if (focus) [...$("home-skill-list").querySelectorAll("button")].find(button => button.dataset.equipSkill === focus && !button.disabled)?.focus();
+}
+async function saveSkills(abilities) {
+  if (!current || savingSkills || !atHome) return;
+  const owner = current.id, session = theftSession, before = current;
+  savingSkills = true;
+  $("home-skills-error").textContent = "";
+  $("home-skills-status").textContent = "Saving skills…";
+  renderSkills();
+  try {
+    const response = await fetch(`/api/pets/${encodeURIComponent(owner)}/equip-skills`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ abilities }),
+    });
+    const result = await response.json();
+    if (current?.id !== owner || theftSession !== session) return;
+    if (!response.ok) throw new Error(result.error || "Could not equip skills.");
+    // HTTP is also server-confirmed, so a disconnected socket cannot leave
+    // an old loadout on screen after a successful save.
+    if (result.id === owner && current === before) render(result);
+    $("home-skills-status").textContent = "Battle skills saved.";
+  } catch (error) {
+    if (current?.id === owner && theftSession === session) {
+      $("home-skills-status").textContent = "";
+      $("home-skills-error").textContent = error.message || "Could not save skills. Try again.";
+    }
+  } finally {
+    savingSkills = false;
+    renderSkills();
+  }
+}
 
 // One renderer for the dashboard, rivals, leaderboard and feed. Only saved
 // pet rows reach here; form drafts never change an avatar.
@@ -738,7 +803,7 @@ async function startFight(opponent, errorId = "arena-error") {
     }
     if (res.ok) {
       const body = await res.json();
-      if (active()) onFight(body.fight);
+      if (active()) body.session ? showLiveBattle(body.session) : onFight(body.fight);
     }
     return res.ok;
   } catch {
@@ -799,9 +864,81 @@ function showFightScene(fight, replay = false) {
   } }));
 }
 
+const liveBattles = new Map();
+let refreshingBattles = false;
+let battleRefreshTimer = null;
+function showLiveBattle(session) {
+  if (!current || !session?.battle?.fighters.some(fighter => fighter.id === current.id)) return;
+  const prior = liveBattles.get(session.id);
+  if (prior && prior.battle.revision > session.battle.revision) return;
+  liveBattles.set(session.id, session);
+  if (session.battle.status === "active" && battleRefreshTimer === null) {
+    battleRefreshTimer = setInterval(() => { if (!document.hidden && current) loadLiveBattles(); }, 1000);
+  } else if (![...liveBattles.values()].some(saved => saved.battle.status === "active")) {
+    clearInterval(battleRefreshTimer);
+    battleRefreshTimer = null;
+  }
+  const owner = current.id;
+  const result = session.result;
+  let text = result?.fight ? describeFight(result.fight).text : "The battle is over.";
+  if (session.kind === "revenge" && result) {
+    text = session.attacker === owner
+      ? result.won ? `Recovered $${result.reward} and gained +1 to each attribute.` : "The revenge attempt is used. No extra money was lost."
+      : result.won ? `Revenge succeeded. You paid back $${result.reward}.` : "You defended against revenge.";
+  }
+  document.dispatchEvent(new CustomEvent("battle:show", { detail: {
+    key: `session:${session.id}`, battle: session.battle, viewer: owner,
+    title: session.kind === "revenge" ? "Revenge battle" : "Arena battle",
+    manual: true, result: text, showLog: false, allowReplay: false,
+    onChoose: (ability, revision) => actInBattle(session.id, "turn", { ability, revision }),
+    onForfeit: revision => actInBattle(session.id, "forfeit", { revision }),
+  } }));
+  if (result?.fight) onFight(result.fight);
+  if (session.kind === "revenge" && session.battle.status === "finished" && prior?.battle.status !== "finished") loadThefts();
+}
+async function actInBattle(id, action, payload) {
+  const owner = current?.id, login = theftSession;
+  if (!owner) return;
+  const response = await fetch(`/api/battles/${encodeURIComponent(id)}/${action}`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+  });
+  const result = await response.json();
+  if (current?.id !== owner || theftSession !== login) return;
+  if (!response.ok) {
+    // Read after a rejected/stale choice so the displayed turn can recover.
+    await loadLiveBattles();
+    throw new Error(result.error || "Could not save this move. Try again.");
+  }
+  showLiveBattle(result.session);
+}
+async function loadLiveBattles() {
+  if (!current || refreshingBattles) return;
+  const owner = current.id, login = theftSession;
+  refreshingBattles = true;
+  try {
+    const [response, ...known] = await Promise.all([
+      fetch("/api/battles", { cache: "no-store" }),
+      ...[...liveBattles.values()].filter(session => session.battle.status === "active")
+        .map(session => fetch(`/api/battles/${encodeURIComponent(session.id)}`, { cache: "no-store" })),
+    ]);
+    const data = await response.json();
+    const recent = await Promise.all(known.map(async res => res.ok ? (await res.json()).session : null));
+    if (current?.id !== owner || theftSession !== login || !response.ok) return;
+    for (const session of [...(Array.isArray(data) ? data : data.sessions || []), ...recent.filter(Boolean)]) {
+      const before = liveBattles.get(session.id);
+      if (!before || before.battle.revision !== session.battle.revision || before.battle.status !== session.battle.status) showLiveBattle(session);
+    }
+  } catch {
+    // The next refresh recovers the saved turn; no move is resubmitted.
+  } finally {
+    refreshingBattles = false;
+  }
+}
 function onFight(fight) {
   if (!current || (fight.attacker !== current.id && fight.defender !== current.id)) return;
-  showFightScene(fight);
+  // The live session already shows its final turn. Saved fights remain
+  // available in the journal without opening a second playback.
+  if (fight.battle?.status === undefined) showFightScene(fight);
   if (fightLog.some((entry) => entry.id === fight.id)) return;
   const { won, text, rolls } = describeFight(fight);
   $("fight-news").textContent = `${text} (${rolls})`;
@@ -1039,6 +1176,7 @@ function render(pet) {
   if (previous?.id !== pet.id) {
     clearThefts();
     loadThefts();
+    loadLiveBattles();
   }
   document.dispatchEvent(new CustomEvent("adventure:pet", { detail: pet }));
   renderPetAvatar($("pet-avatar"), pet);
@@ -1072,6 +1210,7 @@ function render(pet) {
   if (rules) {
     $("learned-abilities").textContent = rules.fight.abilities.filter(a => (pet.abilities || ['claw-strike']).includes(a.id))
       .map(a => `${a.name} (${a.mpCost} MP)`).join(' · ');
+    renderSkills();
     renderBusy(pet);
     renderSchool(pet, previous);
     renderControls(pet);
@@ -1098,6 +1237,11 @@ function clearThefts() {
   document.dispatchEvent(new CustomEvent("battle:reset"));
   document.dispatchEvent(new CustomEvent("adventure:reset"));
   theftSession++;
+  liveBattles.clear();
+  clearInterval(battleRefreshTimer);
+  battleRefreshTimer = null;
+  savingSkills = false;
+  activeSocket?.close?.(); // refresh the socket's authenticated participant
   revengePending = false;
   $("theft-list").setAttribute("aria-busy", "false");
   theftRequest++;
@@ -1164,6 +1308,11 @@ async function takeRevenge(id, owner) {
     if (!res.ok) {
       $("theft-status").textContent = "";
       $("theft-error").textContent = body.error ?? "Couldn't take revenge. Try again.";
+      return;
+    }
+    if (body.session) {
+      $("theft-status").textContent = "Revenge battle started. Choose your pet's moves in the battle window.";
+      showLiveBattle(body.session);
       return;
     }
     $("theft-status").textContent = body.won
@@ -1297,20 +1446,22 @@ fetch("/api/me")
 // Reconnects after a drop (e.g. the Fly machine waking up) and resyncs.
 function connect() {
   const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  activeSocket = ws;
   ws.addEventListener("open", async () => {
     $("live").textContent = "Live";
     $("live").dataset.state = "live";
     if (!current) return;
     loadThefts();
+    loadLiveBattles();
     document.dispatchEvent(new CustomEvent("realtime:resync")); // touches missed while disconnected
     const { id } = current;
-    const seen = broadcasts;
+    const before = current;
     try {
       const res = await fetch(`/api/pets/${encodeURIComponent(id)}`);
       const pet = res.ok ? await res.json() : null;
       // Keep anything newer: a broadcast that landed meanwhile, or another pet
       // the player logged in as while this was in flight.
-      if (pet && current?.id === id && broadcasts === seen) render(pet);
+      if (pet && current?.id === id && current === before) render(pet);
       loadArena(); // catch up on fights and rivals missed while disconnected
     } catch {
       ws.close(); // couldn't resync, so don't claim to be live; reconnect retries it
@@ -1338,6 +1489,8 @@ function connect() {
       document.dispatchEvent(new CustomEvent("pet:touched", { detail: event.touch }));
     } else if (event.type === "fight:finished") {
       onFight(event.fight);
+    } else if (event.type === "battle:updated") {
+      showLiveBattle(event.session);
     } else if (event.type === "feed:added" && current && rules) {
       feed.set(event.entry.id, event.entry);
       renderFeed();

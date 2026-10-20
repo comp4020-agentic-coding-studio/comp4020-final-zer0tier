@@ -1,7 +1,8 @@
 import { TIME_SCALE, realMs } from "./clock.ts";
 import { db, transaction } from "./db.ts";
 import { record } from "./feed.ts";
-import { coinEffect, simulateBattle, withAttributeBonus, type Battle } from "./combat.ts";
+import { randomUUID } from "node:crypto";
+import { ABILITIES, startBattle, takeBattleTurn, forfeitBattle, type ActiveBattle, type AbilityId, type Battle } from "./combat.ts";
 import { inventoryFor } from "./inventory.ts";
 import { logEvent, ROOM } from "./logging.ts";
 import { clientsInRoom } from "./realtime.ts";
@@ -39,6 +40,7 @@ export interface Pet extends ReturnType<typeof inventoryFor> {
   wins: number;
   losses: number;
   equippedCoin: CoinId | null; // global to the pet; applies in Adventure, Arena, and revenge
+  equippedAbilities: AbilityId[];
 }
 
 // Always there to fight, so a new player has someone to test themselves on.
@@ -155,7 +157,8 @@ export const isValidId = (id: unknown): id is string =>
 const select = db.prepare(
   `SELECT id, color, appearance, strength, intelligence, charisma, money, activity, school, credits, stamina, hygiene, food, soap,
           hourglass, construction_rank, office_rank, theatre_rank, task, busy_since, busy_until, reward, wins, losses,
-          steal_available_at AS stealAvailableAt, supplies_available_at AS suppliesAvailableAt, equipped_coin AS equippedCoin
+          steal_available_at AS stealAvailableAt, supplies_available_at AS suppliesAvailableAt, equipped_coin AS equippedCoin,
+          equipped_abilities AS equippedAbilities
      FROM pets WHERE id = ?`,
 );
 // The bot first, then the newest pets, so a player who just joined is easy to
@@ -170,11 +173,12 @@ const save = db.prepare(
   `UPDATE pets SET strength = ?, intelligence = ?, charisma = ?, money = ?, school = ?, credits = ?,
      stamina = ?, hygiene = ?, food = ?, soap = ?, hourglass = ?, construction_rank = ?, office_rank = ?, theatre_rank = ?,
      activity = ?, task = ?, busy_since = ?, busy_until = ?, reward = ?, wins = ?, losses = ?, color = ?, appearance = ?,
-     equipped_coin = ?
+     equipped_coin = ?, equipped_abilities = ?
    WHERE id = ?`,
 );
 
-type Row = Omit<Pet, "jobs" | "busySince" | "busyUntil" | "reward" | "abilities" | "coins"> & {
+type Row = Omit<Pet, "jobs" | "busySince" | "busyUntil" | "reward" | "abilities" | "coins" | "equippedAbilities"> & {
+  equippedAbilities: string;
   construction_rank: number;
   office_rank: number;
   theatre_rank: number;
@@ -186,10 +190,11 @@ type Row = Omit<Pet, "jobs" | "busySince" | "busyUntil" | "reward" | "abilities"
 export function getPet(id: string): Pet | undefined {
   const row = select.get(id) as Row | undefined;
   if (!row) return undefined;
-  const { construction_rank, office_rank, theatre_rank, busy_since, busy_until, reward, ...pet } = row;
+  const { construction_rank, office_rank, theatre_rank, busy_since, busy_until, reward, equippedAbilities, ...pet } = row;
   return {
     ...pet,
     ...inventoryFor(id),
+    equippedAbilities: JSON.parse(equippedAbilities) as AbilityId[],
     busySince: busy_since,
     busyUntil: busy_until,
     reward: reward === null ? null : (JSON.parse(reward) as Reward),
@@ -308,7 +313,7 @@ function write(pet: Pet): void {
     pet.stamina, pet.hygiene, pet.food, pet.soap, pet.hourglass,
     pet.jobs.construction, pet.jobs.office, pet.jobs.theatre,
     pet.activity, pet.task, pet.busySince, pet.busyUntil, pet.reward === null ? null : JSON.stringify(pet.reward),
-    pet.wins, pet.losses, pet.color, pet.appearance, pet.equippedCoin, pet.id,
+    pet.wins, pet.losses, pet.color, pet.appearance, pet.equippedCoin, JSON.stringify(pet.equippedAbilities), pet.id,
   );
   if (pet.school !== before.school) record({ kind: "school", pet: pet.id, school: pet.school });
   for (const location of LOCATIONS) {
@@ -339,7 +344,7 @@ function act(id: string, change: (pet: Pet) => string | undefined): Outcome {
   if (!pet) return { status: 404, error: "no such pet" };
   const finished = finishIfDue(pet, Date.now());
   const next = { ...pet, jobs: { ...pet.jobs } };
-  const refusal = change(next);
+  const refusal = combatBusy(id) ?? change(next);
   if (refusal) {
     if (!finished) return { status: 409, error: refusal };
     write(pet);
@@ -350,6 +355,8 @@ function act(id: string, change: (pet: Pet) => string | undefined): Outcome {
 }
 
 function busy(pet: Pet): string | undefined {
+  const fighting = combatBusy(pet.id);
+  if (fighting) return fighting;
   if (pet.activity === "idle") return undefined;
   const doing = pet.activity === "studying" ? `studying ${pet.task}` : `working at the ${pet.task}`;
   return `Your pet is busy ${doing}. Wait until it's done.`;
@@ -358,7 +365,7 @@ function busy(pet: Pet): string | undefined {
 // For callers that don't settle the pet first: an activity whose time is up
 // no longer keeps it busy, even before its timer pays it out.
 export const busyNow = (pet: Pet, now = Date.now()): string | undefined =>
-  pet.busyUntil !== null && pet.busyUntil <= now ? undefined : busy(pet);
+  combatBusy(pet.id) ?? (pet.busyUntil !== null && pet.busyUntil <= now ? undefined : busy(pet));
 
 export function setAppearance(id: string, color: string, appearance: Appearance): Outcome {
   return act(id, (pet) => {
@@ -376,6 +383,19 @@ export function equipCoin(id: string, coin: unknown): Outcome {
     if (!isCoinId(coin)) return "Unknown coin.";
     if (pet.coins[coin] < 1) return "You don't have that coin to equip.";
     pet.equippedCoin = coin;
+    return undefined;
+  });
+}
+
+export function equipSkills(id: string, abilities: unknown): Outcome {
+  return act(id, (pet) => {
+    if (!Array.isArray(abilities) || abilities.length < 1 || abilities.length > 4
+      || new Set(abilities).size !== abilities.length || !abilities.includes("claw-strike")) {
+      return "Equip up to four different skills, including Claw Strike.";
+    }
+    if (abilities.some(ability => !ABILITIES.some(known => known.id === ability)
+      || (ability !== "claw-strike" && !pet.abilities.includes(ability)))) return "You can only equip skills your pet has learned.";
+    pet.equippedAbilities = abilities as AbilityId[];
     return undefined;
   });
 }
@@ -593,7 +613,7 @@ const roll = (power: number): number => power * (LUCK.min + Math.random() * (LUC
 const tenths = (n: number): number => Math.round(n * 10) / 10;
 
 export type FightOutcome =
-  | { fight: Fight; attacker: Pet; defender: Pet }
+  | { session: BattleSession; fight?: Fight; attacker: Pet; defender: Pet }
   | { status: 400 | 404 | 409 | 429; error: string };
 
 // Why the attacker can't attack this defender again yet, if it can't.
@@ -608,59 +628,33 @@ function cooldown(attacker: Pet, defender: Pet, now: number): string | undefined
   return `You attacked ${defender.id} recently; you can attack them again in ${minutes} min.`;
 }
 
-// Both pets and the fight are written in one transaction, then read back.
+// Starting a fight saves its turn state and pays the starting cost once.
 export function fight(attackerId: string, defenderId: string): FightOutcome {
-  if (attackerId === defenderId) return { status: 400, error: "A pet can't fight itself." };
-  const attacker = getPet(attackerId);
-  if (!attacker) return { status: 404, error: "no such pet" };
-  const defender = getPet(defenderId);
-  if (!defender) return { status: 404, error: `There's no pet called ${defenderId}.` };
-  const now = Date.now();
-  finishIfDue(attacker, now);
-  finishIfDue(defender, now);
-
-  const refusal = busy(attacker);
-  if (refusal) return { status: 409, error: refusal };
-  const waiting = cooldown(attacker, defender, now);
-  if (waiting) return { status: 429, error: waiting };
-  const unfit = spend(attacker, FIGHT_NEEDS, FIGHT_COST, "fight");
-  if (unfit) return { status: 409, error: unfit };
-
-  // Only the attacker's equipped coin counts; the defender's is ignored.
-  const coin = coinEffect(attacker.equippedCoin);
-  const boostedAttacker = withAttributeBonus(attacker, coin.attributeBonus);
-  const attackerPower = powerOf(boostedAttacker);
-  const defenderPower = powerOf(defender);
-  const attackerRoll = roll(attackerPower);
-  const defenderRoll = roll(defenderPower);
-  const battle = simulateBattle(boostedAttacker, defender, [attackerRoll, defenderRoll], coin);
-  const won = battle.winner === attacker.id;
-  const winner = won ? attacker : defender;
-  const loser = won ? defender : attacker;
-  winner.wins++;
-  loser.losses++;
-  const spoils = attacker.id === BOT_ID || defender.id === BOT_ID ? 0 : spoilsFrom(loser);
-  loser.money -= spoils;
-  winner.money += spoils;
-
-  begin.run();
-  try {
-    write(attacker);
-    write(defender);
-    const { lastInsertRowid } = insertFight.run(
-      attacker.id, defender.id, winner.id, attackerPower, defenderPower, tenths(attackerRoll), tenths(defenderRoll), spoils, JSON.stringify(battle),
-    );
-    record({ kind: "fight", pet: attacker.id, other: defender.id, winner: winner.id, spoils });
-    commit.run();
-    return {
-      fight: readFight(selectFight.get(lastInsertRowid)),
-      attacker: getPet(attacker.id)!,
-      defender: getPet(defender.id)!,
-    };
-  } catch (err) {
-    rollback.run();
-    throw err;
-  }
+  return transaction(() => {
+    if (attackerId === defenderId) return { status: 400, error: "A pet can't fight itself." };
+    const attacker = getPet(attackerId), defender = getPet(defenderId);
+    if (!attacker) return { status: 404, error: "no such pet" };
+    if (!defender) return { status: 404, error: `There's no pet called ${defenderId}.` };
+    const now = Date.now();
+    finishIfDue(attacker, now); finishIfDue(defender, now);
+    const refusal = busy(attacker) ?? busy(defender);
+    if (refusal) return { status: 409, error: refusal };
+    const waiting = cooldown(attacker, defender, now);
+    if (waiting) return { status: 429, error: waiting };
+    const unfit = spend(attacker, FIGHT_NEEDS, FIGHT_COST, "fight");
+    if (unfit) return { status: 409, error: unfit };
+    const rolls = [roll(powerOf(attacker)), roll(powerOf(defender))];
+    const battle = startBattle([attacker], defender, rolls, { mode: 'pvp', automaticIds: [BOT_ID] });
+    const powers = [attacker, defender].map((pet, index) =>
+      powerOf(pet) + (battle.coinProvider === index && battle.initiative?.coin === 'copper-coin' ? 4 : 0));
+    write(attacker); write(defender);
+    const session = createBattleSession('arena', attacker.id, defender.id, null, battle, {
+      attackerPower: powers[0], defenderPower: powers[1],
+      attackerRoll: tenths(rolls[0] * powers[0] / powerOf(attacker)),
+      defenderRoll: tenths(rolls[1] * powers[1] / powerOf(defender)),
+    });
+    return { session, ...session.result, attacker: getPet(attacker.id)!, defender: getPet(defender.id)! };
+  });
 }
 
 // Visits and stealing --------------------------------------------------------
@@ -687,6 +681,8 @@ export function steal(thiefId: string, victimId: string): StealOutcome {
     const victim = getPet(victimId);
     if (!thief) return { status: 404, error: "no such pet" };
     if (!victim) return { status: 404, error: `There's no pet called ${victimId}.` };
+    const refusal = combatBusy(thiefId) ?? combatBusy(victimId);
+    if (refusal) return { status: 409, error: refusal };
     const now = Date.now();
     if (victim.stealAvailableAt !== null && now < victim.stealAvailableAt) {
       return { status: 429, error: "Someone already stole from this pet today. Try after midnight UTC." };
@@ -763,48 +759,129 @@ const resolveTheft = db.prepare("UPDATE thefts SET result = ?, resolved_at = ?, 
 export const theftsFor = (id: string): Theft[] => pendingThefts.all(id) as unknown as Theft[];
 
 export type RevengeOutcome =
-  | { theft: Theft; victim: Pet; thief: Pet; won: boolean; reward: number; battle: Battle }
+  | { session: BattleSession; theft: Theft; victim: Pet; thief: Pet; won?: boolean; reward?: number; battle?: ActiveBattle }
   | { status: 404 | 409; error: string };
 
 export function revenge(victimId: string, theftId: number): RevengeOutcome {
-  begin.run();
-  let committed = false;
-  try {
+  return transaction(() => {
     const theft = selectTheft.get(theftId, victimId) as unknown as Theft | undefined;
     if (!theft) return { status: 404, error: "No such theft against your pet." };
     if (theft.result) return { status: 409, error: "You already attempted revenge for this theft." };
-    const victim = getPet(victimId)!;
-    const thief = getPet(theft.thief)!;
+    const victim = getPet(victimId)!, thief = getPet(theft.thief)!;
     const now = Date.now();
-    finishIfDue(victim, now);
-    finishIfDue(thief, now);
-    const refusal = busy(victim);
+    finishIfDue(victim, now); finishIfDue(thief, now);
+    const refusal = busy(victim) ?? busy(thief);
     if (refusal) return { status: 409, error: refusal };
     const reward = theft.amount * 2;
     if (thief.money < reward) return { status: 409, error: `The thief needs $${reward} to pay the full reward. Try again later.` };
     const unfit = spend(victim, FIGHT_NEEDS, FIGHT_COST, "take revenge");
     if (unfit) return { status: 409, error: unfit };
-    // Only the victim's (acting side's) equipped coin counts; the thief's is ignored.
-    const coin = coinEffect(victim.equippedCoin);
-    const boostedVictim = withAttributeBonus(victim, coin.attributeBonus);
-    const battle = simulateBattle(boostedVictim, thief, [roll(powerOf(boostedVictim)), roll(powerOf(thief))], coin);
-    const won = battle.winner === victim.id;
-    if (won) {
-      thief.money -= reward;
-      victim.money += reward;
-      victim.strength++;
-      victim.intelligence++;
-      victim.charisma++;
+    const battle = startBattle([victim], thief, [roll(powerOf(victim)), roll(powerOf(thief))], { mode: 'pvp' });
+    write(victim); write(thief);
+    const session = createBattleSession('revenge', victim.id, thief.id, theft.id, battle, {});
+    return { session, theft, ...session.result, victim: getPet(victimId)!, thief: getPet(thief.id)! };
+  });
+}
+
+export interface BattleSession {
+  id: string;
+  kind: 'arena' | 'revenge';
+  attacker: string;
+  defender: string;
+  sourceId: number | null;
+  battle: ActiveBattle;
+  result?: { fight?: Fight; theft?: Theft; won?: boolean; reward?: number };
+}
+interface SessionRow {
+  id: string; kind: BattleSession['kind']; player_a: string; player_b: string; source_id: number | null;
+  state_json: string; meta_json: string; result_json: string | null;
+}
+const selectSession = db.prepare('SELECT * FROM manual_battles WHERE id = ? AND (player_a = ? OR player_b = ?)');
+const selectActiveSessions = db.prepare("SELECT * FROM manual_battles WHERE status = 'active' AND (player_a = ? OR player_b = ?)");
+function sessionFrom(row: SessionRow): BattleSession {
+  return { id: row.id, kind: row.kind, attacker: row.player_a, defender: row.player_b, sourceId: row.source_id,
+    battle: JSON.parse(row.state_json) as ActiveBattle, ...(row.result_json ? { result: JSON.parse(row.result_json) } : {}) };
+}
+export function battleSessionsFor(id: string): BattleSession[] {
+  return (selectActiveSessions.all(id, id) as unknown as SessionRow[]).map(sessionFrom);
+}
+export function battleSessionFor(id: string, battleId: string): BattleSession | undefined {
+  const row = selectSession.get(battleId, id, id) as unknown as SessionRow | undefined;
+  return row ? sessionFrom(row) : undefined;
+}
+// The bot is a reusable training partner; every human pet has one live fight.
+export function combatBusy(id: string): string | undefined {
+  if (id === BOT_ID) return undefined;
+  if (selectActiveSessions.get(id, id)) return 'Your pet is busy in a battle. Finish it or forfeit first.';
+  const row = db.prepare('SELECT battle_json, abandoned FROM adventures WHERE player_id = ?').get(id) as { battle_json: string | null; abandoned: number } | undefined;
+  if (row?.battle_json && !row.abandoned) {
+    const wrapper = JSON.parse(row.battle_json) as { pending: boolean; playback?: ActiveBattle };
+    const battle = wrapper.playback, mine = battle?.fighters.findIndex(fighter => fighter.id === id) ?? -1;
+    if (wrapper.pending && battle?.status === 'active' && mine >= 0 && battle.hp[mine] > 0) {
+      return 'Your pet is busy in an Adventure battle. Finish it or forfeit first.';
     }
-    // A loss costs the attempt and normal combat energy, but no extra money.
-    write(victim);
-    write(thief);
-    resolveTheft.run(won ? "won" : "lost", new Date(now).toISOString(), JSON.stringify(battle), theft.id);
-    record({ kind: "revenge", pet: victimId, other: thief.id, won, amount: won ? reward : 0 });
-    commit.run();
-    committed = true;
-    return { theft: { ...theft, result: won ? "won" : "lost" }, victim: getPet(victimId)!, thief: getPet(thief.id)!, won, reward: won ? reward : 0, battle };
-  } finally {
-    if (!committed) rollback.run();
   }
+  return undefined;
+}
+function createBattleSession(kind: BattleSession['kind'], attacker: string, defender: string, sourceId: number | null,
+  battle: ActiveBattle, metadata: Record<string, number>): BattleSession {
+  const id = randomUUID();
+  db.prepare('INSERT INTO manual_battles (id, kind, player_a, player_b, source_id, status, state_json, meta_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, kind, attacker, defender, sourceId, battle.status, JSON.stringify(battle), JSON.stringify(metadata));
+  if (battle.status === 'finished') {
+    const outcome = actInBattle(attacker, id, 'turn', 'claw-strike', battle.revision);
+    if ('error' in outcome) throw new Error(outcome.error);
+    return outcome.session;
+  }
+  return battleSessionFor(attacker, id)!;
+}
+export type BattleSessionOutcome = {
+  session: BattleSession; attacker: Pet; defender: Pet; fight?: Fight;
+  theft?: Theft; won?: boolean; reward?: number; battle?: ActiveBattle; victim?: Pet; thief?: Pet;
+} | { status: number; error: string };
+function sessionOutcome(session: BattleSession): Exclude<BattleSessionOutcome, { error: string }> {
+  const attacker = getPet(session.attacker)!, defender = getPet(session.defender)!;
+  return { session, attacker, defender, ...session.result,
+    ...(session.kind === 'revenge' ? { victim: attacker, thief: defender, battle: session.battle } : {}) };
+}
+export function actInBattle(id: string, battleId: string, action: 'turn' | 'forfeit', ability: unknown, revision: unknown): BattleSessionOutcome {
+  return transaction(() => {
+    const row = selectSession.get(battleId, id, id) as unknown as SessionRow | undefined;
+    if (!row) return { status: 404, error: 'No such battle for your pet.' };
+    const session = sessionFrom(row);
+    if (!Number.isSafeInteger(revision) || (revision as number) < 0) return { status: 400, error: 'A valid turn revision is required.' };
+    // Retrying an accepted request returns its saved state, without another turn.
+    if ((revision as number) < session.battle.revision || session.result) return sessionOutcome(session);
+    const battle = session.battle.status === 'finished' ? session.battle
+      : action === 'forfeit' ? forfeitBattle(session.battle, id, revision) : takeBattleTurn(session.battle, id, ability, revision);
+    if ('error' in battle) return battle;
+    const result: NonNullable<BattleSession['result']> = {};
+    if (battle.status === 'finished') {
+      const attacker = getPet(session.attacker)!, defender = getPet(session.defender)!;
+      const won = battle.winner === attacker.id;
+      if (session.kind === 'arena') {
+        const winner = won ? attacker : defender, loser = won ? defender : attacker;
+        winner.wins++; loser.losses++;
+        const spoils = attacker.id === BOT_ID || defender.id === BOT_ID ? 0 : spoilsFrom(loser);
+        loser.money -= spoils; winner.money += spoils;
+        write(attacker); write(defender);
+        const metadata = JSON.parse(row.meta_json) as Record<string, number>;
+        const { lastInsertRowid } = insertFight.run(attacker.id, defender.id, winner.id,
+          metadata.attackerPower, metadata.defenderPower, metadata.attackerRoll, metadata.defenderRoll, spoils, JSON.stringify(battle));
+        result.fight = readFight(selectFight.get(lastInsertRowid));
+        record({ kind: 'fight', pet: attacker.id, other: defender.id, winner: winner.id, spoils });
+      } else {
+        const theft = selectTheft.get(session.sourceId, attacker.id) as unknown as Theft;
+        const reward = won ? theft.amount * 2 : 0;
+        if (won) { defender.money -= reward; attacker.money += reward; attacker.strength++; attacker.intelligence++; attacker.charisma++; }
+        write(attacker); write(defender);
+        resolveTheft.run(won ? 'won' : 'lost', new Date().toISOString(), JSON.stringify(battle), theft.id);
+        result.theft = { ...theft, result: won ? 'won' : 'lost' }; result.won = won; result.reward = reward;
+        record({ kind: 'revenge', pet: attacker.id, other: defender.id, won, amount: reward });
+      }
+    }
+    db.prepare('UPDATE manual_battles SET status = ?, state_json = ?, result_json = ? WHERE id = ?')
+      .run(battle.status, JSON.stringify(battle), battle.status === 'finished' ? JSON.stringify(result) : null, session.id);
+    return sessionOutcome(battleSessionFor(id, session.id)!);
+  });
 }

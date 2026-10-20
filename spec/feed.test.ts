@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { baseUrl, freshId, post, signUp, studyTimes } from "./helpers.ts";
+import { baseUrl, finishBattle, freshId, post, signUp, studyTimes } from "./helpers.ts";
 
 const feed = async (limit = 50): Promise<any[]> =>
   (await fetch(new URL(`/api/feed?limit=${limit}`, baseUrl))).json();
@@ -27,7 +27,7 @@ it("a fight goes in the feed with its winner and the money taken", async () => {
   const defender = freshId();
   await signUp(attacker);
   await signUp(defender);
-  const { fight } = await (await post(`/api/pets/${attacker}/fight/${defender}`)).json();
+  const { fight } = await finishBattle(await (await post(`/api/pets/${attacker}/fight/${defender}`)).json());
   expect((await entriesFor(attacker))[0]).toMatchObject({
     kind: "fight", other: defender, winner: fight.winner, spoils: fight.spoils,
   });

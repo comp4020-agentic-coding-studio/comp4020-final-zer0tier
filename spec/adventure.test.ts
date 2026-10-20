@@ -6,6 +6,17 @@ async function sendAction(id: string, body = {}) {
   return post('/api/adventure', { revision: state.revision, ...body }, id);
 }
 
+async function finishBattle(id: string, state: any) {
+  for (let turn = 0; turn < 100 && state.battle?.playback?.status === 'active'; turn++) {
+    const response = await post('/api/adventure', { action: 'battle-skill', battleId: state.battle.id,
+      turnRevision: state.battle.playback.revision, ability: 'claw-strike' }, id);
+    expect(response.status).toBe(200);
+    state = await response.json();
+  }
+  expect(state.battle.playback.status).toBe('finished');
+  return state;
+}
+
 it('saves one-block adventure movement, blocks trees, and isolates player positions', async () => {
   const id = freshId(); await signUp(id);
   const read = async () => (await post('/api/adventure', {}, id)).json();
@@ -81,6 +92,8 @@ it('walking in tall grass reveals a saved surprise battle within six grass steps
   expect(state.battle).toMatchObject({ surprise: true, pending: true });
   expect(state.battle.enemyId).toMatch(/^f1-enemy-/);
   expect(await (await sendAction(id, { direction: 'a' })).json()).toEqual(state);
+  expect((await sendAction(id, { action: 'continue', battleId: state.battle.id })).status).toBe(409);
+  state = await finishBattle(id, state);
   const continued = await (await sendAction(id, { action: 'continue', battleId: state.battle.id })).json();
   expect(continued).toMatchObject({ x: state.x, y: state.y, battle: { pending: false } });
   expect(continued.enemies.some((e: { id: string }) => e.id === state.battle.enemyId)).toBe(!state.battle.won);
@@ -112,6 +125,7 @@ it('saves exactly one seeded grass encounter for concurrent moves and retries, i
   await post('/api/signout', {}, id); await signIn(id);
   expect(await (await post('/api/adventure', {}, id)).json()).toEqual(result);
   expect((await sendAction(id, { action: 'continue', battleId: 'fake' })).status).toBe(409);
+  result = await finishBattle(id, result);
   const continuation = { action: 'continue', battleId: result.battle.id, revision: result.revision };
   const continued = await (await post('/api/adventure', continuation, id)).json();
   expect(continued.battle.pending).toBe(false);
@@ -239,4 +253,42 @@ it('validates entry and departure revisions and never lets a supplied player ID 
   expect((await post('/api/adventure', request, null)).status).toBe(401);
   expect(await (await post('/api/adventure', request, other)).json()).toEqual(otherState);
   expect(await (await post('/api/adventure', {}, id)).json()).toEqual(state);
+});
+
+
+it('manual adventure turns require the owner’s equipped move and apply once under concurrent retries', async () => {
+  const id = freshId(), other = freshId(); await signUp(id); await signUp(other);
+  for (const direction of ['d', 'd']) await sendAction(id, { direction });
+  let state: any;
+  for (let index = 0; index < 6; index++) {
+    state = await (await sendAction(id, { direction: index % 2 ? 'd' : index ? 'a' : 'd' })).json();
+    if (state.battle) break;
+  }
+  expect(state.battle.playback).toMatchObject({ status: 'active', actor: 0 });
+  expect(state.battle.playback.turns.every((turn: { actor: number }) => turn.actor === 1)).toBe(true);
+  expect(state.battleCount).toBe(0);
+  const request = { action: 'battle-skill', battleId: state.battle.id, turnRevision: state.battle.playback.revision, ability: 'claw-strike', damage: 9999, winner: id };
+  expect((await post('/api/adventure', request, null)).status).toBe(401);
+  expect((await post('/api/adventure', { ...request, player_id: id }, other)).status).toBe(409);
+  expect((await post('/api/adventure', { ...request, ability: 'firebolt' }, id)).status).toBe(400);
+  expect((await post('/api/adventure', { ...request, turnRevision: undefined }, id)).status).toBe(400);
+  const outcomes = await Promise.all(Array.from({ length: 6 }, async () => {
+    const response = await post('/api/adventure', request, id);
+    expect(response.status).toBe(200); return response.json();
+  }));
+  for (const outcome of outcomes) expect(outcome).toEqual(outcomes[0]);
+  const next = outcomes[0];
+  expect(next.battle.playback.turns.filter((turn: { actor: number }) => turn.actor === 0)).toHaveLength(1);
+  expect(await (await post('/api/adventure', {}, id)).json()).toEqual(next);
+  await post('/api/signout', {}, id); await signIn(id);
+  expect(await (await post('/api/adventure', {}, id)).json()).toEqual(next);
+  const ended = await (await post('/api/adventure', { action: 'battle-forfeit', battleId: next.battle.id,
+    turnRevision: next.battle.playback.revision }, id)).json();
+  if (next.battle.playback.status === 'active') {
+    expect(ended).toMatchObject({ abandoned: true, battle: { pending: false, won: false, playback: { status: 'finished' } } });
+  } else {
+    // A lucky first strike can already beat a small slime. A stale retreat
+    // must preserve that completed result instead of turning it into a loss.
+    expect(ended).toEqual(next);
+  }
 });

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import { createWorld } from '../src/adventure-world.ts';
 import type { AdventureBattle } from '../src/adventure.ts';
-import { coinEffect, simulateBattle, simulateTeamBattle } from '../src/combat.ts';
+import { coinEffect, simulateBattle, simulateTeamBattle, startBattle, takeBattleTurn } from '../src/combat.ts';
 import { ABILITIES } from '../src/combat.ts';
 import { COINS } from '../src/treasure.ts';
 import { baseUrl, freshId, getPet, getRules, must, signUp } from './helpers.ts';
@@ -1400,4 +1400,43 @@ it('recovers a saved entry after its response is lost without sending a second e
     expect(bodies.at(-1)).toEqual({ direction: 'd', revision: 'saved-entry' });
     expect(bodies.filter(body => body.action === 'enter')).toHaveLength(1);
   } finally { dom.window.close(); }
+});
+
+it('posts a manual adventure skill only after selection and dismisses an obsolete battle when another window starts a new run', async () => {
+  const { window, $ } = page();
+  Object.defineProperty(window.document, 'hidden', { value: false });
+  const explorer = { id: 'explorer', strength: 5, intelligence: 5, charisma: 5, equippedCoin: 'silver-coin' as const,
+    equippedAbilities: ['claw-strike', 'firebolt'] as const };
+  const monster = { id: 'monster:f1-enemy-0', name: 'Slime', monster: 'slime' as const, strength: 10, intelligence: 1, charisma: 2 };
+  const playback = startBattle([explorer], monster, [20, 15]);
+  let saved: any = { ...map(), battle: { id: 'manual-grass', enemyId: 'f1-enemy-0', enemyName: 'Slime',
+    floor: 1, won: false, pending: true, playback, recovery: { hp: 0, mp: 0 } } };
+  const bodies: any[] = [];
+  window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
+    const body = JSON.parse(options.body as string); bodies.push(body);
+    if (body.action === 'battle-skill') {
+      const next = takeBattleTurn(saved.battle.playback, 'explorer', body.ability, body.turnRevision);
+      if ('error' in next) return Response.json(next, { status: next.status });
+      saved = { ...saved, revision: 'played-turn', battle: { ...saved.battle, playback: next } };
+    }
+    return Response.json(saved);
+  }) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(window.document.querySelector('[data-skill="firebolt"]')).not.toBeNull());
+    expect(bodies.some(body => body.action === 'battle-skill')).toBe(false);
+    expect($('battle-skip').hidden).toBe(true);
+    window.document.querySelector<HTMLButtonElement>('[data-skill="firebolt"]')!.click();
+    await vi.waitFor(() => expect(bodies.some(body => body.action === 'battle-skill')).toBe(true));
+    expect(bodies.find(body => body.action === 'battle-skill')).toMatchObject({ battleId: 'manual-grass', ability: 'firebolt', turnRevision: 0 });
+    expect(saved.battle.playback.turns[0].ability).toBe('firebolt');
+    expect($('battle-log').children).toHaveLength(0);
+    saved = { ...map(), revision: 'other-run', entryId: 'started-elsewhere' };
+    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement).open).toBe(false), { timeout: 2500 });
+    expect($('adventure-status').textContent).toContain('restarted in another window');
+    expect(bodies.filter(body => body.action === 'battle-skill')).toHaveLength(1);
+    expect(bodies.some(body => body.action === 'continue')).toBe(false);
+  } finally { window.close(); }
 });

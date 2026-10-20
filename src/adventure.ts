@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { db, transaction } from './db.ts';
-import { ABILITIES, coinEffect, MONSTER_ABILITIES, simulateBattle, simulateTeamBattle, withAttributeBonus, type Battle } from './combat.ts';
+import { ABILITIES, forfeitBattle, MONSTER_ABILITIES, startBattle, takeBattleTurn, type ActiveBattle, type Battle } from './combat.ts';
 import {
   ADVENTURE_COOLDOWN_MINUTES, ADVENTURE_COST, busyNow, consumeHourglass, findItem, getPet, ITEMS, LUCK, MAX_CARE,
   powerOf, spendForAdventure, use, type Pet,
@@ -14,7 +14,7 @@ import { realMs, TIME_SCALE } from './clock.ts';
 
 export type AdventureBattle = {
   id: string; floor: number; enemyId: string; enemyName: string;
-  won: boolean; pending: boolean; playback: Battle;
+  won: boolean; pending: boolean; playback: Battle | ActiveBattle;
   recovery: { hp: number; mp: number };
   after?: { hp: number; mp: number }; // what the pet carries back to the map; absent in older saves
   fighter?: number; // this pet's place in a team battle's playback; absent means the first
@@ -48,7 +48,7 @@ function inventoryView(pet: Pet) {
     items: ITEMS.map(item => ({ ...item, quantity: pet[item.id],
       usable: pet[item.id] > 0 && (item.effect === 'skip' ? pet.activity !== 'idle' : pet[item.restores] < MAX_CARE),
     })),
-    abilities: ABILITIES.map(a => ({ ...a, learned: pet.abilities.includes(a.id) })),
+    abilities: ABILITIES.map(a => ({ ...a, learned: pet.abilities.includes(a.id), equipped: pet.equippedAbilities.includes(a.id) })),
     coins: COINS.map(coin => ({ ...coin, quantity: pet.coins[coin.id], equipped: coin.id === pet.equippedCoin })),
     stamina: pet.stamina, hygiene: pet.hygiene,
   };
@@ -180,70 +180,116 @@ function alliesOf(saved: Progress): Progress[] {
   return floormates(saved).filter(mate => nearby(mate, saved) && !mate.battle?.pending && !busyNow(mate.pet));
 }
 
-// A surprise encounter keeps the pet on the grass tile it just entered.
-function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = false) {
-  const pet = getPet(id);
-  if (!pet) return { error: 'Your pet could not be found.', status: 404 };
-  const allies = alliesOf(saved);
-  const monster = { ...enemy, id: `monster:${enemy.id}`, monster: enemy.kind, abilities: MONSTER_MOVES[enemy.kind],
-    color: { slime: '#0891b2', goblin: '#15803d', 'slime-king': '#c026d3' }[enemy.kind] };
-  const roll = (stats: Parameters<typeof powerOf>[0]) => powerOf(stats) * (LUCK.min + Math.random() * (LUCK.max - LUCK.min));
-  // Only the pet's own equipped coin applies, even when teammates join in;
-  // monsters never carry coins.
-  const coin = coinEffect(pet.equippedCoin);
-  const boostedPet = withAttributeBonus(pet, coin.attributeBonus);
-  // Copper's extra HP/MP sit on top of what the pet carries in, as a shield.
-  const shieldHp = boostedPet.strength + boostedPet.intelligence + boostedPet.charisma - saved.maxHp;
-  const shieldMp = boostedPet.intelligence - saved.maxMp;
-  const monsterHp = monster.strength + monster.intelligence + monster.charisma;
-  const playback = allies.length === 0
-    ? simulateBattle(boostedPet, monster, [roll(boostedPet), roll(monster)], {
-      hp: [saved.hp + shieldHp, monsterHp], mp: [saved.mp + shieldMp, monster.intelligence], ...coin,
-    })
-    : simulateTeamBattle([boostedPet, ...allies.map(ally => ally.pet)], monster,
-      [roll(boostedPet), ...allies.map(ally => roll(ally.pet)), roll(monster)], {
-        hp: [saved.hp + shieldHp, ...allies.map(ally => ally.hp), monsterHp],
-        mp: [saved.mp + shieldMp, ...allies.map(ally => ally.mp), monster.intelligence], ...coin,
-      });
-  const won = playback.winner !== monster.id;
-  const floor = saved.world[saved.floor - 1];
+function activeBattle(battle: Battle): battle is ActiveBattle {
+  return 'status' in battle && battle.status === 'active';
+}
+
+// Every participant saves the same turn state. The map and rewards change only
+// when its final turn resolves; retries cannot award recovery or a key twice.
+function saveBattle(saved: Progress, participants: Progress[], playback: ActiveBattle) {
+  const encounter = saved.battle!, finished = playback.status === 'finished';
+  const monster = playback.fighters.at(-1)!;
+  const won = finished && playback.winner !== monster.id;
+  const floor = saved.world[encounter.floor - 1];
   const keyDrop = won && floor.down && floor.exit && !floor.exit.keyFound && !floor.exit.unlocked
     && Math.random() < FLOOR_KEY_DROP_RATE;
   if (keyDrop) floor.exit!.keyFound = true;
-  const last = playback.turns.at(-1)!;
-  const battleId = randomUUID();
-  // Each fighter keeps what it has left. Damage spends a Copper shield first;
-  // whatever is left of it disappears, so a fight never leaves the pet with
-  // more HP/MP than it brought. A pet knocked out is out even if its team
-  // wins; the rest recover after a victory.
-  [saved, ...allies].forEach((fighter, index) => {
-    fighter.hp = Math.min(last.hp[index], fighter.hp); fighter.mp = Math.min(last.mp[index], fighter.mp);
-    const standing = won && fighter.hp > 0;
+  if (won) {
+    const enemy = floor.enemies.find(enemy => enemy.id === encounter.enemyId);
+    floor.enemies = floor.enemies.filter(enemy => enemy.id !== encounter.enemyId);
+    // Only the initiating pet advances onto a defeated visible boss's tile.
+    const leader = participants.find(fighter => fighter.id === playback.fighters[0].id);
+    if (leader && enemy && playback.hp[0] > 0 && !encounter.surprise) {
+      leader.x = enemy.x; leader.y = enemy.y;
+    }
+  }
+  for (const fighter of participants) {
+    const index = playback.fighters.findIndex(member => member.id === fighter.id);
+    fighter.hp = Math.min(playback.hp[index], fighter.hp);
+    fighter.mp = Math.min(playback.mp[index], fighter.mp);
+    const standing = won && fighter.hp > 0 && !fighter.abandoned;
     const recovery = {
       hp: standing ? Math.min(Math.ceil(fighter.maxHp * 0.2), fighter.maxHp - fighter.hp) : 0,
       mp: standing ? Math.min(Math.ceil(fighter.maxMp * 0.2), fighter.maxMp - fighter.mp) : 0,
     };
     fighter.hp += recovery.hp; fighter.mp += recovery.mp;
     fighter.battle = {
-      id: battleId, floor: saved.floor, enemyId: enemy.id, enemyName: enemy.name, won, pending: true, playback, recovery,
-      after: { hp: fighter.hp, mp: fighter.mp }, ...(index ? { fighter: index } : {}), ...(surprise ? { surprise: true as const } : {}),
-      ...(keyDrop ? { keyDrop: { floor: saved.floor, name: 'Floor Key' as const } } : {}),
+      ...fighter.battle!, won, playback, recovery,
+      ...(finished ? { after: { hp: fighter.hp, mp: fighter.mp } } : {}),
+      ...(keyDrop ? { keyDrop: { floor: encounter.floor, name: 'Floor Key' as const } } : {}),
     };
-    fighter.records.total++;
-    fighter.records.battles.push({ ...fighter.battle, pending: false });
-    fighter.records.battles = fighter.records.battles.slice(-ADVENTURE_RECORD_LIMIT);
-  });
-  if (won) {
-    floor.enemies = floor.enemies.filter(e => e.id !== enemy.id);
-    if (saved.hp > 0 && !surprise) { saved.x = enemy.x; saved.y = enemy.y; }
+    if (finished) {
+      fighter.records.total++;
+      fighter.records.battles.push({ ...fighter.battle, pending: false });
+      fighter.records.battles = fighter.records.battles.slice(-ADVENTURE_RECORD_LIMIT);
+    }
+    // Loaders may have read the team map separately; save the current shared
+    // world with each row so one participant cannot restore a defeated enemy.
+    fighter.world = saved.world;
   }
   return transaction(() => {
-    for (const ally of allies) {
-      db.prepare('UPDATE adventures SET hp = ?, mp = ?, battle_json = ?, records_json = ?, revision = ? WHERE player_id = ? AND revision = ?')
-        .run(ally.hp, ally.mp, JSON.stringify(ally.battle), JSON.stringify(ally.records), randomUUID(), ally.id, ally.revision);
-    }
-    return save(id, saved);
+    for (const fighter of participants) save(fighter.id, fighter);
+    return adventureFor(saved.id);
   });
+}
+
+// A surprise encounter keeps the pet on the grass tile it just entered. Only
+// monsters choose attacks automatically: a pet's saved turn waits for its owner.
+function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = false) {
+  const allies = alliesOf(saved), participants = [saved, ...allies];
+  const monster = { ...enemy, id: `monster:${enemy.id}`, monster: enemy.kind, abilities: MONSTER_MOVES[enemy.kind],
+    color: { slime: '#0891b2', goblin: '#15803d', 'slime-king': '#c026d3' }[enemy.kind] };
+  const roll = (stats: Parameters<typeof powerOf>[0]) => powerOf(stats) * (LUCK.min + Math.random() * (LUCK.max - LUCK.min));
+  const playback = startBattle(participants.map(fighter => fighter.pet), monster,
+    [...participants.map(fighter => roll(fighter.pet)), roll(monster)], {
+      mode: 'monster', hp: [...participants.map(fighter => fighter.hp), monster.strength + monster.intelligence + monster.charisma],
+      mp: [...participants.map(fighter => fighter.mp), monster.intelligence],
+    });
+  const battleId = randomUUID();
+  participants.forEach((fighter, index) => {
+    fighter.battle = {
+      id: battleId, floor: saved.floor, enemyId: enemy.id, enemyName: enemy.name,
+      won: false, pending: true, playback, recovery: { hp: 0, mp: 0 },
+      ...(index ? { fighter: index } : {}), ...(surprise ? { surprise: true as const } : {}),
+    };
+  });
+  return saveBattle(saved, participants, playback);
+}
+
+function battleParticipants(saved: Progress): Progress[] {
+  return saved.battle!.playback.fighters.filter(fighter => !fighter.monster).map(fighter => fighter.id === saved.id ? saved : load(fighter.id))
+    .filter(fighter => fighter.battle?.id === saved.battle!.id);
+}
+
+function battleAction(id: string, battleId: unknown, turnRevision: unknown, ability: unknown, forfeit: boolean) {
+  if (typeof battleId !== 'string' || !Number.isInteger(turnRevision)) {
+    return { error: 'Choose the saved battle and its current turn.', status: 400 };
+  }
+  return transaction(() => {
+    const saved = load(id), battle = saved.battle;
+    if (!battle || battle.id !== battleId) return { error: 'That battle is not your current encounter.', status: 409 };
+    if (!activeBattle(battle.playback)) return view(saved);
+    if (turnRevision !== battle.playback.revision) return view(saved);
+    if (saved.abandoned) return { error: 'You have already left this battle.', status: 409 };
+    const playback = forfeit ? forfeitBattle(battle.playback, id, turnRevision)
+      : takeBattleTurn(battle.playback, id, ability, turnRevision);
+    if ('error' in playback) return playback;
+    if (forfeit) { saved.abandoned = true; battle.pending = false; saved.awaitingEntry = false; }
+    return saveBattle(saved, battleParticipants(saved), playback);
+  });
+}
+export function adventureBattleSkill(id: string, battleId: unknown, turnRevision: unknown, ability: unknown) {
+  return battleAction(id, battleId, turnRevision, ability, false);
+}
+export function forfeitAdventureBattle(id: string, battleId: unknown, turnRevision: unknown) {
+  return battleAction(id, battleId, turnRevision, undefined, true);
+}
+
+// A shared monster belongs to one active battle at a time, even when another
+// teammate explores elsewhere on the same floor.
+function reservedEnemies(saved: Progress): string[] {
+  return floormates(saved).filter(mate => mate.battle && activeBattle(mate.battle.playback))
+    .map(mate => mate.battle!.enemyId);
 }
 
 export function moveAdventure(id: string, direction: unknown, revision?: unknown) {
@@ -259,9 +305,12 @@ export function moveAdventure(id: string, direction: unknown, revision?: unknown
   const player = { x: saved.x + dx, y: saved.y + dy };
   if (!walkable(floor, player)) return { error: 'A tree blocks that path.', status: 409 };
   const enemy = floor.enemies.find(e => e.kind === 'slime-king' && samePoint(e, player));
-  if (enemy) return resolveBattle(id, saved, enemy);
+  if (enemy) {
+    if (reservedEnemies(saved).includes(enemy.id)) return { error: 'Your teammates are already fighting this monster.', status: 409 };
+    return resolveBattle(id, saved, enemy);
+  }
   saved.x = player.x; saved.y = player.y;
-  const hidden = grassEncounter(floor, player);
+  const hidden = grassEncounter(floor, player, reservedEnemies(saved));
   if (hidden) return resolveBattle(id, saved, hidden, true);
   return save(id, saved);
 }
@@ -297,6 +346,7 @@ export function continueAdventure(id: string, battleId: unknown, revision: unkno
   if (revision !== saved.revision) return view(saved);
   if (!saved.battle || saved.battle.id !== battleId) return { error: 'That battle is not your current encounter.', status: 409 };
   if (!saved.battle.pending) return view(saved);
+  if (activeBattle(saved.battle.playback)) return { error: 'Finish the battle or retreat before returning to the map.', status: 409 };
   saved.battle.pending = false;
   return save(id, saved);
 }
@@ -315,9 +365,17 @@ export function abandonAdventure(id: string, revision: unknown) {
   return save(id, saved);
 }
 
-// Closing the scene ends only this pet's run. A pending battle has already
-// resolved on the server, so leaving acknowledges it without rolling again.
+// Leaving retires only this pet. In a cooperative battle its teammates keep
+// their saved turns, and a departed pet can never strand the turn order.
 function endRun(saved: Progress) {
+  if (saved.abandoned && !saved.battle?.pending) return view(saved);
+  if (saved.battle && activeBattle(saved.battle.playback)) {
+    const playback = forfeitBattle(saved.battle.playback, saved.id);
+    if ('error' in playback) return playback;
+    saved.abandoned = true; saved.battle.pending = false; saved.awaitingEntry = false;
+    saveBattle(saved, battleParticipants(saved), playback);
+    return adventureFor(saved.id);
+  }
   const changed = Boolean(saved.battle?.pending) || (!over(saved) && !complete(saved));
   if (!saved.started || !changed) return view(saved);
   if (!over(saved) && !complete(saved)) saved.abandoned = true;
@@ -380,7 +438,8 @@ export function enterAdventure(id: string, revision: unknown, entryId: unknown) 
 export function setOffRefusal(id: string, now = Date.now()): string | undefined {
   const saved = load(id), pet = saved.pet;
   if (saved.battle?.pending) return 'has to return from its last battle first';
-  if (busyNow(pet, now)) return pet.activity === 'studying' ? `is studying ${pet.task}` : `is working at the ${pet.task}`;
+  const busy = busyNow(pet, now);
+  if (busy) return pet.activity === 'studying' ? `is studying ${pet.task}` : pet.activity === 'working' ? `is working at the ${pet.task}` : 'is already in a battle';
   if (saved.started && !over(saved) && !complete(saved)) return 'has an adventure in progress; end it first';
   if (saved.cooldownUntil && saved.cooldownUntil > now) return `is resting; its next adventure opens in ${restMinutes(saved.cooldownUntil, now)} min`;
   if (pet.stamina < ADVENTURE_COST.stamina) return `is too tired; it needs ${ADVENTURE_COST.stamina} stamina`;

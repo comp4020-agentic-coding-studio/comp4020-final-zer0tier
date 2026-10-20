@@ -1,6 +1,6 @@
 import {
   abandonAdventure, adventureFor, changeFloor, continueAdventure, enterAdventure, leaveAdventure, moveAdventure, openAdventureChest, patrolAdventure,
-  restartAdventure, skipAdventureCooldown, useAdventureItem,
+  restartAdventure, skipAdventureCooldown, useAdventureItem, adventureBattleSkill, forfeitAdventureBattle,
 } from "./adventure.ts";
 import { accept, invite, leave, setOff, teamFor, type TeamOutcome } from "./teams.ts";
 import express from "express";
@@ -15,7 +15,7 @@ import {
   matchBot, study, upgrade, use, work, BOT_ID, FIGHT_COOLDOWN_MINUTES, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS,
   SPOILS, LEADERBOARD_ORDERS, LEADERBOARD_SIZE, fight, isLeaderboardOrder, leaderboard, listPets, recentFights,
   APPEARANCES, isAppearance, setAppearance, STEAL, steal, help, theftsFor, revenge, equipCoin, FREE_SUPPLIES, collectSupplies,
-  ADVENTURE_COST, ADVENTURE_COOLDOWN_MINUTES, type Outcome,
+  ADVENTURE_COST, ADVENTURE_COOLDOWN_MINUTES, equipSkills, battleSessionsFor, battleSessionFor, actInBattle, type BattleSessionOutcome, type Outcome,
 } from "./pets.ts";
 import {
   Busy, PASSWORD, type AuthOutcome, clearedCookie, isValidPassword, playerFor, sessionCookie, sessionToken, signIn,
@@ -128,6 +128,51 @@ app.get("/api/me", (req, res) => {
   res.json(pet);
 });
 
+// Live battles are private to their participants and survive reconnects.
+app.get('/api/battles', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: 'Sign in first.' });
+  res.json(battleSessionsFor(id));
+});
+app.get('/api/battles/:battle', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: 'Sign in first.' });
+  const session = battleSessionFor(id, req.params.battle);
+  if (!session) return void res.status(404).json({ error: 'No such battle for your pet.' });
+  res.json({ session });
+});
+function announceBattle(outcome: Exclude<BattleSessionOutcome, { error: string }>, finished: boolean, petsChanged = true): void {
+  if (petsChanged) {
+    broadcast({ type: 'pet:updated', pet: outcome.attacker });
+    broadcast({ type: 'pet:updated', pet: outcome.defender });
+  }
+  broadcast({ type: 'battle:updated', session: outcome.session });
+  if (finished && outcome.fight) {
+    logEvent('action_result', { user: outcome.attacker.id, room: ROOM, client_in_room: clientsInRoom(),
+      action: 'fight', opponent: outcome.defender.id, winner: outcome.fight.winner, spoils: outcome.fight.spoils });
+    broadcast({ type: 'fight:finished', fight: outcome.fight });
+  }
+  if (finished && outcome.session.kind === 'revenge') {
+    logEvent('action_result', { user: outcome.attacker.id, room: ROOM, client_in_room: clientsInRoom(),
+      action: 'revenge', thief: outcome.defender.id, won: outcome.won ?? false, reward: outcome.reward ?? 0 });
+  }
+  followUp();
+}
+app.post('/api/battles/:battle/:action', (req, res) => {
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: 'Sign in first.' });
+  const action = req.params.action;
+  if (action !== 'turn' && action !== 'forfeit') return void res.status(400).json({ error: 'Unknown battle action.' });
+  const before = battleSessionFor(id, req.params.battle);
+  const outcome = actInBattle(id, req.params.battle, action, req.body?.ability, req.body?.revision);
+  if ('error' in outcome) return void res.status(outcome.status).json({ error: outcome.error });
+  const changed = before?.battle.revision !== outcome.session.battle.revision;
+  if (changed) announceBattle(outcome, before?.battle.status !== 'finished' && outcome.session.battle.status === 'finished', outcome.session.battle.status === 'finished');
+  res.json(outcome);
+});
+
 // Exploration is private, and every accepted step is saved before returning it.
 app.post("/api/adventure", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -140,6 +185,8 @@ app.post("/api/adventure", (req, res) => {
   const before = inventoryAction ? getPet(id) : undefined;
   const result = req.body?.action === 'open-chest' ? openAdventureChest(id, req.body.revision)
     : req.body?.action === 'use-item' ? useAdventureItem(id, req.body.item, req.body.revision)
+    : req.body?.action === 'battle-skill' ? adventureBattleSkill(id, req.body.battleId, req.body.turnRevision, req.body.ability)
+    : req.body?.action === 'battle-forfeit' ? forfeitAdventureBattle(id, req.body.battleId, req.body.turnRevision)
     : req.body?.action === 'continue' ? continueAdventure(id, req.body.battleId, req.body.revision)
     : req.body?.action === 'abandon' ? abandonAdventure(id, req.body.revision)
     : req.body?.action === 'enter' ? enterAdventure(id, req.body.revision, req.body.entryId)
@@ -380,6 +427,10 @@ app.post("/api/pets/:id/collect-supplies", (req, res) => {
   respond(res, collectSupplies(req.params.id));
 });
 
+app.post('/api/pets/:id/equip-skills', (req, res) => {
+  respond(res, equipSkills(req.params.id, req.body?.abilities));
+});
+
 app.post("/api/pets/:id/equip-coin/:coin", (req, res) => {
   if (!isValidId(req.params.id)) return notFound(res, "pet");
   respond(res, equipCoin(req.params.id, req.params.coin === "none" ? null : req.params.coin));
@@ -393,14 +444,7 @@ app.post("/api/pets/:id/fight/:opponent", (req, res) => {
     res.status(outcome.status).json({ error: outcome.error });
     return;
   }
-  logEvent("action_result", {
-    user: outcome.attacker.id, room: ROOM, client_in_room: clientsInRoom(),
-    action: "fight", opponent: outcome.defender.id, winner: outcome.fight.winner, spoils: outcome.fight.spoils,
-  });
-  broadcast({ type: "pet:updated", pet: outcome.attacker });
-  broadcast({ type: "pet:updated", pet: outcome.defender });
-  broadcast({ type: "fight:finished", fight: outcome.fight });
-  followUp();
+  announceBattle({ ...outcome, ...outcome.session.result }, outcome.session.battle.status === 'finished');
   res.json(outcome);
 });
 
@@ -462,13 +506,7 @@ app.post("/api/pets/:id/revenge/:theft", (req, res) => {
   }
   const outcome = revenge(req.params.id, Number(req.params.theft));
   if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
-  logEvent("action_result", {
-    user: outcome.victim.id, room: ROOM, client_in_room: clientsInRoom(),
-    action: "revenge", thief: outcome.thief.id, won: outcome.won, reward: outcome.reward,
-  });
-  broadcast({ type: "pet:updated", pet: outcome.victim });
-  broadcast({ type: "pet:updated", pet: outcome.thief });
-  followUp();
+  announceBattle({ ...outcome, attacker: outcome.victim, defender: outcome.thief, ...outcome.session.result }, outcome.session.battle.status === 'finished');
   res.json(outcome);
 });
 

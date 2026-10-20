@@ -1,6 +1,6 @@
 import { connect } from "node:net";
 import { expect, it } from "vitest";
-import { baseUrl, buyHourglass, freshId, getPet, post, readyToStudy, studyTimes, workHour, signUp } from "./helpers.ts";
+import { baseUrl, finishBattle, buyHourglass, freshId, getPet, post, readyToStudy, studyTimes, workHour, signUp } from "./helpers.ts";
 
 const wsUrl = (): string => new URL("/ws", baseUrl).href.replace(/^http/, "ws");
 
@@ -217,11 +217,11 @@ it("fight:finished — a fight reaches the attacker's and the defender's windows
   const windows = [await open(), await open()]; // one each
   try {
     const fights = windows.map(nextFight);
-    const attackerUpdate = nextUpdate(windows[0], attacker);
-    const defenderUpdate = nextUpdate(windows[1], defender);
+    const attackerUpdate = nextUpdate(windows[0], attacker, pet => pet.wins + pet.losses > 0);
+    const defenderUpdate = nextUpdate(windows[1], defender, pet => pet.wins + pet.losses > 0);
     const res = await post(`/api/pets/${attacker}/fight/${defender}`);
     expect(res.status).toBe(200);
-    const { fight } = await res.json();
+    const { fight } = await finishBattle(await res.json());
     for (const event of await Promise.all(fights)) expect(event.fight).toEqual(fight);
     const loser = fight.winner === attacker ? defender : attacker;
     for (const event of [await attackerUpdate, await defenderUpdate]) {
@@ -275,10 +275,10 @@ it("fight:finished — the money the winner took reaches both windows within 1s"
   const windows = [await open(), await open()];
   try {
     const fights = windows.map(nextFight);
-    const updates = [nextUpdate(windows[0], attacker), nextUpdate(windows[1], defender)];
+    const updates = [nextUpdate(windows[0], attacker, pet => pet.wins + pet.losses > 0), nextUpdate(windows[1], defender, pet => pet.wins + pet.losses > 0)];
     const res = await post(`/api/pets/${attacker}/fight/${defender}`);
     expect(res.status).toBe(200);
-    const { fight } = await res.json();
+    const { fight } = await finishBattle(await res.json());
     expect(fight.spoils).toBeGreaterThan(0);
     for (const event of await Promise.all(fights)) expect(event.fight.spoils).toBe(fight.spoils);
     for (const { pet } of await Promise.all(updates)) {
@@ -363,7 +363,7 @@ it("feed:added — a fight reaches every open window within 1s, after fight:fini
     windows[0].addEventListener("message", (msg) => order.push(JSON.parse(String(msg.data)).type));
     const news = windows.map((ws) => nextFeed(ws, (entry) => entry.kind === "fight" && entry.pet === attacker));
     const res = await post(`/api/pets/${attacker}/fight/${defender}`);
-    const { fight } = await res.json();
+    const { fight } = await finishBattle(await res.json());
     for (const { entry } of await Promise.all(news)) {
       expect(entry).toMatchObject({ pet: attacker, other: defender, winner: fight.winner, spoils: fight.spoils });
     }

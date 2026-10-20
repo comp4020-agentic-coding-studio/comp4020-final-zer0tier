@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { type Floor } from '../src/adventure-world.ts';
+import { type ActiveBattle } from '../src/combat.ts';
 
 // The Team up window's rules and a team's shared run, in-process against a
 // scratch database so tests can place pets and monsters exactly.
@@ -44,7 +45,22 @@ function team(...ids: string[]) {
 const place = (id: string, x: number, y: number, floor = 1) =>
   db.prepare('UPDATE adventures SET x = ?, y = ?, floor = ? WHERE player_id = ?').run(x, y, floor, id);
 function step(id: string, direction: string) {
-  return ok(adventure.moveAdventure(id, direction, adventure.adventureFor(id).revision));
+  ok(adventure.moveAdventure(id, direction, adventure.adventureFor(id).revision));
+  return finishBattle(id);
+}
+
+// Test callers choose every pet's move; production never chooses for a player.
+function finishBattle(id: string) {
+  let state = adventure.adventureFor(id);
+  for (let turn = 0; turn < 500; turn++) {
+    const battle = state.battle?.playback as ActiveBattle | null;
+    if (!battle || battle.status !== 'active') return state;
+    const actor = battle.actor!;
+    const skill = battle.attacks[actor].filter(move => move.mpCost <= battle.mp[actor]).sort((a, b) => b.damage - a.damage || a.mpCost - b.mpCost)[0];
+    ok(adventure.adventureBattleSkill(battle.fighters[actor].id, state.battle!.id, battle.revision, skill.id));
+    state = adventure.adventureFor(id);
+  }
+  throw new Error('Battle did not finish in 500 chosen turns.');
 }
 
 // Arrange a deterministic grass encounter without changing its combat luck.
@@ -315,4 +331,72 @@ it('saves each teammate’s battle record and reveals it only when that member e
   const continued = ok(adventure.continueAdventure(lead, fought.battle!.id, fought.revision));
   expect(continued).toMatchObject({ records: [], abandoned: false, battle: { pending: false, playback: null } });
   expect(continued.team!.members).toEqual([expect.objectContaining({ id: mate, status: 'abandoned' })]);
+});
+
+it('cooperative turns belong to each pet owner and use the strongest teammate’s coin', () => {
+  const lead = player('manual-team-lead', [2, 4, 4]), mate = player('manual-team-mate', [3, 5, 5]);
+  db.prepare('INSERT INTO inventory (player_id, item_id, quantity) VALUES (?, ?, ?)').run(mate, 'silver-coin', 1);
+  expect(pets.equipCoin(mate, 'silver-coin')).not.toHaveProperty('error');
+  const { id } = team(lead, mate), enemy = readyEncounter(id, 'f1-enemy-0');
+  place(lead, enemy.x - 1, enemy.y); place(mate, enemy.x - 1, enemy.y + 1);
+  const started = ok(adventure.moveAdventure(lead, 'd', adventure.adventureFor(lead).revision));
+  const battle = started.battle!.playback as ActiveBattle;
+  expect(battle).toMatchObject({ status: 'active', coinProvider: 1, initiative: { coin: 'silver-coin' }, turns: [] });
+  expect(adventure.adventureFor(mate).battle!.playback).toEqual(battle);
+  const actor = battle.fighters[battle.actor!].id, other = actor === lead ? mate : lead;
+  expect(adventure.adventureBattleSkill(other, started.battle!.id, battle.revision, 'claw-strike')).toMatchObject({ status: 403 });
+  const acted = ok(adventure.adventureBattleSkill(actor, started.battle!.id, battle.revision, 'claw-strike'));
+  expect(adventure.adventureFor(other).battle!.playback).toEqual(acted.battle!.playback);
+  expect(adventure.adventureBattleSkill(actor, started.battle!.id, battle.revision, 'claw-strike')).toEqual(acted);
+  expect(adventure.adventureFor(lead).battleCount).toBe(0);
+  const finished = finishBattle(lead);
+  expect(finished.battleCount).toBe(1);
+  expect(adventure.adventureFor(mate).battleCount).toBe(1);
+});
+
+it('a teammate can retreat on any turn without stranding the remaining player or reserving the monster twice', () => {
+  const lead = player('retreat-team-lead', [2, 10, 10]), mate = player('retreat-team-mate', [4, 20, 20]), far = player('retreat-team-far');
+  db.prepare('INSERT INTO inventory (player_id, item_id, quantity) VALUES (?, ?, ?)').run(mate, 'silver-coin', 1);
+  pets.equipCoin(mate, 'silver-coin');
+  const { id } = team(lead, mate, far), enemy = readyEncounter(id, 'f1-enemy-0');
+  const saved = db.prepare('SELECT world_json FROM teams WHERE id = ?').get(id) as { world_json: string };
+  const world = JSON.parse(saved.world_json) as Floor[];
+  world[0].enemies = [enemy];
+  db.prepare('UPDATE teams SET world_json = ? WHERE id = ?').run(JSON.stringify(world), id);
+  place(lead, enemy.x - 1, enemy.y); place(mate, enemy.x - 1, enemy.y + 1); place(far, 5, 10);
+  const started = ok(adventure.moveAdventure(lead, 'd', adventure.adventureFor(lead).revision));
+  expect(adventure.adventureFor(far).battle).toBeNull();
+  // A distant pet may keep walking grass; this enemy is already occupied.
+  for (let index = 0; index < 8; index++) {
+    const moved = ok(adventure.moveAdventure(far, index % 2 ? 'd' : 'a', adventure.adventureFor(far).revision));
+    expect(moved.battle).toBeNull();
+    expect(moved.enemies).toHaveLength(1);
+  }
+  const exited = ok(adventure.leaveAdventure(lead, started.revision));
+  expect(exited).toMatchObject({ abandoned: true, hp: 0, battle: { pending: false, playback: { status: 'active' } }, records: [] });
+  const remaining = adventure.adventureFor(mate);
+  expect(remaining.battle!.playback).toMatchObject({ status: 'active', actor: 1 });
+  const finished = finishBattle(mate);
+  expect(finished).toMatchObject({ battle: { won: true }, abandoned: false, battleCount: 1 });
+  const retired = adventure.adventureFor(lead);
+  expect(retired).toMatchObject({ abandoned: true, hp: 0, battle: { pending: false, recovery: { hp: 0, mp: 0 } }, battleCount: 1 });
+  expect(retired.records).toHaveLength(1);
+});
+
+it('a retired teammate can begin a new solo run while the remaining battle continues without later overwriting it', () => {
+  const lead = player('new-run-team-lead', [2, 10, 10]), mate = player('new-run-team-mate', [4, 20, 20]);
+  db.prepare('INSERT INTO inventory (player_id, item_id, quantity) VALUES (?, ?, ?)').run(mate, 'silver-coin', 1);
+  pets.equipCoin(mate, 'silver-coin');
+  const { id } = team(lead, mate), enemy = readyEncounter(id, 'f1-enemy-0');
+  place(lead, enemy.x - 1, enemy.y); place(mate, enemy.x - 1, enemy.y + 1);
+  const started = ok(adventure.moveAdventure(lead, 'd', adventure.adventureFor(lead).revision));
+  const oldBattle = started.battle!.playback as ActiveBattle;
+  const retired = ok(adventure.forfeitAdventureBattle(lead, started.battle!.id, oldBattle.revision));
+  expect(retired).toMatchObject({ abandoned: true, battle: { pending: false, playback: { status: 'active' } } });
+  expect(pets.equipSkills(lead, ['claw-strike'])).not.toHaveProperty('error');
+  db.prepare('UPDATE adventures SET cooldown_until = NULL WHERE player_id = ?').run(lead);
+  const fresh = ok(adventure.enterAdventure(lead, retired.revision, 'after-retreat'));
+  expect(fresh).toMatchObject({ team: null, battle: null, records: [], hp: 22, abandoned: false });
+  expect(finishBattle(mate)).toMatchObject({ battleCount: 1, battle: { won: true } });
+  expect(adventure.adventureFor(lead)).toEqual(fresh);
 });

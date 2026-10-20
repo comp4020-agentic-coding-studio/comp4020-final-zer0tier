@@ -82,6 +82,17 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   fixed 5% chance per victory. Keep grass encounters available until the key
   drops. Keys and permanent gate unlocks belong to the shared floor, and saved
   battle replays never reroll drops. Preserve unlocked exits within a run.
+- Pet attacks require their owner's explicit skill choice on each turn;
+  only monsters and the training bot choose attacks automatically. Keep
+  the existing damage and coin effects. In PvP (including revenge), the
+  pet with the highest Strength + Intelligence + Charisma supplies the coin;
+  in cooperative encounters use the strongest participating pet, and in
+  solo encounters always use the player's coin. Compare unboosted attributes,
+  with the initiating pet winning ties.
+- Equip learned battle skills at the storage chest at home. Keep Claw Strike
+  available for free. Persist active turns, validate the acting owner and
+  saved turn revision, and award battle rewards only once on completion.
+  Each teammate controls their own pet; leaving forfeits only that pet.
 - Use cute original monster artwork, detailed treasure chests, and subtle
   environmental animation. Respect reduced-motion preferences and pause scene
   animation when hidden or covered by another window.

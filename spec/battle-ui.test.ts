@@ -1,7 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { coinEffect, simulateBattle } from '../src/combat.ts';
+import { coinEffect, forfeitBattle, simulateBattle, startBattle, takeBattleTurn, type ActiveBattle } from '../src/combat.ts';
 
 it.each(['hedgehog', 'lizard', 'panda'])('keeps the saved %s model and coat color in battle playback', (appearance) => {
   const dom = new JSDOM(readFileSync('public/index.html', 'utf8'), { runScripts: 'outside-only' });
@@ -130,4 +130,208 @@ it('withholds Adventure replay and attack records until the finished-run scene e
     $('battle-replay').click();
     expect($('battle-hp-text-1').textContent).toBe('15 / 15');
   } finally { window.close(); }
+});
+
+function manualScene() {
+  const dom = new JSDOM('<!doctype html><body></body>', { runScripts: 'outside-only' });
+  const { window } = dom;
+  window.matchMedia = (() => ({ matches: true })) as unknown as typeof window.matchMedia;
+  window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+  const timers = new Map<number, () => void>();
+  let timerId = 0;
+  window.setTimeout = ((callback: () => void) => { timers.set(++timerId, callback); return timerId; }) as typeof window.setTimeout;
+  window.clearTimeout = (id: number | undefined) => { if (id !== undefined) timers.delete(id); };
+  window.eval(readFileSync('public/battle.js', 'utf8'));
+  const $ = (id: string) => window.document.getElementById(id)!;
+  const show = (battle: ActiveBattle, extra: Record<string, unknown> = {}) => window.document.dispatchEvent(new window.CustomEvent('battle:show', {
+    detail: { key: 'manual:test', battle, viewer: 'pet', manual: true, result: '', ...extra },
+  }));
+  function flush() {
+    let limit = 100;
+    while (timers.size && limit-- > 0) {
+      const [id, callback] = timers.entries().next().value!;
+      timers.delete(id); callback();
+    }
+    expect(timers.size).toBe(0);
+  }
+  const skill = (id: string) => window.document.querySelector<HTMLButtonElement>(`[data-skill="${id}"]`)!;
+  return { window, $, show, flush, skill, timers, close: () => window.close() };
+}
+const manualPet = {
+  id: 'pet', strength: 5, intelligence: 6, charisma: 20,
+  equippedCoin: 'silver-coin' as const, equippedAbilities: ['firebolt', 'heavy-strike'] as const,
+};
+const manualRival = { id: 'rival', strength: 4, intelligence: 4, charisma: 14 };
+const manualBattle = () => startBattle([manualPet], manualRival, [36, 26], { mp: [2, 4] });
+const microtasks = async () => { await Promise.resolve(); await Promise.resolve(); };
+
+it('opens a live battle with zero attacks, waits indefinitely for a choice, and exposes no live replay, skip or attack log', () => {
+  const scene = manualScene();
+  try {
+    let requests = 0;
+    const battle = manualBattle();
+    scene.show(battle, { onChoose: () => { requests++; } });
+    scene.flush();
+    expect((scene.$('battle-dialog') as HTMLDialogElement).open).toBe(true);
+    expect(scene.$('battle-status').textContent).toBe('What will your pet do?');
+    expect(scene.$('battle-hp-text-0').textContent).toBe('31 / 31');
+    expect(scene.$('battle-hp-text-1').textContent).toBe('22 / 22');
+    expect(scene.$('battle-skip').hidden).toBe(true);
+    expect(scene.$('battle-replay').hidden).toBe(true);
+    expect(scene.$('battle-log').closest('details')!.hidden).toBe(true);
+    expect(requests).toBe(0);
+    expect(battle.turns).toHaveLength(0);
+    scene.$('battle-skip').click();
+    scene.$('battle-replay').click();
+    scene.flush();
+    expect(scene.$('battle-status').textContent).toBe('What will your pet do?');
+    expect(scene.$('battle-skills').hidden).toBe(false);
+    expect(scene.$('battle-log').children).toHaveLength(0);
+    expect(requests).toBe(0);
+  } finally { scene.close(); }
+});
+
+it('submits only the selected affordable skill with its saved revision and waits for server-confirmed resources', async () => {
+  const scene = manualScene();
+  try {
+    const battle = manualBattle(), requests: unknown[][] = [];
+    let release!: () => void;
+    const onChoose = (ability: string, revision: number) => {
+      requests.push([ability, revision]);
+      return new Promise<void>(resolve => { release = resolve; });
+    };
+    scene.show(battle, { onChoose });
+    expect(scene.skill('firebolt').disabled).toBe(true);
+    expect(scene.skill('firebolt').textContent).toContain('Not enough MP');
+    expect(scene.skill('heavy-strike').disabled).toBe(false);
+    scene.skill('firebolt').click();
+    expect(requests).toEqual([]);
+    scene.skill('heavy-strike').click();
+    scene.skill('claw-strike').click();
+    expect(requests).toEqual([['heavy-strike', 0]]);
+    expect(scene.$('battle-skills').getAttribute('aria-busy')).toBe('true');
+    expect(scene.skill('claw-strike').disabled).toBe(true);
+    expect(scene.$('battle-hp-text-1').textContent).toBe('22 / 22');
+    expect(scene.$('battle-mp-text-0').textContent).toBe('2 / 6');
+    const updated = takeBattleTurn(battle, 'pet', 'heavy-strike', 0);
+    if ('error' in updated) throw new Error(updated.error);
+    scene.show(updated, { onChoose });
+    release();
+    await microtasks();
+    scene.flush();
+    expect(scene.$('battle-mp-text-0').textContent).toBe('0 / 6');
+    expect(scene.$('battle-hp-text-1').textContent).toBe('14 / 22');
+    expect(scene.$('battle-status').textContent).toContain('Waiting for rival');
+    expect(scene.skill('claw-strike').disabled).toBe(true);
+    expect(scene.$('battle-log').children).toHaveLength(0);
+  } finally { scene.close(); }
+});
+
+it('waits for the opponent and animates only newly saved turns without replaying duplicate or stale updates', () => {
+  const scene = manualScene();
+  try {
+    const rival = { ...manualRival, charisma: 40, equippedCoin: 'silver-coin' as const };
+    const battle = startBattle([manualPet], rival, [36, 52]);
+    let requests = 0;
+    const handlers = { onChoose: () => { requests++; } };
+    scene.show(battle, handlers);
+    expect(scene.$('battle-status').textContent).toContain('Waiting for rival');
+    expect(scene.skill('claw-strike').disabled).toBe(true);
+    scene.skill('claw-strike').click();
+    expect(requests).toBe(0);
+    const updated = takeBattleTurn(battle, 'rival', 'claw-strike', 0);
+    if ('error' in updated) throw new Error(updated.error);
+    scene.show(updated, handlers);
+    expect(scene.$('battle-status').textContent).toContain('rival used Claw Strike');
+    expect(scene.timers.size).toBe(1);
+    scene.show(updated, handlers); // the same turn arriving over HTTP and WebSocket
+    expect(scene.$('battle-status').textContent).toContain('rival used Claw Strike');
+    expect(scene.timers.size).toBe(1);
+    scene.flush();
+    expect(scene.$('battle-status').textContent).toBe('What will your pet do?');
+    expect(scene.$('battle-hp-text-0').textContent).toBe('27 / 31');
+    expect(scene.skill('claw-strike').disabled).toBe(false);
+    scene.show(updated, handlers);
+    expect(scene.timers.size).toBe(0);
+    expect(scene.$('battle-status').textContent).toBe('What will your pet do?');
+    scene.show(battle, handlers);
+    expect(scene.$('battle-hp-text-0').textContent).toBe('27 / 31');
+    expect(scene.$('battle-status').textContent).toBe('What will your pet do?');
+    expect(requests).toBe(0);
+  } finally { scene.close(); }
+});
+
+it('asks the game confirmation before forfeiting by button or Escape and renders the final authoritative HP', async () => {
+  const scene = manualScene();
+  try {
+    const battle = manualBattle(), forfeits: number[] = [];
+    let answer!: (yes: boolean) => void;
+    scene.window.document.addEventListener('confirm:ask', event => {
+      const detail = (event as CustomEvent).detail;
+      expect(detail.title).toBe('Forfeit this battle?');
+      answer = detail.answer;
+    });
+    const onForfeit = (revision: number) => { forfeits.push(revision); };
+    scene.show(battle, { onForfeit });
+    scene.$('battle-close').click();
+    expect(forfeits).toEqual([]);
+    expect((scene.$('battle-dialog') as HTMLDialogElement).open).toBe(true);
+    expect((scene.$('battle-close') as HTMLButtonElement).disabled).toBe(true);
+    answer(false); await microtasks();
+    expect(forfeits).toEqual([]);
+    expect((scene.$('battle-close') as HTMLButtonElement).disabled).toBe(false);
+    const cancel = new scene.window.Event('cancel', { cancelable: true });
+    scene.$('battle-dialog').dispatchEvent(cancel);
+    expect(cancel.defaultPrevented).toBe(true);
+    answer(true); await microtasks();
+    expect(forfeits).toEqual([battle.revision]);
+    const ended = forfeitBattle(battle, 'pet', battle.revision);
+    if ('error' in ended) throw new Error(ended.error);
+    scene.show(ended, { onForfeit, result: 'Your pet withdrew.' });
+    scene.flush();
+    expect(scene.$('battle-hp-text-0').textContent).toBe('0 / 31');
+    expect(scene.$('battle-status').textContent).toContain('Defeat. Your pet withdrew.');
+    expect(scene.$('battle-skills').hidden).toBe(true);
+    expect(scene.$('battle-replay').hidden).toBe(true);
+    scene.$('battle-close').click();
+    expect((scene.$('battle-dialog') as HTMLDialogElement).open).toBe(false);
+  } finally { scene.close(); }
+});
+
+it('identifies the actual stronger defender and cooperative teammate as the saved coin provider', () => {
+  const scene = manualScene();
+  try {
+    const stronger = { ...manualRival, charisma: 40, equippedCoin: 'gold-coin' as const };
+    scene.show(startBattle([manualPet], stronger, [36, 52]));
+    expect(scene.$('battle-initiative').textContent).toBe("rival's Gold Coin: pet attacks first, but rival's first hit deals double damage.");
+    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:reset'));
+    const monster = { id: 'monster:slime', name: 'Slime', monster: 'slime' as const, strength: 2, intelligence: 1, charisma: 30 };
+    scene.show(startBattle([manualPet, { ...stronger, equippedCoin: 'silver-coin' }], monster, [36, 52, 35]));
+    expect(scene.$('battle-initiative').textContent).toBe("rival's Silver Coin: rival's team attacks first.");
+    expect(scene.$('battle-name-2').textContent).toBe('rival');
+  } finally { scene.close(); }
+});
+
+it('keeps the newest saved state when a live battle is queued behind another battle window', () => {
+  const scene = manualScene();
+  try {
+    const old = forfeitBattle(manualBattle(), 'pet');
+    if ('error' in old) throw new Error(old.error);
+    scene.show(old, { key: 'manual:old' });
+    scene.flush();
+    const queued = manualBattle();
+    scene.show(queued, { key: 'manual:queued' });
+    const finished = forfeitBattle(queued, 'rival');
+    if ('error' in finished) throw new Error(finished.error);
+    scene.show(finished, { key: 'manual:queued', result: 'Your opponent withdrew.' });
+    scene.show(queued, { key: 'manual:queued' }); // a delayed older response
+    scene.$('battle-close').click();
+    scene.flush();
+    expect((scene.$('battle-dialog') as HTMLDialogElement).open).toBe(true);
+    expect(scene.$('battle-status').textContent).toBe('Victory! Your opponent withdrew.');
+    expect(scene.$('battle-hp-text-1').textContent).toBe('0 / 22');
+    expect(scene.$('battle-skills').hidden).toBe(true);
+    expect(scene.$('battle-close').textContent).toBe('Close');
+  } finally { scene.close(); }
 });

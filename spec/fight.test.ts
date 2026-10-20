@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
 import {
-  baseUrl, finish, freshId, getPet, getRules, post, readyToStudy, studyTimes, signUp, workHour,
+  baseUrl, finishBattle, finish, freshId, getPet, getRules, post, readyToStudy, studyTimes, signUp, workHour,
 } from "./helpers.ts";
 
 async function newPet(): Promise<string> {
@@ -11,7 +11,7 @@ async function newPet(): Promise<string> {
 
 const fight = async (id: string, opponent: string): Promise<{ status: number; body: any }> => {
   const res = await post(`/api/pets/${id}/fight/${opponent}`);
-  return { status: res.status, body: await res.json() };
+  return { status: res.status, body: await finishBattle(await res.json()) };
 };
 
 const getJson = async (path: string): Promise<any> => (await fetch(new URL(path, baseUrl))).json();

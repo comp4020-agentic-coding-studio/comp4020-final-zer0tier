@@ -23,13 +23,23 @@ function setup() {
   return { victim, thief, theft: pets.theftsFor(victim)[0] };
 }
 
+function finishBattle(result: ReturnType<typeof pets.revenge>) {
+  if ('error' in result) return result;
+  let state: ReturnType<typeof pets.actInBattle> = { ...result, attacker: result.victim, defender: result.thief };
+  while (!('error' in state) && state.session.battle.status === 'active') {
+    const { session } = state, battle = session.battle;
+    state = pets.actInBattle(battle.fighters[battle.actor!].id, session.id, 'turn', 'claw-strike', battle.revision);
+  }
+  return state;
+}
+
 it("pays double and increases all attributes once, without removing daily protection", () => {
   const { victim, thief, theft } = setup();
   const before = pets.getPet(victim)!;
   const balance = pets.getPet(thief)!.money;
   // Coin toss sends the victim first, then a high/low luck split in its favor.
-  vi.spyOn(Math, "random").mockReturnValueOnce(0).mockReturnValueOnce(0.99).mockReturnValueOnce(0);
-  expect(pets.revenge(victim, theft.id)).toMatchObject({ won: true, reward: theft.amount * 2,
+  vi.spyOn(Math, "random").mockReturnValueOnce(0.99).mockReturnValueOnce(0).mockReturnValueOnce(0);
+  expect(finishBattle(pets.revenge(victim, theft.id))).toMatchObject({ won: true, reward: theft.amount * 2,
     victim: { money: before.money + theft.amount * 2, strength: 6, intelligence: 6, charisma: 6,
       stealAvailableAt: before.stealAvailableAt, stamina: 90, hygiene: 95 },
     thief: { money: balance - theft.amount * 2 } });
@@ -45,10 +55,23 @@ it("a loss consumes exactly one attempt without money or attribute rewards", () 
   const before = pets.getPet(victim)!;
   const balance = pets.getPet(thief)!.money;
   vi.spyOn(Math, "random").mockReturnValue(0.5); // a tie belongs to the defender
-  expect(pets.revenge(victim, theft.id)).toMatchObject({ won: false, reward: 0,
+  expect(finishBattle(pets.revenge(victim, theft.id))).toMatchObject({ won: false, reward: 0,
     victim: { money: before.money, strength: 5, intelligence: 5, charisma: 5, stamina: 90 },
     thief: { money: balance } });
   expect(pets.revenge(victim, theft.id)).toMatchObject({ status: 409 });
+});
+
+it("lets the stronger thief supply the coin and choose its own revenge-battle moves", () => {
+  const { victim, thief, theft } = setup();
+  db.prepare("UPDATE pets SET strength = ?, equipped_coin = ? WHERE id = ?").run(12, "silver-coin", thief);
+  const started = pets.revenge(victim, theft.id);
+  if ("error" in started) throw new Error(started.error);
+  expect(started.session.battle).toMatchObject({ actor: 1, coinProvider: 1, turns: [],
+    initiative: { providerId: thief, coin: "silver-coin" } });
+  expect(pets.actInBattle(victim, started.session.id, "turn", "claw-strike", started.session.battle.revision))
+    .toMatchObject({ status: 403 });
+  expect(pets.actInBattle(victim, started.session.id, "forfeit", undefined, started.session.battle.revision))
+    .toMatchObject({ won: false, reward: 0 });
 });
 
 it("keeps the attempt and energy when the thief cannot pay or the victim is unfit", () => {
@@ -74,11 +97,14 @@ it("persists private reports through feed pruning and process restart", () => {
 
 it("rolls back rewards and the attempt when recording the result fails", () => {
   const { victim, thief, theft } = setup();
+  vi.spyOn(Math, "random").mockReturnValueOnce(0.99).mockReturnValueOnce(0).mockReturnValueOnce(0);
+  const pending = pets.revenge(victim, theft.id);
+  if ("error" in pending) throw new Error(pending.error);
   const before = [pets.getPet(victim), pets.getPet(thief)];
-  vi.spyOn(Math, "random").mockReturnValueOnce(0).mockReturnValueOnce(0.99).mockReturnValueOnce(0);
   db.exec("CREATE TRIGGER fail_revenge BEFORE INSERT ON feed WHEN NEW.kind = 'revenge' BEGIN SELECT RAISE(ABORT, 'test failure'); END");
   try {
-    expect(() => pets.revenge(victim, theft.id)).toThrow("test failure");
+    expect(() => finishBattle(pending)).toThrow("test failure");
+    expect(pets.battleSessionsFor(victim)).toHaveLength(1);
     expect([pets.getPet(victim), pets.getPet(thief)]).toEqual(before);
     expect(pets.theftsFor(victim)).toEqual([theft]);
   } finally { db.exec("DROP TRIGGER fail_revenge"); }

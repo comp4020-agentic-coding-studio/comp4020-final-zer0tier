@@ -109,6 +109,8 @@ guide.innerHTML = `
       <li>The Slime King guards the final grove. Walk up to it to battle.</li>
       <li>HP and MP carry between battles. A win gives back 20%.</li>
       <li>A coin toss decides who strikes first.</li>
+      <li>Choose an equipped skill on your turn. Equip learned skills at your storage chest at home.</li>
+      <li>Your coin always applies in solo battles. In a team, the pet with the highest total attributes supplies the coin.</li>
       <li>Teammates beside you join your battles.</li>
       <li>On a team, each chest opens once, for whoever gets there first.</li>
     </ul>
@@ -610,7 +612,7 @@ function renderInventory() {
   abilities.replaceChildren();
   for (const ability of inventory.abilities.filter(a => a.learned)) {
     const row = document.createElement('li');
-    row.textContent = `${ability.name} · ${ability.mpCost} MP. ${ability.description}`;
+    row.textContent = `${ability.name} · ${ability.mpCost} MP${ability.equipped ? ' · Equipped' : ''}. ${ability.description}`;
     abilities.append(row);
   }
   const coins = adventure.querySelector('#adventure-coins');
@@ -663,20 +665,33 @@ function renderRecords() {
   }
 }
 function showBattle(replay = false, battle = state?.battle) {
-  if (!battle?.playback || (replay && !recordsAvailable()) || (!replay && (!entryReady || shownBattle === battle.id))) return;
+  const manual = Boolean(battle?.playback?.status) && !replay;
+  if (!battle?.playback || (replay && !recordsAvailable()) || (!replay && (!entryReady || (!manual && shownBattle === battle.id)))) return;
   if (!replay) shownBattle = battle.id;
   packPanel.hidden = true;
   packToggle.setAttribute('aria-expanded', 'false');
   const last = battle.playback.turns.at(-1), mine = battle.fighter ?? 0;
   // What the pet carries back to the map (a Copper shield's leftover is gone).
-  const hp = [...last.hp], mp = [...last.mp];
-  hp[mine] = battle.after?.hp ?? last.hp[mine] + battle.recovery.hp;
-  mp[mine] = battle.after?.mp ?? last.mp[mine] + battle.recovery.mp;
+  const hp = [...(battle.playback.hp ?? last?.hp ?? battle.playback.initialHp)];
+  const mp = [...(battle.playback.mp ?? last?.mp ?? battle.playback.initialMp)];
+  hp[mine] = battle.after?.hp ?? hp[mine] + battle.recovery.hp;
+  mp[mine] = battle.after?.mp ?? mp[mine] + battle.recovery.mp;
   document.dispatchEvent(new CustomEvent('battle:show', { detail: {
     key: `adventure:${battle.id}`, battle: battle.playback, viewer: battle.playback.fighters[mine].id,
-    title: battle.surprise ? `Surprise in the grass! · ${battle.enemyName}` : `Floor ${battle.floor} · ${battle.enemyName}${battle.attacked ? ' attacks!' : ''}`,
+    title: battle.surprise ? manual ? `A wild ${battle.enemyName}!` : `Surprise in the grass! · ${battle.enemyName}` : `Floor ${battle.floor} · ${battle.enemyName}${battle.attacked ? ' attacks!' : ''}`,
     encounter: battle.surprise ? 'grass' : 'woodland', result: battleResult(battle), won: battle.won,
-    replay: true, allowReplay: replay, showLog: replay,
+    replay: !manual, manual, allowReplay: replay, showLog: replay,
+    onChoose: async (ability, turnRevision) => {
+      if (!await request({ action: 'battle-skill', battleId: battle.id, ability, turnRevision })) {
+        throw new Error(status.textContent || 'Could not save your move. Try again.');
+      }
+    },
+    onForfeit: async turnRevision => {
+      if (!await request({ action: 'battle-forfeit', battleId: battle.id, turnRevision })) {
+        throw new Error(status.textContent || 'Could not withdraw. Try again.');
+      }
+      document.dispatchEvent(new CustomEvent('battle:dismiss', { detail: { key: `adventure:${battle.id}` } }));
+    },
     returnLabel: replay ? 'Back to records' : 'Return to map', resultResources: { hp, mp },
   } }));
 }
@@ -684,6 +699,8 @@ function matchesCurrentEntry(result) {
   if (!acceptedEntryId || result.entryId === acceptedEntryId) return true;
   entryReady = false;
   stopWalking();
+  if (state?.battle) document.dispatchEvent(new CustomEvent('battle:dismiss', { detail: { key: `adventure:${state.battle.id}` } }));
+  shownBattle = null;
   adventure.classList.add('adventure-entering');
   status.textContent = 'This adventure was restarted in another window. Return to town and enter again.';
   status.classList.remove('visually-hidden');
@@ -737,8 +754,9 @@ async function request(payload = {}) {
 // Refresh shared progress while exploring. This legacy action name now reads
 // the saved map only; standing still never rolls an encounter.
 async function patrol() {
-  if (!entryReady || !adventure.open || document.hidden || patrolling || pending || !state || state.battle?.pending
-    || runEnded() || busyText()) return;
+  const live = state?.battle?.playback?.status === 'active';
+  if (!entryReady || !adventure.open || document.hidden || patrolling || pending || !state || (state.battle?.pending && !live)
+    || (runEnded() && !live) || busyText()) return;
   const version = generation, order = ++sent;
   patrolling = true;
   try {
@@ -1143,7 +1161,7 @@ const ask = (title, message) => new Promise(answer =>
 adventure.querySelector('#adventure-abandon').addEventListener('click', endAdventure);
 adventure.querySelector('#adventure-skip-cooldown').addEventListener('click', () => request({ action: 'skip-cooldown' }));
 async function continueExploring() {
-  if (!state?.battle?.pending) return;
+  if (!state?.battle?.pending || state.battle?.playback?.status === 'active') return;
   await request({ action: 'continue', battleId: state.battle.id });
   if (!adventure.open || document.querySelector('#battle-dialog')?.open) return;
   if (!runEnded()) return grid.focus({ preventScroll: true });

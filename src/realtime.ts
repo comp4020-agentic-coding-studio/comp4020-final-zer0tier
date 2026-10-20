@@ -4,7 +4,7 @@ import { WebSocket, WebSocketServer } from "ws";
 import { playerFor } from "./auth.ts";
 import { logEvent, ROOM } from "./logging.ts";
 import type { FeedEntry } from "./feed.ts";
-import type { Fight, Pet } from "./pets.ts";
+import type { BattleSession, Fight, Pet } from "./pets.ts";
 import type { Team } from "./teams.ts";
 import type { Touch } from "./touches.ts";
 
@@ -13,6 +13,7 @@ export type ServerEvent =
   | { type: "pet:updated"; pet: Pet }
   // Sent after both fighters' pet:updated, so clients can tell the story.
   | { type: "fight:finished"; fight: Fight }
+  | { type: "battle:updated"; session: BattleSession }
   // Sent last, after the change it describes, for the Arena's "Happening now".
   | { type: "feed:added"; entry: FeedEntry }
   // A team forming in the Team up window changed or set off. Players it no
@@ -23,6 +24,7 @@ export type ServerEvent =
   | { type: "pet:touched"; touch: Touch };
 
 let wss: WebSocketServer | undefined;
+const credentials = new WeakMap<WebSocket, string | undefined>();
 
 export function clientsInRoom(): number {
   let count = 0;
@@ -35,6 +37,7 @@ export function attachRealtime(server: Server): void {
   // A malformed frame makes ws emit "error"; unheard, that would crash the app.
   wss.on("error", (err) => console.error("websocket server error", err));
   wss.on("connection", (ws, req) => {
+    credentials.set(ws, req.headers.cookie);
     const id = randomUUID();
     const connection = `c_${id}`;
     // The socket may be opened before sign-in. Give those connections a
@@ -56,6 +59,10 @@ export function broadcast(event: ServerEvent): void {
   let recipients = 0;
   for (const client of wss.clients) {
     if (client.readyState === WebSocket.OPEN) {
+      if (event.type === "battle:updated") {
+        const player = playerFor(credentials.get(client));
+        if (player !== event.session.attacker && player !== event.session.defender) continue;
+      }
       client.send(message);
       recipients++;
     }

@@ -18,6 +18,8 @@ export interface PetStats {
   color?: string; appearance?: string;
   name?: string; monster?: MonsterKind;
   abilities?: readonly AbilityId[];
+  equippedCoin?: CoinId | null;
+  equippedAbilities?: readonly AbilityId[];
 }
 export interface Fighter {
   id: string; maxHp: number; maxMp: number; damage: number;
@@ -33,15 +35,17 @@ export interface BattleTurn {
 }
 // How the turn order was decided, saved so every replay can show it. `toss`
 // is null when the acting pet's Silver or Gold Coin fixed the order instead.
-export interface Initiative { toss: 'heads' | 'tails' | null; coin: CoinId | null }
+export interface Initiative {
+  toss: 'heads' | 'tails' | null; coin: CoinId | null;
+  provider?: number; providerId?: string;
+}
 export interface Battle {
   fighters: Fighter[]; turns: BattleTurn[]; winner: string;
   initialHp?: number[]; initialMp?: number[]; // absent in older saved replays
   initiative?: Initiative; // absent in older saved replays
 }
-// Before battle, a coin toss decides initiative (heads = fighter 0 first), fair
-// unless the acting pet's equipped coin overrides it. Only the acting side's
-// coin ever applies; the opponent's equipped coin (if any) is ignored.
+// This effect is relative to the pet supplying the coin: heads/Silver put its
+// side first, while tails/Gold put the opposing side first.
 export interface CoinEffect extends Initiative { first: 0 | 1; doubleFirstStrike: boolean; attributeBonus: number }
 export function coinEffect(coin: CoinId | null | undefined, random = Math.random): CoinEffect {
   if (coin === 'silver-coin') return { first: 0, doubleFirstStrike: false, attributeBonus: 0, toss: null, coin };
@@ -79,6 +83,199 @@ function attacksOf(pet: PetStats, fighter: Fighter, roll: number) {
       : ability.id === 'heavy-strike' ? Math.ceil(fighter.damage * 1.5) : fighter.damage,
   }));
 }
+
+export interface BattleAttack {
+  id: AbilityId; name: string; mpCost: number; description: string; damage: number;
+}
+// Everything needed to resume a live fight is saved as plain JSON. `turns`
+// remains the replay format, while the current resources and turn are explicit.
+export interface ActiveBattle extends Battle {
+  status: 'active' | 'finished';
+  actor: number | null;
+  hp: number[]; mp: number[];
+  revision: number;
+  attacks: BattleAttack[][];
+  coinProvider: number;
+  order: number[];
+  cursor: number;
+  monsterIndex: number | null;
+  automaticIds: string[];
+  goldPending: boolean;
+  forfeited: number[];
+}
+export interface BattleActionError { error: string; status: number }
+export interface StartBattleOptions {
+  mode?: 'pvp' | 'monster';
+  hp?: number[]; mp?: number[];
+  random?: () => number;
+  // Only the server's fixed training bot belongs here. Human participants must
+  // always select their own move, including when they disconnect.
+  automaticIds?: string[];
+}
+
+export function isActiveBattle(battle: Battle): battle is ActiveBattle {
+  return 'status' in battle && 'actor' in battle && 'revision' in battle;
+}
+
+function attributeTotal(pet: PetStats) {
+  return pet.strength + pet.intelligence + pet.charisma;
+}
+function battlePower(pet: PetStats) {
+  return 2 * pet.strength + pet.intelligence + pet.charisma;
+}
+function battleFinished(battle: ActiveBattle) {
+  if (battle.monsterIndex !== null) {
+    if (battle.hp[battle.monsterIndex] <= 0) battle.winner = battle.fighters[0].id;
+    else if (!battle.hp.some((hp, i) => i !== battle.monsterIndex && hp > 0)) {
+      battle.winner = battle.fighters[battle.monsterIndex].id;
+    }
+  } else if (battle.hp.some(hp => hp <= 0)) {
+    battle.winner = battle.fighters[battle.hp[0] > 0 ? 0 : 1].id;
+  }
+  if (!battle.winner) return false;
+  battle.status = 'finished';
+  battle.actor = null;
+  return true;
+}
+function targetOf(battle: ActiveBattle, actor: number) {
+  if (battle.monsterIndex === null) return 1 - actor;
+  if (actor !== battle.monsterIndex) return battle.monsterIndex;
+  // Preserve the monster's existing targeting rule: most remaining HP,
+  // keeping the earlier teammate on a tie.
+  return battle.hp.reduce((target, hp, i) =>
+    i !== battle.monsterIndex && hp > 0 && (target < 0 || hp > battle.hp[target]) ? i : target, -1);
+}
+function attackDamage(battle: ActiveBattle, target: number, attack: BattleAttack) {
+  return attack.id === 'bump' ? Math.ceil(battle.hp[target] * 2 / 3) : attack.damage;
+}
+function strikeInPlace(battle: ActiveBattle, actor: number, attack: BattleAttack) {
+  const target = targetOf(battle, actor);
+  const boost = battle.goldPending && actor === battle.coinProvider ? 2 : 1;
+  if (actor === battle.coinProvider) battle.goldPending = false;
+  const damage = Math.min(battle.hp[target], attackDamage(battle, target, attack) * boost);
+  battle.hp[target] -= damage;
+  battle.mp[actor] -= attack.mpCost;
+  battle.turns.push({
+    actor, target, ability: attack.id, name: attack.name, mpCost: attack.mpCost,
+    damage, hits: 1, hp: [...battle.hp], mp: [...battle.mp],
+  });
+  battle.revision++;
+  battle.cursor = (battle.cursor + 1) % battle.order.length;
+}
+function advanceInPlace(battle: ActiveBattle) {
+  while (!battleFinished(battle)) {
+    while (battle.hp[battle.order[battle.cursor]] <= 0) {
+      battle.cursor = (battle.cursor + 1) % battle.order.length;
+    }
+    const actor = battle.order[battle.cursor];
+    battle.actor = actor;
+    if (actor !== battle.monsterIndex && !battle.automaticIds.includes(battle.fighters[actor].id)) return;
+    const target = targetOf(battle, actor);
+    const attack = battle.attacks[actor].filter(move => move.mpCost <= battle.mp[actor]).reduce((best, move) => {
+      const gain = attackDamage(battle, target, move) - attackDamage(battle, target, best);
+      return gain > 0 || (gain === 0 && move.mpCost < best.mpCost) ? move : best;
+    });
+    strikeInPlace(battle, actor, attack);
+  }
+}
+function copyBattle(battle: ActiveBattle): ActiveBattle {
+  // Structured cloning prevents an invalid/stale request or a failed database
+  // transaction from changing the caller's previously persisted snapshot.
+  return structuredClone(battle);
+}
+
+/** Start a fight without selecting any human pet's move. Rolls use raw stats. */
+export function startBattle(
+  pets: PetStats[], opponent: PetStats, rolls: number[], options: StartBattleOptions = {},
+): ActiveBattle {
+  const mode = options.mode ?? (opponent.monster ? 'monster' : 'pvp');
+  if (!pets.length || (mode === 'pvp' && pets.length !== 1)) throw new Error('Choose the battle participants.');
+  const all = [...pets, opponent];
+  if (new Set(all.map(pet => pet.id)).size !== all.length) throw new Error('Each fighter must be different.');
+  if (all.some(pet => ![pet.strength, pet.intelligence, pet.charisma].every(value => Number.isFinite(value) && value >= 0)
+    || attributeTotal(pet) <= 0)) throw new Error('Fighter attributes must be valid.');
+  if (all.some((_, i) => !Number.isFinite(rolls[i]) || rolls[i] < 0)) throw new Error('Each fighter needs a valid battle roll.');
+
+  const candidates = mode === 'monster' ? pets : all;
+  const provider = candidates.reduce((strongest, pet, i) =>
+    attributeTotal(pet) > attributeTotal(candidates[strongest]) ? i : strongest, 0);
+  const effect = coinEffect(all[provider].equippedCoin, options.random);
+  const prepared = all.map((pet, i) => {
+    const monster = mode === 'monster' && i === pets.length;
+    const selected = monster ? pet.abilities : pet.equippedAbilities ?? pet.abilities;
+    const abilities = [...new Set(selected ?? [])].filter(id =>
+      (monster ? ALL_ABILITIES : ABILITIES).some(ability => ability.id === id));
+    return withAttributeBonus({ ...pet, abilities }, i === provider ? effect.attributeBonus : 0);
+  });
+  const adjustedRolls = rolls.map((roll, i) => roll * battlePower(prepared[i]) / battlePower(all[i]));
+  const fighters = prepared.map((pet, i) => fighterOf(pet, adjustedRolls[i]));
+  const attacks = prepared.map((pet, i) => attacksOf(pet, fighters[i], adjustedRolls[i]));
+  const initialHp = fighters.map((fighter, i) => {
+    const carried = options.hp?.[i] ?? attributeTotal(all[i]);
+    return carried <= 0 ? 0 : Math.min(fighter.maxHp, carried + (i === provider ? effect.attributeBonus * 3 : 0));
+  });
+  const initialMp = fighters.map((fighter, i) => Math.max(0, Math.min(fighter.maxMp,
+    (options.mp?.[i] ?? all[i].intelligence) + (i === provider ? effect.attributeBonus : 0))));
+  const monsterIndex = mode === 'monster' ? pets.length : null;
+  const petOrder = pets.map((_, i) => i);
+  const order = monsterIndex === null
+    ? effect.first === 0 ? [provider, 1 - provider] : [1 - provider, provider]
+    : effect.first === 0 ? [...petOrder, monsterIndex] : [monsterIndex, ...petOrder];
+  const battle: ActiveBattle = {
+    fighters, attacks, turns: [], winner: '', status: 'active', actor: null,
+    initialHp, initialMp, hp: [...initialHp], mp: [...initialMp], revision: 0,
+    initiative: { toss: effect.toss, coin: effect.coin, provider, providerId: all[provider].id },
+    coinProvider: provider, goldPending: effect.doubleFirstStrike,
+    order, cursor: 0, monsterIndex, automaticIds: [...new Set(options.automaticIds ?? [])],
+    forfeited: [],
+  };
+  advanceInPlace(battle);
+  return battle;
+}
+
+/** Validate and resolve one selected pet move, then any following monster move. */
+export function takeBattleTurn(
+  battle: ActiveBattle, actorId: string, ability: unknown, revision: unknown,
+): ActiveBattle | BattleActionError {
+  if (!Number.isInteger(revision) || revision !== battle.revision) {
+    return { error: 'The battle has moved on. Choose a move for the current turn.', status: 409 };
+  }
+  if (battle.status !== 'active' || battle.actor === null) return { error: 'This battle has ended.', status: 409 };
+  const actor = battle.actor;
+  if (battle.fighters[actor].id !== actorId) return { error: 'Wait for your pet’s turn.', status: 403 };
+  if (actor === battle.monsterIndex || battle.automaticIds.includes(actorId)) {
+    return { error: 'This fighter’s move is controlled by the game.', status: 403 };
+  }
+  const attack = battle.attacks[actor].find(move => move.id === ability);
+  if (!attack) return { error: 'Choose one of your equipped skills.', status: 400 };
+  if (attack.mpCost > battle.mp[actor]) return { error: 'Your pet does not have enough MP for that skill.', status: 409 };
+  const next = copyBattle(battle);
+  strikeInPlace(next, actor, attack);
+  advanceInPlace(next);
+  return next;
+}
+
+/** Remove only this participant; remaining teammates retain their own turns. */
+export function forfeitBattle(
+  battle: ActiveBattle, actorId: string, revision?: unknown,
+): ActiveBattle | BattleActionError {
+  if (revision !== undefined && (!Number.isInteger(revision) || revision !== battle.revision)) {
+    return { error: 'The battle has moved on. Refresh it before leaving.', status: 409 };
+  }
+  const actor = battle.fighters.findIndex(fighter => fighter.id === actorId);
+  if (actor < 0 || actor === battle.monsterIndex || battle.automaticIds.includes(actorId)) {
+    return { error: 'You are not a player in this battle.', status: 403 };
+  }
+  if (battle.status !== 'active') return { error: 'This battle has ended.', status: 409 };
+  if (battle.forfeited.includes(actor)) return battle;
+  const next = copyBattle(battle);
+  next.hp[actor] = 0;
+  next.forfeited.push(actor);
+  next.revision++;
+  advanceInPlace(next);
+  return next;
+}
+
 export function simulateBattle(
   a: PetStats, b: PetStats, rolls: [number, number],
   // A coin's effect can be spread in whole; its attribute bonus must already be

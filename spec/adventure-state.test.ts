@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { createWorld, type Enemy, type Floor } from '../src/adventure-world.ts';
+import { type ActiveBattle } from '../src/combat.ts';
 const directory = mkdtempSync(join(tmpdir(), 'virtuepets-adventure-'));
 let adventure: typeof import('../src/adventure.ts');
 let db: typeof import('../src/db.ts').db;
@@ -65,7 +66,22 @@ function readyGrassBattle(id: string, enemyId: string) {
 function step(id: string, direction: string) {
   const result = adventure.moveAdventure(id, direction, adventure.adventureFor(id).revision);
   if ('error' in result) throw new Error(result.error);
-  return result;
+  return finishBattle(id);
+}
+// Existing reward/carry tests choose every player move explicitly. Separate
+// manual-turn tests below inspect the waiting state before making any choice.
+function finishBattle(id: string) {
+  let state = adventure.adventureFor(id);
+  for (let turn = 0; turn < 500; turn++) {
+    const battle = state.battle?.playback as ActiveBattle | null;
+    if (!battle || battle.status !== 'active') return state;
+    const actor = battle.actor!;
+    const skill = battle.attacks[actor].filter(move => move.mpCost <= battle.mp[actor]).sort((a, b) => b.damage - a.damage || a.mpCost - b.mpCost)[0];
+    const result = adventure.adventureBattleSkill(battle.fighters[actor].id, state.battle!.id, battle.revision, skill.id);
+    if ('error' in result) throw new Error(result.error);
+    state = adventure.adventureFor(id);
+  }
+  throw new Error('Battle did not finish in 500 chosen turns.');
 }
 function continueRun(id: string) {
   const saved = adventure.adventureFor(id);
@@ -177,8 +193,9 @@ it('uses chest food, soap, and hourglasses with existing effects and cannot cons
   expect(afterRestart(id)).toEqual(current);
 });
 
-it('loads learned abilities into both monster and Arena battles, spending carried MP only once', () => {
+it('loads equipped skills into monster battles, spending carried MP only once', () => {
   const id = 'learned-fighter'; standOnChest(id); openChest(id, 0.6);
+  expect(pets.equipSkills(id, ['claw-strike', 'firebolt'])).not.toHaveProperty('error');
   const before = setupBattle(id, 'goblin', [5, 10, 12]);
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
   try {
@@ -186,10 +203,7 @@ it('loads learned abilities into both monster and Arena battles, spending carrie
     expect(result.battle!.playback!.turns.find(turn => turn.actor === 0)).toMatchObject({ ability: 'firebolt', mpCost: 3 });
     expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(result);
     expect(result.battle!.playback!.initialMp![0]).toBe(before.mp);
-    pets.getOrCreatePet('learned-opponent');
-    const arena = pets.fight(id, 'learned-opponent');
-    if ('error' in arena) throw new Error(arena.error);
-    expect(arena.fight.battle!.turns.find(turn => turn.actor === 0)).toMatchObject({ ability: 'firebolt', mpCost: 3 });
+
   } finally { random.mockRestore(); }
 });
 
@@ -410,7 +424,7 @@ it("a Silver coin forces the pet to attack first against a much stronger goblin"
   expect(pets.equipCoin(id, 'silver-coin')).not.toHaveProperty('error');
   const result = step(id, 'd');
   expect(result.battle!.playback!.turns[0].actor).toBe(0);
-  expect(result.battle!.playback!.initiative).toEqual({ toss: null, coin: 'silver-coin' });
+  expect(result.battle!.playback!.initiative).toMatchObject({ toss: null, coin: 'silver-coin', provider: 0, providerId: id });
 });
 
 it("a Gold coin makes the pet attack second but doubles its own first hit", () => {
@@ -468,7 +482,7 @@ it("a Copper shield absorbs damage for a hurt pet first but never heals it", () 
   } finally { random.mockRestore(); }
 });
 
-it("an Arena fight applies only the attacker's equipped coin; the defender's is ignored", () => {
+it("an Arena fight uses the stronger defender's equipped coin", () => {
   const attacker = 'coin-attacker', defender = 'coin-defender';
   pets.getOrCreatePet(attacker); pets.getOrCreatePet(defender);
   db.prepare('UPDATE pets SET strength = 1, intelligence = 1, charisma = 1 WHERE id = ?').run(attacker);
@@ -478,25 +492,7 @@ it("an Arena fight applies only the attacker's equipped coin; the defender's is 
   expect(pets.equipCoin(defender, 'gold-coin')).not.toHaveProperty('error');
   const outcome = pets.fight(attacker, defender);
   if ('error' in outcome) throw new Error(outcome.error);
-  // Silver forces the far weaker attacker first; the defender's Gold never applies.
-  expect(outcome.fight.battle!.turns[0].actor).toBe(0);
-});
-
-it("a revenge battle applies only the victim's equipped coin; the thief's is ignored", () => {
-  const victim = 'coin-victim', thief = 'coin-thief';
-  pets.getOrCreatePet(victim); pets.getOrCreatePet(thief);
-  db.prepare('UPDATE pets SET strength = 1, intelligence = 1, charisma = 1, money = 20 WHERE id = ?').run(victim);
-  db.prepare('UPDATE pets SET strength = 20, intelligence = 1, charisma = 1, money = 1000 WHERE id = ?').run(thief);
-  const stolen = pets.steal(thief, victim);
-  if ('error' in stolen) throw new Error(stolen.error);
-  grantCoin(victim, 'silver-coin'); grantCoin(thief, 'gold-coin');
-  expect(pets.equipCoin(victim, 'silver-coin')).not.toHaveProperty('error');
-  expect(pets.equipCoin(thief, 'gold-coin')).not.toHaveProperty('error');
-  const [theft] = pets.theftsFor(victim);
-  const outcome = pets.revenge(victim, theft.id);
-  if ('error' in outcome) throw new Error(outcome.error);
-  // Silver forces the far weaker victim first; the thief's Gold never applies.
-  expect(outcome.battle.turns[0].actor).toBe(0);
+  expect(outcome.session.battle).toMatchObject({ coinProvider: 1, actor: 0, turns: [], initiative: { coin: 'gold-coin' } });
 });
 
 it('a studying pet cannot move, use stairs, open chests, or start over, but can view, finish a battle, and use items', () => {
@@ -803,4 +799,67 @@ it('rolls back entry charges and retired progress together if creating the fresh
   finally { db.exec('DROP TRIGGER reject_entry'); }
   expect(adventure.adventureFor(id)).toEqual(before);
   expect(pets.getPet(id)).toEqual(pet);
+});
+
+it('waits for an equipped skill, persists unfinished turns, and never attacks on reads or acknowledgements', () => {
+  const id = 'manual-turns';
+  const before = setupBattle(id, 'slime', [3, 10, 10]);
+  grantCoin(id, 'silver-coin'); pets.equipCoin(id, 'silver-coin');
+  const started = adventure.moveAdventure(id, 'd', before.revision);
+  if ('error' in started) throw new Error(started.error);
+  const battle = started.battle!.playback as ActiveBattle;
+  expect(battle).toMatchObject({ status: 'active', actor: 0, turns: [], hp: [23, 6], mp: [10, 1], coinProvider: 0 });
+  expect(started).toMatchObject({ battleCount: 0, records: [], battle: { won: false, pending: true } });
+  expect(started.enemies.some(enemy => enemy.id === started.battle!.enemyId)).toBe(true);
+  expect(adventure.patrolAdventure(id)).toEqual(started);
+  expect(afterRestart(id)).toEqual(started);
+  expect(adventure.continueAdventure(id, started.battle!.id, started.revision)).toMatchObject({ status: 409 });
+  for (const ability of ['firebolt', '__proto__', null, ['claw-strike']]) {
+    expect(adventure.adventureBattleSkill(id, started.battle!.id, battle.revision, ability)).toHaveProperty('error');
+  }
+  expect(adventure.adventureBattleSkill(id, started.battle!.id, undefined, 'claw-strike')).toMatchObject({ status: 400 });
+  expect(adventure.adventureBattleSkill(id, 'other-battle', battle.revision, 'claw-strike')).toMatchObject({ status: 409 });
+  const chosen = adventure.adventureBattleSkill(id, started.battle!.id, battle.revision, 'claw-strike');
+  if ('error' in chosen) throw new Error(chosen.error);
+  expect(chosen.battle!.playback!.turns.map(turn => turn.actor)).toEqual([0, 1]);
+  expect(chosen.battleCount).toBe(0);
+  expect(adventure.adventureBattleSkill(id, started.battle!.id, battle.revision, 'claw-strike')).toEqual(chosen);
+  expect(afterRestart(id)).toEqual(chosen);
+  const final = finishBattle(id);
+  expect(final).toMatchObject({ battleCount: 1, records: [], battle: { won: true, playback: { status: 'finished' } } });
+  expect(adventure.adventureBattleSkill(id, started.battle!.id, battle.revision, 'claw-strike')).toEqual(final);
+});
+
+it('retreating from an unfinished solo encounter ends it without a key or victory recovery', () => {
+  const id = 'manual-retreat', before = setupBattle(id, 'slime');
+  grantCoin(id, 'silver-coin'); pets.equipCoin(id, 'silver-coin');
+  const started = adventure.moveAdventure(id, 'd', before.revision);
+  if ('error' in started) throw new Error(started.error);
+  const battle = started.battle!.playback as ActiveBattle;
+  const random = vi.spyOn(Math, 'random');
+  try {
+    const ended = adventure.forfeitAdventureBattle(id, started.battle!.id, battle.revision);
+    if ('error' in ended) throw new Error(ended.error);
+    expect(ended).toMatchObject({ abandoned: true, hp: 0, battleCount: 1, battle: { pending: false, won: false, playback: { status: 'finished' }, recovery: { hp: 0, mp: 0 } } });
+    expect(ended.records).toHaveLength(1);
+    expect(ended.battle!.keyDrop).toBeUndefined();
+    expect(ended.enemies).toEqual(started.enemies);
+    expect(random).not.toHaveBeenCalled();
+    expect(adventure.forfeitAdventureBattle(id, started.battle!.id, battle.revision)).toEqual(ended);
+  } finally { random.mockRestore(); }
+});
+
+it('rolls back a final manual turn, its recovery, monster removal, and key together when saving fails', () => {
+  const id = 'manual-final-atomic', before = setupBattle(id, 'slime', [100, 100, 100]);
+  grantCoin(id, 'silver-coin'); pets.equipCoin(id, 'silver-coin');
+  const started = adventure.moveAdventure(id, 'd', before.revision);
+  if ('error' in started) throw new Error(started.error);
+  const battle = started.battle!.playback as ActiveBattle;
+  db.exec("CREATE TRIGGER reject_manual_turn BEFORE UPDATE OF battle_json ON adventures BEGIN SELECT RAISE(ABORT, 'test turn disk failure'); END");
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+  try {
+    expect(() => adventure.adventureBattleSkill(id, started.battle!.id, battle.revision, 'claw-strike')).toThrow('test turn disk failure');
+  } finally { db.exec('DROP TRIGGER reject_manual_turn'); random.mockRestore(); }
+  expect(adventure.adventureFor(id)).toEqual(started);
+  expect(finishBattle(id).battleCount).toBe(1);
 });
