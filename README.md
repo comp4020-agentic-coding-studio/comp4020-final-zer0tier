@@ -116,7 +116,9 @@ Use the food bowl to feed it and the bath to clean it. The pet house opens
 the **Journal**. The wall clock opens game help and **Sign out**. Step through
 the front door to visit town.
 
-The town has **Shops**, **Adventure**, **Arena**, **Part-time Jobs**, and
+The town shares home's warm illustrated style, with tiled roofs, timber
+shopfronts, leafy gardens, a stone fountain, and a riverside footbridge.
+It has **Shops**, **Adventure**, **Arena**, **Part-time Jobs**, and
 **School**. Walk near a building to see its outline, then press **Space**,
 or click or tap the building to open its activities. **Sweet Home**
 returns you to your pet. Your **Backpack** holds supplies, learned abilities, and

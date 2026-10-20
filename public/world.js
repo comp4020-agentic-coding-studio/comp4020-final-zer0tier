@@ -45,7 +45,7 @@ worldShell.innerHTML = `
           <span class="home-pet-label" id="home-pet-label">Your companion</span>
         </div>
         <div id="town-scene" hidden>
-          <img class="scene-art" src="/scenes/town.svg" alt="A green village connected by winding paths, with shops, a school, a job board, an arena, your home, and a woodland adventure trail." draggable="false" />
+          <img class="scene-art" src="/scenes/town.svg" alt="A warm illustrated village with tiled roofs, leafy gardens, a fountain, and a riverside footbridge. Winding paths connect the shops, school, job board, arena, your home, and woodland adventure trail." draggable="false" />
           <svg id="town-interaction-outline" viewBox="0 0 960 640" aria-hidden="true" focusable="false" hidden>
             <use class="interaction-outline-edge" />
             <use class="interaction-outline-light" />
