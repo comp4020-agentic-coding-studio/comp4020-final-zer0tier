@@ -175,3 +175,163 @@
 .team-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 #team-dialog :focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
 @media (max-width: 480px) { #team-dialog { padding: 12px; } #team-dialog h2 { font-size: 20px; } }
+
+/* Illustrated woodland. Terrain is built once per floor; only actors and the
+   camera move. All panels float over the scene and keep the centre playable. */
+#adventure-dialog { padding: 0; background: #91a573; }
+#adventure-dialog[open] { display: block; }
+.adventure-top {
+  position: absolute; z-index: 6; top: max(14px, env(safe-area-inset-top)); left: 16px; right: 16px;
+  align-items: flex-start; pointer-events: none; border: 0 !important;
+}
+.adventure-top > div { pointer-events: auto; }
+.adventure-top > div:first-child {
+  padding: 10px 16px; border: 2px solid var(--border); border-radius: 18px;
+  background: var(--surface); box-shadow: var(--shadow);
+}
+.adventure-top .section-label { font-size: .65rem; letter-spacing: .14em; }
+.adventure-top h2 { font-size: 1.15rem; margin-top: 2px; }
+.adventure-header-actions { max-width: 60%; gap: 6px; }
+.adventure-header-actions .chip-btn { background: var(--surface); box-shadow: var(--shadow); }
+.adventure-stage, .adventure-board { position: absolute; inset: 0; display: block; overflow: hidden; }
+#adventure-grid {
+  position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-width: none;
+  aspect-ratio: auto; border: 0 !important; border-radius: 0; background: #9eaf79;
+  touch-action: manipulation; cursor: var(--cursor-pointer);
+}
+#adventure-grid:focus-visible { outline: 3px solid var(--ring); outline-offset: -4px; }
+#adventure-map-scene {
+  position: absolute; top: 0; left: 0; width: 1024px; height: 1024px;
+  transform-origin: 0 0; transition: transform 180ms linear; contain: layout style;
+}
+.adventure-landscape, #adventure-terrain, #adventure-actors, .adventure-air { position: absolute; inset: 0; width: 100%; height: 100%; }
+.adventure-landscape, #adventure-actors, .adventure-air { pointer-events: none; }
+.adventure-edge-scenery { position: absolute; left: -128px; top: -128px; width: 1280px; height: 1280px; pointer-events: none; }
+#adventure-terrain { display: grid; grid-template-columns: repeat(16, 64px); grid-template-rows: repeat(16, 64px); }
+.adventure-tile { position: relative; width: 64px; height: 64px; border: 0; min-width: 0; }
+.adventure-tile.adventure-tree { background: none; border-radius: 0; box-shadow: none; z-index: 1; }
+.adventure-tile .adventure-icon { stroke: none; overflow: visible; }
+.adventure-tree > svg { position: absolute; width: 80px; height: 84px; left: -8px; bottom: 0; }
+.adventure-grass { background: radial-gradient(ellipse, #718e5360 20%, transparent 72%); }
+.adventure-grass-blades { position: absolute; inset: -5px -2px 0; transform-origin: 50% 85%; }
+.adventure-grass-blades svg { width: 100%; height: 100%; }
+.adventure-ground-detail { position: absolute; inset: 16px; opacity: .9; pointer-events: none; }
+.adventure-water { background: linear-gradient(90deg, #81b5ad, #6b9f9c 60%, #659795); overflow: hidden; }
+.adventure-water::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(170deg, transparent 0 22px, #c5e6cd70 23px 24px, transparent 25px 43px);
+  animation: adventure-water-drift 5s ease-in-out infinite alternate;
+}
+.adventure-marker-chest > svg { padding: 2px; }
+.adventure-chest-opened { opacity: 1; }
+.adventure-chest-opened > svg { animation: adventure-treasure-open 500ms ease-out; }
+.adventure-tile.is-interactable::after {
+  content: ''; position: absolute; inset: 2px; border: 2px solid #fff1bd; border-radius: 18px;
+  box-shadow: 0 0 0 2px #986b37, 0 0 14px #fff1bd70; pointer-events: none;
+}
+.adventure-actor {
+  position: absolute; top: 0; left: 0; width: 64px; height: 64px; pointer-events: none;
+  transition: transform 180ms linear; border: 0; outline: 0; background: none;
+}
+.adventure-actor::before {
+  content: ''; position: absolute; left: 10px; bottom: 6px; width: 44px; height: 15px;
+  border-radius: 50%; background: #31452636;
+}
+.adventure-actor > svg { position: absolute; inset: -5px 3px auto; display: block; width: 58px; height: 62px; margin: 0; color: var(--pet-color, #f59e0b); }
+.adventure-player { z-index: 3; }
+.adventure-player > svg { filter: drop-shadow(0 1px 0 #ffedc8); }
+.adventure-actor.is-walking > svg { animation: adventure-pet-step 220ms ease-in-out infinite; }
+.adventure-player.in-grass::after {
+  content: ''; position: absolute; left: 2px; right: 2px; bottom: 2px; height: 18px;
+  background: #75984f; clip-path: polygon(0 100%, 2% 15%, 15% 68%, 23% 0, 37% 75%, 49% 20%, 56% 76%, 70% 0, 79% 66%, 94% 10%, 100% 100%);
+}
+.adventure-player.adventure-shared::after { clip-path: none; left: auto; right: 0; bottom: 0; height: auto; background: var(--intelligence); content: attr(data-shared); }
+.adventure-actor.adventure-marker-slime-king > svg { inset: -14px -5px auto; width: 74px; height: 74px; animation: adventure-monster-breathe 3s ease-in-out infinite; transform-origin: 50% 85%; }
+.adventure-air { overflow: hidden; }
+.adventure-air i { position: absolute; width: 8px; height: 5px; border-radius: 80% 0 80% 0; background: #e9d789; opacity: .6; animation: adventure-leaf-drift 12s ease-in-out infinite; }
+.adventure-air i:nth-child(1) { left: 22%; top: 24%; }
+.adventure-air i:nth-child(2) { left: 65%; top: 43%; animation-delay: -4s; }
+.adventure-air i:nth-child(3) { left: 36%; top: 73%; animation-delay: -8s; }
+.adventure-air i:nth-child(4) { left: 80%; top: 83%; animation-delay: -2s; }
+.is-rustling .adventure-grass-blades { animation: adventure-grass-sway 2.5s ease-in-out infinite; animation-delay: var(--sway-delay); }
+#adventure-movement-tip {
+  position: absolute; z-index: 4; top: 94px; left: 20px; margin: 0; padding: 8px 11px;
+  border: 1px solid #d9caa2; border-radius: 12px; background: #fff7e9e8; color: #503d2b;
+  font-size: .72rem; line-height: 1.6; pointer-events: none;
+}
+#adventure-movement-tip kbd { font: inherit; font-weight: 800; }
+#adventure-movement-tip span { font-size: .66rem; }
+.adventure-side {
+  position: absolute; z-index: 7; top: 80px; right: 16px; bottom: auto;
+  width: min(320px, calc(100% - 32px)); max-height: calc(100dvh - 210px);
+  display: flex; padding: 16px; gap: 16px; overflow-y: auto;
+  border: 2px solid var(--border); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow);
+}
+.adventure-backpack { width: 100%; padding: 0; border: 0; }
+.adventure-side:not(:has(#adventure-team:not([hidden]))) .adventure-backpack:not([open]) { margin-top: 0; }
+.adventure-messages {
+  position: absolute; z-index: 4; left: 50%; bottom: 118px; transform: translateX(-50%);
+  width: min(440px, calc(100% - 32px)); gap: 5px; pointer-events: none; font-size: .77rem;
+}
+.adventure-messages > p:not(:empty):not([hidden]), #adventure-battle-summary {
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); box-shadow: var(--shadow); max-width: 100%;
+}
+.adventure-messages button, #adventure-battle-summary { pointer-events: auto; }
+#adventure-cooldown-panel { gap: 4px; padding: 7px 10px; box-shadow: var(--shadow); }
+.adventure-cooldown-heading { font-size: .72rem; }
+#adventure-cooldown-progress { height: 6px; }
+#adventure-cooldown { font-size: .68rem; }
+#adventure-result { font-size: .72rem; }
+.adventure-hud {
+  position: absolute; z-index: 5; left: 16px; right: 16px; bottom: max(14px, env(safe-area-inset-bottom));
+  display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: end;
+  pointer-events: none; padding: 0; border: 0;
+}
+.adventure-hud button { pointer-events: auto; box-shadow: var(--shadow); }
+.adventure-gauges { gap: 8px; padding: 7px; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); }
+.adventure-gauge { --size: 58px; }
+.adventure-gauge::before { inset: 5px; }
+.adventure-gauge-value { font-size: .69rem; }
+.adventure-gauge-value b { font-size: .6rem; }
+.adventure-actions { grid-column: 2; grid-row: 1; padding-bottom: 8px; }
+.adventure-controls { grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 44px); gap: 4px; }
+.adventure-controls button { min-width: 44px; min-height: 44px; font-size: 21px; }
+.adventure-motion-paused *, .adventure-motion-paused *::after { animation-play-state: paused !important; }
+@keyframes adventure-pet-step { 45% { transform: translateY(-5px) rotate(-3deg); } 80% { transform: rotate(2deg); } }
+@keyframes adventure-grass-sway { 50% { transform: rotate(3deg) translateX(1px); } }
+@keyframes adventure-monster-breathe { 50% { transform: scale(1.035, .96) translateY(2px); } }
+@keyframes adventure-water-drift { to { transform: translate(3px, 2px); } }
+@keyframes adventure-leaf-drift { 50% { transform: translate(26px, 16px) rotate(100deg); opacity: .3; } }
+@keyframes adventure-treasure-open { from { transform: translateY(5px) scale(.94); } 50% { transform: translateY(-3px) scale(1.05); } }
+@media (max-width: 760px) {
+  .adventure-top { top: max(8px, env(safe-area-inset-top)); left: 10px; right: 10px; gap: 6px; }
+  .adventure-top > div:first-child { padding: 8px 10px; max-width: 50%; }
+  .adventure-top h2 { font-size: .95rem; }
+  .adventure-top .section-label { font-size: .55rem; }
+  .adventure-header-actions { gap: 4px; max-width: 48%; }
+  .adventure-header-actions button { font-size: .68rem; padding: 6px 8px; min-height: 44px; }
+  #adventure-movement-tip { top: 108px; left: 12px; right: 12px; width: max-content; max-width: calc(100% - 24px); padding: 5px 8px; font-size: .65rem; }
+  #adventure-movement-tip span { font-size: .59rem; }
+  .adventure-side { top: 104px; right: 10px; width: calc(100% - 20px); max-height: calc(100dvh - 220px); }
+  .adventure-hud { left: 10px; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); grid-template-columns: auto 1fr auto; gap: 6px; }
+  .adventure-gauges { gap: 4px; padding: 5px; }
+  .adventure-gauge { --size: 48px; }
+  .adventure-gauge-value { font-size: .6rem; }
+  .adventure-gauge-value b { font-size: .55rem; }
+  .adventure-actions { position: absolute; bottom: 100px; left: 0; right: 0; padding: 0; }
+  .adventure-controls { grid-column: 3; }
+  .adventure-messages { bottom: 156px; font-size: .69rem; }
+  .adventure-messages > p:not(:empty):not([hidden]), #adventure-battle-summary { padding: 6px 9px; }
+}
+@media (max-height: 520px) and (min-width: 600px) {
+  #adventure-movement-tip { top: 84px; }
+  .adventure-messages { bottom: 18px; width: min(400px, calc(100% - 340px)); }
+  .adventure-gauge { --size: 48px; }
+  .adventure-top h2 { font-size: .9rem; }
+  .adventure-side { top: 70px; max-height: calc(100dvh - 90px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #adventure-map-scene, .adventure-actor { transition: none; }
+  #adventure-dialog *, #adventure-dialog *::after { animation: none !important; }
+}

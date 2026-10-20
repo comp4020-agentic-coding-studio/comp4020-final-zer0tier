@@ -1,4 +1,5 @@
 // Pure map and movement rules, shared by persistence and focused rule tests.
+import { randomInt } from 'node:crypto';
 import type { MonsterAbilityId } from './combat.ts';
 import type { TreasureReward } from './treasure.ts';
 export const SIZE = 16;
@@ -11,7 +12,7 @@ export type Enemy = Point & {
   strength: number;
   intelligence: number;
   charisma: number;
-  // A patrol walks back and forth between the two ends; `leg` is the end it's heading for.
+  // Kept in saved maps for compatibility; ordinary monsters now hide in grass.
   route: [Point, Point];
   leg: 0 | 1;
 };
@@ -19,12 +20,15 @@ export type Floor = {
   number: number;
   name: string;
   tiles: string[];
+  // Separate from collision tiles so old maps keep their paths and landmarks.
+  grass?: string[];
+  encounter?: { seed: number; steps: number };
   enemies: Enemy[];
   // `openedBy` names the teammate who opened a chest on a team's shared map.
   chests: (Point & { id: string; reward?: TreasureReward; openedBy?: string })[];
   up: Point | null;
   down: Point | null;
-  // A team's map steps each floor on its own clock, since teammates spread out.
+  // Legacy patrol timestamp; no longer advances monsters.
   patrolledAt?: number;
 };
 // What each kind knows besides the free Claw Strike. Looked up by kind rather
@@ -32,10 +36,6 @@ export type Floor = {
 export const MONSTER_MOVES: Record<Enemy['kind'], readonly MonsterAbilityId[]> = { slime: [], goblin: [], 'slime-king': ['bump'] };
 export const samePoint = (a: Point, b: Point): boolean => a.x === b.x && a.y === b.y;
 export const nearby = (a: Point, b: Point): boolean => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= 1;
-// A monster sees the pet up to SIGHT blocks away in every direction, diagonals
-// included (a 7 × 7 square), whatever trees stand between them.
-export const SIGHT = 3;
-export const sees = (enemy: Point, player: Point): boolean => Math.max(Math.abs(enemy.x - player.x), Math.abs(enemy.y - player.y)) <= SIGHT;
 export const directions = { w: [0, -1], a: [-1, 0], s: [0, 1], d: [1, 0] } as const;
 export const walkable = (floor: Floor, point: Point): boolean => floor.tiles[point.y]?.[point.x] === '.';
 
@@ -46,8 +46,8 @@ export function createWorld(): Floor[] {
     const up = number > 1 ? { x: 2, y: 2 } : null;
     const down = number < FLOOR_COUNT ? { x: 13, y: 13 } : null;
     const chests = [{ id: `f${number}-chest`, x: 11, y: 3 }];
-    // Each monster paces between its spawn and a post. No route comes within
-    // sight of the stairs, so arriving on a floor never starts a chase.
+    // Stable IDs preserve the finite roster and old saved battles. Ordinary
+    // coordinates are legacy data; only the boss occupies a visible map tile.
     const routes = [[[6, 2], [9, 2]], [[10, 5], [13, 5]], [[4, 11], [4, 8]], [[9, 12], [6, 12]]];
     const enemies: Enemy[] = routes.map(([[x, y], [postX, postY]], i) => {
       const goblin = i % 2 === 1;
@@ -72,47 +72,55 @@ export function createWorld(): Floor[] {
         : x === 7 && y >= 4 && y <= 11 && y !== 6 && y !== 9;
       return wall ? '#' : '.';
     }).join(''));
-    return { number, name, tiles, enemies, chests, up, down };
+    const floor: Floor = { number, name, tiles, enemies, chests, up, down };
+    prepareGrass(floor);
+    return floor;
   });
 }
 
-// Moves `mover` one cardinal step along a shortest open path to `goal`. The
-// goal itself may be taken (by the pet): the mover then stops beside it.
-function stepToward(mover: Point, goal: Point, open: (p: Point) => boolean): void {
-  const key = (p: Point) => `${p.x},${p.y}`;
-  const cameFrom = new Map([[key(mover), mover]]), queue = [mover];
-  for (let i = 0; i < queue.length; i++) {
-    for (const [dx, dy] of Object.values(directions)) {
-      const p = { x: queue[i].x + dx, y: queue[i].y + dy };
-      if (cameFrom.has(key(p)) || !(samePoint(p, goal) || open(p))) continue;
-      cameFrom.set(key(p), queue[i]);
-      if (!samePoint(p, goal)) { queue.push(p); continue; }
-      let step = p;
-      while (cameFrom.get(key(step)) !== mover) step = cameFrom.get(key(step))!;
-      if (open(step)) { mover.x = step.x; mover.y = step.y; }
-      return;
-    }
-  }
+// Grass grows away from the outer walking route, entrances, chests, and the
+// boss clearing. Deriving it from existing collision tiles preserves old runs.
+export function grassFor(floor: Floor): string[] {
+  const safe = [{ x: 2, y: 2 }, ...floor.chests, ...[floor.up, floor.down].filter(p => p !== null),
+    ...floor.enemies.filter(enemy => enemy.kind === 'slime-king')];
+  return floor.tiles.map((row, y) => [...row].map((_, x) => {
+    const point = { x, y };
+    const patch = (x >= 5 && x <= 8 && y >= 2 && y <= 5)
+      || (x >= 10 && x <= 13 && y >= 5 && y <= 8)
+      || (x >= 3 && x <= 5 && y >= 9 && y <= 12)
+      || (x >= 7 && x <= 10 && y >= 11 && y <= 13);
+    return patch && walkable(floor, point) && !safe.some(p => nearby(p, point)) ? 'g' : '.';
+  }).join(''));
 }
 
-// One real-time step for every monster on the floor. One that sees a pet
-// walks toward the nearest it sees; once beside it, its next step walks into
-// the pet instead, and it stays put while the caller starts that battle. The
-// rest walk their routes, heading back to them after a chase. Trees, chests,
-// stairs, pets, and other monsters block the way.
-export function patrol<P extends Point>(floor: Floor, pets: P | readonly P[]): { enemy: Enemy; pet: P }[] {
-  const players: readonly P[] = 'x' in pets ? [pets] : pets;
-  const attacks: { enemy: Enemy; pet: P }[] = [];
-  const open = (p: Point) => walkable(floor, p) && !players.some(player => samePoint(p, player))
-    && !floor.enemies.some(e => samePoint(e, p)) && !floor.chests.some(chest => samePoint(chest, p))
-    && ![floor.up, floor.down].some(stair => stair && samePoint(stair, p));
-  const distance = (a: Point, b: Point) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-  for (const enemy of floor.enemies) {
-    const target = players.filter(player => sees(enemy, player)).sort((a, b) => distance(enemy, a) - distance(enemy, b))[0];
-    if (target && distance(enemy, target) === 1) { attacks.push({ enemy, pet: target }); continue; }
-    if (target) { stepToward(enemy, target, open); continue; }
-    if (samePoint(enemy, enemy.route[enemy.leg])) enemy.leg = enemy.leg === 0 ? 1 : 0;
-    stepToward(enemy, enemy.route[enemy.leg], open);
-  }
-  return attacks;
+// A seed and the number of grass steps are part of the saved floor, including
+// shared team floors. Reading or refreshing a map never rerolls an encounter.
+export function prepareGrass(floor: Floor): boolean {
+  let changed = false;
+  if (!floor.grass) { floor.grass = grassFor(floor); changed = true; }
+  if (!floor.encounter) { floor.encounter = { seed: randomInt(1, 0x100000000), steps: 0 }; changed = true; }
+  return changed;
+}
+
+export const inGrass = (floor: Floor, point: Point): boolean => walkable(floor, point) && floor.grass?.[point.y]?.[point.x] === 'g';
+function nextSeed(seed: number): number {
+  let next = seed || 1;
+  next ^= next << 13; next ^= next >>> 17; next ^= next << 5;
+  return next >>> 0;
+}
+
+// Call only after an accepted movement. There are two quiet grass steps after
+// each encounter, then a seeded chance, with an encounter guaranteed by six.
+// The finite roster prevents defeated monsters returning on later visits.
+export function grassEncounter(floor: Floor, point: Point): Enemy | undefined {
+  const hidden = floor.enemies.filter(enemy => enemy.kind !== 'slime-king');
+  if (!inGrass(floor, point) || !hidden.length) return;
+  const encounter = floor.encounter!;
+  encounter.steps++;
+  if (encounter.steps < 3) return;
+  encounter.seed = nextSeed(encounter.seed);
+  if (encounter.steps < 6 && encounter.seed / 0x100000000 >= 0.35) return;
+  encounter.seed = nextSeed(encounter.seed);
+  encounter.steps = 0;
+  return hidden[Math.floor(encounter.seed / 0x100000000 * hidden.length)];
 }

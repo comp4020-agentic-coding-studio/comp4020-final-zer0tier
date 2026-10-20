@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
-import { createWorld, type Enemy } from '../src/adventure-world.ts';
+import { createWorld, type Enemy, type Floor } from '../src/adventure-world.ts';
 const directory = mkdtempSync(join(tmpdir(), 'virtuepets-adventure-'));
 let adventure: typeof import('../src/adventure.ts');
 let db: typeof import('../src/db.ts').db;
@@ -46,10 +46,20 @@ function setupBattle(id: string, kind: Enemy['kind'], stats = [12, 7, 12]) {
   db.prepare('UPDATE pets SET strength = ?, intelligence = ?, charisma = ? WHERE id = ?').run(...stats, id);
   adventure.adventureFor(id);
   const world = createWorld(), floor = kind === 'slime-king' ? 5 : 1;
-  const enemy = world[floor - 1].enemies.find(e => e.kind === kind)!;
+  const level = world[floor - 1];
+  const enemy = level.enemies.find(e => e.kind === kind)!;
+  level.enemies = [enemy, ...level.enemies.filter(e => e !== enemy)];
+  level.encounter = { seed: 1, steps: 5 };
   db.prepare('UPDATE adventures SET x = ?, y = ?, floor = ?, world_json = ? WHERE player_id = ?')
     .run(enemy.x - 1, enemy.y, floor, JSON.stringify(world), id);
   return adventure.adventureFor(id);
+}
+function readyGrassBattle(id: string, enemyId: string) {
+  const saved = db.prepare('SELECT world_json, floor FROM adventures WHERE player_id = ?').get(id) as { world_json: string; floor: number };
+  const world = JSON.parse(saved.world_json) as Floor[], floor = world[saved.floor - 1];
+  floor.enemies.sort((a, b) => Number(b.id === enemyId) - Number(a.id === enemyId));
+  floor.encounter = { seed: 1, steps: 5 };
+  db.prepare('UPDATE adventures SET world_json = ? WHERE player_id = ?').run(JSON.stringify(world), id);
 }
 function step(id: string, direction: string) {
   const result = adventure.moveAdventure(id, direction, adventure.adventureFor(id).revision);
@@ -231,12 +241,14 @@ it('carries HP/MP across battles and floors, restoring 20% of maximum rounded up
     expect(adventure.changeFloor(id, 'descend', continued.revision)).toMatchObject({ floor: 2, hp: 21, mp: 2 });
     adventure.changeFloor(id, 'ascend', adventure.adventureFor(id).revision);
     db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(9, 5, id);
+    readyGrassBattle(id, 'f1-enemy-1');
     const next = step(id, 'd');
     expect(next.battle!.playback.initialHp![0]).toBe(21);
     expect(next.battle!.playback.initialMp![0]).toBe(2);
     expect(next).toMatchObject({ hp: 23, mp: 4 });
     continueRun(id);
     db.prepare('UPDATE adventures SET x = ?, y = ?, hp = ?, mp = ? WHERE player_id = ?').run(3, 11, 30, 6, id);
+    readyGrassBattle(id, 'f1-enemy-2');
     const capped = step(id, 'd');
     expect(capped).toMatchObject({ hp: 31, mp: 7, battle: { recovery: { hp: 4, mp: 1 } } });
     expect(afterRestart(id)).toEqual(capped);
@@ -246,7 +258,7 @@ it('carries HP/MP across battles and floors, restoring 20% of maximum rounded up
 it('ends the adventure on defeat and requires an explicit fresh run; old retries cannot damage or reset the new run', () => {
   const id = 'defeated'; const before = setupBattle(id, 'goblin', [1, 1, 1]);
   const result = step(id, 'd');
-  expect(result).toMatchObject({ hp: 0, failed: true, x: before.x, y: before.y, battle: { won: false, recovery: { hp: 0, mp: 0 } } });
+  expect(result).toMatchObject({ hp: 0, failed: true, x: before.x + 1, y: before.y, battle: { won: false, recovery: { hp: 0, mp: 0 } } });
   expect(result.enemies.map(e => e.id)).toEqual(before.enemies.map(e => e.id));
   expect(adventure.restartAdventure(id, result.revision)).toEqual(result); // first return from the saved battle
   const failed = continueRun(id);
@@ -403,56 +415,58 @@ it('a studying pet cannot move, use stairs, open chests, or start over, but can 
   expect(adventure.changeFloor(id, 'descend', adventure.adventureFor(id).revision)).toMatchObject({ floor: 2 });
 });
 
-it('patrols at most once a second, keeps the revision, and gives older saves their routes', () => {
-  const id = 'patroller'; pets.getOrCreatePet(id);
-  const start = adventure.adventureFor(id);
-  // A map saved before monsters patrolled: no routes, and the old alerted flag.
-  const world = createWorld();
-  for (const floor of world) for (const enemy of floor.enemies) Object.assign(enemy, { route: undefined, leg: undefined, alerted: false });
+it('migrates old maps once, conceals ordinary monster coordinates, and keeps polls read-only', () => {
+  const id = 'old-grass'; pets.getOrCreatePet(id);
+  const start = adventure.adventureFor(id), world = createWorld();
+  world[0].enemies.shift();
+  for (const floor of world) { delete floor.grass; delete floor.encounter; }
   db.prepare('UPDATE adventures SET world_json = ? WHERE player_id = ?').run(JSON.stringify(world), id);
-  expect(adventure.adventureFor(id).enemies.map(e => e.route)).toEqual(createWorld()[0].enemies.map(e => e.route));
-  const walked = adventure.patrolAdventure(id);
-  expect(walked.revision).toBe(start.revision);
-  expect(walked.enemies.find(e => e.id === 'f1-enemy-1')).toMatchObject({ x: 11, y: 5 });
-  expect(adventure.patrolAdventure(id)).toEqual(walked);
-  expect(afterRestart(id)).toEqual(walked);
-  // The step was saved before the move, which applies to the same revision.
-  const moved = step(id, 's');
-  expect(moved.enemies).toEqual(walked.enemies.map(e => ({ ...e, alerted: false })));
+  const migrated = adventure.adventureFor(id);
+  expect(migrated.revision).toBe(start.revision);
+  expect(migrated.grass.some(row => row.includes('g'))).toBe(true);
+  expect(migrated.enemies).toHaveLength(3);
+  for (const enemy of migrated.enemies) {
+    expect(enemy.hidden).toBe(true);
+    for (const key of ['x', 'y', 'route', 'leg']) expect(enemy).not.toHaveProperty(key);
+  }
+  const saved = db.prepare('SELECT world_json FROM adventures WHERE player_id = ?').get(id);
+  for (let i = 0; i < 5; i++) expect(adventure.patrolAdventure(id)).toEqual(migrated);
+  expect(db.prepare('SELECT world_json FROM adventures WHERE player_id = ?').get(id)).toEqual(saved);
+  expect(afterRestart(id)).toEqual(migrated);
 });
 
-it('a monster beside the pet attacks it on its step, saving the battle with the pet left where it stood', () => {
-  const id = 'ambushed';
-  const start = setupBattle(id, 'slime', [100, 100, 100]); // the pet stands just left of the slime
-  const slime = start.enemies.find(e => e.kind === 'slime')!;
-  const attacked = adventure.patrolAdventure(id);
-  expect(attacked).toMatchObject({ x: slime.x - 1, y: slime.y, battle: { attacked: true, pending: true, won: true, enemyId: slime.id } });
+it('saves surprise battles on the entered grass tile, while waiting and retries cannot reroll them', () => {
+  const id = 'ambushed', start = setupBattle(id, 'slime', [100, 100, 100]);
+  expect(adventure.patrolAdventure(id)).toEqual(start);
+  const attacked = step(id, 'd');
+  expect(attacked).toMatchObject({ x: start.x + 1, y: start.y, battle: { surprise: true, pending: true, won: true, enemyId: 'f1-enemy-0' } });
   expect(attacked.revision).not.toBe(start.revision);
-  expect(attacked.enemies.some(e => e.id === slime.id)).toBe(false);
+  expect(attacked.enemies.some(e => e.id === 'f1-enemy-0')).toBe(false);
   expect(afterRestart(id)).toEqual(attacked);
-  // A move sent with the old revision gets the battle back instead.
   expect(adventure.moveAdventure(id, 'd', start.revision)).toEqual(attacked);
-  expect(continueRun(id)).toMatchObject({ x: slime.x - 1, battle: { pending: false } });
+  expect(continueRun(id)).toMatchObject({ x: start.x + 1, battle: { pending: false } });
+  const after = db.prepare('SELECT world_json FROM adventures WHERE player_id = ?').get(id) as { world_json: string };
+  expect((JSON.parse(after.world_json) as Floor[])[0].encounter!.steps).toBe(0);
 });
 
-it('never patrols during a pending battle, while the pet studies or works, or once the run has ended', () => {
-  const id = 'patrol-paused';
-  setupBattle(id, 'slime', [100, 100, 100]);
-  const ready = () => db.prepare('UPDATE adventures SET patrolled_at = NULL WHERE player_id = ?').run(id);
-  const fought = step(id, 'd');
-  ready();
-  expect(adventure.patrolAdventure(id)).toEqual(fought);
-  const continued = continueRun(id);
+it('does not advance grass encounters for blocked moves, busy pets, or a pending battle', () => {
+  const id = 'grass-paused'; setupBattle(id, 'slime', [100, 100, 100]);
+  const savedWorld = () => db.prepare('SELECT world_json FROM adventures WHERE player_id = ?').get(id);
+  const before = savedWorld();
+  db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(1, 1, id);
+  expect(adventure.moveAdventure(id, 'w', adventure.adventureFor(id).revision)).toMatchObject({ status: 409 });
+  expect(savedWorld()).toEqual(before);
   expect(pets.study(id, 'math')).not.toHaveProperty('error');
-  ready();
-  expect(adventure.patrolAdventure(id)).toEqual(adventure.adventureFor(id));
-  expect(adventure.adventureFor(id).enemies).toEqual(continued.enemies);
+  db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(5, 2, id);
+  expect(adventure.moveAdventure(id, 'd', adventure.adventureFor(id).revision)).toMatchObject({ status: 409 });
+  expect(savedWorld()).toEqual(before);
   db.prepare('UPDATE pets SET busy_until = ? WHERE id = ?').run(Date.now() - 1, id);
-  ready();
-  expect(adventure.patrolAdventure(id).enemies).not.toEqual(continued.enemies);
+  const fought = step(id, 'd'), after = savedWorld();
+  expect(adventure.patrolAdventure(id)).toEqual(fought);
+  expect(step(id, 'd')).toEqual(fought);
+  expect(savedWorld()).toEqual(after);
+  continueRun(id);
   const abandoned = adventure.abandonAdventure(id, adventure.adventureFor(id).revision);
-  if ('error' in abandoned) throw new Error(abandoned.error);
-  ready();
   expect(adventure.patrolAdventure(id)).toEqual(abandoned);
 });
 

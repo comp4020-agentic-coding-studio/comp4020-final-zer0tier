@@ -8,7 +8,12 @@ import { COINS } from '../src/treasure.ts';
 import { baseUrl, freshId, getPet, getRules, must, signUp } from './helpers.ts';
 
 function map(floor = 1) {
-  return { ...createWorld()[floor - 1], floor, floorCount: 5, size: 16, x: 2, y: 2, encounters: [], revision: 'saved-map', battle: null, completed: false, failed: false, hp: 15, mp: 5, maxHp: 15, maxMp: 5,
+  const saved = createWorld()[floor - 1];
+  const enemies = saved.enemies.map(enemy => {
+    const { x, y, route: _route, leg: _leg, ...monster } = enemy;
+    return { ...monster, ...(enemy.kind === 'slime-king' ? { x, y } : {}), hidden: enemy.kind !== 'slime-king', alerted: false };
+  });
+  return { ...saved, enemies, floor, floorCount: 5, size: 16, x: 2, y: 2, encounters: [], revision: 'saved-map', battle: null, completed: false, failed: false, hp: 15, mp: 5, maxHp: 15, maxMp: 5,
     cooldownUntil: null as number | null, timeScale: 1, restartCost: { stamina: 40, hygiene: 20 }, cooldownMinutes: 240,
     inventory: { stamina: 30, hygiene: 40,
       items: [{ id: 'food', name: 'Food', effect: 'restore', restores: 'stamina', amount: 40, quantity: 0, usable: false }],
@@ -60,7 +65,7 @@ it.each(['dragon', 'hedgehog', 'lizard', 'panda'])('uses the signed-in %s in Adv
     $('login').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
     await vi.waitFor(() => expect($('dashboard').hidden).toBe(false));
     $('adventure-open').click();
-    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
     expect($('adventure-grid').querySelector('.adventure-player use')?.getAttribute('href')).toBe(`#pet-${appearance}`);
     expect(($('adventure-grid').querySelector('.adventure-player') as HTMLElement).style.getPropertyValue('--pet-color')).toBe('#123456');
   } finally { dom.window.close(); }
@@ -120,31 +125,34 @@ it('locks exploring on an open map while a live update says the pet is busy, and
   } finally { dom.window.close(); }
 });
 
-it('moves monsters on the open map in real time, keeping focus, and stops asking once the map closes', async () => {
+it('refreshes the open map without revealing hidden monsters or replacing the scene, and stops asking once it closes', async () => {
   const { dom, window, $ } = page();
   Object.defineProperty(window.document, 'hidden', { value: false });
   const start = map();
-  const walked = { ...start, enemies: start.enemies.map((e, i) => i === 0 ? { ...e, x: 5, alerted: true } : e) };
   const bodies: unknown[] = [];
   window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
     const body = JSON.parse(options.body as string);
     bodies.push(body);
-    return Response.json(body.action === 'patrol' ? walked : start);
+    return Response.json(start);
   }) as unknown as typeof fetch;
-  const cell = (x: number, y: number) => $('adventure-grid').children[y * 16 + x];
   try {
     window.eval(readFileSync('public/adventure.js', 'utf8'));
     $('adventure-open').click();
-    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
-    expect(cell(6, 2).classList.contains('adventure-marker-slime')).toBe(true);
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
+    const scene = $('adventure-map-scene'), terrain = $('adventure-terrain'), tile = terrain.firstElementChild, player = $('adventure-player');
+    expect(terrain.querySelectorAll('.adventure-grass').length).toBeGreaterThan(0);
+    expect($('adventure-grid').querySelectorAll('.adventure-marker-slime, .adventure-marker-goblin')).toHaveLength(0);
+    expect($('adventure-enemies').firstElementChild!.textContent).toContain('Hidden in tall grass');
+    expect($('adventure-enemies').textContent).not.toMatch(/column|row|undefined|NaN/);
+    expect($('adventure-grid').getAttribute('aria-label')).toMatch(/tall grass/i);
     $('adventure-grid').focus();
-    await vi.waitFor(() => expect(cell(5, 2).classList.contains('adventure-marker-slime')).toBe(true), { timeout: 2500 });
+    await vi.waitFor(() => expect(bodies.length).toBeGreaterThan(1), { timeout: 2500 });
     expect(bodies[1]).toEqual({ action: 'patrol' });
-    expect($('adventure-grid').children).toHaveLength(256);
-    expect(cell(5, 2).classList.contains('adventure-alerted')).toBe(true);
-    expect(cell(6, 2).classList.contains('adventure-marker-slime')).toBe(false);
-    expect($('adventure-enemies').firstElementChild!.textContent).toContain('column 6, row 3');
-    expect($('adventure-notice').textContent).toBe('Slime spotted you! Move more than 3 blocks away to lose it.');
+    expect($('adventure-map-scene')).toBe(scene);
+    expect($('adventure-terrain')).toBe(terrain);
+    expect(terrain.firstElementChild).toBe(tile);
+    expect($('adventure-player')).toBe(player);
+    expect($('adventure-grid').querySelectorAll('.adventure-marker-slime, .adventure-marker-goblin')).toHaveLength(0);
     expect(window.document.activeElement?.id).toBe('adventure-grid');
     $('adventure-close').click();
     const asked = bodies.length;
@@ -153,20 +161,28 @@ it('moves monsters on the open map in real time, keeping focus, and stops asking
   } finally { dom.window.close(); }
 });
 
-it('opens the battle scene when a monster attacks the pet on its step, naming the attacker', async () => {
+it('opens a surprise battle only after the server saves a step into tall grass', async () => {
   const { dom, window, $ } = page();
-  Object.defineProperty(window.document, 'hidden', { value: false });
   const start = map(), fought = battleProgress();
-  const attacked = { ...fought, x: start.x, battle: { ...fought.battle, attacked: true } };
+  const attacked = { ...fought, x: start.x + 1, y: start.y, battle: { ...fought.battle, surprise: true } };
+  let finishMove: (response: Response) => void = () => { throw new Error('No movement request was sent.'); };
   window.fetch = vi.fn(async (_url: string, options: RequestInit) =>
-    Response.json(JSON.parse(options.body as string).action === 'patrol' ? attacked : start)) as unknown as typeof fetch;
+    JSON.parse(options.body as string).direction ? new Promise<Response>(resolve => { finishMove = resolve; }) : Response.json(start)) as unknown as typeof fetch;
   try {
     window.eval(readFileSync('public/battle.js', 'utf8'));
     window.eval(readFileSync('public/adventure.js', 'utf8'));
     $('adventure-open').click();
-    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
-    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement | null)?.open).toBe(true), { timeout: 2500 });
-    expect($('battle-title').textContent).toBe('Floor 1 · Slime attacks!');
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
+    const player = $('adventure-player'), before = player.style.transform;
+    $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    expect(($('battle-dialog') as HTMLDialogElement | null)?.open).not.toBe(true);
+    expect(player.style.transform).toBe(before);
+    finishMove(Response.json(attacked));
+    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement | null)?.open).toBe(true));
+    expect($('battle-title').textContent).toContain('Slime');
+    expect($('battle-title').textContent).toMatch(/grass|surprise/i);
+    expect($('adventure-player')).toBe(player);
+    expect(player.style.transform).not.toBe(before);
     expect(($('adventure-continue') as HTMLButtonElement).hidden).toBe(false);
   } finally { dom.window.close(); }
 });
@@ -185,6 +201,8 @@ it('clears the previous floor on account reset and ignores its late movement res
       ? [{ id: 'bump', name: 'Bump', mpCost: 5, description: 'Two-thirds of the target’s current HP, rounded up.' }] : [] })) }));
     await vi.waitFor(() => expect($('adventure-title').textContent).toBe('Slime King’s grove'));
     expect($('adventure-enemies').lastElementChild!.textContent).toMatch(/^Slime King · .* · Bump \(5 MP\): Two-thirds of the target’s current HP, rounded up\.$/);
+    expect($('adventure-grid').querySelector('[data-enemy="slime-king"] use')?.getAttribute('href')).toBe('#monster-slime-king');
+    expect($('adventure-grid').querySelectorAll('.adventure-marker-slime, .adventure-marker-goblin')).toHaveLength(0);
     $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
     expect(finishes).toHaveLength(2);
     window.document.dispatchEvent(new window.CustomEvent('adventure:reset'));
@@ -199,10 +217,117 @@ it('clears the previous floor on account reset and ignores its late movement res
     expect($('adventure-grid').children).toHaveLength(0);
     expect(scenes).not.toHaveBeenCalled();
     finishes[2](Response.json(map()));
-    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
     expect($('adventure-title').textContent).toBe('Woodland clearing');
     expect($('adventure-enemies').children).toHaveLength(4);
     expect($('adventure-status').textContent).toBe('Column 3 · Row 3');
+  } finally { dom.window.close(); }
+});
+
+it('keeps the saved pet position on delayed or refused moves, then moves the same actor after a successful response', async () => {
+  const { dom, window, $ } = page();
+  const requests: { body: unknown; finish: (response: Response) => void }[] = [];
+  window.fetch = vi.fn((_url: string, options: RequestInit) => new Promise<Response>(finish => {
+    requests.push({ body: JSON.parse(options.body as string), finish });
+  })) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    requests[0].finish(Response.json(map()));
+    await vi.waitFor(() => expect($('adventure-player')).not.toBeNull());
+    const player = $('adventure-player'), scene = $('adventure-map-scene'), terrain = $('adventure-terrain');
+    const avatar = player.firstElementChild, before = player.style.transform;
+    $('adventure-grid').focus();
+    $('adventure-grid').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    expect(requests[1].body).toEqual({ direction: 'd', revision: 'saved-map' });
+    expect(player.style.transform).toBe(before);
+    requests[1].finish(Response.json({ error: 'The map changed. Try again.' }, { status: 409 }));
+    await vi.waitFor(() => expect($('adventure-status').textContent).toBe('The map changed. Try again.'));
+    expect(player.style.transform).toBe(before);
+    expect($('adventure-player')).toBe(player);
+    $('adventure-grid').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    requests[2].finish(Response.json({ ...map(), x: 3, revision: 'moved-map' }));
+    await vi.waitFor(() => expect($('adventure-status').textContent).toBe('Column 4 · Row 3'));
+    expect($('adventure-player')).toBe(player);
+    expect(player.firstElementChild).toBe(avatar);
+    expect($('adventure-map-scene')).toBe(scene);
+    expect($('adventure-terrain')).toBe(terrain);
+    expect(player.style.transform).toBe('translate3d(192px, 128px, 0)');
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+  } finally { dom.window.close(); }
+});
+
+it('routes taps one saved step at a time and cancels the remaining walk when tall grass starts a battle', async () => {
+  const { dom, window, $ } = page();
+  Object.defineProperty(window.document, 'hidden', { value: false });
+  const saved = map(), requests: { body: any; finish: (response: Response) => void }[] = [];
+  saved.grass = saved.tiles.map((row, y) => [...row].map((_tile, x) => y === 2 && x >= 3 && x <= 5 ? 'g' : '.').join(''));
+  window.fetch = vi.fn((_url: string, options: RequestInit) => new Promise<Response>(finish => {
+    requests.push({ body: JSON.parse(options.body as string), finish });
+  })) as unknown as typeof fetch;
+  const battles = vi.fn();
+  window.document.addEventListener('battle:show', battles);
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    requests[0].finish(Response.json(saved));
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
+    const player = $('adventure-player'), before = player.style.transform;
+    const target = $('adventure-terrain').querySelector<HTMLElement>('[data-x="5"][data-y="2"]')!;
+    target.click();
+    expect(requests[1].body).toEqual({ direction: 'd', revision: 'saved-map' });
+    expect(player.style.transform).toBe(before);
+    expect(requests).toHaveLength(2);
+    requests[1].finish(Response.json({ ...saved, x: 3, revision: 'first-step' }));
+    await vi.waitFor(() => expect(requests.length).toBe(3));
+    expect(requests[2].body).toEqual({ direction: 'd', revision: 'first-step' });
+    expect(player.style.transform).toBe('translate3d(192px, 128px, 0)');
+    const surprise = battleProgress();
+    requests[2].finish(Response.json({ ...surprise, grass: saved.grass, x: 4, y: 2, battle: { ...surprise.battle, surprise: true } }));
+    await vi.waitFor(() => expect(battles).toHaveBeenCalledOnce());
+    expect($('adventure-player')).toBe(player);
+    expect(player.style.transform).toBe('translate3d(256px, 128px, 0)');
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(requests.filter(request => request.body.direction)).toHaveLength(2);
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+  } finally { dom.window.close(); }
+});
+
+it('ignores a cancelled route response after reopening so it cannot interrupt a new tap route', async () => {
+  const { dom, window, $ } = page();
+  Object.defineProperty(window.document, 'hidden', { value: false });
+  const saved = map(), requests: { body: any; finish: (response: Response) => void }[] = [];
+  window.fetch = vi.fn((_url: string, options: RequestInit) => new Promise<Response>(finish => {
+    requests.push({ body: JSON.parse(options.body as string), finish });
+  })) as unknown as typeof fetch;
+  const tap = (x: number) => $('adventure-terrain').querySelector<HTMLElement>(`[data-x="${x}"][data-y="2"]`)!.click();
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    requests[0].finish(Response.json(saved));
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
+    tap(5);
+    expect(requests[1].body).toEqual({ direction: 'd', revision: 'saved-map' });
+    $('adventure-close').click();
+    $('adventure-open').click();
+    // The server already saved the old step; only its response is delayed.
+    requests[2].finish(Response.json({ ...saved, x: 3, revision: 'reopened-map' }));
+    await vi.waitFor(() => expect($('adventure-status').textContent).toBe('Column 4 · Row 3'));
+    tap(6);
+    expect(requests[3].body).toEqual({ direction: 'd', revision: 'reopened-map' });
+    requests[1].finish(Response.json({ ...saved, x: 3, revision: 'old-step' }));
+    // The old continuation must not consume the new path while its move waits.
+    await new Promise(resolve => setTimeout(resolve, 230));
+    expect($('adventure-grid').getAttribute('aria-busy')).toBe('true');
+    requests[3].finish(Response.json({ ...saved, x: 4, revision: 'new-step-1' }));
+    await vi.waitFor(() => expect(requests.length).toBe(5));
+    expect(requests[4].body).toEqual({ direction: 'd', revision: 'new-step-1' });
+    requests[4].finish(Response.json({ ...saved, x: 5, revision: 'new-step-2' }));
+    await vi.waitFor(() => expect(requests.length).toBe(6));
+    expect(requests[5].body).toEqual({ direction: 'd', revision: 'new-step-2' });
+    requests[5].finish(Response.json({ ...saved, x: 6, revision: 'arrived' }));
+    await vi.waitFor(() => expect($('adventure-status').textContent).toBe('Column 7 · Row 3'));
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
   } finally { dom.window.close(); }
 });
 
@@ -305,7 +430,7 @@ it('shows a failed run with disabled movement and starts a fresh adventure only 
     expect($('adventure-restart').hidden).toBe(true);
     expect($('adventure-resources').textContent).toBe('HP 15 / 15 · MP 5 / 5');
     expect($('adventure-battle-summary').hidden).toBe(true);
-    expect($('adventure-grid').querySelectorAll('.adventure-marker-slime')).toHaveLength(2);
+    expect($('adventure-grid').querySelectorAll('.adventure-marker-slime')).toHaveLength(0);
   } finally { dom.window.close(); }
 });
 
@@ -331,7 +456,7 @@ it('ends the mini-game at once on Abandon run: the map closes, and reopening off
     window.eval(readFileSync('public/confirm.js', 'utf8'));
     const dialog = $('adventure-dialog') as HTMLDialogElement;
     $('adventure-open').click();
-    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
     expect($('adventure-abandon').hidden).toBe(false);
     expect($('adventure-restart').hidden).toBe(true);
     $('adventure-abandon').focus(); $('adventure-abandon').click();
@@ -485,12 +610,16 @@ it('keeps keyboard movement focused on the map when using stairs disables the se
     requests[0].finish(Response.json({ ...map(), x: 13, y: 13 }));
     const descend = $('adventure-descend') as HTMLButtonElement;
     await vi.waitFor(() => expect(descend.disabled).toBe(false));
+    const firstTerrain = $('adventure-terrain'), firstTile = firstTerrain.firstElementChild;
+    expect(firstTerrain.querySelector('.adventure-marker-down')?.classList.contains('is-interactable')).toBe(true);
     descend.focus(); descend.click();
     expect(descend.disabled).toBe(true);
     expect(window.document.activeElement?.id).toBe('adventure-grid');
     expect(requests[1].body).toEqual({ action: 'descend', revision: 'saved-map' });
     requests[1].finish(Response.json(map(2)));
     await vi.waitFor(() => expect($('adventure-floor').textContent).toBe('ADVENTURE · FLOOR 2 / 5'));
+    expect($('adventure-terrain').contains(firstTile)).toBe(false);
+    expect($('adventure-terrain').querySelector('.adventure-marker-up')?.classList.contains('is-interactable')).toBe(true);
     window.document.activeElement!.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
     expect(requests[2].body).toEqual({ direction: 'd', revision: 'saved-map' });
     requests[2].finish(Response.json({ ...map(2), x: 3 }));
@@ -580,10 +709,10 @@ it('after a defeat while the pet rests, asks to spend an Hourglass on the wait, 
   } finally { dom.window.close(); }
 });
 
-it('a monster attack while Abandon run is being asked answers it No, so a later Yes can\'t abandon by surprise', async () => {
+it('a shared battle received while Abandon run is being asked answers it No, so a later Yes cannot abandon by surprise', async () => {
   const { dom, window, $ } = page();
   const start = map(), fought = battleProgress();
-  const attacked = { ...fought, x: start.x, battle: { ...fought.battle, attacked: true } };
+  const attacked = { ...fought, x: start.x, battle: { ...fought.battle, surprise: true } };
   const bodies: any[] = [];
   window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
     const body = JSON.parse(options.body as string);
@@ -596,10 +725,10 @@ it('a monster attack while Abandon run is being asked answers it No, so a later 
     window.eval(readFileSync('public/adventure.js', 'utf8'));
     window.eval(readFileSync('public/confirm.js', 'utf8'));
     $('adventure-open').click();
-    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
     $('adventure-abandon').click();
     await vi.waitFor(() => expect(($('confirm-dialog') as HTMLDialogElement | null)?.open).toBe(true));
-    // The monster's step attacks: the battle opens, and the question is gone.
+    // A teammate's encounter reaches this map: the battle opens and the question is gone.
     await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement | null)?.open).toBe(true), { timeout: 2500 });
     expect(($('confirm-dialog') as HTMLDialogElement).open).toBe(false);
     expect(bodies.some(body => body.action === 'abandon')).toBe(false);
@@ -642,11 +771,15 @@ it('opens chests and uses backpack items only after the server saves them, retai
     requests[0].finish(Response.json(before));
     const open = $('adventure-open-chest') as HTMLButtonElement;
     await vi.waitFor(() => expect(open.disabled).toBe(false));
+    const chest = $('adventure-terrain').querySelector('.adventure-marker-chest')!;
+    expect(chest.classList.contains('is-interactable')).toBe(true);
+    expect(chest.classList.contains('adventure-chest-opened')).toBe(false);
     open.focus(); open.click(); open.click();
     expect(requests).toHaveLength(2);
     expect(requests[1].body).toEqual({ action: 'open-chest', revision: 'saved-map' });
     expect($('adventure-items').textContent).toContain('Food × 0');
     expect($('adventure-treasure').textContent).toBe('');
+    expect(chest.classList.contains('adventure-chest-opened')).toBe(false);
     expect(window.document.activeElement?.id).toBe('adventure-grid');
     const saved = { ...before, revision: 'opened-map', chests: before.chests.map(c => ({ ...c, reward: { category: 'food', id: 'food', name: 'Food', quantity: 1 } })),
       inventory: { ...before.inventory, items: before.inventory.items.map(item => ({ ...item, quantity: 1, usable: true })) } };
@@ -654,6 +787,9 @@ it('opens chests and uses backpack items only after the server saves them, retai
     await vi.waitFor(() => expect($('adventure-items').textContent).toContain('Food × 1'));
     expect(open.textContent).toBe('Chest opened'); expect(open.disabled).toBe(true);
     expect($('adventure-treasure').textContent).toContain('Found 1 Food');
+    expect($('adventure-terrain').querySelector('.adventure-marker-chest')).toBe(chest);
+    expect(chest.classList.contains('adventure-chest-opened')).toBe(true);
+    expect(chest.classList.contains('is-interactable')).toBe(false);
     const use = $('adventure-items').querySelector('button')!;
     use.focus(); use.click();
     expect(requests[2].body).toEqual({ action: 'use-item', item: 'food', revision: 'opened-map' });
@@ -766,9 +902,9 @@ it('offers the Team up window before a first adventure, then opens the shared ma
     await vi.waitFor(() => expect(($('adventure-dialog') as HTMLDialogElement).open).toBe(true));
     expect(teamUp.open).toBe(false);
     expect(bodies.at(-1)).toEqual({ action: 'set-off' });
-    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
     // Sharing the pet's tile: a badge counts both pets, and the map says who.
-    const start = $('adventure-grid').children[2 * 16 + 2] as HTMLElement;
+    const start = $('adventure-player');
     expect(start.classList.contains('adventure-shared')).toBe(true);
     expect(start.dataset.shared).toBe('2');
     expect($('adventure-grid').getAttribute('aria-label')).toContain('Your pet is at column 3, row 3, with pal.');
@@ -777,10 +913,11 @@ it('offers the Team up window before a first adventure, then opens the shared ma
     // Once the teammate walks on, it stands on its own tile.
     onMap = { ...shared, team: { ...shared.team, members: [{ ...shared.team.members[0], x: 3 }] } };
     Object.defineProperty(window.document, 'hidden', { value: false });
-    await vi.waitFor(() => expect($('adventure-grid').children[2 * 16 + 3].classList.contains('adventure-teammate')).toBe(true), { timeout: 2500 });
-    const cell = $('adventure-grid').children[2 * 16 + 3];
-    expect(cell.querySelector('use')?.getAttribute('href')).toBe('#pet-panda');
-    expect($('adventure-grid').children[2 * 16 + 2].classList.contains('adventure-shared')).toBe(false);
+    await vi.waitFor(() => expect($('adventure-grid').querySelector<HTMLElement>('.adventure-teammate[data-player="pal"]')?.style.transform).toContain('192px'), { timeout: 2500 });
+    const teammate = $('adventure-grid').querySelector('.adventure-teammate[data-player="pal"]')!;
+    expect(teammate.querySelector('use')?.getAttribute('href')).toBe('#pet-panda');
+    expect($('adventure-player')).toBe(start);
+    expect(start.classList.contains('adventure-shared')).toBe(false);
     expect($('adventure-grid').getAttribute('aria-label')).toContain('1 teammate here');
   } finally { dom.window.close(); }
 });
@@ -838,7 +975,7 @@ it('keeps reference info in the Game guide: shown once as a new pet reaches the 
     // Once the pet has moved, reopening the map leaves the guide closed.
     $('adventure-close').click();
     $('adventure-open').click();
-    await vi.waitFor(() => expect($('adventure-grid').children).toHaveLength(256));
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(guide.open).toBe(false);
     expect(window.document.activeElement?.id).toBe('adventure-grid');

@@ -18,6 +18,13 @@ function buildDialog() {
       <button type="button" id="battle-close" class="chip-btn chip-buy" aria-label="Close battle">Close</button></header>
     <p id="battle-initiative" class="battle-initiative" hidden></p>
     <div class="battle-stage">
+      <div class="battle-woodland-art" aria-hidden="true"><svg viewBox="0 0 600 220" preserveAspectRatio="xMidYMax slice">
+        <use href="/scenes/adventure-atlas.svg#tree" x="-38" y="-14" width="190" height="190"/>
+        <use href="/scenes/adventure-atlas.svg#tree" x="450" y="-18" width="200" height="200"/>
+        <use href="/scenes/adventure-atlas.svg#fern" x="230" y="140" width="90" height="90"/>
+        <use href="/scenes/adventure-atlas.svg#grass" x="8" y="160" width="100" height="70"/>
+        <use href="/scenes/adventure-atlas.svg#grass" x="500" y="160" width="100" height="70"/>
+      </svg></div>
       <article class="battle-fighter" id="battle-fighter-0"><h3 id="battle-name-0"></h3><div class="battle-avatar" id="battle-avatar-0"></div>
         <label for="battle-hp-0">HP <span id="battle-hp-text-0"></span></label><meter id="battle-hp-0" min="0" aria-label="Attacker HP"></meter>
         <label for="battle-mp-0">MP <span id="battle-mp-text-0"></span></label><meter id="battle-mp-0" min="0" aria-label="Attacker MP"></meter></article>
@@ -164,6 +171,7 @@ function play(next) {
   scene = next;
   turn = 0;
   if (!dialog) buildDialog();
+  dialog.dataset.encounter = next.encounter || '';
   $('battle-title').textContent = next.title || 'Arena battle';
   $('battle-close').textContent = next.returnLabel || 'Close';
   $('battle-close').setAttribute('aria-label', next.returnLabel || 'Close battle');

@@ -8,7 +8,7 @@ import {
 import { grantTreasure } from './inventory.ts';
 import { COINS, rollTreasure } from './treasure.ts';
 import {
-  createWorld, directions, FLOOR_COUNT, MONSTER_MOVES, nearby, patrol, samePoint, sees, SIZE, walkable, type Enemy, type Floor, type Point,
+  createWorld, directions, FLOOR_COUNT, grassEncounter, MONSTER_MOVES, nearby, prepareGrass, samePoint, SIZE, walkable, type Enemy, type Floor, type Point,
 } from './adventure-world.ts';
 import { realMs, TIME_SCALE } from './clock.ts';
 
@@ -18,7 +18,8 @@ export type AdventureBattle = {
   recovery: { hp: number; mp: number };
   after?: { hp: number; mp: number }; // what the pet carries back to the map; absent in older saves
   fighter?: number; // this pet's place in a team battle's playback; absent means the first
-  attacked?: true; // the monster walked into the pet, rather than the pet into it
+  attacked?: true; // legacy battle where a patrolling monster caught the pet
+  surprise?: true; // hidden monster encountered by walking into tall grass
 };
 type SavedAdventure = {
   x: number; y: number; floor: number; world_json: string | null;
@@ -71,13 +72,12 @@ function load(id: string): Progress {
   const hp = Math.min(saved.hp ?? maxHp, maxHp), mp = Math.min(saved.mp ?? maxMp, maxMp);
   const team = saved.team_id !== null;
   const world: Floor[] = team ? JSON.parse(saved.team_world!) : saved.world_json ? JSON.parse(saved.world_json) : createWorld();
-  // Maps saved before monsters patrolled give each one its route from a fresh map.
-  if (world.some(floor => floor.enemies.some(e => !e.route))) {
-    const fresh = createWorld();
-    for (const floor of world) for (const enemy of floor.enemies) {
-      enemy.route ??= fresh[floor.number - 1].enemies.find(e => e.id === enemy.id)?.route ?? [{ x: enemy.x, y: enemy.y }, { x: enemy.x, y: enemy.y }];
-      enemy.leg ??= 1;
-    }
+  // Upgrade old solo and shared maps without replacing their walls, rewards,
+  // remaining monsters, or saved battles. Persist the seed before returning it.
+  const upgraded = world.map(prepareGrass).some(Boolean);
+  if (upgraded) {
+    if (team) db.prepare('UPDATE teams SET world_json = ? WHERE id = ?').run(JSON.stringify(world), saved.team_id);
+    else db.prepare('UPDATE adventures SET world_json = ? WHERE player_id = ?').run(JSON.stringify(world), id);
   }
   const revision = saved.revision ?? randomUUID();
   // Setting off with a team saves every member's run in full.
@@ -102,16 +102,20 @@ function teammates(saved: Progress): Progress[] {
   return (db.prepare('SELECT player_id FROM adventures WHERE team_id = ? AND player_id <> ? ORDER BY player_id')
     .all(saved.teamId, saved.id) as { player_id: string }[]).map(row => load(row.player_id));
 }
-// Teammates still exploring on the pet's floor: monsters see and chase them too.
+// Teammates still exploring on the pet's floor can join a nearby encounter.
 const floormates = (saved: Progress) => teammates(saved).filter(mate => mate.floor === saved.floor && !over(mate));
 
 function view(saved: Progress) {
   const floor = saved.world[saved.floor - 1];
   return {
     x: saved.x, y: saved.y, floor: saved.floor, floorCount: FLOOR_COUNT, size: SIZE,
-    name: floor.name, tiles: floor.tiles, chests: floor.chests,
-    // `alerted`: the monster sees the pet and is walking toward it.
-    enemies: floor.enemies.map(e => ({ ...e, alerted: sees(e, saved), moves: MONSTER_ABILITIES.filter(a => MONSTER_MOVES[e.kind].includes(a.id)) })),
+    name: floor.name, tiles: floor.tiles, grass: floor.grass!, chests: floor.chests,
+    // Hidden monster coordinates/routes are deliberately absent from the API.
+    enemies: floor.enemies.map(({ x, y, route: _route, leg: _leg, ...enemy }) => ({
+      ...enemy, ...(enemy.kind === 'slime-king' ? { x, y } : {}),
+      hidden: enemy.kind !== 'slime-king', alerted: false,
+      moves: MONSTER_ABILITIES.filter(a => MONSTER_MOVES[enemy.kind].includes(a.id)),
+    })),
     up: floor.up, down: floor.down, revision: saved.revision, battle: saved.battle,
     inventory: saved.inventory,
     hp: saved.hp, mp: saved.mp, maxHp: saved.maxHp, maxMp: saved.maxMp, failed: saved.hp === 0,
@@ -124,7 +128,7 @@ function view(saved: Progress) {
         status: mate.abandoned ? 'abandoned' : mate.hp === 0 ? 'defeated' : 'exploring',
       })),
     },
-    encounters: floor.enemies.filter(e => nearby(e, saved)).map(e => e.id),
+    encounters: floor.enemies.filter(e => e.kind === 'slime-king' && nearby(e, saved)).map(e => e.id),
     cooldownUntil: saved.cooldownUntil, timeScale: TIME_SCALE, patrolMs: PATROL_MS,
     restartCost: ADVENTURE_COST, cooldownMinutes: ADVENTURE_COOLDOWN_MINUTES,
   };
@@ -159,9 +163,8 @@ function alliesOf(saved: Progress): Progress[] {
   return floormates(saved).filter(mate => nearby(mate, saved) && !mate.battle?.pending && !busyNow(mate.pet));
 }
 
-// `attacked`: the monster walked into the pet, so a win leaves the pet where
-// it stands rather than moving it onto the monster's tile.
-function resolveBattle(id: string, saved: Progress, enemy: Enemy, attacked = false) {
+// A surprise encounter keeps the pet on the grass tile it just entered.
+function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = false) {
   const pet = getPet(id);
   if (!pet) return { error: 'Your pet could not be found.', status: 404 };
   const allies = alliesOf(saved);
@@ -203,12 +206,12 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy, attacked = fal
     fighter.hp += recovery.hp; fighter.mp += recovery.mp;
     fighter.battle = {
       id: battleId, floor: saved.floor, enemyId: enemy.id, enemyName: enemy.name, won, pending: true, playback, recovery,
-      after: { hp: fighter.hp, mp: fighter.mp }, ...(index ? { fighter: index } : {}), ...(attacked ? { attacked: true as const } : {}),
+      after: { hp: fighter.hp, mp: fighter.mp }, ...(index ? { fighter: index } : {}), ...(surprise ? { surprise: true as const } : {}),
     };
   });
   if (won) {
     floor.enemies = floor.enemies.filter(e => e.id !== enemy.id);
-    if (saved.hp > 0 && !attacked) { saved.x = enemy.x; saved.y = enemy.y; }
+    if (saved.hp > 0 && !surprise) { saved.x = enemy.x; saved.y = enemy.y; }
   }
   return transaction(() => {
     for (const ally of allies) {
@@ -231,52 +234,18 @@ export function moveAdventure(id: string, direction: unknown, revision?: unknown
   const [dx, dy] = directions[direction as keyof typeof directions];
   const player = { x: saved.x + dx, y: saved.y + dy };
   if (!walkable(floor, player)) return { error: 'A tree blocks that path.', status: 409 };
-  const enemy = floor.enemies.find(e => samePoint(e, player));
+  const enemy = floor.enemies.find(e => e.kind === 'slime-king' && samePoint(e, player));
   if (enemy) return resolveBattle(id, saved, enemy);
   saved.x = player.x; saved.y = player.y;
+  const hidden = grassEncounter(floor, player);
+  if (hidden) return resolveBattle(id, saved, hidden, true);
   return save(id, saved);
 }
 
-// Monsters move in real time, but only while their owner has the map open:
-// the page asks for a step every PATROL_MS, and the server takes one at most
-// that often (less a little slack for timer jitter), however many windows ask.
-// A step keeps the revision, so a move sent at the same moment still applies,
-// to the monsters' new positions. Nothing moves during a battle, after the run
-// ends, or while the pet studies or works. On a team's map each floor steps on
-// its own clock, for any teammate there who asks, and its monsters chase
-// whichever teammate is nearest.
-// A monster already beside the pet it's chasing walks into it instead, which
-// starts a battle as if the pet had walked into the monster; that battle
-// changes the revision. A pet that's busy, out, or already has a battle
-// waiting isn't attacked: the monster waits beside it.
+// Keep the established refresh action for shared-map updates and old clients.
+// Reading the map cannot move monsters or begin a battle: only walking does.
 export const PATROL_MS = 1000;
-export function patrolAdventure(id: string) {
-  const saved = load(id), now = Date.now(), floor = saved.world[saved.floor - 1];
-  const last = saved.teamId === null ? saved.patrolledAt : floor.patrolledAt ?? 0;
-  if (saved.battle?.pending || over(saved) || busyNow(saved.pet) || now - last < PATROL_MS * 0.8) return view(saved);
-  return transaction(() => {
-    let attacks;
-    if (saved.teamId === null) {
-      attacks = patrol(floor, saved);
-      db.prepare('UPDATE adventures SET world_json = ?, patrolled_at = ? WHERE player_id = ? AND revision = ?')
-        .run(JSON.stringify(saved.world), now, id, saved.revision);
-    } else {
-      attacks = patrol(floor, [saved, ...floormates(saved)]);
-      floor.patrolledAt = now;
-      db.prepare('UPDATE teams SET world_json = ? WHERE id = ?').run(JSON.stringify(saved.world), saved.teamId);
-    }
-    // Each battle reads the map as the one before it left it: a teammate
-    // drawn into an earlier battle, or a monster it removed, is skipped, and
-    // so is any attack the saved map no longer matches.
-    for (const attack of attacks) {
-      const victim = load(attack.pet.id), enemy = victim.world[victim.floor - 1].enemies.find(e => e.id === attack.enemy.id);
-      if (!enemy || !samePoint(enemy, attack.enemy) || !samePoint(victim, attack.pet) || victim.floor !== saved.floor
-        || victim.battle?.pending || over(victim) || busyNow(victim.pet)) continue;
-      resolveBattle(victim.id, victim, enemy, true);
-    }
-    return adventureFor(id);
-  });
-}
+export function patrolAdventure(id: string) { return adventureFor(id); }
 
 export function changeFloor(id: string, action: unknown, revision?: unknown) {
   if (action !== 'ascend' && action !== 'descend') return { error: 'Choose ascend or descend.', status: 400 };

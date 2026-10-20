@@ -7,12 +7,12 @@ adventure.setAttribute('aria-labelledby', 'adventure-title');
 adventure.innerHTML = `
   <header class="adventure-top"><div><p class="section-label" id="adventure-floor">ADVENTURE · FLOOR 1 / 5</p><h2 id="adventure-title">Woodland clearing</h2></div>
     <div class="adventure-header-actions">
-      <button type="button" id="adventure-abandon" class="chip-btn chip-buy" hidden>Abandon run</button>
+      <button type="button" id="adventure-pack-toggle" class="chip-btn chip-buy" aria-expanded="false" aria-controls="adventure-pack-panel">Backpack & team</button>
       <button type="button" id="adventure-guide-open" class="chip-btn chip-buy" aria-haspopup="dialog">Game guide</button>
       <button type="button" id="adventure-close" class="chip-btn">Leave</button>
     </div></header>
   <div class="adventure-stage">
-    <div class="adventure-side">
+    <div class="adventure-side" id="adventure-pack-panel" hidden>
       <section id="adventure-team" aria-labelledby="adventure-team-heading" hidden>
         <h3 id="adventure-team-heading">Your team</h3>
         <ul id="adventure-team-list"></ul>
@@ -24,9 +24,11 @@ adventure.innerHTML = `
         <h4>Learned abilities</h4><ul id="adventure-abilities"></ul>
         <h4>Unfair coins</h4><ul id="adventure-coins"></ul>
       </details>
+      <button type="button" id="adventure-abandon" class="chip-btn chip-buy" hidden>Abandon run</button>
     </div>
     <div class="adventure-board">
-      <div id="adventure-grid" role="img" aria-label="Woodland map" tabindex="0"></div>
+      <div id="adventure-grid" role="img" aria-label="Woodland map" aria-describedby="adventure-movement-tip" tabindex="0"></div>
+      <p id="adventure-movement-tip"><kbd>W/A/S/D</kbd> move · <kbd>Space</kbd> interact<br><span>Tap a path to walk. Tall grass may hide a surprise.</span></p>
       <p id="adventure-status" role="status" class="visually-hidden">Opening the clearing…</p>
       <div class="adventure-messages">
         <p id="adventure-notice" role="status"></p>
@@ -92,9 +94,9 @@ guide.innerHTML = `
     <ul class="adventure-guide-list">
       <li>Move with W/A/S/D, the arrow keys, or the arrow pad.</li>
       <li>Space opens a chest or takes the stairs you stand on.</li>
-      <li>Walk into a monster to battle it.</li>
-      <li>A monster that spots you (!) chases you. Once beside you, it attacks.</li>
-      <li>Move more than 3 blocks away to lose it.</li>
+      <li>Walk through tall grass for a chance of a surprise battle.</li>
+      <li>Clear paths are safe. Standing still never starts an encounter.</li>
+      <li>The Slime King guards the final grove. Walk up to it to battle.</li>
       <li>HP and MP carry between battles. A win gives back 20%.</li>
       <li>A coin toss decides who strikes first.</li>
       <li>Teammates beside you join your battles.</li>
@@ -133,6 +135,7 @@ let sent = 0, shown = 0, patrolling = false;
 let guideOffered = false;
 function openGuide() {
   if (guide.open || !adventure.open) return;
+  stopWalking();
   guide.showModal();
   guide.querySelector('#adventure-guide-close').focus({ preventScroll: true });
 }
@@ -155,14 +158,10 @@ const icons = {
   slime: '<use href="#monster-slime"/>',
   goblin: '<use href="#monster-goblin"/>',
   'slime-king': '<use href="#monster-slime-king"/>',
-  chest: '<rect x="3" y="7" width="18" height="14" rx="2" fill="currentColor"/><path d="M3 13h18m-11-3h4v6h-4Z"/>',
-  'open-chest': '<path d="M3 13h18v8H3Z" fill="currentColor"/><path d="M3 10 6 3h15v7Zm7 3h4v4h-4Z"/>',
-  up: '<path d="M3 21h6v-6h6V9h6M5 10V2m-3 3 3-3 3 3"/>',
-  down: '<path d="M3 21h6v-6h6V9h6M5 2v8m-3-3 3 3 3-3"/>',
 };
-const mapIcon = kind => `<svg viewBox="0 0 24 24" aria-hidden="true" class="adventure-icon">${icons[kind]}</svg>`;
+const mapIcon = kind => `<svg viewBox="0 0 ${icons[kind] ? '24 24' : '96 96'}" aria-hidden="true" class="adventure-icon">${icons[kind] || `<use href="/scenes/adventure-atlas.svg#${kind}"/>`}</svg>`;
 const legend = guide.querySelector('.adventure-legend');
-for (const [kind, label] of [['slime', 'Slime'], ['goblin', 'Goblin'], ['slime-king', 'Slime King'], ['chest', 'Chest'], ['up', 'Stairs up'], ['down', 'Stairs down']]) {
+for (const [kind, label] of [['grass', 'Tall grass'], ['slime', 'Wild slime'], ['goblin', 'Wild goblin'], ['slime-king', 'Slime King'], ['chest', 'Chest'], ['up', 'Stairs up'], ['down', 'Stairs down']]) {
   const entry = document.createElement('span');
   entry.className = `adventure-marker-${kind}`;
   entry.innerHTML = mapIcon(kind);
@@ -199,9 +198,16 @@ function syncControls() {
   disable(open, blocked || !chest || Boolean(chest.reward));
   adventure.querySelectorAll('[data-use-item]').forEach(button => disable(button,
     pending || Boolean(state?.battle?.pending) || !state?.inventory?.items.find(item => item.id === button.dataset.useItem)?.usable));
+  if (terrain) for (const cell of terrain.querySelectorAll('.adventure-marker-chest, .adventure-marker-up, .adventure-marker-down')) {
+    const here = state && Number(cell.dataset.x) === state.x && Number(cell.dataset.y) === state.y;
+    cell.classList.toggle('is-interactable', Boolean(here && !blocked && cell.dataset.opened !== 'true'));
+  }
 }
 function clearMap() {
+  resetScene();
   state = null; shownBattle = null; guideOffered = false;
+  packPanel.hidden = true;
+  packToggle.setAttribute('aria-expanded', 'false');
   if (guide.open) guide.close();
   grid.replaceChildren();
   grid.setAttribute('aria-label', 'Woodland map');
@@ -321,8 +327,119 @@ function renderTeam() {
     list.append(row);
   }
 }
-// What a monster's step can change, so a patrol leaves the rest of the
-// window, its focus, and its announcements alone.
+// A persistent scene: saved moves translate the same actors. Refreshing the
+// team or cooldown never tears down terrain, focus, or an animation in flight.
+const TILE = 64, MAP_SIZE = TILE * 16, FOREST_MARGIN = TILE * 2;
+let sceneSignature = '', mapScene = null, terrain = null, actors = null;
+const actorNodes = new Map();
+let walkingPath = [], walkingTimer = 0, walkingGeneration = 0;
+const hiddenEnemy = enemy => enemy.hidden ?? enemy.kind !== 'slime-king';
+const onGrass = (x, y) => state?.grass?.[y]?.[x] === 'g';
+function stopWalking() { walkingGeneration++; walkingPath = []; clearTimeout(walkingTimer); }
+function resetScene() {
+  stopWalking();
+  for (const actor of actorNodes.values()) clearTimeout(actor.walkTimer);
+  actorNodes.clear();
+  sceneSignature = ''; mapScene = null; terrain = null; actors = null;
+}
+function drawCamera(immediate = false) {
+  if (!state || !mapScene) return;
+  const width = grid.clientWidth || window.innerWidth || 960;
+  const height = grid.clientHeight || window.innerHeight || 640;
+  const extent = MAP_SIZE + FOREST_MARGIN * 2;
+  const zoom = Math.max(.85, width / extent, height / extent);
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+  // The surrounding forest gives edge tiles room beneath the floating controls.
+  const x = clamp(width / 2 - (state.x + .5) * TILE * zoom, width - (MAP_SIZE + FOREST_MARGIN) * zoom, FOREST_MARGIN * zoom);
+  const y = clamp(height / 2 - (state.y + .5) * TILE * zoom, height - (MAP_SIZE + FOREST_MARGIN) * zoom, FOREST_MARGIN * zoom);
+  mapScene.style.transitionDuration = immediate ? '0s' : '';
+  mapScene.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${zoom})`;
+}
+function makeTerrain() {
+  const signature = JSON.stringify([state.floor, state.tiles, state.grass, state.chests.map(c => [c.id, c.x, c.y]), state.up, state.down]);
+  if (signature === sceneSignature && mapScene) return false;
+  resetScene();
+  sceneSignature = signature;
+  const forest = [];
+  for (let y = -2; y < 18; y++) for (let x = -2; x < 18; x++) {
+    if (x >= 0 && x < 16 && y >= 0 && y < 16) continue;
+    forest.push(`<use href="/scenes/adventure-atlas.svg#tree" x="${x * TILE - 8}" y="${y * TILE - 20}" width="80" height="84"/>`);
+  }
+  grid.innerHTML = `<div id="adventure-map-scene" aria-hidden="true">
+    <svg class="adventure-edge-scenery" viewBox="-128 -128 1280 1280">
+      <path fill="#7e9a6c" d="M-128-128H1152V1152H-128Z"/>${forest.join('')}
+    </svg>
+    <svg class="adventure-landscape" viewBox="0 0 1024 1024">
+      <defs>
+        <radialGradient id="adventure-meadow"><stop stop-color="#d1d49c"/><stop offset=".65" stop-color="#a8bb7f"/><stop offset="1" stop-color="#8fa573"/></radialGradient>
+        <pattern id="adventure-grain" width="57" height="43" patternUnits="userSpaceOnUse"><path d="m12 17 2-3 2 3m25 18 1-3 2 3" fill="none" stroke="#526e45" stroke-width="1" opacity=".17"/><path d="M32 8h2M9 35h3" stroke="#eff0c8" stroke-width="1.4" opacity=".4"/></pattern>
+        <path id="adventure-trail" d="M96 96H928V928H96ZM160 96V160M736 96V224M928 864H864"/>
+      </defs>
+      <path fill="url(#adventure-meadow)" d="M0 0h1024v1024H0z"/>
+      <g fill="none" stroke-linejoin="round" stroke-linecap="round">
+        <use href="#adventure-trail" stroke="#829361" stroke-opacity=".35" stroke-width="52"/>
+        <use href="#adventure-trail" stroke="#decea0" stroke-width="43"/>
+        <use href="#adventure-trail" stroke="#eddeb5" stroke-opacity=".5" stroke-width="25"/>
+      </g>
+      <path fill="url(#adventure-grain)" d="M0 0h1024v1024H0z"/>
+      <ellipse cx="520" cy="500" rx="285" ry="225" fill="#e8dfa6" opacity=".09"/>
+    </svg>
+    <div id="adventure-terrain"></div><div id="adventure-actors"></div>
+    <div class="adventure-air"><i></i><i></i><i></i><i></i></div>
+  </div>`;
+  mapScene = grid.querySelector('#adventure-map-scene');
+  terrain = grid.querySelector('#adventure-terrain');
+  actors = grid.querySelector('#adventure-actors');
+  state.tiles.forEach((row, y) => [...row].forEach((tile, x) => {
+    const cell = document.createElement('span');
+    const water = tile === '#' && ((x === 15 && y > 2) || (y === 15 && x > 8));
+    cell.className = `adventure-tile ${tile === '#' ? water ? 'adventure-water' : 'adventure-tree' : 'adventure-path'}${onGrass(x, y) ? ' adventure-grass' : ''}`;
+    cell.dataset.x = String(x); cell.dataset.y = String(y);
+    cell.style.setProperty('--tile-x', x);
+    cell.style.setProperty('--tile-y', y);
+    cell.style.setProperty('--sway-delay', `${-((x * 7 + y * 3) % 17) / 4}s`);
+    const chest = state.chests.find(c => c.x === x && c.y === y);
+    const stair = [state.up && { ...state.up, kind: 'up' }, state.down && { ...state.down, kind: 'down' }].find(s => s && s.x === x && s.y === y);
+    if (tile === '#' && !water) cell.innerHTML = mapIcon('tree');
+    else if (onGrass(x, y)) cell.innerHTML = `<span class="adventure-grass-blades">${mapIcon('grass')}</span>`;
+    else if (tile === '.' && !chest && !stair && ![1, 14].includes(x) && ![1, 14].includes(y) && (x * 7 + y * 11 + state.floor) % 9 === 0) {
+      cell.innerHTML = `<span class="adventure-ground-detail">${mapIcon((x + y) % 3 ? 'flowers' : 'fern')}</span>`;
+    }
+    if (chest || stair) {
+      cell.classList.add(`adventure-marker-${chest ? 'chest' : stair.kind}`);
+      cell.innerHTML = mapIcon(chest?.reward ? 'open-chest' : chest ? 'chest' : stair.kind);
+      if (chest) cell.dataset.opened = String(Boolean(chest.reward));
+    }
+    terrain.append(cell);
+  }));
+  return true;
+}
+function placeActor(key, position, className, art, label) {
+  let entry = actorNodes.get(key);
+  if (!entry) {
+    const node = document.createElement('span');
+    node.className = `adventure-actor ${className}`;
+    node.dataset.actor = key;
+    if (key === 'player') node.id = 'adventure-player';
+    actors.append(node);
+    entry = { node, art: '', x: position.x, y: position.y, walkTimer: 0 };
+    actorNodes.set(key, entry);
+  }
+  const { node } = entry;
+  if (entry.art !== art) { node.innerHTML = art; entry.art = art; }
+  node.title = label;
+  if (position.color && /^#[0-9a-f]{6}$/i.test(position.color)) node.style.setProperty('--pet-color', position.color);
+  if (entry.x !== position.x || entry.y !== position.y) {
+    node.dataset.facing = position.x < entry.x ? 'left' : position.x > entry.x ? 'right' : position.y < entry.y ? 'up' : 'down';
+    node.classList.add('is-walking');
+    clearTimeout(entry.walkTimer);
+    entry.walkTimer = setTimeout(() => node.classList.remove('is-walking'), 220);
+  }
+  node.style.transform = `translate3d(${position.x * TILE}px, ${position.y * TILE}px, 0)`;
+  node.style.zIndex = String(position.y * 2 + 2);
+  entry.x = position.x; entry.y = position.y;
+  return node;
+}
 function renderMonsters() {
   renderTeam();
   const roster = guide.querySelector('#adventure-enemies');
@@ -330,56 +447,63 @@ function renderMonsters() {
   for (const enemy of state.enemies) {
     const item = document.createElement('li');
     const moves = (enemy.moves ?? []).map(move => ` · ${move.name} (${move.mpCost} MP): ${move.description}`).join('');
-    item.textContent = `${enemy.name} · column ${enemy.x + 1}, row ${enemy.y + 1} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence} · STR ${enemy.strength} / INT ${enemy.intelligence} / CHA ${enemy.charisma}${moves}`;
+    const where = hiddenEnemy(enemy) ? 'Hidden in tall grass' : `column ${enemy.x + 1}, row ${enemy.y + 1}`;
+    item.textContent = `${enemy.name} · ${where} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence} · STR ${enemy.strength} / INT ${enemy.intelligence} / CHA ${enemy.charisma}${moves}`;
     roster.append(item);
   }
-  grid.replaceChildren();
-  state.tiles.forEach((row, y) => [...row].forEach((tile, x) => {
-    const cell = document.createElement('span');
-    cell.className = tile === '#' ? 'adventure-tree' : 'adventure-path';
-    const enemy = state.enemies.find(e => e.x === x && e.y === y);
-    const chest = state.chests.find(c => c.x === x && c.y === y);
-    const stair = [state.up && { ...state.up, kind: 'up' }, state.down && { ...state.down, kind: 'down' }].find(s => s && s.x === x && s.y === y);
-    const kind = enemy?.kind || (chest ? 'chest' : stair?.kind);
-    if (kind) {
-      cell.classList.add(`adventure-marker-${kind}`);
-      cell.innerHTML = mapIcon(chest?.reward ? 'open-chest' : kind);
-      if (chest?.reward) cell.classList.add('adventure-chest-opened');
-      cell.title = enemy ? `${enemy.name} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence}` : chest ? (chest.reward ? `Opened chest · ${chest.reward.name}` : 'Unopened treasure chest') : `Stairs ${stair.kind}`;
-      if (enemy?.alerted) cell.classList.add('adventure-alerted');
-    }
-    const mate = teammatesHere().find(m => m.x === x && m.y === y);
-    if (mate && !(x === state.x && y === state.y)) {
-      cell.classList.add('adventure-teammate');
-      cell.title = `${mate.id} · HP ${mate.hp} / ${mate.maxHp}`;
-      cell.innerHTML = avatarFor(mate);
-    }
-    if (x === state.x && y === state.y) {
-      cell.classList.add('adventure-player');
-      // Teammates can share a tile (they all set off from the same one).
-      if (mate) {
-        cell.classList.add('adventure-shared');
-        cell.dataset.shared = String(teammatesHere().filter(m => m.x === x && m.y === y).length + 1);
+  const rebuilt = makeTerrain();
+  const active = new Set(['player']);
+  const player = placeActor('player', { ...state, color: pet?.color }, 'adventure-player', avatarFor(pet || {}), 'Your companion');
+  for (const mate of teammatesHere()) {
+    const key = `pet:${mate.id}`;
+    active.add(key);
+    const node = placeActor(key, mate, 'adventure-teammate', avatarFor(mate), `${mate.id} · HP ${mate.hp} / ${mate.maxHp}`);
+    node.dataset.player = mate.id;
+    node.hidden = at(mate);
+  }
+  for (const enemy of state.enemies.filter(enemy => !hiddenEnemy(enemy))) {
+    const key = `enemy:${enemy.id}`;
+    active.add(key);
+    const node = placeActor(key, enemy, `adventure-marker-${enemy.kind}`, mapIcon(enemy.kind), `${enemy.name} · HP ${enemy.strength + enemy.intelligence + enemy.charisma}`);
+    node.dataset.enemy = enemy.id;
+  }
+  for (const [key, entry] of actorNodes) {
+    if (active.has(key)) continue;
+    clearTimeout(entry.walkTimer);
+    entry.node.remove(); actorNodes.delete(key);
+  }
+  for (const cell of terrain.children) {
+    const point = { x: Number(cell.dataset.x), y: Number(cell.dataset.y) };
+    const chest = state.chests.find(c => c.x === point.x && c.y === point.y);
+    if (chest) {
+      const opened = Boolean(chest.reward);
+      if (cell.dataset.opened !== String(opened)) {
+        cell.innerHTML = mapIcon(opened ? 'open-chest' : 'chest');
+        cell.dataset.opened = String(opened);
       }
-      const shape = ['cat', 'dog', 'hedgehog', 'lizard', 'panda', 'bird', 'dragon', 'blob'].includes(pet?.appearance) ? pet.appearance : 'blob';
-      cell.innerHTML = `<svg class="pet-avatar" viewBox="0 0 120 110" aria-hidden="true"><use href="#pet-${shape}" /></svg>`;
-      if (pet?.color) cell.style.setProperty('--pet-color', pet.color);
+      cell.classList.toggle('adventure-chest-opened', opened);
+      cell.title = opened ? `Opened chest · ${chest.reward.name}` : 'Unopened treasure chest';
     }
-    grid.append(cell);
-  }));
+    const interactable = at(point) && ((chest && !chest.reward) || cell.classList.contains('adventure-marker-up') || cell.classList.contains('adventure-marker-down'));
+    cell.classList.toggle('is-interactable', Boolean(interactable) && !state.battle?.pending && !pending && !busyText());
+    cell.classList.toggle('is-rustling', onGrass(point.x, point.y) && Math.abs(point.x - state.x) <= 1 && Math.abs(point.y - state.y) <= 1);
+  }
   const mates = teammatesHere(), sharing = mates.filter(m => m.x === state.x && m.y === state.y).map(m => m.id);
-  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Monster locations are in the Game guide. Trees block movement; stepping into a monster starts battle, and so does a monster stepping into your pet. Space opens a chest or takes the stairs your pet stands on.`);
-  const nearby = state.enemies.filter(e => state.encounters.includes(e.id));
-  const spotted = state.enemies.filter(e => e.alerted && !state.encounters.includes(e.id));
+  player.classList.toggle('adventure-shared', sharing.length > 0);
+  player.dataset.shared = String(sharing.length + 1);
+  player.classList.toggle('in-grass', onGrass(state.x, state.y));
+  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Tall grass can hide surprise encounters. Clear paths are safe. Trees and water block movement. Space opens a chest or takes the stairs your pet stands on.`);
+  const nearby = state.enemies.filter(e => !hiddenEnemy(e) && state.encounters.includes(e.id));
   const notice = busyText() || (nearby.length
-    ? `${nearby.map(e => e.name).join(', ')} nearby! Step into ${nearby.length > 1 ? 'one' : 'it'} to battle, or move away before ${nearby.length > 1 ? 'they attack' : 'it attacks'}.`
-    : spotted.length ? `${spotted.map(e => e.name).join(', ')} spotted you! Move more than 3 blocks away to lose ${spotted.length > 1 ? 'them' : 'it'}.`
+    ? `${nearby.map(e => e.name).join(', ')} guards this grove. Walk up to challenge it.`
     : state.chests.some(at) ? (state.chests.find(at).reward ? 'Chest already opened.' : 'You found a treasure chest. Press Space or choose Open chest to collect its reward.')
     : at(state.up) ? 'Stairs up: Space or Ascend.'
-    : at(state.down) ? 'Stairs down: press Space or choose Descend to explore deeper.' : '');
+    : at(state.down) ? 'Stairs down: press Space or choose Descend to explore deeper.'
+    : onGrass(state.x, state.y) && state.enemies.some(hiddenEnemy) ? 'Tall grass… something might be hiding here.' : '');
   // Only a new message is announced again.
   const noticeText = adventure.querySelector('#adventure-notice');
   if (noticeText.textContent !== notice) noticeText.textContent = notice;
+  drawCamera(rebuilt);
 }
 function rewardText(reward) {
   return reward.category === 'ability'
@@ -454,7 +578,8 @@ function showBattle(replay = false) {
   mp[mine] = battle.after?.mp ?? last.mp[mine] + battle.recovery.mp;
   document.dispatchEvent(new CustomEvent('battle:show', { detail: {
     key: `adventure:${battle.id}`, battle: battle.playback, viewer: battle.playback.fighters[mine].id,
-    title: `Floor ${battle.floor} · ${battle.enemyName}${battle.attacked ? ' attacks!' : ''}`, result: battleResult(battle), won: battle.won,
+    title: battle.surprise ? `Surprise in the grass! · ${battle.enemyName}` : `Floor ${battle.floor} · ${battle.enemyName}${battle.attacked ? ' attacks!' : ''}`,
+    encounter: battle.surprise ? 'grass' : 'woodland', result: battleResult(battle), won: battle.won,
     replay: true, returnLabel: 'Return to map', resultResources: { hp, mp },
   } }));
 }
@@ -487,8 +612,8 @@ async function request(payload = {}) {
     }
   }
 }
-// Monsters move in real time while the map is open and on screen: the page
-// asks for each step, and the server decides where they go and how often.
+// Refresh shared progress while exploring. This legacy action name now reads
+// the saved map only; standing still never rolls an encounter.
 async function patrol() {
   if (!adventure.open || document.hidden || patrolling || pending || !state || state.battle?.pending
     || state.failed || state.abandoned || busyText()) return;
@@ -731,16 +856,19 @@ document.addEventListener('team:updated', async ({ detail: team }) => {
 });
 adventure.querySelector('#adventure-close').addEventListener('click', () => adventure.close());
 adventure.addEventListener('close', () => {
+  stopWalking();
   generation++; pending = false; state = null;
   if (guide.open) guide.close();
 });
 adventure.querySelectorAll('[data-direction]').forEach(button => button.addEventListener('click', () => {
+  stopWalking();
   if (state) request({ direction: button.dataset.direction });
   else request();
 }));
 // Space acts on what the pet stands on: it opens the chest, or takes the
 // stairs. On a focused button or summary, Space presses that instead.
 function interact() {
+  stopWalking();
   const chest = state?.chests.find(at);
   const control = chest && !chest.reward ? '#adventure-open-chest'
     : at(state?.down) ? '#adventure-descend' : at(state?.up) ? '#adventure-ascend' : null;
@@ -759,7 +887,66 @@ adventure.addEventListener('keydown', event => {
   const direction = { arrowup: 'w', arrowleft: 'a', arrowdown: 's', arrowright: 'd' }[key] || key;
   if (!['w', 'a', 's', 'd'].includes(direction)) return;
   event.preventDefault();
-  if (!event.repeat && state && !state.battle?.pending && !state.failed && !state.abandoned && !busyText()) request({ direction });
+  stopWalking();
+  if (state && !state.battle?.pending && !state.failed && !state.abandoned && !busyText() &&
+    (!event.repeat || performance.now() - lastWalkKey > 170)) {
+    lastWalkKey = performance.now();
+    request({ direction });
+  }
+});
+let lastWalkKey = 0;
+const packToggle = adventure.querySelector('#adventure-pack-toggle');
+const packPanel = adventure.querySelector('#adventure-pack-panel');
+packToggle.addEventListener('click', () => {
+  stopWalking();
+  packPanel.hidden = !packPanel.hidden;
+  packToggle.setAttribute('aria-expanded', String(!packPanel.hidden));
+  if (!packPanel.hidden) packPanel.querySelector('details').open = true;
+});
+window.addEventListener('resize', () => drawCamera(true));
+function syncAdventureMotion() {
+  const paused = !adventure.open || document.hidden || [...document.querySelectorAll('dialog[open]')].some(dialog => dialog !== adventure);
+  adventure.classList.toggle('adventure-motion-paused', paused);
+  if (paused) stopWalking();
+}
+new MutationObserver(syncAdventureMotion).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
+document.addEventListener('visibilitychange', syncAdventureMotion);
+window.addEventListener('blur', () => { stopWalking(); adventure.classList.add('adventure-motion-paused'); });
+window.addEventListener('focus', syncAdventureMotion);
+// Tap routing follows only confirmed server positions. A battle, window, wall,
+// failed request, or floor change cancels the remaining route.
+grid.addEventListener('click', event => {
+  const cell = event.target.closest('.adventure-tile');
+  if (!cell || !state || pending || state.battle?.pending || state.failed || state.abandoned || busyText()) return;
+  const goal = { x: Number(cell.dataset.x), y: Number(cell.dataset.y) };
+  stopWalking();
+  if (at(goal)) return interact();
+  if (state.tiles[goal.y]?.[goal.x] !== '.') return;
+  const key = point => `${point.x},${point.y}`, queue = [{ x: state.x, y: state.y, path: [] }], seen = new Set([key(state)]);
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
+    if (current.x === goal.x && current.y === goal.y) { walkingPath = current.path; break; }
+    for (const [direction, dx, dy] of [['w', 0, -1], ['a', -1, 0], ['s', 0, 1], ['d', 1, 0]]) {
+      const next = { x: current.x + dx, y: current.y + dy };
+      if (seen.has(key(next)) || state.tiles[next.y]?.[next.x] !== '.') continue;
+      seen.add(key(next));
+      queue.push({ ...next, path: [...current.path, direction] });
+    }
+  }
+  grid.focus({ preventScroll: true });
+  const routeGeneration = walkingGeneration;
+  async function step() {
+    if (routeGeneration !== walkingGeneration) return;
+    if (!walkingPath.length || !state || pending || state.failed || state.abandoned || busyText() ||
+      !adventure.open || document.hidden || state.battle?.pending ||
+      [...document.querySelectorAll('dialog[open]')].some(dialog => dialog !== adventure)) return stopWalking();
+    const before = `${state.floor}:${state.x},${state.y}`, floor = state.floor;
+    await request({ direction: walkingPath.shift() });
+    if (routeGeneration !== walkingGeneration) return;
+    if (!state || state.floor !== floor || `${state.floor}:${state.x},${state.y}` === before || state.battle?.pending) return stopWalking();
+    walkingTimer = setTimeout(step, 180);
+  }
+  step();
 });
 for (const action of ['ascend', 'descend']) {
   adventure.querySelector(`#adventure-${action}`).addEventListener('click', () => request({ action }));

@@ -577,28 +577,39 @@ and the built-in `node:sqlite` for storage.
 
 ## Adventure exploration
 
-Leave home for the town map and choose **Adventure**. Move one block per press
-with W/A/S/D, arrow keys, or the on-screen direction buttons. The map takes
-the keyboard as soon as it opens. **Space** acts on the tile your pet stands
-on: it opens an unopened chest, or takes the stairs there (Descend or
-Ascend), so the whole adventure plays without a mouse. On a focused button,
-Space presses that button instead.
+Leave home for the town map and choose **Adventure**. Move with W/A/S/D,
+arrow keys, or the on-screen direction buttons; holding a movement key keeps
+walking. You can also click or tap a reachable tile to walk there. Each step
+waits for the server to confirm the position, and a battle, another window,
+or a blocked move stops the route. The map takes the keyboard as soon as it
+opens. **Space** acts on the tile your pet stands on: it opens an unopened
+chest, or takes the stairs there (Descend or Ascend), so the whole adventure
+plays without a mouse. On a focused button, Space presses that button instead.
 
-The Adventure fills the whole screen. A slim top bar shows the floor, with
-**Abandon run**, **Game guide**, and **Leave**. The map takes up the middle.
+The Adventure fills the whole screen with an illustrated woodland in the
+same warm style as home and town. The camera follows your pet through leafy
+trees, tall grass, flower patches, and stone paths. A slim top bar shows the
+floor, with **Backpack & team**, **Game guide**, and **Leave**. **Abandon run**
+lives inside **Backpack & team**.
 At the bottom left, two rings show your pet's **HP (red)** and **MP (blue)**:
 the coloured arc is what's left, and the number inside reads e.g. `12/15`. The
 arrow pad sits at the bottom right. **Open chest**, **Ascend**, and **Descend**
-appear only while your pet stands on a chest or stairs. Your team and
-backpack sit beside the map (under it on a phone).
+appear only while your pet stands on a chest or stairs, and the available
+object is highlighted. **Backpack & team** reveals inventory and teammate
+details when needed, keeping the map clear while exploring. Monsters have
+original woodland artwork, and wooden treasure chests show their open and
+closed states. Gentle grass, creature, and treasure animations pause while
+the map is hidden or another window is open and respect reduced-motion
+preferences.
 
-The map itself carries no instructions. Everything to look up lives in the
-**Game guide** window: how to play, the map key, where the down stairs are,
-each monster's position and attributes, the treasure odds, and what a new run
-costs. It opens on its own the first time a pet reaches the map (after **Go
-solo**, or after setting off with a team), and from **Game guide** any time
-after that. Close or Escape returns the keyboard to the map. A battle that
-starts while it's open closes it.
+A small upper-left tip explains movement, Space, and tall grass. Further
+help lives in the **Game guide** window: how to play, the map key, where the
+down stairs are, the remaining monsters' attributes, the treasure odds, and
+what a new run costs. Ordinary monsters' hiding places aren't revealed; the
+visible Slime King's position is listed. The guide opens on its own the first
+time a pet reaches the map (after **Go solo**, or after setting off with a
+team), and from **Game guide** any time after that. Close or Escape returns
+the keyboard to the map. A battle that starts while it's open closes it.
 
 Each of the five fixed floors starts with a 16 × 16 grid, four regular
 enemies (slimes and goblins), and at least one marked treasure chest. Floor
@@ -620,39 +631,27 @@ window. Your floor, position, HP/MP, and each floor's remaining enemies are
 saved privately to your account, even across server restarts. Older
 clearing saves keep their positions during migration.
 
-**Monsters move in real time.** While the map is open and on screen, every
-monster on your floor takes one cardinal step about once a second, whether
-or not you move. Out of sight, each walks back and forth along its own
-short patrol route. A monster sees your pet anywhere within **3 blocks** in
-every direction, diagonals included (a 7 × 7 square, even through trees).
-It then walks toward the pet by the shortest open path, around trees, until
-it stands right beside it (up, down, left, or right). **On its next step it
-attacks**: it walks into the pet, starting a battle exactly as if your pet
-had walked into it — except your pet stays on its own tile if it wins. So
-you get one step, about a second, to strike first by walking into the
-monster, or to move away. Once the pet is more than 3 blocks away, the
-monster loses it and heads back to its route. Monsters can't cross trees,
-chests, stairs, the pet, or each other, and no patrol route comes within
-sight of the stairs — so arriving on a floor is safe. An exclamation mark
-marks every monster that has spotted your pet, with a message when one is
-on your trail or right beside you. A monster won't attack a pet that's
-studying or working, or one whose last battle is waiting for **Return to
-map**; it waits beside it instead.
+**Monsters hide in tall grass.** Walking through a grass patch can start a
+surprise battle with one of that floor's remaining slimes or goblins.
+Ordinary monsters aren't drawn on the map, and their coordinates aren't
+sent to the browser. Clear paths are safe from random encounters, and
+standing still never starts one. The **Slime King** remains visible in the
+final grove; walk onto its tile to challenge it.
 
-The page asks the server for each step (`{ "action": "patrol" }`). The
-server decides where every monster goes and saves each step, taking at most
-one step a second, however many windows ask. Monsters only move for their
-owner while that owner has the map open. They stay put while the map is
-closed or the tab is hidden, while a battle awaits **Return to map**, after
-the run ends, and while the pet studies or works. A monster step doesn't
-change the map's `revision`, so a move you send at the same moment still
-applies — just to the monsters' new positions. A step that starts a battle
-does change it, as any battle does; the response carries the battle, with
-`battle.attacked: true`, and the battle scene's title says the monster
-attacks. Saves from before patrols existed keep their monster positions and
-gain the routes. Enemy attributes and positions are listed under **Monster
-attributes** in the Game guide, and every stair and chest is reachable
-through the map's paths.
+Only a successful step into tall grass advances the encounter counter.
+There are two quiet grass steps before another encounter can happen, then
+a chance on each grass step, with an encounter guaranteed by the sixth
+while regular monsters remain. The server saves the random seed and step
+counter with the floor, so closing, refreshing, or reopening the map
+doesn't reroll them. Defeated monsters stay defeated; after clearing a
+floor's four regular enemies, its grass no longer starts battles. A
+surprise battle leaves the pet on the grass tile it entered.
+
+Trees still block movement, and every stair and chest is reachable.
+Existing runs gain grass without resetting positions, defeated enemies,
+opened chests, HP/MP, or pending battles. Map refreshes use the existing
+`{ "action": "patrol" }` request to read saved progress, including teammates'
+positions. Refreshing never moves monsters or starts a battle.
 
 For initial balancing, floor-one slimes have STR/INT/CHA **3/1/2**, and
 goblins have **5/3/2**. Each deeper floor adds **2/1/1**. The floor-five
@@ -693,31 +692,31 @@ Every teammate then explores **one shared map**: one set of floors,
 monsters, and chests, starting together at floor one. Each pet keeps its
 own position, floor, HP, and MP, and the map shows teammates on the same
 floor (with their positions and HP under **Your team**). Every window
-refreshes about once a second through its monster steps, so each player
-sees the others move. A monster sees and chases whichever teammate it can
-see that is nearest, and each floor's monsters take at most one step a
-second, whichever teammate's window asks.
+refreshes the shared state about once a second, so each player sees the
+others move. Grass encounter progress and remaining monsters belong to the
+shared floor; only a teammate walking through grass advances that progress.
 
-**Teammates beside your pet join its battles.** When a pet walks into a
-monster, or a monster attacks a pet, every teammate exploring within 1
-block of that pet (diagonals included) fights alongside it — unless that
-teammate is busy, already has a battle waiting, or is out of the run. A
-team battle is one automatic battle scene: each standing pet strikes the
-monster in turn (the pet that walked in, or was attacked, goes first), then
+**Teammates beside your pet join its battles.** When a pet encounters a
+monster in grass or walks into the Slime King, every teammate exploring
+within 1 block of that pet (diagonals included) fights alongside it — unless
+that teammate is busy, already has a battle waiting, or is out of the run.
+A team battle is one automatic battle scene: each standing pet strikes the
+monster in turn (the pet that triggered the encounter goes first), then
 the monster strikes whichever pet has the most HP left. The coin toss (and
 only that first pet's equipped coin) decides whether the pets or the
 monster go first. Each pet uses its own learned abilities, carried HP/MP,
-and a Copper shield only if it's the first pet's. A monster attacks the
-teammate it's chasing, whichever teammate's window asked for the step.
-Every pet in the battle sees the same saved battle from its own side and
-returns to the map separately.
+and a Copper shield only if it's the first pet's. Every pet in the battle
+sees the same saved battle from its own side and returns to the map
+separately.
 
 **A knocked-out pet is out; the team plays on.** A pet at 0 HP after a
 battle (won or lost) has failed its run, exactly like a solo defeat, while
 its teammates keep exploring. After a victory, every pet still standing
-recovers 20% of its maximum HP and MP; the monster is removed for everyone;
-a pet that walked in takes its tile. A team's run ends for each pet when
-it's defeated or abandons the run — abandoning leaves the rest exploring.
+recovers 20% of its maximum HP and MP, and the monster is removed for
+everyone. Grass encounters keep the pet on its grass tile; a surviving pet
+that challenged the Slime King takes the king's tile after winning. A team's
+run ends for each pet when it's defeated or abandons the run — abandoning
+leaves the rest exploring.
 **Start new adventure** after that is always solo; to team up again, use
 **Team up**.
 
@@ -741,8 +740,10 @@ the pet's own equipped Unfair Coin overrides it — monsters never carry
 coins. The scene starts at the pet's saved HP/MP (plus any Copper shield),
 and each monster starts at full HP/MP.
 
-On victory, the monster stays defeated and the pet takes its tile. Recover
-**20% of maximum HP and MP, rounded up separately**, capped at their
+On victory, the monster stays defeated. A grass encounter keeps the pet on
+the grass tile it entered; beating the Slime King moves it onto the king's
+tile. Victory restores **20% of maximum HP and MP, rounded up separately**,
+capped at their
 maximums. For example, maximums of 31 HP and 7 MP restore up to 7 HP and 2
 MP after a win. The server applies this recovery once, alongside the
 outcome. Defeating the Slime King marks the woodland complete; you can
@@ -770,8 +771,8 @@ a new adventure (409) while a run is still in progress.
 confirm something, it opens a small window with the question and **Yes**
 and **No** — never the browser's own prompt. Focus starts on **No**, so a
 stray key never confirms; Escape or a click outside the window also
-answers No. A battle that starts while the window is open (a monster
-attacking, or an Arena fight) answers it No too, since the question no
+answers No. A battle that starts while the window is open (a teammate's
+encounter, or an Arena fight) answers it No too, since the question no
 longer fits the moment.
 
 **Skip to result**, **Replay battle**, and **Watch last battle** only play
@@ -879,10 +880,9 @@ action:
   completion, or abandoning. Refused with 409 while a run is still in
   progress or if stamina/hygiene are too low, or 429 while the 4-hour
   cooldown is active.
-- `{ "action": "patrol" }` moves the monsters on the pet's floor one step,
-  at most once a second (see above). Otherwise, and whenever the run is
-  paused, it returns the current state unchanged. It needs no revision,
-  and keeps the current one unless a monster attacks and starts a battle.
+- `{ "action": "patrol" }` is a read-only refresh of the saved state,
+  including shared team progress. It needs no revision and never moves
+  monsters, advances grass encounters, or starts a battle.
 - `{ "action": "skip-cooldown", "revision": "…" }` spends one Hourglass to
   clear an active cooldown early; refused with 409 if there's no Hourglass
   to spend. A no-op, returning the current state, if no cooldown is
@@ -898,6 +898,13 @@ team's `id` and every other teammate's `id`, `color`, `appearance`,
 `floor`, `x`, `y`, `hp`, `maxHp`, and `status` (`exploring`, `defeated`, or
 `abandoned`). In a team battle, `battle.fighter` gives the pet's place in
 `battle.playback.fighters` (the pets in order, then the monster last).
+
+The `grass` array matches the 16 × 16 terrain grid: `g` marks tall grass
+and `.` marks other tiles. Ordinary entries in `enemies` have
+`hidden: true` and omit coordinates and patrol routes; the Slime King has
+`hidden: false` with its visible `x` and `y`. A battle triggered by grass
+includes `battle.surprise: true`. Encounter seeds and counters stay on the
+server.
 
 The **Team up** window uses `GET /api/team` (signed in), which returns the
 forming `team` the pet has joined (or `null`), its pending `invitations`,

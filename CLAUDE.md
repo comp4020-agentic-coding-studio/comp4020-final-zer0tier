@@ -62,6 +62,18 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   indicator tied to the current interaction range and clear it while a
   dialog is open, without adding persistent scene panels or animated effects.
 
+## Adventure interface
+
+- Match home's and town's warm illustrated style with a full-screen woodland
+  and following camera. Keep movement tips small and reveal backpack and team
+  details only when requested. Support keyboard movement and touch routes.
+- Ordinary monsters hide in tall grass and trigger surprise battles while
+  walking. Clear paths and standing still are safe; the final boss remains
+  visible. Preserve saved exploration, battle, treasure, and team progress.
+- Use cute original monster artwork, detailed treasure chests, and subtle
+  environmental animation. Respect reduced-motion preferences and pause scene
+  animation when hidden or covered by another window.
+
 ## Rules
 
 1. **Every database query is parameterised.** Use `db.prepare(...)` with `?`

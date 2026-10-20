@@ -53,3 +53,24 @@
   .battle-avatar { width: 90px; }
 }
 @media (prefers-reduced-motion: reduce) { #battle-dialog *, #battle-dialog *::after { animation: none !important; transition: none !important; } }
+.battle-woodland-art { display: none; }
+#battle-dialog[data-encounter="grass"] .battle-stage,
+#battle-dialog[data-encounter="woodland"] .battle-stage {
+  position: relative; isolation: isolate; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 0, #e0dfae, #acbf86 65%, #91a972);
+  border: 1px solid #889a69;
+}
+#battle-dialog[data-encounter="grass"] .battle-woodland-art,
+#battle-dialog[data-encounter="woodland"] .battle-woodland-art { display: block; position: absolute; inset: 0; z-index: -1; opacity: .55; pointer-events: none; }
+.battle-woodland-art svg { width: 100%; height: 100%; }
+#battle-dialog[data-encounter="grass"] .battle-stage h3,
+#battle-dialog[data-encounter="woodland"] .battle-stage h3 { color: #2e432a; }
+#battle-dialog[data-encounter="grass"] .battle-stage label,
+#battle-dialog[data-encounter="woodland"] .battle-stage label,
+#battle-dialog[data-encounter="grass"] .battle-versus,
+#battle-dialog[data-encounter="woodland"] .battle-versus { color: #34482e; }
+.battle-monster .monster-body { transform-origin: 12px 21px; animation: battle-monster-breathe 2.8s ease-in-out infinite; }
+#battle-dialog[data-encounter="grass"] .battle-monster { animation: battle-wild-arrival 550ms var(--ease); }
+@keyframes battle-monster-breathe { 50% { transform: translateY(.3px) scale(1.025, .98); } }
+@keyframes battle-wild-arrival { from { opacity: 0; transform: translateY(18px) scale(.85); } 70% { transform: translateY(-4px) scale(1.03); } }
+@media (prefers-reduced-motion: reduce) { .battle-monster, .battle-monster .monster-body { animation: none !important; } }

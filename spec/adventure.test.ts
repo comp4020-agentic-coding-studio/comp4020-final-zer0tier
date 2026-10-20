@@ -6,19 +6,6 @@ async function sendAction(id: string, body = {}) {
   return post('/api/adventure', { revision: state.revision, ...body }, id);
 }
 
-// The monsters' next step after `from`, about a second on. The server skips a
-// request that comes too soon by its clock, so ask again until the map
-// changes. A wall clock that jumps (seen on WSL, by up to ~8 s) holds steps
-// back until it has caught up.
-async function nextStep(id: string, from: unknown): Promise<any> {
-  for (let i = 0; i < 15; i++) {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const state = await (await post('/api/adventure', { action: 'patrol' }, id)).json();
-    if (JSON.stringify(state) !== JSON.stringify(from)) return state;
-  }
-  return from;
-}
-
 it('saves one-block adventure movement, blocks trees, and isolates player positions', async () => {
   const id = freshId(); await signUp(id);
   const read = async () => (await post('/api/adventure', {}, id)).json();
@@ -50,7 +37,7 @@ it('lets the owner descend all five floors only at stairs, ascend, and resume th
   expect((await post('/api/adventure', { action: 'descend', direction: 's' }, id)).status).toBe(400);
   let state = await act();
   for (let floor = 1; floor < 5; floor++) {
-    // The outer path crosses no monster, and nothing patrols while the test walks it.
+    // The outer path avoids tall grass and remains safe on every floor.
     for (const direction of ['w', ...Array(12).fill('d'), ...Array(12).fill('s'), 'a']) state = await act({ direction });
     expect(state).toMatchObject({ x: 13, y: 13, floor });
     state = await act({ action: 'descend' });
@@ -64,82 +51,63 @@ it('lets the owner descend all five floors only at stairs, ascend, and resume th
   expect(await act({ action: 'ascend' })).toMatchObject({ floor: 4, x: 13, y: 13 });
 });
 
-it('monsters patrol in real time, chase a pet within 3 blocks, and lose it once it gets away', async () => {
+it('keeps hidden monsters and grass encounters unchanged while the map is read or refreshed', async () => {
   const id = freshId(); await signUp(id);
-  const act = async (body = {}) => (await sendAction(id, body)).json();
-  const start = await act();
-  expect(start.patrolMs).toBe(1000);
-  expect(start.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: false, route: [{ x: 6, y: 2 }, { x: 9, y: 2 }] });
-  // Patrolling, out of sight: one block per step along its route, and the
-  // revision stays, so a move sent alongside still applies.
-  const walked = await nextStep(id, start);
-  expect(walked.enemies[0]).toMatchObject({ x: 7, y: 2, alerted: false });
-  expect(walked.revision).toBe(start.revision);
-  // Asking again straight away (another window, or a quick retry) moves nothing.
-  expect(await (await post('/api/adventure', { action: 'patrol' }, id)).json()).toEqual(walked);
-  expect(await act()).toEqual(walked);
+  const start = await (await post('/api/adventure', {}, id)).json();
+  expect(start.grass).toHaveLength(16);
+  expect(start.grass.some((row: string) => row.includes('g'))).toBe(true);
+  expect(start.encounters).toEqual([]);
+  for (const enemy of start.enemies) {
+    expect(enemy.hidden).toBe(true);
+    for (const key of ['x', 'y', 'route', 'leg']) expect(enemy).not.toHaveProperty(key);
+  }
+  for (let i = 0; i < 6; i++) expect(await (await post('/api/adventure', { action: 'patrol' }, id)).json()).toEqual(start);
   await post('/api/signout', {}, id); await signIn(id);
-  expect(await act()).toEqual(walked);
-  // Four blocks off, it keeps patrolling; within three it sees the pet and comes.
-  const spotted = await act({ direction: 'd' });
-  expect(spotted).toMatchObject({ x: 3, y: 2, encounters: [] });
-  expect(spotted.enemies[0]).toMatchObject({ x: 7, y: 2, alerted: false });
-  const seen = await act({ direction: 'd' });
-  expect(seen.enemies[0]).toMatchObject({ x: 7, y: 2, alerted: true });
-  const chased = await nextStep(id, seen);
-  expect(chased.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: true });
-  // A step short of the pet, the pet slips away before the monster reaches it.
-  // More than 3 blocks away, it loses the pet and heads back along its route.
-  expect((await sendAction(id, { direction: 'x' })).status).toBe(400);
-  for (const direction of ['w', 'a', 'a', 'a']) await act({ direction });
-  const away = await act();
-  expect(away).toMatchObject({ x: 1, y: 1, encounters: [], battle: null });
-  expect(away.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: false });
-  expect((await nextStep(id, away)).enemies[0]).toMatchObject({ x: 7, y: 2, alerted: false });
+  expect(await (await post('/api/adventure', {}, id)).json()).toEqual(start);
 });
 
-it('a monster that catches the pet attacks it on its next step, and the battle is saved like any other', async () => {
+it('walking in tall grass reveals a saved surprise battle within six grass steps, never on safe paths', async () => {
   const id = freshId(); await signUp(id);
-  const act = async (body = {}) => (await sendAction(id, body)).json();
-  // Two blocks from the floor-one slime at its spawn (column 7, row 3).
-  await act({ direction: 'd' });
-  const before = await act({ direction: 'd' });
-  expect(before.enemies[0]).toMatchObject({ x: 6, y: 2, alerted: true });
-  // It steps up beside the pet, which is warned, and then walks into it.
-  const beside = await nextStep(id, before);
-  expect(beside).toMatchObject({ x: 4, y: 2, battle: null, revision: before.revision });
-  expect(beside.enemies[0]).toMatchObject({ x: 5, y: 2 });
-  expect(beside.encounters).toEqual(['f1-enemy-0']);
-  const attacked = await nextStep(id, beside);
-  expect(attacked).toMatchObject({ x: 4, y: 2, battle: { pending: true, attacked: true, enemyId: 'f1-enemy-0', enemyName: 'Slime' } });
-  expect(attacked.revision).not.toBe(before.revision);
-  expect(attacked.battle.playback.fighters.map((f: { id: string }) => f.id)).toEqual([id, 'monster:f1-enemy-0']);
-  // Nothing moves, and the pet can't, until the player returns to the map.
-  expect(await (await post('/api/adventure', { action: 'patrol' }, id)).json()).toEqual(attacked);
-  expect(await act({ direction: 'a' })).toEqual(attacked);
-  const continued = await act({ action: 'continue', battleId: attacked.battle.id });
-  expect(continued).toMatchObject({ x: 4, y: 2, battle: { pending: false } });
-  expect(continued.enemies.some((e: { id: string }) => e.id === 'f1-enemy-0')).toBe(!attacked.battle.won);
+  for (const direction of ['d', 'd']) {
+    expect(await (await sendAction(id, { direction })).json()).toMatchObject({ battle: null });
+  }
+  let state: any;
+  for (let i = 0; i < 6; i++) {
+    state = await (await sendAction(id, { direction: i % 2 ? 'd' : i ? 'a' : 'd' })).json();
+    expect(state.grass[state.y][state.x]).toBe('g');
+    if (i < 2) expect(state.battle).toBeNull();
+    if (state.battle) break;
+    expect(await (await post('/api/adventure', { action: 'patrol' }, id)).json()).toEqual(state);
+  }
+  expect(state.battle).toMatchObject({ surprise: true, pending: true });
+  expect(state.battle.enemyId).toMatch(/^f1-enemy-/);
+  expect(await (await sendAction(id, { direction: 'a' })).json()).toEqual(state);
+  const continued = await (await sendAction(id, { action: 'continue', battleId: state.battle.id })).json();
+  expect(continued).toMatchObject({ x: state.x, y: state.y, battle: { pending: false } });
+  expect(continued.enemies.some((e: { id: string }) => e.id === state.battle.enemyId)).toBe(!state.battle.won);
 });
 
-it('saves exactly one monster battle for concurrent moves and retries, including after returning to exploration', async () => {
+it('saves exactly one seeded grass encounter for concurrent moves and retries, including after returning to exploration', async () => {
   const id = freshId(); await signUp(id);
   const pet = await getPet(id);
-  // Reach the slime beside its spawn, at column 7, before it walks away.
-  for (const direction of ['d', 'd', 'd']) await sendAction(id, { direction });
-  const before = await (await post('/api/adventure', {}, id)).json();
-  const request = { direction: 'd', revision: before.revision, winner: id, strength: 9999, reward: 9999 };
-  const results = await Promise.all(Array.from({ length: 6 }, async () => {
-    const res = await post('/api/adventure', request, id);
-    expect(res.status).toBe(200);
-    return res.json();
-  }));
-  const result = results[0];
-  for (const duplicate of results) expect(duplicate).toEqual(result);
-  expect(result).toMatchObject({ x: 6, y: 2, battle: { pending: true, enemyName: 'Slime', won: true } });
-  expect(result.enemies).toHaveLength(3);
+  for (const direction of ['d', 'd']) await sendAction(id, { direction });
+  let before: any, result: any;
+  let request: Record<string, unknown> = {};
+  for (let i = 0; i < 6; i++) {
+    before = await (await post('/api/adventure', {}, id)).json();
+    request = { direction: i % 2 ? 'd' : i ? 'a' : 'd', revision: before.revision, winner: id, strength: 9999, reward: 9999 };
+    const results = await Promise.all(Array.from({ length: 6 }, async () => {
+      const res = await post('/api/adventure', request, id);
+      expect(res.status).toBe(200); return res.json();
+    }));
+    result = results[0];
+    for (const duplicate of results) expect(duplicate).toEqual(result);
+    if (result.battle) break;
+  }
+  expect(result.battle).toMatchObject({ pending: true, surprise: true });
+  expect(result.enemies).toHaveLength(result.battle.won ? 3 : 4);
   expect(result.battle.playback.fighters[0]).toMatchObject({ id, maxHp: 15, maxMp: 5 });
-  expect(result.battle.playback.fighters[1]).toMatchObject({ id: 'monster:f1-enemy-0', name: 'Slime', monster: 'slime', maxHp: 6, maxMp: 1 });
+  expect(result.battle.playback.fighters[1].id).toBe(`monster:${result.battle.enemyId}`);
   expect(await (await sendAction(id, { direction: 's' })).json()).toEqual(result);
   expect(await (await sendAction(id, { action: 'descend' })).json()).toEqual(result);
   await post('/api/signout', {}, id); await signIn(id);
@@ -151,7 +119,6 @@ it('saves exactly one monster battle for concurrent moves and retries, including
   expect(continued.battle.playback).toEqual(result.battle.playback);
   expect(await (await post('/api/adventure', continuation, id)).json()).toEqual(continued);
   expect(await (await post('/api/adventure', request, id)).json()).toEqual(continued);
-  expect(await (await sendAction(id, { direction: 's' })).json()).toMatchObject({ x: 6, y: 3 });
   expect(await getPet(id)).toEqual(pet);
 });
 

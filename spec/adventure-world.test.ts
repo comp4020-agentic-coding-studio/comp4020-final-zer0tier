@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { createWorld, directions, patrol, samePoint, sees, SIGHT, walkable, type Floor } from '../src/adventure-world.ts';
+import { createWorld, directions, grassEncounter, grassFor, inGrass, nearby, prepareGrass, walkable } from '../src/adventure-world.ts';
 
 it('builds five connected 16 × 16 floors with reachable chests, stairs, stronger enemies, and a final boss', () => {
   const world = createWorld();
@@ -27,100 +27,64 @@ it('builds five connected 16 × 16 floors with reachable chests, stairs, stronge
       }
     }
     expect(floor.enemies.some(e => e.kind === 'slime-king')).toBe(index === 4);
-    // Patrols are straight open lines, and none comes within sight of the stairs.
-    for (const enemy of floor.enemies) {
-      const [from, to] = enemy.route;
-      expect(from.x === to.x || from.y === to.y).toBe(true);
-      expect(samePoint(enemy, from)).toBe(true);
-      for (let i = 0; i <= Math.abs(to.x - from.x) + Math.abs(to.y - from.y); i++) {
-        const p = { x: from.x + Math.sign(to.x - from.x) * i, y: from.y + Math.sign(to.y - from.y) * i };
-        expect(walkable(floor, p)).toBe(true);
-        for (const stair of [floor.up, floor.down, { x: 2, y: 2 }]) if (stair) expect(sees(p, stair)).toBe(false);
+    expect(floor.grass).toHaveLength(16);
+    expect(floor.grass!.some(row => row.includes('g'))).toBe(true);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      if (!inGrass(floor, { x, y })) continue;
+      expect(seen.has(`${x},${y}`)).toBe(true);
+      expect(x > 1 && x < 14 && y > 1 && y < 14).toBe(true);
+      for (const safe of [...floor.chests, { x: 2, y: 2 }, floor.up, floor.down]) {
+        if (safe) expect(nearby(safe, { x, y })).toBe(false);
       }
     }
   }
   expect(world[0].up).toBeNull(); expect(world[4].down).toBeNull();
 });
 
-// One monster alone on floor one, so other monsters don't get in the way.
-function alone(at: { x: number; y: number }): Floor {
+it('derives grass for legacy maps without changing paths, rewards, or the surviving roster', () => {
   const floor = createWorld()[0];
-  floor.enemies = [{ ...floor.enemies[0], ...at }];
-  return floor;
-}
-
-it('a monster sees the pet anywhere within 3 blocks, diagonals included, and walks toward it one block at a time', () => {
-  expect(SIGHT).toBe(3);
-  for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) {
-    const floor = alone({ x: 10, y: 8 }), enemy = floor.enemies[0];
-    const player = { x: 10 + dx, y: 8 + dy };
-    if (samePoint(player, enemy)) continue;
-    expect(sees(enemy, player)).toBe(true);
-    const gap = Math.abs(dx) + Math.abs(dy);
-    patrol(floor, player);
-    expect(Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y)).toBe(Math.max(1, gap - 1));
-  }
+  floor.enemies.shift();
+  const before = structuredClone(floor);
+  delete floor.grass; delete floor.encounter;
+  expect(prepareGrass(floor)).toBe(true);
+  expect(floor.grass).toEqual(grassFor(before));
+  expect(floor.tiles).toEqual(before.tiles);
+  expect(floor.enemies).toEqual(before.enemies);
+  expect(floor.chests).toEqual(before.chests);
+  expect(prepareGrass(floor)).toBe(false);
 });
 
-it('walks up beside the pet, never onto it, and on its next step attacks it', () => {
-  for (const player of [{ x: 7, y: 2 }, { x: 7, y: 3 }, { x: 8, y: 4 }]) {
-    const floor = alone({ x: 6, y: 2 }), enemy = floor.enemies[0];
-    const gap = () => Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y);
-    while (gap() > 1) expect(patrol(floor, player)).toEqual([]);
-    const at = { x: enemy.x, y: enemy.y };
-    // Beside it, the monster attacks the pet it caught, and stays where it is.
-    expect(patrol(floor, player)).toEqual([{ enemy, pet: player }]);
-    expect(enemy).toMatchObject(at);
-  }
-  // A diagonal neighbour isn't beside it yet: the monster steps in first.
-  const floor = alone({ x: 6, y: 2 });
-  expect(patrol(floor, { x: 7, y: 3 })).toEqual([]);
-  expect(patrol(floor, { x: 7, y: 3 })).toHaveLength(1);
-});
-
-it('attacks whichever pet it chases, the nearest it sees, and only that one', () => {
-  const floor = alone({ x: 6, y: 2 }), near = { x: 7, y: 2 }, far = { x: 6, y: 4 };
-  expect(patrol(floor, [far, near])).toEqual([{ enemy: floor.enemies[0], pet: near }]);
-});
-
-it('patrols back and forth along its route while the pet is more than 3 blocks away', () => {
-  const floor = createWorld()[0], player = { x: 14, y: 1 };
-  const slime = floor.enemies[0];
-  expect(slime.route).toEqual([{ x: 6, y: 2 }, { x: 9, y: 2 }]);
-  const path = [];
-  for (let i = 0; i < 7; i++) { patrol(floor, player); path.push(slime.x); }
-  expect(path).toEqual([7, 8, 9, 8, 7, 6, 7]);
-  expect(slime.y).toBe(2);
-});
-
-it('chases around trees by the shortest open path, then returns to its route once it loses the pet', () => {
-  // A tree stands between them: floor one's wall runs down column 7 (index 6).
-  const floor = alone({ x: 5, y: 5 }), enemy = floor.enemies[0];
-  patrol(floor, { x: 7, y: 5 });
-  expect([{ x: 5, y: 4 }, { x: 5, y: 6 }]).toContainEqual({ x: enemy.x, y: enemy.y });
-  // Out of sight: it heads back toward the end of its route it was walking to.
-  const before = Math.abs(enemy.x - 9) + Math.abs(enemy.y - 2);
-  patrol(floor, { x: 13, y: 13 });
-  expect(Math.abs(enemy.x - 9) + Math.abs(enemy.y - 2)).toBe(before - 1);
-});
-
-it('cannot walk through trees, chests, stairs, or other monsters, and waits when every way is blocked', () => {
-  // A tree, a chest, the stairs, and another monster fill every way out.
-  const floor = alone({ x: 2, y: 3 });
-  floor.up = { x: 2, y: 4 };
-  floor.chests = [{ id: 'blocker', x: 3, y: 3 }];
-  floor.enemies.push({ ...floor.enemies[0], id: 'other', x: 2, y: 2 });
-  floor.tiles = floor.tiles.map((row, y) => y === 3 ? '##' + row.slice(2) : row);
-  patrol(floor, { x: 4, y: 4 });
-  expect(floor.enemies[0]).toMatchObject({ x: 2, y: 3 });
-  // Every monster still stands on an open tile of its own.
-  const world = createWorld();
-  for (const level of world) {
-    for (let i = 0; i < 40; i++) patrol(level, { x: 2, y: 2 });
-    expect(new Set(level.enemies.map(e => `${e.x},${e.y}`)).size).toBe(level.enemies.length);
-    for (const e of level.enemies) {
-      expect(walkable(level, e)).toBe(true);
-      expect([...level.chests, level.up, level.down].some(p => p && samePoint(p, e))).toBe(false);
+it('only accepted grass steps advance seeded encounters, with two quiet steps and a maximum of six', () => {
+  const floor = createWorld()[0], grass = { x: 6, y: 2 };
+  expect(inGrass(floor, grass)).toBe(true);
+  for (const seed of [1, 12345, 987654321, 0xffffffff]) {
+    floor.encounter = { seed, steps: 0 };
+    for (const point of [{ x: 1, y: 1 }, { x: 11, y: 3 }, { x: 6, y: 4 }]) {
+      expect(grassEncounter(floor, point)).toBeUndefined();
+      expect(floor.encounter).toEqual({ seed, steps: 0 });
     }
+    expect(grassEncounter(floor, grass)).toBeUndefined();
+    expect(grassEncounter(floor, grass)).toBeUndefined();
+    let found;
+    for (let steps = 3; steps <= 6 && !found; steps++) found = grassEncounter(floor, grass);
+    expect(found?.kind).not.toBe('slime-king');
+    expect(found).toBeDefined();
+    expect(floor.encounter.steps).toBe(0);
   }
+});
+
+it('replays the same saved seed, selects varied hidden monsters, and never restores a defeated monster', () => {
+  const floor = createWorld()[4], original = structuredClone(floor), found = new Set();
+  for (let i = 0; i < 80; i++) {
+    const first = grassEncounter(floor, { x: 6, y: 2 });
+    const replayed = grassEncounter(original, { x: 6, y: 2 });
+    expect(replayed?.id).toBe(first?.id);
+    expect(original.encounter).toEqual(floor.encounter);
+    if (first) found.add(first.id);
+  }
+  expect(found.size).toBeGreaterThan(1);
+  floor.enemies = floor.enemies.filter(enemy => enemy.kind === 'slime-king');
+  const cleared = structuredClone(floor);
+  for (let i = 0; i < 20; i++) expect(grassEncounter(floor, { x: 6, y: 2 })).toBeUndefined();
+  expect(floor).toEqual(cleared);
 });
