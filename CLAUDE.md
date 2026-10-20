@@ -53,6 +53,9 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   keyboard and touch. World movement must pause while a dialog is open or
   the player is typing. Home movement and floor-click routes must respect
   the pet's space while keeping nearby pet interaction reachable.
+- Highlight the available object that Space will interact with. Keep the
+  indicator tied to the current interaction range and clear it while a
+  dialog is open, without adding persistent home panels or animated effects.
 
 ## Rules
 

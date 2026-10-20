@@ -327,6 +327,93 @@ it('uses Space to interact at home and walks with the town direction pad', () =>
   } finally { p.dom.window.close(); }
 });
 
+it('highlights the reachable home object that Space will open and clears it outside interaction range', async () => {
+  const p = page();
+  try {
+    const highlighted = () => [...p.window.document.querySelectorAll('.is-interactable')];
+    const pet = p.window.document.querySelector('[data-home-action="pet"]')!;
+    const chest = p.window.document.querySelector('[data-home-action="chest"]')!;
+    const stage = p.$('world-stage');
+    expect(highlighted()).toEqual([]);
+    stage.focus();
+    p.walk('w');
+    expect(highlighted()).toEqual([pet]);
+    expect(p.$('world-interact').textContent).toContain('Spend time with your pet');
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+    expect(p.$('world-dialog').dataset.place).toBe('pet');
+    await vi.waitFor(() => expect(highlighted()).toEqual([]));
+    p.$('world-dialog-close').click();
+    await vi.waitFor(() => expect(highlighted()).toEqual([pet]));
+    p.walk('s');
+    expect(highlighted()).toEqual([]);
+    expect((p.$('world-interact') as HTMLButtonElement).disabled).toBe(true);
+
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
+    stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: 400, clientY: 540, bubbles: true }));
+    p.advance(100);
+    expect(highlighted()).toEqual([chest]);
+    expect(p.$('world-interact').textContent).toContain('Open your backpack');
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+    expect(p.$('world-dialog').dataset.place).toBe('backpack');
+    await vi.waitFor(() => expect(highlighted()).toEqual([]));
+  } finally { p.dom.window.close(); }
+});
+
+it('highlights only the active scene and follows a nearby Adventure entrance being enabled or disabled', async () => {
+  const p = page();
+  try {
+    const highlighted = () => [...p.window.document.querySelectorAll('.is-interactable')];
+    p.walk('w');
+    expect(highlighted()).toEqual([p.window.document.querySelector('[data-home-action="pet"]')]);
+    p.$('home-door').click();
+    expect(highlighted()).toEqual([p.$('town-home')]);
+    expect(highlighted()[0].closest('[hidden]')).toBeNull();
+    p.$('town-home').click();
+    expect(highlighted()).toEqual([]);
+    p.$('home-door').click();
+    const stage = p.$('world-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
+    stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: 760, clientY: 200, bubbles: true }));
+    p.advance(500);
+    const entrance = p.$('adventure-open') as HTMLButtonElement;
+    expect(highlighted()).toEqual([entrance]);
+    const enter = vi.fn();
+    entrance.addEventListener('click', enter);
+    entrance.disabled = true;
+    await vi.waitFor(() => expect(highlighted()).toEqual([]));
+    expect((p.$('world-interact') as HTMLButtonElement).disabled).toBe(true);
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+    expect(enter).not.toHaveBeenCalled();
+    entrance.disabled = false;
+    await vi.waitFor(() => expect(highlighted()).toEqual([entrance]));
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+    expect(enter).toHaveBeenCalledOnce();
+  } finally { p.dom.window.close(); }
+});
+
+it('suspends the nearby highlight for other dialogs and resets it when the player signs out', async () => {
+  const p = page();
+  try {
+    const highlighted = () => [...p.window.document.querySelectorAll('.is-interactable')];
+    const pet = p.window.document.querySelector('[data-home-action="pet"]')!;
+    p.walk('w');
+    expect(highlighted()).toEqual([pet]);
+    const confirmation = p.window.document.createElement('dialog');
+    p.window.document.body.append(confirmation);
+    confirmation.showModal();
+    await vi.waitFor(() => expect(highlighted()).toEqual([]));
+    confirmation.close();
+    await vi.waitFor(() => expect(highlighted()).toEqual([pet]));
+    p.$('dashboard').hidden = true;
+    await vi.waitFor(() => expect(highlighted()).toEqual([]));
+    p.$('dashboard').hidden = false;
+    await vi.waitFor(() => expect(p.window.document.body.classList.contains('world-playing')).toBe(true));
+    expect(highlighted()).toEqual([]);
+    p.walk('w');
+    expect(highlighted()).toEqual([pet]);
+  } finally { p.dom.window.close(); }
+});
+
 it.each([30, 60, 120])('walks at a consistent speed from the first frame at %i Hz', (refreshRate) => {
   const p = page();
   try {

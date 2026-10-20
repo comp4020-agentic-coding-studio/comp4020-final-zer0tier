@@ -162,6 +162,7 @@ let worldView = { width: 960, height: 640, viewportWidth: 960, viewportHeight: 6
 let worldCameraTransform = '';
 let worldAvatarTransform = '';
 let worldNearest = null;
+let worldHighlighted = null;
 let worldFeedbackTimer = 0;
 let worldCarePending = null;
 let worldWasVisible = false;
@@ -433,6 +434,15 @@ function worldTargets() {
   ];
   return [[250, 194, 'Browse part-time jobs', '[data-place="work"]'], [482, 233, 'Visit school', '[data-place="school"]'], [751, 189, 'Enter the woodland', '#adventure-open'], [204, 379, 'Visit the shops', '[data-place="shop"]'], [752, 440, 'Enter the arena', '[data-place="arena"]'], [482, 571, 'Go home', '#town-home']];
 }
+function worldHighlight(destination) {
+  const target = !worldDashboard.hidden && !worldModalOpen() && destination && !destination.disabled ? destination : null;
+  // Only touch the highlight when the interaction target changes. Walking
+  // within one object's range must not repaint its indicator every frame.
+  if (target === worldHighlighted) return;
+  worldHighlighted?.classList.remove('is-interactable');
+  worldHighlighted = target;
+  worldHighlighted?.classList.add('is-interactable');
+}
 function worldDraw() {
   const transform = `translate3d(${worldPosition.x * worldView.width / 960}px, ${worldPosition.y * worldView.height / 640}px, 0) translate(-50%, -100%)`;
   if (worldAvatarTransform !== transform) {
@@ -450,8 +460,19 @@ function worldDraw() {
   const label = worldNearest ? `${worldNearest[2]} · Space` : 'Move closer to interact';
   if (control.disabled !== disabled) control.disabled = disabled;
   if (control.textContent !== label) control.textContent = label;
+  worldHighlight(destination);
   worldCamera();
 }
+// Dialogs and destination availability can change while the player stands
+// still, so keep their highlight in sync without a polling animation loop.
+const worldAvailabilityObserver = new MutationObserver(records => {
+  if (records.some(record => record.attributeName === 'disabled')) worldDraw();
+  else if (records.some(record => record.target.tagName === 'DIALOG')) {
+    worldHighlight(worldNearest && worldShell.querySelector(worldNearest[3]));
+  }
+});
+worldAvailabilityObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
+worldAvailabilityObserver.observe(worldStage, { subtree: true, attributes: true, attributeFilter: ['disabled'] });
 worldById('world-interact').addEventListener('click', () => {
   if (worldNearest && !worldModalOpen()) worldShell.querySelector(worldNearest[3])?.click();
 });

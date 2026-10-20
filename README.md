@@ -96,8 +96,10 @@ Your pet lives in **Sweet Home**, a furnished room with a television,
 couch, pet house, fireplace, food bowl, bath, and storage chest. Home fills
 the screen, with just a small movement and interaction tip in the upper-left
 corner. Walk with **W/A/S/D** or the **arrow keys**, then press **Space**
-near your pet or a piece of furniture to interact. You can also click or tap
-an empty spot to walk there, or select an object directly. Clicked routes
+near your pet or a piece of furniture to interact. The nearby object that
+Space will interact with is highlighted; the highlight follows your position
+and disappears when you move out of range or open a window. You can also
+click or tap an empty spot to walk there, or select an object directly. Clicked routes
 continue smoothly around furniture and your pet, and walking keeps the same
 speed across display refresh rates. Movement pauses while a window is open
 or you are typing. Home and town work on desktop and phones.
