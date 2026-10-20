@@ -29,6 +29,7 @@ it('migrates a legacy clearing without moving its pet or overlapping a new enemy
   expect(pets.getPet('legacy')).toMatchObject({ abilities: ['claw-strike'], coins: { 'copper-coin': 0, 'silver-coin': 0, 'gold-coin': 0 } });
 });
 it('preserves floor, player position, and enemy positions across a process restart', () => {
+  grantFloorKey('legacy');
   for (const direction of ['a', 'a', 'a', 'a', ...Array(11).fill('s'), ...Array(12).fill('d'), 'w']) {
     expect(adventure.moveAdventure('legacy', direction, adventure.adventureFor('legacy').revision)).not.toHaveProperty('error');
   }
@@ -76,6 +77,12 @@ function afterRestart(id: string) {
   return JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e',
     "import { adventureFor } from './src/adventure.ts'; console.log(JSON.stringify(adventureFor(process.argv[1])));", id],
   { env: { ...process.env, DATA_DIR: directory }, encoding: 'utf8' }));
+}
+function grantFloorKey(id: string, floor = 1) {
+  const saved = db.prepare('SELECT world_json FROM adventures WHERE player_id = ?').get(id) as { world_json: string };
+  const world = JSON.parse(saved.world_json) as Floor[];
+  world[floor - 1].exit!.keyFound = true;
+  db.prepare('UPDATE adventures SET world_json = ? WHERE player_id = ?').run(JSON.stringify(world), id);
 }
 
 function standOnChest(id: string, floor = 1) {
@@ -204,6 +211,107 @@ it.each(['slime', 'goblin', 'slime-king'] as const)('saves a %s victory, removes
   expect(pets.getPet(id)).toEqual(pet);
 });
 
+it.each([[0, true], [0.049999, true], [0.05, false], [0.999999, false]] as const)(
+  'uses the exact 5%% key threshold at %s and saves its result without rerolling', (roll, dropped) => {
+    const id = `key-threshold-${roll}`, before = setupBattle(id, 'slime', [100, 100, 100]);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(roll);
+    try {
+      const fought = step(id, 'd');
+      expect(fought.exit).toEqual({ keyFound: dropped, unlocked: false, dropRate: 0.05 });
+      expect(fought.battle!.keyDrop).toEqual(dropped ? { floor: 1, name: 'Floor Key' } : undefined);
+      expect(random).toHaveBeenCalledTimes(4);
+      expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(fought);
+      expect(adventure.patrolAdventure(id)).toEqual(fought);
+      expect(afterRestart(id)).toEqual(fought);
+      const continued = continueRun(id);
+      expect(continued.battle!.keyDrop).toEqual(fought.battle!.keyDrop);
+      expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(continued);
+      expect(afterRestart(id)).toEqual(continued);
+      expect(random).toHaveBeenCalledTimes(4);
+    } finally { random.mockRestore(); }
+  },
+);
+
+it('does not roll keys for defeats, an already found key, an unlocked gate, or the final boss floor', () => {
+  for (const kind of ['defeat', 'found', 'unlocked', 'boss'] as const) {
+    const id = `key-ineligible-${kind}`;
+    setupBattle(id, kind === 'boss' ? 'slime-king' : 'goblin', kind === 'defeat' ? [1, 1, 1] : [100, 100, 100]);
+    if (kind === 'found') grantFloorKey(id);
+    if (kind === 'unlocked') {
+      const row = db.prepare('SELECT world_json FROM adventures WHERE player_id = ?').get(id) as { world_json: string };
+      const world = JSON.parse(row.world_json) as Floor[];
+      world[0].exit!.unlocked = true;
+      db.prepare('UPDATE adventures SET world_json = ? WHERE player_id = ?').run(JSON.stringify(world), id);
+    }
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const fought = step(id, 'd');
+      expect(fought.battle!.won).toBe(kind !== 'defeat');
+      expect(fought.battle!.keyDrop).toBeUndefined();
+      expect(random).toHaveBeenCalledTimes(3);
+      if (kind === 'boss') expect(fought.exit).toBeNull();
+    } finally { random.mockRestore(); }
+  }
+});
+
+it('spends a floor key once to open its stairs permanently, leaving later floors locked and ascent free', () => {
+  const id = 'key-stairs';
+  setupBattle(id, 'slime', [100, 100, 100]);
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+  try { expect(step(id, 'd').battle!.keyDrop).toEqual({ floor: 1, name: 'Floor Key' }); }
+  finally { random.mockRestore(); }
+  continueRun(id);
+  expect(adventure.changeFloor(id, 'descend', adventure.adventureFor(id).revision)).toMatchObject({ status: 409 });
+  expect(adventure.adventureFor(id).exit!.keyFound).toBe(true);
+  for (let floor = 1; floor < 5; floor++) {
+    db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(13, 13, id);
+    const locked = adventure.adventureFor(id);
+    if (floor > 1) {
+      expect(adventure.changeFloor(id, 'descend', locked.revision)).toMatchObject({ status: 409 });
+      grantFloorKey(id, floor);
+    }
+    const descended = adventure.changeFloor(id, 'descend', locked.revision);
+    expect(descended).toMatchObject({ floor: floor + 1, x: 2, y: 2 });
+    expect(adventure.changeFloor(id, 'descend', locked.revision)).toEqual(descended);
+    expect(afterRestart(id)).toEqual(descended);
+    const next = adventure.adventureFor(id);
+    expect(next.exit).toEqual(floor === 4 ? null : { keyFound: false, unlocked: false, dropRate: 0.05 });
+    const returned = adventure.changeFloor(id, 'ascend', next.revision);
+    expect(returned).toMatchObject({ floor, x: 13, y: 13, exit: { keyFound: false, unlocked: true } });
+    expect(afterRestart(id)).toEqual(returned);
+    expect(adventure.changeFloor(id, 'descend', adventure.adventureFor(id).revision)).toMatchObject({ floor: floor + 1 });
+  }
+  expect(adventure.changeFloor(id, 'descend', adventure.adventureFor(id).revision)).toMatchObject({ status: 409 });
+});
+
+it('rolls back a key drop, removed monster, and battle together if the save fails', () => {
+  const id = 'atomic-floor-key', before = setupBattle(id, 'slime', [100, 100, 100]);
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+  db.exec("CREATE TRIGGER reject_key_save BEFORE UPDATE OF world_json ON adventures BEGIN SELECT RAISE(ABORT, 'test key disk failure'); END");
+  try { expect(() => step(id, 'd')).toThrow('test key disk failure'); }
+  finally { db.exec('DROP TRIGGER reject_key_save'); random.mockRestore(); }
+  expect(adventure.adventureFor(id)).toEqual(before);
+  expect(afterRestart(id)).toEqual(before);
+});
+
+it('persists replenished monsters only after a grass step, and refreshes cannot refill a cleared floor', () => {
+  const id = 'key-respawn'; setupBattle(id, 'slime', [100, 100, 100]);
+  const row = db.prepare('SELECT world_json FROM adventures WHERE player_id = ?').get(id) as { world_json: string };
+  const world = JSON.parse(row.world_json) as Floor[];
+  world[0].enemies = []; world[0].encounter!.steps = 0;
+  db.prepare('UPDATE adventures SET x = ?, y = ?, world_json = ? WHERE player_id = ?').run(3, 2, JSON.stringify(world), id);
+  const cleared = adventure.adventureFor(id);
+  expect(cleared.enemies).toEqual([]);
+  expect(adventure.patrolAdventure(id)).toEqual(cleared);
+  expect(afterRestart(id)).toEqual(cleared);
+  expect(step(id, 'd').enemies).toEqual([]);
+  const replenished = step(id, 'd');
+  expect(replenished.battle).toBeNull();
+  expect(replenished.enemies.map(enemy => enemy.id)).toEqual([0, 1, 2, 3].map(i => `f1-wave-1-enemy-${i}`));
+  expect(adventure.moveAdventure(id, 'd', cleared.revision)).toEqual(replenished);
+  expect(afterRestart(id)).toEqual(replenished);
+});
+
 it("the Slime King Bumps for two-thirds of the pet's current HP while that beats its Claw Strike", () => {
   const id = 'bumped';
   const before = setupBattle(id, 'slime-king', [30, 10, 30]); // 70 HP, hits for 30; the king's Claw Strike is 18
@@ -235,8 +343,9 @@ it('carries HP/MP across battles and floors, restoring 20% of maximum rounded up
     expect(adventure.adventureFor(id)).toEqual(result);
     const continued = continueRun(id);
     expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(continued);
-    // One coin toss plus a luck roll for each fighter.
-    expect(random).toHaveBeenCalledTimes(3);
+    // One coin toss, a luck roll for each fighter, and one key drop roll.
+    expect(random).toHaveBeenCalledTimes(4);
+    grantFloorKey(id);
     db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(13, 13, id);
     expect(adventure.changeFloor(id, 'descend', continued.revision)).toMatchObject({ floor: 2, hp: 21, mp: 2 });
     adventure.changeFloor(id, 'ascend', adventure.adventureFor(id).revision);
@@ -393,6 +502,7 @@ it("a revenge battle applies only the victim's equipped coin; the thief's is ign
 it('a studying pet cannot move, use stairs, open chests, or start over, but can view, finish a battle, and use items', () => {
   const id = 'busy-explorer';
   setupBattle(id, 'slime');
+  grantFloorKey(id);
   const fought = step(id, 'd'); // the battle started while idle
   expect(pets.study(id, 'math')).not.toHaveProperty('error');
   const continued = adventure.continueAdventure(id, fought.battle!.id, adventure.adventureFor(id).revision);
@@ -419,12 +529,13 @@ it('migrates old maps once, conceals ordinary monster coordinates, and keeps pol
   const id = 'old-grass'; pets.getOrCreatePet(id);
   const start = adventure.adventureFor(id), world = createWorld();
   world[0].enemies.shift();
-  for (const floor of world) { delete floor.grass; delete floor.encounter; }
+  for (const floor of world) { delete floor.grass; delete floor.encounter; delete floor.exit; }
   db.prepare('UPDATE adventures SET world_json = ? WHERE player_id = ?').run(JSON.stringify(world), id);
   const migrated = adventure.adventureFor(id);
   expect(migrated.revision).toBe(start.revision);
   expect(migrated.grass.some(row => row.includes('g'))).toBe(true);
   expect(migrated.enemies).toHaveLength(3);
+  expect(migrated.exit).toEqual({ keyFound: false, unlocked: true, dropRate: 0.05 });
   for (const enemy of migrated.enemies) {
     expect(enemy.hidden).toBe(true);
     for (const key of ['x', 'y', 'route', 'leg']) expect(enemy).not.toHaveProperty(key);

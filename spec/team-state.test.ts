@@ -152,6 +152,58 @@ it('teammates beside the pet, diagonals included, join its battle; one further a
   expect(id).toBeGreaterThan(0);
 });
 
+it('rolls one shared Floor Key per team victory, saves it in each replay, and lets any teammate unlock the gate', () => {
+  const [lead, near, far] = ['key-lead', 'key-near', 'key-far'].map(id => player(id, [100, 100, 100]));
+  const { id } = team(lead, near, far);
+  const slime = readyEncounter(id, 'f1-enemy-0');
+  place(lead, slime.x - 1, slime.y); place(near, slime.x - 1, slime.y + 1); place(far, 13, 13);
+  const before = adventure.adventureFor(lead), remoteBefore = adventure.adventureFor(far);
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+  try {
+    const fought = step(lead, 'd');
+    expect(fought.battle!.keyDrop).toEqual({ floor: 1, name: 'Floor Key' });
+    expect(adventure.adventureFor(near).battle!.keyDrop).toEqual(fought.battle!.keyDrop);
+    expect(adventure.adventureFor(far).battle).toBeNull();
+    for (const member of [lead, near, far]) {
+      expect(adventure.adventureFor(member).exit).toEqual({ keyFound: true, unlocked: false, dropRate: 0.05 });
+    }
+    expect(random).toHaveBeenCalledTimes(5); // coin, three fighter luck rolls, one drop
+    expect(adventure.moveAdventure(lead, 'd', before.revision)).toEqual(fought);
+    // Shared map updates do not invalidate a distant teammate's own movement revision.
+    expect(ok(adventure.changeFloor(far, 'descend', remoteBefore.revision))).toMatchObject({
+      floor: 2, exit: { keyFound: false, unlocked: false },
+    });
+    expect(adventure.adventureFor(lead).exit).toEqual({ keyFound: false, unlocked: true, dropRate: 0.05 });
+    ok(adventure.continueAdventure(lead, fought.battle!.id, fought.revision));
+    const ally = adventure.adventureFor(near);
+    ok(adventure.continueAdventure(near, ally.battle!.id, ally.revision));
+    expect(adventure.adventureFor(lead).exit!.unlocked).toBe(true);
+    expect(adventure.adventureFor(near).battle!.keyDrop).toEqual(fought.battle!.keyDrop);
+    expect(random).toHaveBeenCalledTimes(5);
+    place(lead, 13, 13);
+    expect(ok(adventure.changeFloor(lead, 'descend', adventure.adventureFor(lead).revision))).toMatchObject({ floor: 2 });
+  } finally { random.mockRestore(); }
+});
+
+it('preserves legacy shared routes and defeated monsters while migrating missing floor gates once', () => {
+  const [lead, mate] = ['old-key-lead', 'old-key-mate'].map(id => player(id));
+  const { id } = team(lead, mate);
+  const row = db.prepare('SELECT world_json FROM teams WHERE id = ?').get(id) as { world_json: string };
+  const world = JSON.parse(row.world_json) as Floor[];
+  for (const floor of world) delete floor.exit;
+  world[0].enemies = [];
+  db.prepare('UPDATE teams SET world_json = ? WHERE id = ?').run(JSON.stringify(world), id);
+  const first = adventure.adventureFor(lead);
+  expect(first.exit).toEqual({ keyFound: false, unlocked: true, dropRate: 0.05 });
+  expect(first.enemies).toEqual([]);
+  const migrated = db.prepare('SELECT world_json FROM teams WHERE id = ?').get(id);
+  expect(adventure.adventureFor(mate).exit).toEqual(first.exit);
+  expect(adventure.patrolAdventure(lead)).toEqual(first);
+  expect(db.prepare('SELECT world_json FROM teams WHERE id = ?').get(id)).toEqual(migrated);
+  place(mate, 5, 2);
+  expect(step(mate, 'd').enemies).toEqual([]);
+});
+
 it('a knocked-out teammate is out of the run while the rest explore on, and recovery skips it', () => {
   const [lead, weak] = [player('ko-lead', [12, 7, 12]), player('ko-weak', [2, 1, 1])];
   const { id } = team(lead, weak);

@@ -20,6 +20,7 @@ adventure.innerHTML = `
       <details class="adventure-backpack">
         <summary id="adventure-backpack-title">Your backpack</summary>
         <p class="help" id="adventure-care"></p>
+        <p id="adventure-floor-key" role="status"></p>
         <ul id="adventure-items"></ul>
         <h4>Learned abilities</h4><ul id="adventure-abilities"></ul>
         <h4>Unfair coins</h4><ul id="adventure-coins"></ul>
@@ -95,6 +96,8 @@ guide.innerHTML = `
       <li>Move with W/A/S/D, the arrow keys, or the arrow pad.</li>
       <li>Space opens a chest or takes the stairs you stand on.</li>
       <li>Walk through tall grass for a chance of a surprise battle.</li>
+      <li>Defeated monsters have a 5% chance to drop a Floor Key. Use it at the locked stairs to unlock the next floor.</li>
+      <li>Monsters keep appearing while the key is missing. A team's key and unlocked exit are shared.</li>
       <li>Clear paths are safe. Standing still never starts an encounter.</li>
       <li>The Slime King guards the final grove. Walk up to it to battle.</li>
       <li>HP and MP carry between battles. A win gives back 20%.</li>
@@ -161,7 +164,7 @@ const icons = {
 };
 const mapIcon = kind => `<svg viewBox="0 0 ${icons[kind] ? '24 24' : '96 96'}" aria-hidden="true" class="adventure-icon">${icons[kind] || `<use href="/scenes/adventure-atlas.svg#${kind}"/>`}</svg>`;
 const legend = guide.querySelector('.adventure-legend');
-for (const [kind, label] of [['grass', 'Tall grass'], ['slime', 'Wild slime'], ['goblin', 'Wild goblin'], ['slime-king', 'Slime King'], ['chest', 'Chest'], ['up', 'Stairs up'], ['down', 'Stairs down']]) {
+for (const [kind, label] of [['grass', 'Tall grass'], ['slime', 'Wild slime'], ['goblin', 'Wild goblin'], ['slime-king', 'Slime King'], ['chest', 'Chest'], ['up', 'Stairs up'], ['down', 'Stairs down'], ['lock', 'Locked exit'], ['key', 'Floor Key']]) {
   const entry = document.createElement('span');
   entry.className = `adventure-marker-${kind}`;
   entry.innerHTML = mapIcon(kind);
@@ -169,6 +172,14 @@ for (const [kind, label] of [['grass', 'Tall grass'], ['slime', 'Wild slime'], [
   legend.append(entry);
 }
 const at = point => state && point && point.x === state.x && point.y === state.y;
+const exitLocked = () => Boolean(state?.down && state.exit && !state.exit.unlocked);
+const exitReady = () => !exitLocked() || state.exit.keyFound;
+const keyOdds = () => `${Math.round((state?.exit?.dropRate ?? .05) * 100)}%`;
+function exitHint() {
+  return !exitLocked() ? 'Exit unlocked. Press Space or choose Descend to explore deeper.'
+    : state.exit.keyFound ? 'Floor Key found! Press Space or choose Unlock & descend.'
+    : `Exit locked. Defeat monsters in tall grass for a Floor Key (${keyOdds()} drop chance per victory).`;
+}
 // From the latest broadcast pet; the server refuses exploring while busy anyway.
 const busyText = () => pet?.activity === 'studying' ? `Your pet is busy studying ${pet.task}. Explore once it's done.`
   : pet?.activity === 'working' ? `Your pet is busy working at the ${pet.task}. Explore once it's done.` : '';
@@ -182,7 +193,8 @@ function syncControls() {
   }
   for (const [action, stair] of [['ascend', state?.up], ['descend', state?.down]]) {
     const button = adventure.querySelector(`#adventure-${action}`);
-    disable(button, blocked || !at(stair));
+    if (action === 'descend') button.textContent = exitLocked() && state.exit.keyFound ? 'Unlock & descend' : '↓ Descend';
+    disable(button, blocked || !at(stair) || (action === 'descend' && !exitReady()));
   }
   adventure.querySelectorAll('[data-direction]').forEach(button => disable(button, blocked));
   disable(adventure.querySelector('#adventure-continue'), pending);
@@ -200,7 +212,8 @@ function syncControls() {
     pending || Boolean(state?.battle?.pending) || !state?.inventory?.items.find(item => item.id === button.dataset.useItem)?.usable));
   if (terrain) for (const cell of terrain.querySelectorAll('.adventure-marker-chest, .adventure-marker-up, .adventure-marker-down')) {
     const here = state && Number(cell.dataset.x) === state.x && Number(cell.dataset.y) === state.y;
-    cell.classList.toggle('is-interactable', Boolean(here && !blocked && cell.dataset.opened !== 'true'));
+    cell.classList.toggle('is-interactable', Boolean(here && !blocked && cell.dataset.opened !== 'true' &&
+      (!cell.classList.contains('adventure-marker-down') || exitReady())));
   }
 }
 function clearMap() {
@@ -218,6 +231,7 @@ function clearMap() {
   guide.querySelector('#adventure-enemies').replaceChildren();
   adventure.querySelector('#adventure-team').hidden = true;
   adventure.querySelector('#adventure-team-list').replaceChildren();
+  adventure.querySelector('#adventure-floor-key').replaceChildren();
   adventure.querySelector('#adventure-notice').textContent = '';
   adventure.querySelector('#adventure-battle-summary').hidden = true;
   adventure.querySelector('#adventure-result').textContent = '';
@@ -290,7 +304,7 @@ function renderMap() {
   adventure.querySelector('#adventure-title').textContent = state.name;
   adventure.querySelector('#adventure-floor').textContent = `ADVENTURE · FLOOR ${state.floor} / ${state.floorCount}`;
   guide.querySelector('#adventure-stair-hint').textContent = state.down
-    ? 'The ↓ stairs are at column 14, row 14.'
+    ? `The ↓ stairs are at column 14, row 14. ${exitHint()}`
     : state.completed ? 'Final floor. The Slime King is defeated.' : 'Final floor. The Slime King lives here.';
   adventure.querySelector('#adventure-completion').hidden = !state.completed;
   adventure.querySelector('#adventure-failure').hidden = !state.failed && !state.abandoned;
@@ -484,7 +498,24 @@ function renderMonsters() {
       cell.classList.toggle('adventure-chest-opened', opened);
       cell.title = opened ? `Opened chest · ${chest.reward.name}` : 'Unopened treasure chest';
     }
-    const interactable = at(point) && ((chest && !chest.reward) || cell.classList.contains('adventure-marker-up') || cell.classList.contains('adventure-marker-down'));
+    if (cell.classList.contains('adventure-marker-down')) {
+      cell.classList.toggle('is-locked', exitLocked());
+      cell.classList.toggle('has-floor-key', exitLocked() && state.exit.keyFound);
+      cell.title = exitHint();
+      const badgeKind = exitLocked() ? state.exit.keyFound ? 'key' : 'lock' : '';
+      if (cell.dataset.exitBadge !== badgeKind) {
+        cell.querySelector('.adventure-lock')?.remove();
+        if (badgeKind) {
+          const badge = document.createElement('span');
+          badge.className = 'adventure-lock';
+          badge.innerHTML = mapIcon(badgeKind);
+          cell.append(badge);
+        }
+        cell.dataset.exitBadge = badgeKind;
+      }
+    }
+    const interactable = at(point) && ((chest && !chest.reward) || cell.classList.contains('adventure-marker-up') ||
+      (cell.classList.contains('adventure-marker-down') && exitReady()));
     cell.classList.toggle('is-interactable', Boolean(interactable) && !state.battle?.pending && !pending && !busyText());
     cell.classList.toggle('is-rustling', onGrass(point.x, point.y) && Math.abs(point.x - state.x) <= 1 && Math.abs(point.y - state.y) <= 1);
   }
@@ -492,14 +523,14 @@ function renderMonsters() {
   player.classList.toggle('adventure-shared', sharing.length > 0);
   player.dataset.shared = String(sharing.length + 1);
   player.classList.toggle('in-grass', onGrass(state.x, state.y));
-  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Tall grass can hide surprise encounters. Clear paths are safe. Trees and water block movement. Space opens a chest or takes the stairs your pet stands on.`);
+  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Tall grass can hide surprise encounters. Clear paths are safe. Trees and water block movement. Space opens a chest or takes the stairs your pet stands on.${state.down ? ` ${exitHint()}` : ''}`);
   const nearby = state.enemies.filter(e => !hiddenEnemy(e) && state.encounters.includes(e.id));
   const notice = busyText() || (nearby.length
     ? `${nearby.map(e => e.name).join(', ')} guards this grove. Walk up to challenge it.`
     : state.chests.some(at) ? (state.chests.find(at).reward ? 'Chest already opened.' : 'You found a treasure chest. Press Space or choose Open chest to collect its reward.')
     : at(state.up) ? 'Stairs up: Space or Ascend.'
-    : at(state.down) ? 'Stairs down: press Space or choose Descend to explore deeper.'
-    : onGrass(state.x, state.y) && state.enemies.some(hiddenEnemy) ? 'Tall grass… something might be hiding here.' : '');
+    : at(state.down) ? exitHint()
+    : onGrass(state.x, state.y) && (state.enemies.some(hiddenEnemy) || !exitReady()) ? 'Tall grass… something might be hiding here.' : '');
   // Only a new message is announced again.
   const noticeText = adventure.querySelector('#adventure-notice');
   if (noticeText.textContent !== notice) noticeText.textContent = notice;
@@ -515,6 +546,16 @@ function renderInventory() {
   if (!inventory) return;
   const focused = document.activeElement?.dataset.useItem;
   adventure.querySelector('#adventure-care').textContent = `Stamina ${inventory.stamina} / 100 · Hygiene ${inventory.hygiene} / 100`;
+  const floorKey = adventure.querySelector('#adventure-floor-key');
+  floorKey.hidden = !state.down;
+  if (state.down) {
+    floorKey.innerHTML = mapIcon(exitLocked() && !state.exit.keyFound ? 'lock' : 'key');
+    const text = document.createElement('span');
+    text.textContent = !exitLocked() ? `Floor ${state.floor} exit unlocked.`
+      : state.exit.keyFound ? `Floor Key · ready to unlock floor ${state.floor}'s stairs.`
+      : `Floor Key not found · ${keyOdds()} drop chance per monster victory on floor ${state.floor}.`;
+    floorKey.append(text);
+  }
   const items = adventure.querySelector('#adventure-items');
   items.replaceChildren();
   for (const item of inventory.items) {
@@ -562,9 +603,10 @@ async function equipCoin(button, coinId) {
 function battleResult(battle) {
   const knockedOut = battle.after?.hp === 0;
   const team = battle.playback.fighters.length > 2 ? 'Your team' : 'You';
-  if (battle.won && knockedOut) return `${team} defeated ${battle.enemyName} on floor ${battle.floor}, but your pet was knocked out. Its adventure is over; your teammates explore on.`;
+  const keyDrop = battle.keyDrop ? ` Found a Floor Key! The stairs on floor ${battle.keyDrop.floor} can now be unlocked.` : '';
+  if (battle.won && knockedOut) return `${team} defeated ${battle.enemyName} on floor ${battle.floor}, but your pet was knocked out. Its adventure is over; your teammates explore on.${keyDrop}`;
   return battle.won
-    ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}`
+    ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${keyDrop}${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}`
     : `${battle.enemyName} defeated ${team === 'You' ? 'you' : 'your team'}. Adventure failed. Start a new adventure to try again.`;
 }
 function showBattle(replay = false) {

@@ -583,8 +583,9 @@ walking. You can also click or tap a reachable tile to walk there. Each step
 waits for the server to confirm the position, and a battle, another window,
 or a blocked move stops the route. The map takes the keyboard as soon as it
 opens. **Space** acts on the tile your pet stands on: it opens an unopened
-chest, or takes the stairs there (Descend or Ascend), so the whole adventure
-plays without a mouse. On a focused button, Space presses that button instead.
+chest, or uses the stairs there (Unlock & descend, Descend, or Ascend), so
+the whole adventure plays without a mouse. On a focused button, Space
+presses that button instead.
 
 The Adventure fills the whole screen with an illustrated woodland in the
 same warm style as home and town. The camera follows your pet through leafy
@@ -593,9 +594,9 @@ floor, with **Backpack & team**, **Game guide**, and **Leave**. **Abandon run**
 lives inside **Backpack & team**.
 At the bottom left, two rings show your pet's **HP (red)** and **MP (blue)**:
 the coloured arc is what's left, and the number inside reads e.g. `12/15`. The
-arrow pad sits at the bottom right. **Open chest**, **Ascend**, and **Descend**
-appear only while your pet stands on a chest or stairs, and the available
-object is highlighted. **Backpack & team** reveals inventory and teammate
+arrow pad sits at the bottom right. **Open chest**, **Ascend**, and the
+down-stair action appear only while your pet stands on a chest or stairs,
+and the available object is highlighted. **Backpack & team** reveals inventory and teammate
 details when needed, keeping the map clear while exploring. Monsters have
 original woodland artwork, and wooden treasure chests show their open and
 closed states. Gentle grass, creature, and treasure animations pause while
@@ -623,13 +624,27 @@ or shift ends — an Hourglass can bring that forward. Viewing the map,
 returning from a saved battle, and using backpack items still work. An
 activity whose time is up no longer counts, even before it's been paid out.
 
+**Find a Floor Key to unlock the next floor.** In a new run, floors one
+through four have locked down stairs. Each monster victory on a locked
+floor has a **5% chance** to drop that floor's key while it is missing.
+The chance stays 5% each time; there is no guaranteed drop after a set
+number of battles. More monsters appear in the grass while the key is
+missing, so clearing the first four enemies cannot leave the exit
+permanently locked. Once the key drops, no more keys or replacement
+monsters appear on that floor.
+
 Stand on the down stairs at column 14, row 14 and press Space, or choose
-**Descend**. You arrive at the next floor's up stairs, at column 3, row 3.
-**Ascend** returns you to the previous floor's down stairs. Floor one has no
-up stairs; floor five has no down stairs. Leave or Escape closes the
-window. Your floor, position, HP/MP, and each floor's remaining enemies are
-saved privately to your account, even across server restarts. Older
-clearing saves keep their positions during migration.
+**Unlock & descend** when you have the key. This permanently unlocks the
+gate and takes you to the next floor's up stairs, at column 3, row 3.
+Later visits use **Descend** without another key. **Ascend** returns you
+to the previous floor's down stairs and never needs a key. Floor one has
+no up stairs; floor five has no down stairs or Floor Key.
+
+Leave or Escape closes the window. Your floor, position, HP/MP, remaining
+enemies, keys, and unlocked gates are saved privately to your account,
+even across server restarts. Existing saved adventures keep their exits
+unlocked, preserving their progress; starting a new run adds the locked
+gates.
 
 **Monsters hide in tall grass.** Walking through a grass patch can start a
 surprise battle with one of that floor's remaining slimes or goblins.
@@ -643,9 +658,11 @@ There are two quiet grass steps before another encounter can happen, then
 a chance on each grass step, with an encounter guaranteed by the sixth
 while regular monsters remain. The server saves the random seed and step
 counter with the floor, so closing, refreshing, or reopening the map
-doesn't reroll them. Defeated monsters stay defeated; after clearing a
-floor's four regular enemies, its grass no longer starts battles. A
-surprise battle leaves the pet on the grass tile it entered.
+doesn't reroll them. Defeated monsters stay defeated, but fresh ordinary
+monsters replenish the grass while a locked floor still needs its key.
+After the key is found, or on a floor without a locked exit, clearing the
+remaining regular enemies makes its grass safe. A surprise battle leaves
+the pet on the grass tile it entered.
 
 Trees still block movement, and every stair and chest is reachable.
 Existing runs gain grass without resetting positions, defeated enemies,
@@ -695,6 +712,10 @@ floor (with their positions and HP under **Your team**). Every window
 refreshes the shared state about once a second, so each player sees the
 others move. Grass encounter progress and remaining monsters belong to the
 shared floor; only a teammate walking through grass advances that progress.
+Floor Keys and unlocked gates also belong to the shared floor. A key
+found by any teammate lets any teammate unlock that floor's exit, and the
+gate then stays open for everyone. A shared battle rolls for one key drop,
+not a separate drop for each pet.
 
 **Teammates beside your pet join its battles.** When a pet encounters a
 monster in grass or walks into the Slime King, every teammate exploring
@@ -780,7 +801,8 @@ the saved turns. **Return to map** (or Escape from the battle window)
 acknowledges the saved result and resumes exploration after a win. If that
 request fails, **Continue exploring** lets you retry it. A reload before
 returning to the map reopens the same pending battle. Replays can't reroll
-a result, grant more recovery, or resurrect a monster.
+a result, grant more recovery, reroll a Floor Key drop, or resurrect a
+monster.
 
 **Starting a fresh adventure costs 40 stamina and 20 hygiene**, and opens a
 **4-hour cooldown** — whether that fresh start follows a win, a defeat, or
@@ -796,8 +818,8 @@ and the time remaining (including seconds during the final minute). Reopening
 the map keeps the correct progress. Once a run ends during the cooldown,
 the map shows how long the pet needs to rest and
 offers **Skip wait (use Hourglass)**. Adventure still doesn't alter Arena
-wins/losses. Monster victories grant recovery; chests grant the items
-below.
+wins/losses. Monster victories grant recovery and can drop a missing
+Floor Key; chests grant the items below.
 
 ### Treasure and inventory
 
@@ -808,6 +830,10 @@ within the ability category; Copper, Silver, and Gold Coins have equal
 chances within the coin category. Opened chests stay on the map, keep their
 reward, and can't be looted again. New adventures have fresh chests.
 Defeat, restarting, and signing out don't remove inventory.
+
+Floor Keys come from monster victories, not chests. They belong to their
+adventure floor rather than the pet's backpack; a new run starts with fresh
+locked gates and no keys.
 
 The map's **Your backpack** shows items, learned abilities, and coins, each
 with an **Equip**/**Unequip** button. Food restores 40 stamina; soap
@@ -870,7 +896,9 @@ action:
 
 - `{ "direction": "w" | "a" | "s" | "d", "revision": "…" }` moves one tile.
 - `{ "action": "ascend" | "descend", "revision": "…" }` uses matching
-  stairs.
+  stairs. Descending first unlocks a locked exit if its Floor Key has been
+  found; without the key, it returns 409 and the pet stays on the current
+  floor.
 - `{ "action": "continue", "battleId": "…", "revision": "…" }`
   acknowledges a battle.
 - `{ "action": "abandon", "revision": "…" }` ends the run in progress at
@@ -906,6 +934,13 @@ and `.` marks other tiles. Ordinary entries in `enemies` have
 includes `battle.surprise: true`. Encounter seeds and counters stay on the
 server.
 
+The current floor's `exit` is `{ keyFound, unlocked, dropRate: 0.05 }`,
+or `null` on the final floor, which has no down stairs. A successful key
+drop is recorded as `battle.keyDrop: { floor, name: "Floor Key" }` in the
+saved battle. Both the key and the unlocked gate are shared by the team;
+neither is a backpack item. Existing saved floors without exit state
+migrate to unlocked exits.
+
 The **Team up** window uses `GET /api/team` (signed in), which returns the
 forming `team` the pet has joined (or `null`), its pending `invitations`,
 its own `run` (`team` id or `null`, and `state`: `new`, `exploring`, or
@@ -933,7 +968,9 @@ first, for the stamina and hygiene spent.
 Stale revisions return the current saved state without applying the
 action, including retries after a battle or a new run. Movement pauses
 while a battle awaits acknowledgement. The server saves position, enemy
-removal, HP/MP, recovery, and the exact playback in one atomic update.
+removal, HP/MP, recovery, any Floor Key drop, and the exact playback in one
+atomic update. Retrying or replaying that battle never rolls for a key
+again.
 Clients can't choose stats, battle outcomes, rewards, enemy positions, or
 floors. Chest opening and its inventory grant commit in one database
 transaction; item use and its new revision do too. These actions can't

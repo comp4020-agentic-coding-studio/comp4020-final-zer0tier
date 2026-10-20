@@ -24,7 +24,7 @@ it('saves one-block adventure movement, blocks trees, and isolates player positi
   expect((await post('/api/adventure', {}, null)).status).toBe(401);
 });
 
-it('lets the owner descend all five floors only at stairs, ascend, and resume the same floor', async () => {
+it('locks the next floor until a saved monster drop and rejects forged keys or unlocks over HTTP', async () => {
   const id = freshId(); await signUp(id);
   const act = async (body = {}) => {
     const response = await sendAction(id, body);
@@ -36,19 +36,18 @@ it('lets the owner descend all five floors only at stairs, ascend, and resume th
   expect((await post('/api/adventure', { action: 'teleport' }, id)).status).toBe(400);
   expect((await post('/api/adventure', { action: 'descend', direction: 's' }, id)).status).toBe(400);
   let state = await act();
-  for (let floor = 1; floor < 5; floor++) {
-    // The outer path avoids tall grass and remains safe on every floor.
-    for (const direction of ['w', ...Array(12).fill('d'), ...Array(12).fill('s'), 'a']) state = await act({ direction });
-    expect(state).toMatchObject({ x: 13, y: 13, floor });
-    state = await act({ action: 'descend' });
-    expect(state).toMatchObject({ x: 2, y: 2, floor: floor + 1, floorCount: 5 });
-  }
-  expect(state.enemies.find((e: any) => e.kind === 'slime-king')).toMatchObject({ name: 'Slime King', moves: [{ id: 'bump', name: 'Bump', mpCost: 5 }] });
-  expect(state.down).toBeNull();
-  expect((await sendAction(id, { action: 'descend' })).status).toBe(409);
+  expect(state.exit).toEqual({ keyFound: false, unlocked: false, dropRate: 0.05 });
+  // Safe walking can reach the gate, but cannot bypass it.
+  for (const direction of ['w', ...Array(12).fill('d'), ...Array(12).fill('s'), 'a']) state = await act({ direction });
+  expect(state).toMatchObject({ x: 13, y: 13, floor: 1, floorCount: 5 });
+  const refused = await sendAction(id, { action: 'descend', keyFound: true, unlocked: true,
+    exit: { keyFound: true, unlocked: true }, keyDrop: { floor: 1, name: 'Floor Key' } });
+  expect(refused.status).toBe(409);
+  expect((await refused.json()).error).toMatch(/locked.*5%.*Floor Key/);
+  expect(await act()).toEqual(state);
   await post('/api/signout', {}, id); await signIn(id);
   expect(await act()).toEqual(state);
-  expect(await act({ action: 'ascend' })).toMatchObject({ floor: 4, x: 13, y: 13 });
+  expect((await sendAction(id, { action: 'ascend' })).status).toBe(409);
 });
 
 it('keeps hidden monsters and grass encounters unchanged while the map is read or refreshed', async () => {

@@ -70,6 +70,10 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
 - Ordinary monsters hide in tall grass and trigger surprise battles while
   walking. Clear paths and standing still are safe; the final boss remains
   visible. Preserve saved exploration, battle, treasure, and team progress.
+- New runs lock each downward exit until a monster drops its Floor Key at a
+  fixed 5% chance per victory. Keep grass encounters available until the key
+  drops. Keys and permanent gate unlocks belong to the shared floor, and saved
+  battle replays never reroll drops. Preserve unlocked exits in existing runs.
 - Use cute original monster artwork, detailed treasure chests, and subtle
   environmental animation. Respect reduced-motion preferences and pause scene
   animation when hidden or covered by another window.

@@ -4,6 +4,7 @@ import type { MonsterAbilityId } from './combat.ts';
 import type { TreasureReward } from './treasure.ts';
 export const SIZE = 16;
 export const FLOOR_COUNT = 5;
+export const FLOOR_KEY_DROP_RATE = 0.05;
 export type Point = { x: number; y: number };
 export type Enemy = Point & {
   id: string;
@@ -23,6 +24,9 @@ export type Floor = {
   // Separate from collision tiles so old maps keep their paths and landmarks.
   grass?: string[];
   encounter?: { seed: number; steps: number };
+  // The key belongs to this floor and is shared by everyone on the run.
+  exit?: { keyFound: boolean; unlocked: boolean };
+  spawnWave?: number;
   enemies: Enemy[];
   // `openedBy` names the teammate who opened a chest on a team's shared map.
   chests: (Point & { id: string; reward?: TreasureReward; openedBy?: string })[];
@@ -39,6 +43,20 @@ export const nearby = (a: Point, b: Point): boolean => Math.max(Math.abs(a.x - b
 export const directions = { w: [0, -1], a: [-1, 0], s: [0, 1], d: [1, 0] } as const;
 export const walkable = (floor: Floor, point: Point): boolean => floor.tiles[point.y]?.[point.x] === '.';
 
+function ordinaryEnemies(number: number, wave = 0): Enemy[] {
+  const index = number - 1;
+  const routes = [[[6, 2], [9, 2]], [[10, 5], [13, 5]], [[4, 11], [4, 8]], [[9, 12], [6, 12]]];
+  return routes.map(([[x, y], [postX, postY]], i) => {
+    const goblin = i % 2 === 1;
+    return {
+      id: wave ? `f${number}-wave-${wave}-enemy-${i}` : `f${number}-enemy-${i}`,
+      x, y, kind: goblin ? 'goblin' : 'slime', name: goblin ? 'Goblin' : 'Slime',
+      strength: (goblin ? 5 : 3) + index * 2, intelligence: (goblin ? 3 : 1) + index,
+      charisma: 2 + index, route: [{ x, y }, { x: postX, y: postY }], leg: 1,
+    };
+  });
+}
+
 export function createWorld(): Floor[] {
   const names = ['Woodland clearing', 'Goblin thicket', 'Mossy hollows', 'Deepwood paths', 'Slime King’s grove'];
   return names.map((name, index) => {
@@ -46,18 +64,9 @@ export function createWorld(): Floor[] {
     const up = number > 1 ? { x: 2, y: 2 } : null;
     const down = number < FLOOR_COUNT ? { x: 13, y: 13 } : null;
     const chests = [{ id: `f${number}-chest`, x: 11, y: 3 }];
-    // Stable IDs preserve the finite roster and old saved battles. Ordinary
+    // Stable IDs preserve old saved battles. Ordinary
     // coordinates are legacy data; only the boss occupies a visible map tile.
-    const routes = [[[6, 2], [9, 2]], [[10, 5], [13, 5]], [[4, 11], [4, 8]], [[9, 12], [6, 12]]];
-    const enemies: Enemy[] = routes.map(([[x, y], [postX, postY]], i) => {
-      const goblin = i % 2 === 1;
-      return {
-        id: `f${number}-enemy-${i}`, x, y, kind: goblin ? 'goblin' : 'slime',
-        name: goblin ? 'Goblin' : 'Slime', strength: (goblin ? 5 : 3) + index * 2,
-        intelligence: (goblin ? 3 : 1) + index, charisma: 2 + index,
-        route: [{ x, y }, { x: postX, y: postY }], leg: 1,
-      };
-    });
+    const enemies = ordinaryEnemies(number);
     if (number === FLOOR_COUNT) enemies.push({
       id: 'slime-king', kind: 'slime-king', name: 'Slime King', x: 10, y: 11,
       strength: 18, intelligence: 10, charisma: 12, route: [{ x: 10, y: 11 }, { x: 12, y: 11 }], leg: 1,
@@ -72,7 +81,9 @@ export function createWorld(): Floor[] {
         : x === 7 && y >= 4 && y <= 11 && y !== 6 && y !== 9;
       return wall ? '#' : '.';
     }).join(''));
-    const floor: Floor = { number, name, tiles, enemies, chests, up, down };
+    const floor: Floor = { number, name, tiles, enemies, chests, up, down,
+      ...(down ? { exit: { keyFound: false, unlocked: false } } : {}),
+    };
     prepareGrass(floor);
     return floor;
   });
@@ -102,6 +113,14 @@ export function prepareGrass(floor: Floor): boolean {
   return changed;
 }
 
+// Old runs had freely accessible stairs. Keep those routes open instead of
+// imposing a new lock on progress whose visited floors were never recorded.
+export function prepareExit(floor: Floor): boolean {
+  if (!floor.down || floor.exit) return false;
+  floor.exit = { keyFound: false, unlocked: true };
+  return true;
+}
+
 export const inGrass = (floor: Floor, point: Point): boolean => walkable(floor, point) && floor.grass?.[point.y]?.[point.x] === 'g';
 function nextSeed(seed: number): number {
   let next = seed || 1;
@@ -111,10 +130,17 @@ function nextSeed(seed: number): number {
 
 // Call only after an accepted movement. There are two quiet grass steps after
 // each encounter, then a seeded chance, with an encounter guaranteed by six.
-// The finite roster prevents defeated monsters returning on later visits.
+// Until the key drops, fresh monsters replace an exhausted ordinary roster.
+// Refill only while walking in grass, never on a read or a safe path.
 export function grassEncounter(floor: Floor, point: Point): Enemy | undefined {
-  const hidden = floor.enemies.filter(enemy => enemy.kind !== 'slime-king');
-  if (!inGrass(floor, point) || !hidden.length) return;
+  if (!inGrass(floor, point)) return;
+  let hidden = floor.enemies.filter(enemy => enemy.kind !== 'slime-king');
+  if (!hidden.length && floor.down && floor.exit && !floor.exit.keyFound && !floor.exit.unlocked) {
+    floor.spawnWave = (floor.spawnWave ?? 0) + 1;
+    hidden = ordinaryEnemies(floor.number, floor.spawnWave);
+    floor.enemies.push(...hidden);
+  }
+  if (!hidden.length) return;
   const encounter = floor.encounter!;
   encounter.steps++;
   if (encounter.steps < 3) return;

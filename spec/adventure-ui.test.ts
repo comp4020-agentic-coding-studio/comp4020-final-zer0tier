@@ -13,7 +13,7 @@ function map(floor = 1) {
     const { x, y, route: _route, leg: _leg, ...monster } = enemy;
     return { ...monster, ...(enemy.kind === 'slime-king' ? { x, y } : {}), hidden: enemy.kind !== 'slime-king', alerted: false };
   });
-  return { ...saved, enemies, floor, floorCount: 5, size: 16, x: 2, y: 2, encounters: [], revision: 'saved-map', battle: null, completed: false, failed: false, hp: 15, mp: 5, maxHp: 15, maxMp: 5,
+  return { ...saved, enemies, exit: floor < 5 ? { keyFound: false, unlocked: true, dropRate: 0.05 } : null, floor, floorCount: 5, size: 16, x: 2, y: 2, encounters: [], revision: 'saved-map', battle: null, completed: false, failed: false, hp: 15, mp: 5, maxHp: 15, maxMp: 5,
     cooldownUntil: null as number | null, timeScale: 1, restartCost: { stamina: 40, hygiene: 20 }, cooldownMinutes: 240,
     inventory: { stamina: 30, hygiene: 40,
       items: [{ id: 'food', name: 'Food', effect: 'restore', restores: 'stamina', amount: 40, quantity: 0, usable: false }],
@@ -372,6 +372,45 @@ it('reuses automatic monster playback with carried resources and returns to the 
   } finally { dom.window.close(); }
 });
 
+it('shows the saved Floor Key drop in battle playback and replay without claiming it again', async () => {
+  const { dom, window, $ } = page();
+  const fought = battleProgress();
+  let saved = { ...fought, exit: { keyFound: true, unlocked: false, dropRate: 0.05 },
+    battle: { ...fought.battle, keyDrop: { floor: 1, name: 'Floor Key' } } };
+  const bodies: unknown[] = [];
+  window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
+    const body = JSON.parse(options.body as string);
+    bodies.push(body);
+    if (body.action === 'continue') saved = { ...saved, revision: 'key-kept', battle: { ...saved.battle, pending: false } };
+    return Response.json(saved);
+  }) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement).open).toBe(true));
+    $('battle-skip').click();
+    const result = $('battle-status').textContent;
+    expect(result).toContain('Floor Key');
+    expect(result).toMatch(/floor 1/i);
+    expect($('adventure-result').textContent).toContain('Floor Key');
+    expect($('adventure-floor-key').textContent).toContain('Floor Key');
+    $('battle-replay').click();
+    $('battle-skip').click();
+    expect($('battle-status').textContent).toBe(result);
+    expect(bodies).toHaveLength(1);
+    $('battle-close').click();
+    await vi.waitFor(() => expect($('adventure-continue').hidden).toBe(true));
+    expect(bodies).toEqual([{}, { action: 'continue', battleId: 'saved-battle', revision: 'battle-map' }]);
+    $('adventure-replay').click();
+    $('battle-skip').click();
+    expect($('battle-status').textContent).toBe(result);
+    $('battle-close').click();
+    expect(bodies).toHaveLength(2);
+    expect($('adventure-floor-key').textContent).toContain('Floor Key');
+  } finally { dom.window.close(); }
+});
+
 it('ends the battle scene at the HP/MP the pet carries back, without a spent Copper shield', async () => {
   const { dom, window, $ } = page();
   const saved = battleProgress();
@@ -598,6 +637,113 @@ it('counts down the final cooldown seconds and unlocks a new run without replaci
   } finally { interval.mockRestore(); clock.mockRestore(); dom.window.close(); }
 });
 
+it('explains the locked stairs and 5% monster drop chance without sending an unusable Space action', async () => {
+  const { dom, window, $ } = page();
+  const saved = { ...map(), x: 13, y: 13, exit: { keyFound: false, unlocked: false, dropRate: 0.05 } };
+  const requests = vi.fn(async () => Response.json(saved));
+  window.fetch = requests as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
+    const descend = $('adventure-descend') as HTMLButtonElement;
+    const stairs = $('adventure-terrain').querySelector<HTMLElement>('.adventure-marker-down')!;
+    expect(descend.disabled).toBe(true);
+    expect(stairs.title).toMatch(/\blocked\b/i);
+    expect(stairs.classList.contains('is-interactable')).toBe(false);
+    expect($('adventure-notice').textContent).toMatch(/locked/i);
+    expect($('adventure-notice').textContent).toContain('5%');
+    expect($('adventure-stair-hint').textContent).toContain('5%');
+    $('adventure-pack-toggle').click();
+    expect($('adventure-floor-key').textContent).toMatch(/Floor Key/i);
+    expect($('adventure-floor-key').textContent).toContain('5%');
+    $('adventure-grid').focus();
+    expect($('adventure-grid').dispatchEvent(new window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }))).toBe(false);
+    descend.click();
+    expect(requests).toHaveBeenCalledTimes(1);
+    expect($('adventure-floor').textContent).toBe('ADVENTURE · FLOOR 1 / 5');
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+  } finally { dom.window.close(); }
+});
+
+it('uses a found key only after the server accepts descent, retaining it through a refused stale request', async () => {
+  const { dom, window, $ } = page();
+  const saved = { ...map(), x: 13, y: 13, exit: { keyFound: true, unlocked: false, dropRate: 0.05 } };
+  const requests: { body: unknown; finish: (response: Response) => void }[] = [];
+  window.fetch = vi.fn((_url: string, options: RequestInit) => new Promise<Response>(finish => {
+    requests.push({ body: JSON.parse(options.body as string), finish });
+  })) as unknown as typeof fetch;
+  const space = () => $('adventure-grid').dispatchEvent(new window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    requests[0].finish(Response.json(saved));
+    const descend = $('adventure-descend') as HTMLButtonElement;
+    await vi.waitFor(() => expect(descend.disabled).toBe(false));
+    expect(descend.textContent).toBe('Unlock & descend');
+    expect($('adventure-terrain').querySelector('.adventure-marker-down')?.classList.contains('is-interactable')).toBe(true);
+    const keyStatus = $('adventure-floor-key').textContent;
+    space();
+    expect(requests[1].body).toEqual({ action: 'descend', revision: 'saved-map' });
+    expect(descend.disabled).toBe(true);
+    expect($('adventure-floor').textContent).toBe('ADVENTURE · FLOOR 1 / 5');
+    expect($('adventure-floor-key').textContent).toBe(keyStatus);
+    requests[1].finish(Response.json({ error: 'The map changed. Try again.' }, { status: 409 }));
+    await vi.waitFor(() => expect(descend.disabled).toBe(false));
+    expect($('adventure-status').textContent).toBe('The map changed. Try again.');
+    expect(descend.textContent).toBe('Unlock & descend');
+    expect($('adventure-floor-key').textContent).toBe(keyStatus);
+    space();
+    expect(requests[2].body).toEqual({ action: 'descend', revision: 'saved-map' });
+    const next = { ...map(2), revision: 'opened-next-floor', exit: { keyFound: false, unlocked: false, dropRate: 0.05 } };
+    requests[2].finish(Response.json(next));
+    await vi.waitFor(() => expect($('adventure-floor').textContent).toBe('ADVENTURE · FLOOR 2 / 5'));
+    expect($('adventure-floor-key').textContent).not.toBe(keyStatus);
+    expect(($('adventure-ascend') as HTMLButtonElement).disabled).toBe(false);
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+    // Returning to the previous floor uses the saved, permanently open exit.
+    space();
+    expect(requests[3].body).toEqual({ action: 'ascend', revision: 'opened-next-floor' });
+    requests[3].finish(Response.json({ ...saved, revision: 'back-up', exit: { ...saved.exit, keyFound: false, unlocked: true } }));
+    await vi.waitFor(() => expect(descend.disabled).toBe(false));
+    expect(descend.textContent).toBe('↓ Descend');
+    expect($('adventure-terrain').querySelector<HTMLElement>('.adventure-marker-down')!.title).not.toMatch(/\blocked\b/i);
+  } finally { dom.window.close(); }
+});
+
+it('shares a teammate’s key discovery and unlocked stairs through saved map refreshes without rebuilding the scene', async () => {
+  const { dom, window, $ } = page();
+  Object.defineProperty(window.document, 'hidden', { value: false });
+  let saved = { ...map(), x: 13, y: 13, exit: { keyFound: false, unlocked: false, dropRate: 0.05 },
+    team: { id: 7, members: [{ id: 'pal', color: '#654321', appearance: 'panda', floor: 1, x: 3, y: 2, hp: 15, maxHp: 15, status: 'exploring' }] } };
+  const bodies: unknown[] = [];
+  window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
+    bodies.push(JSON.parse(options.body as string));
+    return Response.json(saved);
+  }) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-terrain')?.children).toHaveLength(256));
+    const terrain = $('adventure-terrain'), stairs = terrain.querySelector<HTMLElement>('.adventure-marker-down')!;
+    const descend = $('adventure-descend') as HTMLButtonElement;
+    expect(descend.disabled).toBe(true);
+    saved = { ...saved, revision: 'teammate-found-key', exit: { ...saved.exit, keyFound: true } };
+    await vi.waitFor(() => expect(descend.disabled).toBe(false), { timeout: 2500 });
+    expect(descend.textContent).toBe('Unlock & descend');
+    expect($('adventure-floor-key').textContent).toContain('Floor Key');
+    expect(stairs.classList.contains('is-interactable')).toBe(true);
+    expect($('adventure-terrain')).toBe(terrain);
+    expect(terrain.querySelector('.adventure-marker-down')).toBe(stairs);
+    saved = { ...saved, revision: 'teammate-unlocked-exit', exit: { ...saved.exit, keyFound: false, unlocked: true } };
+    await vi.waitFor(() => expect(descend.textContent).toBe('↓ Descend'), { timeout: 2500 });
+    expect(stairs.title).not.toMatch(/\blocked\b/i);
+    expect($('adventure-terrain')).toBe(terrain);
+    expect(bodies.slice(1).every(body => JSON.stringify(body) === JSON.stringify({ action: 'patrol' }))).toBe(true);
+    expect(window.document.activeElement?.id).toBe('adventure-grid');
+  } finally { dom.window.close(); }
+});
+
 it('keeps keyboard movement focused on the map when using stairs disables the selected button', async () => {
   const { dom, window, $ } = page();
   const requests: { body: unknown; finish: (response: Response) => void }[] = [];
@@ -657,7 +803,7 @@ it('opens the map with focus on it, and Space opens the chest or takes the stair
     expect(bodies).toHaveLength(asked);
     $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
     await vi.waitFor(() => expect($('adventure-status').textContent).toBe('Column 14 · Row 14'));
-    expect($('adventure-notice').textContent).toBe('Stairs down: press Space or choose Descend to explore deeper.');
+    expect($('adventure-notice').textContent).toBe('Exit unlocked. Press Space or choose Descend to explore deeper.');
     space();
     await vi.waitFor(() => expect($('adventure-floor').textContent).toBe('ADVENTURE · FLOOR 2 / 5'));
     expect(bodies.at(-1)).toEqual({ action: 'descend', revision: 'at-stairs' });

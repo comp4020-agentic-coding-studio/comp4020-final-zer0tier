@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { createWorld, directions, grassEncounter, grassFor, inGrass, nearby, prepareGrass, walkable } from '../src/adventure-world.ts';
+import { createWorld, directions, grassEncounter, grassFor, inGrass, nearby, prepareExit, prepareGrass, walkable } from '../src/adventure-world.ts';
 
 it('builds five connected 16 × 16 floors with reachable chests, stairs, stronger enemies, and a final boss', () => {
   const world = createWorld();
@@ -27,6 +27,7 @@ it('builds five connected 16 × 16 floors with reachable chests, stairs, stronge
       }
     }
     expect(floor.enemies.some(e => e.kind === 'slime-king')).toBe(index === 4);
+    expect(floor.exit).toEqual(index === 4 ? undefined : { keyFound: false, unlocked: false });
     expect(floor.grass).toHaveLength(16);
     expect(floor.grass!.some(row => row.includes('g'))).toBe(true);
     for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
@@ -87,4 +88,40 @@ it('replays the same saved seed, selects varied hidden monsters, and never resto
   const cleared = structuredClone(floor);
   for (let i = 0; i < 20; i++) expect(grassEncounter(floor, { x: 6, y: 2 })).toBeUndefined();
   expect(floor).toEqual(cleared);
+});
+
+it('replenishes exhausted locked floors only on grass steps with fresh identities and unchanged difficulty', () => {
+  const floor = createWorld()[2], original = structuredClone(floor.enemies);
+  floor.enemies = [];
+  const emptied = structuredClone(floor);
+  expect(grassEncounter(floor, { x: 1, y: 1 })).toBeUndefined();
+  expect(floor).toEqual(emptied);
+  expect(grassEncounter(floor, { x: 6, y: 2 })).toBeUndefined();
+  expect(floor.spawnWave).toBe(1);
+  expect(floor.enemies).toHaveLength(4);
+  for (const [index, enemy] of floor.enemies.entries()) {
+    expect(enemy.id).toBe(`f3-wave-1-enemy-${index}`);
+    expect({ ...enemy, id: original[index].id }).toEqual(original[index]);
+  }
+  floor.enemies = []; floor.encounter!.steps = 0;
+  grassEncounter(floor, { x: 6, y: 2 });
+  expect(floor.spawnWave).toBe(2);
+  expect(floor.enemies.every(enemy => enemy.id.startsWith('f3-wave-2-'))).toBe(true);
+  for (const exit of [{ keyFound: true, unlocked: false }, { keyFound: false, unlocked: true }]) {
+    floor.exit = exit; floor.enemies = [];
+    const stopped = structuredClone(floor);
+    for (let i = 0; i < 8; i++) expect(grassEncounter(floor, { x: 6, y: 2 })).toBeUndefined();
+    expect(floor).toEqual(stopped);
+  }
+});
+
+it('grandfathers old stairs once without altering a new or already saved gate', () => {
+  const world = createWorld();
+  expect(prepareExit(world[0])).toBe(false);
+  delete world[1].exit;
+  expect(prepareExit(world[1])).toBe(true);
+  expect(world[1].exit).toEqual({ keyFound: false, unlocked: true });
+  expect(prepareExit(world[1])).toBe(false);
+  expect(prepareExit(world[4])).toBe(false);
+  expect(world[4].exit).toBeUndefined();
 });

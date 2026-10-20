@@ -8,7 +8,7 @@ import {
 import { grantTreasure } from './inventory.ts';
 import { COINS, rollTreasure } from './treasure.ts';
 import {
-  createWorld, directions, FLOOR_COUNT, grassEncounter, MONSTER_MOVES, nearby, prepareGrass, samePoint, SIZE, walkable, type Enemy, type Floor, type Point,
+  createWorld, directions, FLOOR_COUNT, FLOOR_KEY_DROP_RATE, grassEncounter, MONSTER_MOVES, nearby, prepareExit, prepareGrass, samePoint, SIZE, walkable, type Enemy, type Floor, type Point,
 } from './adventure-world.ts';
 import { realMs, TIME_SCALE } from './clock.ts';
 
@@ -20,6 +20,7 @@ export type AdventureBattle = {
   fighter?: number; // this pet's place in a team battle's playback; absent means the first
   attacked?: true; // legacy battle where a patrolling monster caught the pet
   surprise?: true; // hidden monster encountered by walking into tall grass
+  keyDrop?: { floor: number; name: 'Floor Key' };
 };
 type SavedAdventure = {
   x: number; y: number; floor: number; world_json: string | null;
@@ -74,7 +75,10 @@ function load(id: string): Progress {
   const world: Floor[] = team ? JSON.parse(saved.team_world!) : saved.world_json ? JSON.parse(saved.world_json) : createWorld();
   // Upgrade old solo and shared maps without replacing their walls, rewards,
   // remaining monsters, or saved battles. Persist the seed before returning it.
-  const upgraded = world.map(prepareGrass).some(Boolean);
+  const upgraded = world.map(floor => {
+    const grass = prepareGrass(floor), exit = prepareExit(floor);
+    return grass || exit;
+  }).some(Boolean);
   if (upgraded) {
     if (team) db.prepare('UPDATE teams SET world_json = ? WHERE id = ?').run(JSON.stringify(world), saved.team_id);
     else db.prepare('UPDATE adventures SET world_json = ? WHERE player_id = ?').run(JSON.stringify(world), id);
@@ -117,6 +121,7 @@ function view(saved: Progress) {
       moves: MONSTER_ABILITIES.filter(a => MONSTER_MOVES[enemy.kind].includes(a.id)),
     })),
     up: floor.up, down: floor.down, revision: saved.revision, battle: saved.battle,
+    exit: floor.down ? { ...floor.exit!, dropRate: FLOOR_KEY_DROP_RATE } : null,
     inventory: saved.inventory,
     hp: saved.hp, mp: saved.mp, maxHp: saved.maxHp, maxMp: saved.maxMp, failed: saved.hp === 0,
     abandoned: saved.abandoned, completed: complete(saved), started: saved.started,
@@ -190,6 +195,9 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = fal
       });
   const won = playback.winner !== monster.id;
   const floor = saved.world[saved.floor - 1];
+  const keyDrop = won && floor.down && floor.exit && !floor.exit.keyFound && !floor.exit.unlocked
+    && Math.random() < FLOOR_KEY_DROP_RATE;
+  if (keyDrop) floor.exit!.keyFound = true;
   const last = playback.turns.at(-1)!;
   const battleId = randomUUID();
   // Each fighter keeps what it has left. Damage spends a Copper shield first;
@@ -207,6 +215,7 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = fal
     fighter.battle = {
       id: battleId, floor: saved.floor, enemyId: enemy.id, enemyName: enemy.name, won, pending: true, playback, recovery,
       after: { hp: fighter.hp, mp: fighter.mp }, ...(index ? { fighter: index } : {}), ...(surprise ? { surprise: true as const } : {}),
+      ...(keyDrop ? { keyDrop: { floor: saved.floor, name: 'Floor Key' as const } } : {}),
     };
   });
   if (won) {
@@ -256,6 +265,11 @@ export function changeFloor(id: string, action: unknown, revision?: unknown) {
   if (busy) return busy;
   const stair = action === 'descend' ? floor.down : floor.up;
   if (!stair || !samePoint(saved, stair)) return { error: 'Stand on the matching stairs first.', status: 409 };
+  if (action === 'descend' && !floor.exit!.unlocked) {
+    if (!floor.exit!.keyFound) return { error: 'These stairs are locked. Defeat monsters on this floor for a 5% chance to find its Floor Key.', status: 409 };
+    floor.exit!.keyFound = false;
+    floor.exit!.unlocked = true;
+  }
   const destination = saved.floor + (action === 'descend' ? 1 : -1);
   const landing = action === 'descend' ? saved.world[destination - 1].up! : saved.world[destination - 1].down!;
   saved.x = landing.x; saved.y = landing.y; saved.floor = destination;
