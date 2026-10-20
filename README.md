@@ -148,6 +148,14 @@ activity finishes or you use an Hourglass. The final minute counts down in
 seconds; “finishing…” means the timer has ended and the server is confirming
 the result. The indicator stays out of the home scene.
 
+An original, gentle instrumental soundtrack plays in the background while you
+are signed in, starting after a click, tap, or key press. Open the game menu
+with **Escape** (or the home menu hotspot on touch screens) for **Background
+music** and its **Volume** slider. These preferences are remembered on this
+browser. Music continues across scenes and windows, pauses when you switch tabs,
+and stops when you sign out. The recording is served locally; it needs no music
+service or extra runtime synthesis.
+
 Town uses the same movement and **Space** interaction controls as home.
 Every destination and home object also works with Tab and Enter, and the
 camera brings focused objects into view. Close a window with its Close
