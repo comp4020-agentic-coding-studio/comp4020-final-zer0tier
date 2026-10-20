@@ -334,10 +334,13 @@ it('highlights the reachable home object that Space will open and clears it outs
     const pet = p.window.document.querySelector('[data-home-action="pet"]')!;
     const chest = p.window.document.querySelector('[data-home-action="chest"]')!;
     const stage = p.$('world-stage');
+    const outline = p.$('home-interaction-outline');
     expect(highlighted()).toEqual([]);
+    expect(outline.hasAttribute('hidden')).toBe(true);
     stage.focus();
     p.walk('w');
     expect(highlighted()).toEqual([pet]);
+    expect(outline.hasAttribute('hidden')).toBe(true);
     expect(p.$('world-interact').textContent).toContain('Spend time with your pet');
     stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
     expect(p.$('world-dialog').dataset.place).toBe('pet');
@@ -352,10 +355,18 @@ it('highlights the reachable home object that Space will open and clears it outs
     stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: 400, clientY: 540, bubbles: true }));
     p.advance(100);
     expect(highlighted()).toEqual([chest]);
+    expect(outline.hasAttribute('hidden')).toBe(false);
+    expect([...outline.querySelectorAll('use')].map(stroke => stroke.getAttribute('href')))
+      .toEqual(['/scenes/home-highlights.svg#chest', '/scenes/home-highlights.svg#chest']);
     expect(p.$('world-interact').textContent).toContain('Open your backpack');
     stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
     expect(p.$('world-dialog').dataset.place).toBe('backpack');
     await vi.waitFor(() => expect(highlighted()).toEqual([]));
+    expect(outline.hasAttribute('hidden')).toBe(true);
+    p.$('world-dialog-close').click();
+    await vi.waitFor(() => expect(outline.hasAttribute('hidden')).toBe(false));
+    p.$('home-door').click();
+    expect(outline.hasAttribute('hidden')).toBe(true);
   } finally { p.dom.window.close(); }
 });
 

@@ -522,36 +522,37 @@ body.world-playing.world-home #pet-touch:focus-visible {
 }
 /* The warm outline marks exactly the object that Space will interact with.
    Keep it static: proximity feedback should not add work to the walk loop. */
-body.world-playing .home-hotspot.is-interactable,
-body.world-playing.world-home .home-hotspot.is-interactable {
-  border-color: #ffe5a4;
-  border-radius: 9px;
-  background: rgb(255 229 164 / 10%);
-  box-shadow: 0 0 0 2px rgb(73 48 27 / 65%), 0 0 14px rgb(255 215 128 / 25%);
+body.world-playing #home-interaction-outline {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
 }
+body.world-playing #home-interaction-outline[hidden] { display: none; }
+body.world-playing .interaction-outline-edge { stroke: #63492f; stroke-width: 4px; }
+body.world-playing .interaction-outline-light { stroke: #ffe5a4; stroke-width: 2px; }
 body.world-playing .town-stop.is-interactable {
   border-color: #ffe5a4;
   background: #4b633d;
-  box-shadow: 0 0 0 2px #634d2f, 0 0 0 4px rgb(255 229 164 / 75%), 0 3px 0 #2e402c;
+  box-shadow: 0 0 0 1px #63492f, 0 3px 0 #2e402c;
 }
 /* The pet is a separate live sprite above its invisible interaction target. */
-body.world-playing.world-home .home-hotspot[data-home-action="pet"].is-interactable {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-}
 body.world-playing.world-home .home-hotspot[data-home-action="pet"].is-interactable ~ #pet-touch::before {
   content: "";
   position: absolute;
   z-index: -1;
-  left: -12%;
-  right: -12%;
-  bottom: -2%;
-  height: 24%;
-  border: 2px solid #ffe5a4;
+  left: -3%;
+  right: -3%;
+  bottom: 1%;
+  height: 20%;
+  border: 1.5px solid #ffe5a4;
   border-radius: 50%;
-  background: rgb(255 229 164 / 16%);
-  box-shadow: 0 0 0 2px rgb(73 48 27 / 65%);
+  box-shadow: 0 0 0 1px #63492f;
   pointer-events: none;
 }
 body.world-playing #home-controls-tip,

@@ -28,6 +28,10 @@ worldShell.innerHTML = `
       <div id="world-stage" class="world-stage" data-scene="home" tabindex="0" role="group" aria-label="Your home. Move with W A S D or arrow keys. Press Space near an object to interact." aria-describedby="home-controls-tip">
         <div id="home-scene">
           <img class="scene-art" src="/scenes/home.svg" alt="A cozy wooden room with a television, couch, fireplace, pet house, food bowl, bathtub, storage chest, wall clock, and a door leading into town." draggable="false" />
+          <svg id="home-interaction-outline" viewBox="0 0 960 640" aria-hidden="true" focusable="false" hidden>
+            <use class="interaction-outline-edge" />
+            <use class="interaction-outline-light" />
+          </svg>
           <button type="button" class="home-hotspot" data-home-action="tv" style="--x:22.8%;--y:25.4%;--w:15%;--h:21%" aria-label="Watch the television: town journal"><span class="hotspot-label">Town TV</span></button>
           <button type="button" class="home-hotspot" data-home-action="couch" style="--x:22.9%;--y:50%;--w:19%;--h:18%" aria-label="Sit on the couch with your pet"><span class="hotspot-label">Take a breather</span></button>
           <button type="button" class="home-hotspot" data-home-action="fire" style="--x:77.6%;--y:25%;--w:17%;--h:22%" aria-label="Warm up by the fireplace"><span class="hotspot-label">Cozy fireplace</span></button>
@@ -85,6 +89,8 @@ worldDashboard.append(worldShell);
 
 const worldStage = worldById('world-stage');
 const worldAvatar = worldById('world-avatar');
+const homeInteractionOutline = worldById('home-interaction-outline');
+const homeOutlineStrokes = homeInteractionOutline.querySelectorAll('use');
 const homePet = worldById('pet-touch');
 homePet.classList.add('home-pet');
 worldById('home-scene').append(homePet);
@@ -442,6 +448,14 @@ function worldHighlight(destination) {
   worldHighlighted?.classList.remove('is-interactable');
   worldHighlighted = target;
   worldHighlighted?.classList.add('is-interactable');
+  // Trace the furniture itself, independently of its generous click area.
+  // The pet keeps a floor ring attached to its live sprite.
+  const action = target?.dataset.homeAction;
+  const outline = action && action !== 'pet';
+  homeInteractionOutline.toggleAttribute('hidden', !outline);
+  if (outline) {
+    for (const stroke of homeOutlineStrokes) stroke.setAttribute('href', `/scenes/home-highlights.svg#${action}`);
+  }
 }
 function worldDraw() {
   const transform = `translate3d(${worldPosition.x * worldView.width / 960}px, ${worldPosition.y * worldView.height / 640}px, 0) translate(-50%, -100%)`;
