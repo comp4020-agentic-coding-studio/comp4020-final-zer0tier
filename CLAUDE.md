@@ -32,6 +32,9 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
 
 ## Home and town interface
 
+- Human opponents must be online to start Arena or revenge fights. Visits
+  remain available whether the owner is home, elsewhere, or offline. Share
+  saved character positions live between everyone in the same home or town.
 - Preserve the original sign-in and create-account theme and use its colors,
   typefaces, rounded controls, and light/dark appearance throughout the game.
   Scope world styles to the signed-in game rather than restyling account screens.

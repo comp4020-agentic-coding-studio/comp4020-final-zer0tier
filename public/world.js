@@ -376,7 +376,7 @@ worldDialog.setAttribute('aria-labelledby', 'world-dialog-title');
 worldDialog.innerHTML = `<header class="place-heading"><div><p class="world-eyebrow" id="world-place-eyebrow">AROUND TOWN</p><h2 id="world-dialog-title"></h2></div><button type="button" class="world-button" id="world-dialog-close" aria-label="Close window">Close <span aria-hidden="true">×</span></button></header><p id="world-place-intro" class="place-intro"></p><div class="place-body"></div>`;
 document.body.append(worldDialog);
 const worldPanels = {};
-for (const name of ['school', 'work', 'shop', 'arena', 'journal', 'appearance', 'pet', 'menu']) {
+for (const name of ['school', 'work', 'shop', 'arena', 'journal', 'appearance', 'pet', 'menu', 'visit']) {
   const panel = document.createElement('section');
   panel.id = `world-panel-${name}`;
   panel.className = 'world-panel';
@@ -388,6 +388,7 @@ worldPanels.school.append(original.school, original.study);
 worldPanels.work.append(original.work);
 worldPanels.shop.append(original.supplies, original.adventure);
 worldPanels.arena.append(original.arena);
+worldPanels.visit.append(worldById('visit'));
 worldPanels.appearance.append(worldById('appearance-settings'));
 worldPanels.pet.classList.add('world-companion');
 worldPanels.menu.innerHTML = '<p class="help">Take your time. Your pet and progress are saved.</p><p><a href="/readme/" target="_blank" rel="noopener">How to play</a></p><button type="button" class="world-button" id="world-pet-details" data-place="pet">Pet details</button> <button type="button" class="world-button" data-place="backpack">Backpack</button> <button type="button" class="world-button" data-place="journal">Town journal</button> <button type="button" class="world-button" data-place="appearance">Appearance</button>';
@@ -427,6 +428,7 @@ const worldPlaces = {
   appearance: ["Your pet's little nook", 'Make your companion feel like yours. Choose a shape and colour, then save your appearance.'],
   pet: ['Your companion', 'A little affection goes a long way. Play, care, or see how your pet is doing.'],
   menu: ['Make yourself at home', ''],
+  visit: ['Visiting a neighbour', ''],
 };
 let worldScene = 'home';
 let worldFrame = 0;
@@ -443,6 +445,194 @@ let worldFeedbackTimer = 0;
 let worldCarePending = null;
 let worldWasVisible = false;
 let worldWindowActive = true;
+let worldPlayerId = null;
+let worldHome = null;
+let worldSaved = null;
+let worldIntent = { ...worldPosition };
+let worldIntentFacing = 'down';
+let worldQueued = null;
+let worldSending = false;
+let worldSendTimer = 0;
+let worldLastSent = 0;
+let worldGeneration = 0;
+let worldApplying = false;
+let worldConnected = false;
+let worldPlaced = false;
+let worldVisitedPet = null;
+const worldPlayers = new Map();
+let worldOnline = new Set();
+let worldPresenceChanges = 0;
+const worldPeers = new Map();
+const worldNetworked = () => Boolean(worldPlayerId && typeof fetch === 'function');
+const worldVisiting = () => worldScene === 'home' && worldHome && worldHome !== worldPlayerId;
+const visitPet = document.createElement('button');
+visitPet.type = 'button'; visitPet.id = 'world-visit-pet'; visitPet.className = 'pet-touch home-pet'; visitPet.hidden = true;
+worldById('home-scene').append(visitPet);
+visitPet.addEventListener('click', () => worldOpenPlace('visit'));
+new MutationObserver(() => { visitPet.dataset.reaction = worldById('visit-touch').dataset.reaction; })
+  .observe(worldById('visit-touch'), { attributes: true, attributeFilter: ['data-reaction'] });
+const visitBar = document.createElement('div');
+visitBar.id = 'world-visit-bar'; visitBar.hidden = true;
+visitBar.innerHTML = '<span></span><button type="button" class="world-button">Leave home</button>';
+worldShell.querySelector('.world-main').append(visitBar);
+visitBar.querySelector('button').addEventListener('click', () => worldById('visit-close').click());
+
+function worldRenderVisit() {
+  const visiting = worldVisiting();
+  const hotspot = worldShell.querySelector('[data-home-action="pet"]');
+  hotspot.setAttribute('aria-label', visiting ? `Visit ${worldHome}'s pet` : 'Spend time with your pet: care and details');
+  hotspot.querySelector('.hotspot-label').textContent = visiting ? `${worldHome}'s pet` : 'Your companion';
+  homePet.hidden = Boolean(visiting);
+  visitPet.hidden = !visiting;
+  visitBar.hidden = !visiting;
+  if (!visiting) return;
+  visitBar.querySelector('span').textContent = `${worldHome}'s home`;
+  visitPet.setAttribute('aria-label', `Visit ${worldHome}'s pet`);
+  worldPlaces.visit[0] = `${worldHome}'s pet`;
+  if (worldVisitedPet?.id === worldHome) {
+    const avatar = worldById('visit-avatar').cloneNode(true);
+    avatar.removeAttribute('id');
+    visitPet.replaceChildren(avatar);
+  }
+}
+
+function worldRenderPeers() {
+  const visible = new Set();
+  for (const player of worldPlayers.values()) {
+    if (player.id === worldPlayerId || !worldOnline.has(player.id) || player.scene !== worldScene ||
+      (worldScene === 'home' && player.home !== worldHome)) continue;
+    visible.add(player.id);
+    let avatar = worldPeers.get(player.id);
+    if (!avatar) {
+      avatar = worldAvatar.cloneNode(true);
+      avatar.removeAttribute('id');
+      // Reuse the original SVG's definitions without duplicate document IDs.
+      avatar.querySelector('defs')?.remove();
+      avatar.classList.add('world-peer');
+      avatar.dataset.player = player.id;
+      avatar.removeAttribute('aria-hidden');
+      const label = document.createElement('span');
+      label.className = 'world-player-name'; label.textContent = player.id;
+      avatar.append(label);
+      worldStage.append(avatar); worldPeers.set(player.id, avatar);
+    }
+    avatar.style.transform = `translate3d(${player.x * worldView.width / 960}px, ${player.y * worldView.height / 640}px, 0) translate(-50%, -100%)`;
+    avatar.dataset.facing = player.facing;
+    avatar.dataset.walking = String(player.moving);
+    avatar.dataset.paused = String(document.hidden);
+  }
+  for (const [id, avatar] of worldPeers) if (!visible.has(id)) { avatar.remove(); worldPeers.delete(id); }
+}
+
+function worldReceive(player) {
+  if (!worldPlayerId) return;
+  if (!player || (worldPlayers.get(player.id)?.revision ?? -1) > player.revision) return;
+  worldPlayers.set(player.id, player);
+  if (player.id === worldPlayerId && (!worldSaved || player.revision >= worldSaved.revision)) {
+    worldSaved = player;
+    if (!worldPlaced || worldScene !== player.scene || worldHome !== player.home) {
+      worldPlaced = true;
+      worldApplying = true;
+      worldChangeScene(player.scene, true, player.home, player);
+      worldApplying = false;
+    }
+    worldPosition = { x: player.x, y: player.y };
+    worldAvatar.dataset.facing = player.facing;
+    worldAvatar.dataset.walking = String(player.moving);
+    worldDraw();
+    if (!worldQueued && !worldSending && !worldFrame) {
+      worldIntent = { ...worldPosition };
+      worldIntentFacing = player.facing;
+    }
+    if (player.scene === 'home' && player.y > 558 && Math.abs(player.x - 480) < 55) worldChangeScene('town');
+  }
+  worldRenderPeers();
+}
+
+function worldQueue(state) {
+  if (!worldNetworked() || worldApplying) return;
+  worldQueued = state;
+  if (!worldSendTimer) worldSendTimer = setTimeout(worldSend, Math.max(0, 80 - (performance.now() - worldLastSent)));
+}
+async function worldSend() {
+  worldSendTimer = 0;
+  if (worldSending || !worldQueued || !worldSaved || !worldConnected) return;
+  const generation = worldGeneration, state = worldQueued;
+  worldQueued = null; worldSending = true; worldLastSent = performance.now();
+  try {
+    const response = await fetch('/api/world', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...state, revision: worldSaved.revision }),
+    });
+    const result = await response.json();
+    if (generation !== worldGeneration) return;
+    if (!response.ok) {
+      if (result.player) worldReceive(result.player);
+      worldQueued = null; worldIntent = { ...worldPosition };
+      worldStop();
+      throw new Error(result.error || 'Could not move. Try again.');
+    }
+    worldReceive(result);
+  } catch (error) {
+    if (generation === worldGeneration) {
+      worldQueued = null; worldIntent = { ...worldPosition };
+      worldMessage(error.message || 'Connection lost. Reconnecting…');
+    }
+  } finally {
+    if (generation === worldGeneration) {
+      worldSending = false;
+      if (worldQueued) worldQueue(worldQueued);
+    }
+  }
+}
+
+async function worldResync(fresh = false) {
+  if (!worldNetworked()) return;
+  const generation = worldGeneration, presenceBefore = worldPresenceChanges;
+  try {
+    const response = await fetch('/api/world', { cache: 'no-store' });
+    if (!response.ok) return;
+    const snapshot = await response.json();
+    if (generation !== worldGeneration || !Array.isArray(snapshot.players)) return;
+    if (presenceBefore === worldPresenceChanges) document.dispatchEvent(new CustomEvent('presence:updated', { detail: snapshot.online }));
+    for (const player of snapshot.players) {
+      if (fresh && player.id === worldPlayerId) {
+        if (!worldSaved || player.revision >= worldSaved.revision) worldSaved = player;
+      }
+      else worldReceive(player);
+    }
+    worldConnected = worldOnline.has(worldPlayerId);
+    if (fresh) worldChangeScene('home');
+    else if (worldQueued) worldQueue(worldQueued);
+  } catch { /* The socket's next reconnect retries the snapshot. */ }
+}
+document.addEventListener('world:updated', event => worldReceive(event.detail));
+document.addEventListener('presence:updated', event => {
+  worldPresenceChanges++;
+  worldOnline = new Set(event.detail);
+  for (const id of worldPlayers.keys()) if (id !== worldPlayerId && !worldOnline.has(id)) worldPlayers.delete(id);
+  worldRenderPeers();
+});
+document.addEventListener('realtime:resync', () => worldResync());
+document.addEventListener('realtime:offline', () => { worldConnected = false; worldStop(); });
+document.addEventListener('adventure:pet', event => {
+  if (worldPlayerId === event.detail.id) return;
+  worldGeneration++; worldPlayerId = event.detail.id; worldHome = worldPlayerId;
+  worldSaved = null; worldQueued = null; worldSending = false; worldConnected = false;
+  worldPlaced = false;
+  worldPlayers.clear(); worldIntent = { x: 480, y: 475 };
+  worldResync(true);
+});
+document.addEventListener('home:visit', event => {
+  if (!event.detail) return;
+  worldVisitedPet = event.detail;
+  worldChangeScene('home', true, event.detail.id);
+});
+document.addEventListener('visit:pet', event => {
+  worldVisitedPet = event.detail;
+  worldRenderVisit();
+});
+document.addEventListener('home:leave', () => worldChangeScene('town'));
 const worldInteractionButtons = [...original.play.querySelectorAll('[data-touch]'), worldById('home-feed'), worldById('home-clean')];
 function worldSelectInteraction(kind) {
   let label = '';
@@ -481,7 +671,7 @@ function worldArrangeScene(atHome) {
   if (!worldDashboard.hidden) worldPanels.menu.append(worldById('signout'));
   else signoutAnchor.after(worldById('signout'));
   document.body.classList.toggle('world-home', atHome && !worldDashboard.hidden);
-  document.dispatchEvent(new CustomEvent('world:scene', { detail: { home: atHome } }));
+  document.dispatchEvent(new CustomEvent('world:scene', { detail: { home: atHome && !worldVisiting() } }));
   worldStage.setAttribute('aria-describedby', 'home-controls-tip');
 }
 function worldCamera(point = worldPosition) {
@@ -530,11 +720,17 @@ function worldStop() {
 }
 function worldSetWalking(walking) {
   const value = String(walking);
+  if (worldNetworked() && !worldApplying) {
+    if (!walking && (worldAvatar.dataset.walking === 'true' || worldQueued?.moving)) {
+      worldQueue({ scene: worldScene, home: worldHome, ...worldIntent, facing: worldIntentFacing, moving: false });
+    }
+    return;
+  }
   if (worldAvatar.dataset.walking !== value) worldAvatar.dataset.walking = value;
 }
 function worldModalOpen() { return Boolean(document.querySelector('dialog[open]')); }
 function worldIsPaused() {
-  return worldDashboard.hidden || document.hidden || !worldWindowActive || worldModalOpen();
+  return worldDashboard.hidden || document.hidden || !worldWindowActive || worldModalOpen() || (worldNetworked() && (!worldSaved || !worldConnected));
 }
 function worldSyncAnimation() {
   const paused = worldIsPaused();
@@ -544,6 +740,7 @@ function worldSyncAnimation() {
   if (paused) worldStop();
 }
 function worldOpenPlace(name) {
+  if (name === 'pet' && worldVisiting()) name = 'visit';
   if (worldDashboard.hidden || !worldPlaces[name]) return;
   worldStop();
   const panelName = name === 'backpack' ? 'shop' : name;
@@ -573,10 +770,16 @@ document.addEventListener('click', event => {
 });
 homePet.addEventListener('click', () => worldOpenPlace('pet'));
 
-function worldChangeScene(scene, focus = true) {
+function worldChangeScene(scene, focus = true, home = worldPlayerId, confirmed = null) {
+  if (worldNetworked() && !confirmed) {
+    worldStop();
+    worldQueue({ scene, home: scene === 'home' ? home : null, x: 480, y: scene === 'home' ? 475 : 585, facing: 'down', moving: false });
+    return;
+  }
   worldStop();
   if (worldDialog.open) worldDialog.close();
   worldScene = scene;
+  worldHome = scene === 'home' ? home : null;
   worldStage.dataset.scene = scene;
   worldShell.dataset.scene = scene;
   worldById('home-scene').hidden = scene !== 'home';
@@ -585,7 +788,11 @@ function worldChangeScene(scene, focus = true) {
   clearTimeout(worldFeedbackTimer);
   worldById('home-feedback').hidden = true;
   worldArrangeScene(atHome);
-  worldPosition = atHome ? { x: 480, y: 475 } : { x: 480, y: 585 };
+  worldPosition = confirmed ? { x: confirmed.x, y: confirmed.y } : atHome ? { x: 480, y: 475 } : { x: 480, y: 585 };
+  worldIntent = { ...worldPosition };
+  worldIntentFacing = confirmed?.facing || 'down';
+  worldRenderVisit();
+  if (worldVisiting()) document.dispatchEvent(new CustomEvent('home:arrived', { detail: worldHome }));
   worldById('world-title').textContent = atHome ? 'Home, sweet home.' : 'A little town. A lot to discover.';
   worldById('world-eyebrow').textContent = atHome ? 'A PLACE TO CALL YOUR OWN' : 'WELCOME TO THE NEIGHBOURHOOD';
   worldById('world-description').textContent = atHome ? 'A warm fire, a familiar face, and a little time together.' : 'Follow a path. Meet a neighbour. Make a day of it.';
@@ -594,7 +801,7 @@ function worldChangeScene(scene, focus = true) {
   worldById('world-town').toggleAttribute('aria-current', !atHome);
   (atHome ? worldById('world-home') : worldById('world-town')).setAttribute('aria-current', 'page');
   worldById('town-care-hint').hidden = atHome;
-  worldStage.setAttribute('aria-label', `${atHome ? 'Your home' : 'Town map'}. Move with W A S D or arrow keys. Press Space near an object to interact.`);
+  worldStage.setAttribute('aria-label', `${worldVisiting() ? `${worldHome}'s home` : atHome ? 'Your home' : 'Town map'}. Move with W A S D or arrow keys. Press Space near an object to interact.`);
   worldMessage(atHome ? '' : 'The day is yours. Select a building, or walk over and press Space.', false);
   worldResize();
   worldDraw();
@@ -622,6 +829,7 @@ worldById('home-clean').addEventListener('click', () => worldCare('soap'));
 for (const button of worldShell.querySelectorAll('[data-home-action]')) {
   button.addEventListener('click', () => {
     const action = button.dataset.homeAction;
+    if (worldVisiting() && ['pet', 'feed', 'clean', 'bed', 'couch'].includes(action)) return worldOpenPlace('visit');
     if (action === 'tv') worldOpenPlace('journal');
     if (action === 'bed') worldOpenPlace('appearance');
     if (action === 'chest') worldOpenPlace('backpack');
@@ -753,6 +961,7 @@ function worldDraw() {
   if (control.textContent !== label) control.textContent = label;
   worldHighlight(destination);
   worldCamera();
+  worldRenderPeers();
 }
 // Dialogs and destination availability can change while the player stands
 // still, so keep their highlight in sync without a polling animation loop.
@@ -779,6 +988,8 @@ function worldTick(now) {
   if (worldIsPaused()) return worldStop();
   const seconds = Math.min(Math.max((now - worldLastFrame) / 1000, 0), .04);
   worldLastFrame = now;
+  const confirmed = worldPosition;
+  if (worldNetworked()) worldPosition = { ...worldIntent };
   const previous = { ...worldPosition };
   let dx = 0, dy = 0;
   for (const key of worldKeys) { dx += worldDirections[key][0]; dy += worldDirections[key][1]; }
@@ -808,10 +1019,17 @@ function worldTick(now) {
     // diagonal steps. Keep ties stable so views and walk cycles do not flicker.
     // Use actual travel so sliding along a wall still faces the unblocked axis.
     const facing = Math.abs(dx) > Math.abs(dy) + .000001 ? dx < 0 ? 'left' : 'right' : dy < 0 ? 'up' : 'down';
-    if (worldAvatar.dataset.facing !== facing) worldAvatar.dataset.facing = facing;
-    worldDraw();
-    if (worldScene === 'home' && worldPosition.y > 558 && Math.abs(worldPosition.x - 480) < 55) return worldChangeScene('town');
+    if (worldNetworked()) {
+      worldIntent = { ...worldPosition };
+      worldIntentFacing = facing;
+      worldQueue({ scene: worldScene, home: worldHome, ...worldIntent, facing, moving: true });
+    } else {
+      if (worldAvatar.dataset.facing !== facing) worldAvatar.dataset.facing = facing;
+      worldDraw();
+      if (worldScene === 'home' && worldPosition.y > 558 && Math.abs(worldPosition.x - 480) < 55) return worldChangeScene('town');
+    }
   }
+  if (worldNetworked()) worldPosition = confirmed;
   worldSetWalking(moved);
   if (worldKeys.size || worldPath.length) worldFrame = requestAnimationFrame(worldTick);
   else worldStop();
@@ -833,7 +1051,7 @@ document.addEventListener('keydown', (event) => {
   if (key === 'Escape' && worldStage.contains(event.target)) { event.preventDefault(); worldOpenPlace('menu'); return; }
   // Adventure dialogs restore focus to their entrance. Direction keys should
   // resume walking from focused scene objects; Space/Enter still activate them.
-  if (worldDirections[key] && worldStage.contains(event.target) && event.target.closest?.('.home-hotspot, .town-stop, #pet-touch')) {
+  if (worldDirections[key] && worldStage.contains(event.target) && event.target.closest?.('.home-hotspot, .town-stop, #pet-touch, #world-visit-pet')) {
     event.preventDefault();
     worldStage.focus({ preventScroll: true });
     worldStartWalk(key);
@@ -858,7 +1076,15 @@ for (const button of worldShell.querySelectorAll('[data-world-direction]')) {
     if (event.detail !== 0 || worldIsPaused()) return;
     const [dx, dy] = worldDirections[key];
     const x = worldPosition.x + dx * 20, y = worldPosition.y + dy * 20;
-    if (worldWalkable(x, y)) worldPosition = { x, y };
+    if (worldWalkable(x, y)) {
+      if (worldNetworked()) {
+        worldIntent = { x, y };
+        worldIntentFacing = button.dataset.worldDirection;
+        worldQueue({ scene: worldScene, home: worldHome, x, y, facing: button.dataset.worldDirection, moving: false });
+        return;
+      }
+      worldPosition = { x, y };
+    }
     if (worldScene === 'home' && worldPosition.y > 558 && Math.abs(worldPosition.x - 480) < 55) return worldChangeScene('town');
     worldDraw();
   });
@@ -925,6 +1151,10 @@ document.addEventListener('confirm:ask', worldStop);
 adventureEntrance.addEventListener('click', worldStop);
 function worldSyncSession() {
   const visible = !worldDashboard.hidden;
+  if (!visible && worldPlayerId) {
+    worldGeneration++; worldPlayerId = null; worldSaved = null; worldQueued = null; worldSending = false;
+    worldPlayers.clear(); worldOnline.clear(); worldRenderPeers();
+  }
   document.body.classList.toggle('world-playing', visible);
   if (!visible || !worldWasVisible) worldChangeScene('home', visible);
   worldWasVisible = visible;

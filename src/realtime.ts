@@ -7,9 +7,12 @@ import type { FeedEntry } from "./feed.ts";
 import type { BattleSession, Fight, Pet } from "./pets.ts";
 import type { Team } from "./teams.ts";
 import type { Touch } from "./touches.ts";
+import { stopWorld, type WorldPosition } from './world.ts';
 
 // Server -> client events. Clients act over HTTP; the socket only carries news.
 export type ServerEvent =
+  | { type: 'presence:updated'; players: string[] }
+  | { type: 'world:updated'; player: WorldPosition }
   | { type: "pet:updated"; pet: Pet }
   // Sent after both fighters' pet:updated, so clients can tell the story.
   | { type: "fight:finished"; fight: Fight }
@@ -25,6 +28,23 @@ export type ServerEvent =
 
 let wss: WebSocketServer | undefined;
 const credentials = new WeakMap<WebSocket, string | undefined>();
+let online = new Set<string>();
+
+// Presence is a live connection, never a saved login cookie or pet activity.
+export function refreshPresence(): string[] {
+  const next = new Set<string>();
+  for (const client of wss?.clients ?? []) {
+    if (client.readyState !== WebSocket.OPEN) continue;
+    const id = playerFor(credentials.get(client));
+    if (id) next.add(id);
+  }
+  const changed = next.size !== online.size || [...next].some(id => !online.has(id));
+  for (const id of online) if (!next.has(id)) stopWorld(id);
+  online = next;
+  if (changed) broadcast({ type: 'presence:updated', players: [...online] });
+  return [...online];
+}
+export const isOnline = (id: string): boolean => refreshPresence().includes(id);
 
 export function clientsInRoom(): number {
   let count = 0;
@@ -44,7 +64,21 @@ export function attachRealtime(server: Server): void {
     // stable guest identity; never infer a player from an untrusted URL.
     const user = playerFor(req.headers.cookie) ?? `guest_${id}`;
     logEvent("join", { user, room: ROOM, client_in_room: clientsInRoom(), connection });
+    const player = playerFor(req.headers.cookie);
+    refreshPresence();
+    if (player) broadcast({ type: 'world:updated', player: stopWorld(player) });
+    let alive = true;
+    ws.on('pong', () => { alive = true; });
+    const heartbeat = setInterval(() => {
+      if (!alive) return ws.terminate();
+      alive = false;
+      ws.ping();
+      refreshPresence();
+    }, 10_000);
+    heartbeat.unref();
     ws.once("close", (code) => {
+      clearInterval(heartbeat);
+      refreshPresence();
       logEvent("leave", { user, room: ROOM, client_in_room: clientsInRoom(), connection, code });
     });
     ws.on("error", () => ws.terminate());

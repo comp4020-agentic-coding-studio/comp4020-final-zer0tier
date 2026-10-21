@@ -24,7 +24,8 @@ import {
 import { TIME_SCALE } from "./clock.ts";
 import { recentFeed } from "./feed.ts";
 import { followUp } from "./followups.ts";
-import { attachRealtime, broadcast, clientsInRoom } from "./realtime.ts";
+import { attachRealtime, broadcast, clientsInRoom, isOnline, refreshPresence } from "./realtime.ts";
+import { moveWorld, worldPosition } from './world.ts';
 import { logEvent, ROOM } from "./logging.ts";
 import { logRequest } from "./request-logging.ts";
 import { schedule, scheduleAll } from "./scheduler.ts";
@@ -113,6 +114,7 @@ app.post("/api/signin", (req, res) => authenticate(req, res, signIn, 200, "signi
 app.post("/api/signout", (req, res) => {
   const token = sessionToken(req.headers.cookie);
   if (token) signOut(token);
+  refreshPresence();
   res.setHeader("Set-Cookie", clearedCookie());
   res.status(204).end();
 });
@@ -126,6 +128,22 @@ app.get("/api/me", (req, res) => {
     return;
   }
   res.json(pet);
+});
+
+app.get('/api/world', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: 'Sign in first.' });
+  const online = refreshPresence();
+  res.json({ online, players: [...new Set([...online, id])].map(worldPosition) });
+});
+app.post('/api/world', (req, res) => {
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: 'Sign in first.' });
+  const outcome = moveWorld(id, req.body);
+  if ('error' in outcome) return void res.status(outcome.status).json(outcome);
+  broadcast({ type: 'world:updated', player: outcome });
+  res.json(outcome);
 });
 
 // Live battles are private to their participants and survive reconnects.
@@ -439,6 +457,10 @@ app.post("/api/pets/:id/equip-coin/:coin", (req, res) => {
 app.post("/api/pets/:id/fight/:opponent", (req, res) => {
   if (!isValidId(req.params.id)) return notFound(res, "pet");
   if (!isValidId(req.params.opponent)) return notFound(res, "opponent");
+  if (!getPet(req.params.opponent)) return notFound(res, 'opponent');
+  if (req.params.opponent !== BOT_ID && !isOnline(req.params.opponent)) {
+    return void res.status(409).json({ error: 'This player is offline. You can still visit their home.' });
+  }
   const outcome = fight(req.params.id, req.params.opponent);
   if ("error" in outcome) {
     res.status(outcome.status).json({ error: outcome.error });
@@ -504,6 +526,8 @@ app.post("/api/pets/:id/revenge/:theft", (req, res) => {
   if (!/^[1-9][0-9]*$/.test(req.params.theft) || !Number.isSafeInteger(Number(req.params.theft))) {
     return notFound(res, "theft");
   }
+  const theft = theftsFor(req.params.id).find(theft => theft.id === Number(req.params.theft));
+  if (theft && !isOnline(theft.thief)) return void res.status(409).json({ error: 'The thief is offline. Try again when they are online.' });
   const outcome = revenge(req.params.id, Number(req.params.theft));
   if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
   announceBattle({ ...outcome, attacker: outcome.victim, defender: outcome.thief, ...outcome.session.result }, outcome.session.battle.status === 'finished');
@@ -514,6 +538,7 @@ app.post("/api/pets/:id/revenge/:theft", (req, res) => {
 app.get(["/", "/index.html"], (req, res, next) => {
   const token = sessionToken(req.headers.cookie);
   if (token) signOut(token);
+  refreshPresence();
   res.setHeader("Set-Cookie", clearedCookie());
   res.setHeader("Cache-Control", "no-store");
   next();

@@ -1,4 +1,5 @@
-import { inject } from "vitest";
+import { afterEach, inject } from "vitest";
+import { WebSocket } from 'ws';
 
 export const baseUrl = inject("baseUrl");
 
@@ -9,6 +10,22 @@ export const PASSWORD = "correct horse battery";
 
 // Each signed-up pet's session cookie, so a test acts as that pet's owner.
 const sessions = new Map<string, string>();
+const players = new Map<string, WebSocket>();
+// Integration players keep the same authenticated live connection as a browser.
+export async function connectPlayer(id: string): Promise<WebSocket> {
+  players.get(id)?.terminate();
+  const socket = new WebSocket(new URL('/ws', baseUrl).href.replace(/^http/, 'ws'), { headers: { cookie: sessions.get(id)! } });
+  players.set(id, socket);
+  await new Promise<void>((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });
+  return socket;
+}
+export async function disconnectPlayer(id: string): Promise<void> {
+  const socket = players.get(id);
+  players.delete(id);
+  if (!socket || socket.readyState === WebSocket.CLOSED) return;
+  await new Promise<void>(resolve => { socket.once('close', () => resolve()); socket.close(); });
+}
+afterEach(() => { for (const socket of players.values()) socket.terminate(); players.clear(); });
 
 export const sessionFor = (id: string): string | undefined => sessions.get(id);
 
@@ -42,7 +59,10 @@ export async function finishBattle(result: any, send = post): Promise<any> {
 async function authenticate(path: string, id: string, password: string): Promise<Response> {
   const res = await post(path, { id, password }, null);
   const cookie = res.headers.getSetCookie().find((c) => c.startsWith("session="));
-  if (res.ok && cookie) sessions.set(id, cookie.split(";")[0]);
+  if (res.ok && cookie) {
+    sessions.set(id, cookie.split(";")[0]);
+    await connectPlayer(id);
+  }
   return res;
 }
 

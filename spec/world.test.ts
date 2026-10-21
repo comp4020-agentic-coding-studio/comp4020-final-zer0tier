@@ -78,6 +78,63 @@ function page() {
   return { dom, window, $, controls, lesson, study, play, destination, homeAction, openMenu, walk, position, advance };
 }
 
+it('renders server-confirmed movement, shares only the current room, and removes disconnected visitors', async () => {
+  const p = page();
+  const saved = { id: 'owner', scene: 'home', home: 'owner', x: 480, y: 475, facing: 'down', moving: false, revision: 0 };
+  const moves: { state: typeof saved; reply: (response: Response) => void }[] = [];
+  let initialized = false;
+  p.window.fetch = (async (_url: string, options?: RequestInit) => {
+    if (options?.method !== 'POST') return Response.json({ online: ['owner', 'guest', 'elsewhere'], players: [saved] });
+    const state = { ...JSON.parse(String(options.body)), id: saved.id };
+    if (!initialized) { initialized = true; return Response.json({ ...state, revision: 1 }); }
+    return new Promise<Response>(reply => moves.push({ state, reply }));
+  }) as typeof fetch;
+  const event = (name: string, detail: unknown) => p.window.document.dispatchEvent(new p.window.CustomEvent(name, { detail }));
+  try {
+    event('adventure:pet', { id: 'owner' });
+    await vi.waitFor(() => expect(initialized).toBe(true));
+    const before = p.position();
+    p.walk('ArrowRight');
+    await vi.waitFor(() => expect(moves.length).toBeGreaterThan(0));
+    expect(p.position()).toEqual(before);
+    const pending = moves[0];
+    expect(pending.state.x).toBeGreaterThan(before.x);
+    expect(pending.state.facing).toBe('right');
+    pending.reply(Response.json({ ...pending.state, revision: 2 }));
+    await vi.waitFor(() => expect(p.position().x).toBe(pending.state.x));
+
+    event('world:updated', { ...saved, id: 'guest', x: 530, revision: 4, moving: true });
+    event('world:updated', { ...saved, id: 'elsewhere', home: 'elsewhere' });
+    const peer = p.window.document.querySelector<HTMLElement>('[data-player="guest"]')!;
+    expect(peer).not.toBeNull();
+    expect(peer.dataset.walking).toBe('true');
+    expect(p.window.document.querySelector('[data-player="elsewhere"]')).toBeNull();
+    const transform = peer.style.transform;
+    event('world:updated', { ...saved, id: 'guest', x: 500, revision: 3 });
+    expect(peer.style.transform).toBe(transform); // late snapshot cannot rewind a newer move
+    event('presence:updated', ['owner']);
+    expect(p.window.document.querySelector('[data-player="guest"]')).toBeNull();
+  } finally { p.window.close(); }
+});
+
+it('opens the visited pet controls from the home hotspot and leaves personal care out of the visit', () => {
+  const p = page();
+  try {
+    p.window.document.dispatchEvent(new p.window.CustomEvent('home:visit', { detail: { id: 'neighbour' } }));
+    expect(p.$('world-stage').getAttribute('aria-label')).toContain("neighbour's home");
+    expect(p.$('pet-touch').hidden).toBe(true);
+    p.homeAction('pet');
+    expect(p.$('world-dialog').dataset.place).toBe('visit');
+    expect(p.$('world-panel-pet').hidden).toBe(true);
+    expect(p.$('world-panel-visit').hidden).toBe(false);
+    p.$('world-dialog-close').click();
+    p.$('world-visit-bar').querySelector('button')!.click();
+    // app.js owns the Leave action; the scene listens to the resulting event.
+    p.window.document.dispatchEvent(new p.window.CustomEvent('home:leave'));
+    expect(p.$('world-stage').dataset.scene).toBe('town');
+  } finally { p.window.close(); }
+});
+
 it('keeps the live pet and gameplay controls while navigating between home and town', () => {
   const p = page();
   try {

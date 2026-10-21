@@ -29,6 +29,9 @@ it("shows saved thefts on login, prevents duplicate clicks, and waits for broadc
     expect($("theft-list").textContent).toContain("sneaky stole $20");
     expect($("theft-list").textContent).toContain("$40");
     const button = $("theft-list").querySelector("button")!;
+    expect(button.disabled).toBe(true);
+    window.document.dispatchEvent(new window.CustomEvent('presence:updated', { detail: ['sneaky'] }));
+    expect(button.disabled).toBe(false);
     button.click(); button.click();
     expect(requests.mock.calls.filter(([url]) => url.includes("/revenge/"))).toHaveLength(1);
     expect(button.disabled).toBe(true);
@@ -71,12 +74,14 @@ it('isolates pending revenge requests across sign-out and a new login', async ()
   try {
     window.eval(readFileSync('public/app.js', 'utf8'));
     await vi.waitFor(() => expect($('theft-list').querySelector('button')).not.toBeNull());
+    window.document.dispatchEvent(new window.CustomEvent('presence:updated', { detail: ['sneaky'] }));
     $('theft-list').querySelector('button')!.click();
     expect(finishes).toHaveLength(1);
     $('signout').click();
     await vi.waitFor(() => expect($('login').hidden).toBe(false));
     $('login').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
     await vi.waitFor(() => expect($('theft-list').querySelector('button')).not.toBeNull());
+    window.document.dispatchEvent(new window.CustomEvent('presence:updated', { detail: ['sneaky'] }));
     const next = $('theft-list').querySelector('button')!;
     expect(next.disabled).toBe(false);
     next.click();

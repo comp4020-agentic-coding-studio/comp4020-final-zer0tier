@@ -13,6 +13,19 @@ let pendingAppearance = null;
 let atHome = true;
 let savingSkills = false;
 let activeSocket = null;
+let onlinePlayers = new Set();
+function updatePresence(players) {
+  onlinePlayers = new Set(players);
+  renderFightButtons();
+  for (const status of document.querySelectorAll('[data-online-player]')) {
+    status.textContent = onlinePlayers.has(status.dataset.onlinePlayer) ? 'Online' : 'Offline';
+  }
+  for (const button of $('theft-list').querySelectorAll('[data-thief]')) {
+    button.disabled = revengePending || !onlinePlayers.has(button.dataset.thief);
+    button.title = onlinePlayers.has(button.dataset.thief) ? '' : 'This player is offline.';
+  }
+}
+document.addEventListener('presence:updated', event => updatePresence(event.detail));
 document.addEventListener("world:scene", event => {
   atHome = event.detail.home;
   renderSkills();
@@ -555,10 +568,17 @@ function rivalRow(pet) {
   li.querySelector(".rival-identity").prepend(petAvatar(pet));
   if (pet.id === rules.botId) li.querySelector(".rival-name").insertAdjacentHTML("afterend", '<span class="tag">bot</span>');
   li.querySelector(".rival-meta").textContent = `${school} · ${doing} · ${pet.wins}W ${pet.losses}L`;
+  if (pet.id !== rules.botId) {
+    const status = document.createElement('span');
+    status.dataset.onlinePlayer = pet.id;
+    status.textContent = onlinePlayers.has(pet.id) ? 'Online' : 'Offline';
+    li.querySelector('.rival-meta').append(' · ', status);
+  }
   li.querySelector(".rival-stats").innerHTML =
     `Power <b></b> · Str ${pet.strength} · Int ${pet.intelligence} · Cha ${pet.charisma}`;
   li.querySelector(".rival-stats b").textContent = powerOf(pet);
   const button = li.querySelector(".fight-btn");
+  button.dataset.opponent = pet.id;
   button.setAttribute("aria-label", `Fight ${pet.id}`);
   button.addEventListener("click", () => startFight(pet.id));
   const visit = li.querySelector(".visit-btn");
@@ -591,11 +611,13 @@ function renderVisit() {
   const pet = rivals.get(visiting);
   $("visit").hidden = !pet || !current;
   // Playing with the visited pet lives in interact.js.
-  document.dispatchEvent(new CustomEvent("visit:pet", { detail: pet && current ? pet : null }));
-  if (!pet || !current) return;
+  if (!pet || !current) {
+    document.dispatchEvent(new CustomEvent('visit:pet', { detail: null }));
+    return;
+  }
   $("visit-heading").textContent = `Visiting ${pet.id}`;
   renderPetAvatar($("visit-avatar"), pet);
-  $("visit-activity").textContent = pet.activity === "idle" ? "At home" : busyText(pet);
+  $("visit-activity").textContent = pet.activity === "idle" ? '' : busyText(pet);
   $("visit-money").textContent = `$${pet.money} saved`;
   for (const need of ["stamina", "hygiene"]) {
     const track = $(`visit-${need}`);
@@ -605,7 +627,12 @@ function renderVisit() {
   }
   renderStealControls();
   renderHelpControls();
+  document.dispatchEvent(new CustomEvent('visit:pet', { detail: pet }));
 }
+
+document.addEventListener('home:arrived', event => {
+  if (current && visiting !== event.detail) openVisit(event.detail, false);
+});
 
 // Feeding or cleaning the visited pet spends one of your own Food or Soap.
 function renderHelpControls() {
@@ -681,6 +708,7 @@ async function openVisit(id, focus = true) {
     if (request === visitLoads && current?.id === owner) {
       visitLoading = false;
       renderVisit();
+      if (focus && visitReady) document.dispatchEvent(new CustomEvent('home:visit', { detail: rivals.get(visiting) }));
     }
   }
 }
@@ -700,6 +728,7 @@ function closeVisit() {
 $("visit-close").addEventListener("click", () => {
   const id = visiting;
   closeVisit();
+  document.dispatchEvent(new CustomEvent('home:leave'));
   [...$("rivals").querySelectorAll(".visit-btn")].find((button) => button.dataset.pet === id)?.focus();
 });
 
@@ -769,9 +798,14 @@ for (const button of document.querySelectorAll("[data-help]")) {
 }
 
 function renderFightButtons() {
-  for (const button of $("rivals").querySelectorAll(".fight-btn")) button.disabled = fighting || arenaBlock !== "";
-  $("revenge").disabled = fighting || arenaBlock !== "";
-  $("revenge").title = arenaBlock;
+  for (const button of $("rivals").querySelectorAll(".fight-btn")) {
+    const offline = button.dataset.opponent !== rules?.botId && !onlinePlayers.has(button.dataset.opponent);
+    button.disabled = fighting || arenaBlock !== "" || offline;
+    button.title = offline ? 'This player is offline. You can still visit their home.' : arenaBlock;
+  }
+  const offline = avenging && avenging !== rules?.botId && !onlinePlayers.has(avenging);
+  $("revenge").disabled = fighting || arenaBlock !== "" || Boolean(offline);
+  $("revenge").title = offline ? 'This player is offline.' : arenaBlock;
 }
 
 // Resolves true if the fight happened; otherwise says why in `errorId`.
@@ -1234,6 +1268,7 @@ let revengePending = false;
 let theftSession = 0; // late actions belong only to the login that started them
 function clearThefts() {
   fighting = false;
+  updatePresence([]);
   document.dispatchEvent(new CustomEvent("battle:reset"));
   document.dispatchEvent(new CustomEvent("adventure:reset"));
   theftSession++;
@@ -1275,7 +1310,9 @@ async function loadThefts() {
       button.type = "button";
       button.className = "chip-btn chip-fight";
       button.textContent = `Take revenge on ${theft.thief}`;
-      button.disabled = revengePending;
+      button.dataset.thief = theft.thief;
+      button.disabled = revengePending || !onlinePlayers.has(theft.thief);
+      button.title = onlinePlayers.has(theft.thief) ? '' : 'This player is offline.';
       button.addEventListener("click", () => takeRevenge(theft.id, owner));
       row.append(text, button);
       $("theft-list").append(row);
@@ -1333,7 +1370,7 @@ async function takeRevenge(id, owner) {
     if (active()) {
       revengePending = false;
       $("theft-list").setAttribute("aria-busy", "false");
-      for (const button of $("theft-list").querySelectorAll("button")) button.disabled = false;
+      updatePresence([...onlinePlayers]);
     }
   }
 }
@@ -1454,6 +1491,7 @@ function connect() {
   const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
   activeSocket = ws;
   ws.addEventListener("open", async () => {
+    if (activeSocket !== ws) return;
     $("live").textContent = "Live";
     $("live").dataset.state = "live";
     if (!current) return;
@@ -1474,7 +1512,10 @@ function connect() {
     }
   });
   ws.addEventListener("message", (msg) => {
+    if (activeSocket !== ws) return;
     const event = JSON.parse(msg.data);
+    if (event.type === 'presence:updated') document.dispatchEvent(new CustomEvent('presence:updated', { detail: event.players }));
+    if (event.type === 'world:updated') document.dispatchEvent(new CustomEvent('world:updated', { detail: event.player }));
     if (event.type === "pet:updated") {
       broadcasts++;
       if (feedPets.has(event.pet.id)) feedPets.set(event.pet.id, event.pet);
@@ -1514,6 +1555,9 @@ function connect() {
     if (event.type === "pet:updated" && current && rules) renderFeed();
   });
   ws.addEventListener("close", () => {
+    if (activeSocket !== ws) return;
+    document.dispatchEvent(new CustomEvent('presence:updated', { detail: [] }));
+    document.dispatchEvent(new CustomEvent('realtime:offline'));
     $("live").textContent = "Reconnecting…";
     $("live").dataset.state = "reconnecting";
     setTimeout(connect, 1000);

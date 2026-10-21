@@ -226,6 +226,8 @@ it("logs an action_result naming who did what for sign-in, fights, theft, reveng
   expect(bobUp.status).toBe(201);
   await bobUp.json();
   cookies.set(bob, bobUp.headers.getSetCookie().find((cookie) => cookie.startsWith("session="))!.split(";")[0]);
+  await open(alice);
+  await open(bob);
 
   // Alice studies, then works, so her finished lesson and shift both log.
   // A two-hour shift funds Bob's double-theft reward for every theft amount,

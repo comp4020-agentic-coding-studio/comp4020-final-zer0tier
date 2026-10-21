@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { WebSocket } from "ws";
-import { baseUrl, finishBattle, freshId, post, sessionFor, signIn, signUp, workHour } from "./helpers.ts";
+import { baseUrl, connectPlayer, disconnectPlayer, finishBattle, freshId, getPet, post, sessionFor, signIn, signUp, workHour } from "./helpers.ts";
 
 async function setup() {
   const victim = freshId(), thief = freshId();
@@ -12,6 +12,24 @@ async function setup() {
 }
 const reports = (id?: string) => fetch(new URL("/api/thefts", baseUrl), {
   headers: id ? { cookie: sessionFor(id)! } : {},
+});
+
+it('keeps a revenge report and starting resources until the thief is online', async () => {
+  const { victim, thief } = await setup();
+  const [theft] = await (await reports(victim)).json();
+  await disconnectPlayer(thief);
+  const before = await getPet(victim);
+  const path = `/api/pets/${victim}/revenge/${theft.id}`;
+  const refused = await post(path);
+  expect(refused.status).toBe(409);
+  expect((await refused.json()).error).toMatch(/offline/i);
+  expect(await getPet(victim)).toEqual(before);
+  expect(await (await reports(victim)).json()).toEqual([theft]);
+  await connectPlayer(thief);
+  const response = await post(path);
+  expect(response.status).toBe(200);
+  const { session } = await response.json();
+  await post(`/api/battles/${session.id}/forfeit`, { revision: session.battle.revision }, victim);
 });
 
 it("shows the thief and amount at the next login and keeps reports private", async () => {

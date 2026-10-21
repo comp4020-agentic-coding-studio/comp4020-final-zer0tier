@@ -332,6 +332,12 @@ joins while you're playing shows up in your arena right away. You can also
 look up any pet by its player ID. Each shows its school, what it's doing,
 its attributes, its power, and its wins and losses.
 
+Human opponents must be **online** (signed in with a live connection) to
+start a fight, including revenge. Online status updates automatically;
+offline players can still receive visits. Being at home or in town does
+not determine fight eligibility. The usual activity and battle restrictions
+still apply. A saved login alone does not count as online.
+
 Pet **`0` is a bot**. It always exists, so there's always someone to fight.
 It keeps pace with the players: each of its attributes is the **median** of
 every player's pet (rounded down, never below a new pet's 5), updated the
@@ -404,7 +410,7 @@ from you, when, and how much, with a
 and public-feed pruning. Each theft allows one completed revenge attempt,
 using the same turn-based skill selection and combat energy as a fight.
 Both participants must be available — ordinary fight cooldowns don't block
-theft revenge. On a win, the
+theft revenge, but the thief must be online. On a win, the
 thief pays **twice the stolen amount**, and you gain **+1 Strength, +1
 Intelligence, and +1 Charisma**. If the thief can't afford the full reward,
 no attempt or energy is spent — try later. A loss spends the attempt and
@@ -420,7 +426,15 @@ notifications or buttons.
 ### Visit, play and steal
 
 Press **Visit** beside a pet in the Arena (or look it up by player ID) to
-see its appearance, activity, and balance.
+enter its home, whether the owner is at home, elsewhere, or offline. Walk
+with the same keyboard or floor-click controls. Everyone in the same home
+sees each other's character positions, direction, and walking in real time.
+Players in a different home are not drawn in yours. Select the pet to see
+its appearance, activity, balance, and visiting actions; **Leave home** or
+the front door returns to town. Town also shows the players walking there.
+Signing out or losing the live connection removes your character; reconnecting
+resyncs the saved positions. Closing one of several connected tabs does not
+make the player offline.
 
 **Play with it** by tapping or clicking it where you'd like to touch it, or
 with **Pat head**, **Tickle belly**, **Stroke cheek**, and **Shake paw**
@@ -557,6 +571,14 @@ and the built-in `node:sqlite` for storage.
   visitor plays with someone else's pet. The feed keeps its newest 500
   entries in SQLite. A private `battle:updated` event sends saved
   Arena/revenge session changes only to its participants.
+  `presence:updated` lists authenticated players with open connections;
+  `world:updated` carries a saved home/town position. `GET /api/world`
+  resyncs online players and positions. Authenticated `POST /api/world`
+  accepts `{ scene, home, x, y, facing, moving, revision }` for the caller
+  only; positions are saved in SQLite before broadcasting, and stale
+  revisions are refused. Movement is coalesced to at most one request per
+  80 ms. `spec/world-realtime.test.ts` checks movement and presence delivery
+  to multiple sockets within one second, offline visits, and online fights.
 - **Logs:** server stdout (also visible in `flyctl logs`) records `join`,
   `leave`, `action`, `broadcast`, `reject`, and `snapshot` events, each as
   one line of `key = value` fields. The game's single shared WebSocket room
