@@ -1344,12 +1344,10 @@ $("theft-retry").addEventListener("click", loadThefts);
 let authMode = "signin"; // or "signup"
 const AUTH = {
   signin: {
-    lede: "Welcome back. Sign in to see your pet.",
     submit: "Sign in",
     autocomplete: "current-password",
   },
   signup: {
-    lede: "Pick a player ID and a password. Each ID has one pet, and it's yours.",
     submit: "Create account",
     autocomplete: "new-password",
   },
@@ -1357,14 +1355,22 @@ const AUTH = {
 
 function setAuthMode(mode) {
   authMode = mode;
-  for (const tab of ["signin", "signup"]) $(`tab-${tab}`).setAttribute("aria-selected", String(tab === mode));
-  $("auth-lede").textContent = AUTH[mode].lede;
+  for (const tab of ["signin", "signup"]) $(`tab-${tab}`).hidden = tab === mode;
+  for (const field of ["player-id", "password"]) {
+    $(`${field}-help`).hidden = mode !== "signup";
+    $(field).setAttribute("aria-describedby", mode === "signup" ? `${field}-help login-error` : "login-error");
+  }
+  $("auth-heading").textContent = AUTH[mode].submit;
   $("auth-submit").textContent = AUTH[mode].submit;
   $("password").autocomplete = AUTH[mode].autocomplete;
   $("login-error").textContent = "";
 }
-$("tab-signin").addEventListener("click", () => setAuthMode("signin"));
-$("tab-signup").addEventListener("click", () => setAuthMode("signup"));
+for (const mode of ["signin", "signup"]) {
+  $(`tab-${mode}`).addEventListener("click", () => {
+    setAuthMode(mode);
+    $("player-id").focus();
+  });
+}
 
 // Back to the sign-in form, e.g. after signing out or when a session ends.
 function showSignIn(message = "") {

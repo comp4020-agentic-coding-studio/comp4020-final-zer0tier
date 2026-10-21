@@ -130,13 +130,34 @@ main { flex: 1; width: 100%; max-width: 40rem; margin: 0 auto; padding: 1.5rem 1
 [hidden] { display: none !important; }
 
 /* Login */
-.login { display: grid; gap: 0.5rem; }
+.login { display: grid; gap: 1.25rem; max-width: 26rem; margin: clamp(1rem, 6vh, 3rem) auto 0; }
+.login h1 { margin: 0 0 0.25rem; text-align: center; }
+.auth-field { display: grid; gap: 0.375rem; min-width: 0; }
+.auth-field input { width: 100%; min-width: 0; }
+.login .btn { margin-top: 0.25rem; }
+.auth-switch {
+  min-height: 44px;
+  margin-top: -0.5rem;
+  padding: 0.5rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: var(--cursor-pointer);
+  touch-action: manipulation;
+}
+.auth-switch:hover { background: var(--bg-glow); }
+body:has(#login:not([hidden])) .topbar { justify-content: center; }
+body:has(#login:not([hidden])) .topbar-right,
+body:has(#login:not([hidden])) > .footer { display: none; }
 .notice { margin: 0 0 1rem; padding: 0.75rem 1rem; border-radius: var(--radius-sm); background: var(--surface); border: 2px solid var(--pet); font-weight: 600; }
 .notice:empty { display: none; }
 .topbar-right { display: flex; align-items: center; gap: 0.5rem; }
 .topbar-right .chip-btn { min-height: 36px; padding: 0.25rem 0.9rem; }
-.auth-tabs, .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; padding: 0.25rem; margin-bottom: 0.25rem; border-radius: 999px; background: var(--bg-glow); }
-.auth-tabs button, .tabs button {
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; padding: 0.25rem; margin-bottom: 0.25rem; border-radius: 999px; background: var(--bg-glow); }
+.tabs button {
   min-height: 44px;
   font: inherit;
   font-weight: 700;
@@ -147,8 +168,7 @@ main { flex: 1; width: 100%; max-width: 40rem; margin: 0 auto; padding: 1.5rem 1
   cursor: var(--cursor-pointer);
   transition: background-color 150ms var(--ease), color 150ms var(--ease);
 }
-.auth-tabs button[aria-selected="true"], .tabs button[aria-selected="true"] { color: var(--fg); background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
-.lede { margin: 0 0 1rem; color: var(--muted); }
+.tabs button[aria-selected="true"] { color: var(--fg); background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
 label { font-weight: 700; }
 input, select {
   font: inherit;

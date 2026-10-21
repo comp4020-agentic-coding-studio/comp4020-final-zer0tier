@@ -281,21 +281,22 @@
           <button type="button" id="attacked-close" class="chip-btn chip-buy" aria-label="Dismiss">Dismiss</button>
         </div>
       </div>
-      <form id="login" class="card login" hidden>
-        <h1>Raise a pet worth bragging about</h1>
-        <div class="auth-tabs" role="tablist" aria-label="Account">
-          <button type="button" role="tab" id="tab-signin" aria-selected="true" aria-controls="login">Sign in</button>
-          <button type="button" role="tab" id="tab-signup" aria-selected="false" aria-controls="login">Create account</button>
+      <form id="login" class="card login" aria-labelledby="auth-heading" hidden>
+        <h1 id="auth-heading">Sign in</h1>
+        <div class="auth-field">
+          <label for="player-id">Player ID</label>
+          <input id="player-id" name="id" required maxlength="32" pattern="[A-Za-z0-9_\-]+" autocomplete="username" autocapitalize="none" aria-describedby="login-error" spellcheck="false" />
+          <p id="player-id-help" class="help" hidden>Letters, numbers, <code>-</code> or <code>_</code>. Up to 32 characters.</p>
         </div>
-        <p class="lede" id="auth-lede"></p>
-        <label for="player-id">Player ID</label>
-        <input id="player-id" name="id" required maxlength="32" pattern="[A-Za-z0-9_\-]+" autocomplete="username" aria-describedby="player-id-help login-error" spellcheck="false" />
-        <p id="player-id-help" class="help">Letters, digits, <code>-</code> or <code>_</code>, up to 32 characters. It's also your pet's name in the arena.</p>
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" required minlength="8" maxlength="128" autocomplete="current-password" aria-describedby="password-help login-error" />
-        <p id="password-help" class="help">At least 8 characters.</p>
+        <div class="auth-field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required minlength="8" maxlength="128" autocomplete="current-password" aria-describedby="login-error" />
+          <p id="password-help" class="help" hidden>At least 8 characters.</p>
+        </div>
         <p id="login-error" class="error" role="alert"></p>
         <button type="submit" class="btn" id="auth-submit">Sign in</button>
+        <button type="button" class="auth-switch" id="tab-signup">Create account</button>
+        <button type="button" class="auth-switch" id="tab-signin" hidden>Back to sign in</button>
       </form>
 
       <section id="dashboard" class="card dashboard" hidden aria-labelledby="pet-heading">

@@ -173,6 +173,10 @@ game page always asks for a fresh login — even in a new tab, since tabs
 share a session. Your pet and progress are saved. After 5 wrong passwords
 for an ID, sign-ins to it from that address wait 15 minutes.
 
+The sign-in page keeps the player ID, password, and **Sign in** button together.
+Use **Create account** below the form to register; ID and password requirements
+appear only when creating an account.
+
 Anyone can look at any pet, but only its owner can study, work, shop, steal,
 or fight with it. The bot's ID, `0`, can't be signed up or signed into. A pet
 from before accounts existed is claimed by the first person to sign up with
