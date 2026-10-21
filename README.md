@@ -116,7 +116,8 @@ between server-confirmed positions. Releasing a movement key stops walking
 even when a reply is delayed, and new floor clicks continue from the latest
 requested route position. Character animation
 pauses while a window is open or the game is in the background; reduced-motion
-settings turn off these decorative animations.
+settings turn off these decorative animations. After sign-in or reconnection,
+animation resumes automatically once the live scene is ready.
 
 The room and town have gentle environmental animation: the fireplace flickers,
 the TV shows a moving landscape, bath water ripples, and the river and fountain

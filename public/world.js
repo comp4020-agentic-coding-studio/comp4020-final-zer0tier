@@ -641,6 +641,9 @@ async function worldResync(fresh = false) {
     worldConnected = worldOnline.has(worldPlayerId);
     if (fresh) worldChangeScene('home');
     else if (worldQueued) worldQueue(worldQueued);
+    // Loading the session pauses CSS animation as well as movement. Resume
+    // both when ready, while still respecting dialogs and window visibility.
+    worldSyncAnimation();
   } catch { /* The socket's next reconnect retries the snapshot. */ }
 }
 document.addEventListener('world:updated', event => worldReceive(event.detail));
@@ -651,7 +654,7 @@ document.addEventListener('presence:updated', event => {
   worldRenderPeers();
 });
 document.addEventListener('realtime:resync', () => worldResync());
-document.addEventListener('realtime:offline', () => { worldConnected = false; worldStop(); });
+document.addEventListener('realtime:offline', () => { worldConnected = false; worldSyncAnimation(); });
 document.addEventListener('adventure:pet', event => {
   if (worldPlayerId === event.detail.id) return;
   worldGeneration++; worldPlayerId = event.detail.id; worldHome = worldPlayerId;

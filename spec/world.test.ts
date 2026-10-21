@@ -79,7 +79,7 @@ function page() {
   return { dom, window, $, controls, lesson, study, play, destination, homeAction, openMenu, walk, position, advance };
 }
 
-async function networkPage() {
+async function networkPage(whileConnecting?: (p: ReturnType<typeof page>) => void) {
   const p = page();
   const initial: WorldPosition = { id: 'owner', scene: 'home', home: 'owner', x: 480, y: 475, facing: 'down', moving: false, revision: 0 };
   const moves: { state: typeof initial; reply: (response: Response) => void }[] = [];
@@ -92,9 +92,54 @@ async function networkPage() {
   }) as typeof fetch;
   const send = (state: Partial<typeof initial>) => p.window.document.dispatchEvent(new p.window.CustomEvent('world:updated', { detail: { ...initial, ...state } }));
   p.window.document.dispatchEvent(new p.window.CustomEvent('adventure:pet', { detail: { id: initial.id } }));
+  whileConnecting?.(p);
   await vi.waitFor(() => expect(initialized).toBe(true));
   return { ...p, moves, send };
 }
+
+it('resumes character and scenery animation when sign-in finishes connecting', async () => {
+  const p = await networkPage(p => {
+    // Focus/visibility changes can pause the scene while the initial snapshot is pending.
+    p.window.dispatchEvent(new p.window.Event('focus'));
+    expect(p.$('world-avatar').dataset.paused).toBe('true');
+  });
+  try {
+    expect(p.$('world-avatar').dataset.paused).toBe('false');
+    expect(p.$('world-shell').dataset.paused).toBe('false');
+    p.send({ x: 500, moving: true, facing: 'right', revision: 2 });
+    p.advance(8);
+    expect(p.$('world-avatar').dataset.walking).toBe('true');
+    expect(p.$('world-avatar').dataset.paused).toBe('false');
+  } finally { p.window.close(); }
+});
+
+it.each(['visible scene', 'open menu', 'unfocused window'])(
+  'updates animation pause state after reconnecting: %s', async reason => {
+    const p = await networkPage();
+    try {
+      p.window.document.dispatchEvent(new p.window.Event('realtime:offline'));
+      expect(p.$('world-avatar').dataset.paused).toBe('true');
+      expect(p.$('world-shell').dataset.paused).toBe('true');
+      if (reason === 'open menu') (p.$('world-dialog') as HTMLDialogElement).showModal();
+      if (reason === 'unfocused window') p.window.dispatchEvent(new p.window.Event('blur'));
+      let snapshots = 0;
+      const originalFetch = p.window.fetch;
+      p.window.fetch = (async (...args: Parameters<typeof fetch>) => {
+        const response = await originalFetch(...args);
+        if (args[1]?.method !== 'POST') snapshots++;
+        return response;
+      }) as typeof fetch;
+      p.window.document.dispatchEvent(new p.window.Event('realtime:resync'));
+      await vi.waitFor(() => expect(snapshots).toBe(1));
+      const paused = String(reason !== 'visible scene');
+      expect(p.$('world-avatar').dataset.paused).toBe(paused);
+      expect(p.$('world-shell').dataset.paused).toBe(paused);
+      if (reason === 'open menu') (p.$('world-dialog') as HTMLDialogElement).close();
+      if (reason === 'unfocused window') p.window.dispatchEvent(new p.window.Event('focus'));
+      await vi.waitFor(() => expect(p.$('world-avatar').dataset.paused).toBe('false'));
+    } finally { p.window.close(); }
+  },
+);
 
 it('stops a quick key tap even when its first movement acknowledgement arrives after key release', async () => {
   const p = await networkPage();
