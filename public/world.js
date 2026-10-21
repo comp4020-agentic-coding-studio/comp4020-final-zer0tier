@@ -465,6 +465,7 @@ let worldGeneration = 0;
 let worldApplying = false;
 let worldConnected = false;
 let worldPlaced = false;
+let worldSpawnRevision = null;
 let worldVisitedPet = null;
 const worldPlayers = new Map();
 let worldOnline = new Set();
@@ -576,6 +577,12 @@ function worldReceive(player) {
   worldPlayers.set(player.id, player);
   if (player.id === worldPlayerId && (!worldSaved || player.revision >= worldSaved.revision)) {
     worldSaved = player;
+    // Login always starts at home. Keep earlier socket/snapshot rows for
+    // revision checks, but never animate from the previous session's position.
+    if (!worldPlaced && (worldSpawnRevision === null || player.revision <= worldSpawnRevision ||
+      player.scene !== 'home' || player.home !== worldPlayerId || player.x !== 480 || player.y !== 475 ||
+      player.facing !== 'down' || player.moving)) return;
+    const firstPlacement = !worldPlaced;
     if (!worldPlaced || worldScene !== player.scene || worldHome !== player.home) {
       worldPlaced = true;
       worldApplying = true;
@@ -584,6 +591,7 @@ function worldReceive(player) {
     }
     worldPosition = { x: player.x, y: player.y };
     worldPresent(player);
+    if (firstPlacement) worldSyncAnimation();
     if (!worldQueued && !worldSending && !worldFrame) {
       worldIntent = { ...worldPosition };
       worldIntentFacing = player.facing;
@@ -601,8 +609,10 @@ function worldQueue(state) {
 async function worldSend() {
   worldSendTimer = 0;
   if (worldSending || !worldQueued || !worldSaved || !worldConnected) return;
-  const generation = worldGeneration, state = worldQueued;
+  const generation = worldGeneration, state = worldQueued, entering = !worldPlaced;
+  let retryEntry = entering;
   worldQueued = null; worldSending = true; worldLastSent = performance.now();
+  if (entering) worldSpawnRevision = worldSaved.revision;
   try {
     const response = await fetch('/api/world', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -611,7 +621,14 @@ async function worldSend() {
     const result = await response.json();
     if (generation !== worldGeneration) return;
     if (!response.ok) {
+      retryEntry = entering && response.status >= 500;
       if (result.player) worldReceive(result.player);
+      // The socket may have stopped the old session after our snapshot.
+      // Retry entry against that newer revision instead of leaving it paused.
+      if (response.status === 409 && entering && result.player) {
+        if (!worldPlaced) worldChangeScene('home');
+        return;
+      }
       worldQueued = null; worldIntent = { ...worldPosition };
       worldStop();
       throw new Error(result.error || 'Could not move. Try again.');
@@ -621,6 +638,13 @@ async function worldSend() {
     if (generation === worldGeneration) {
       worldQueued = null; worldIntent = { ...worldPosition };
       worldMessage(error.message || 'Connection lost. Reconnecting…');
+      if (retryEntry && !worldPlaced) {
+        // A transient HTTP failure need not close the socket. Keep entry
+        // recoverable without requiring another refresh or a reconnect.
+        worldQueued = state;
+        clearTimeout(worldSendTimer);
+        worldSendTimer = setTimeout(worldSend, 1000);
+      }
     }
   } finally {
     if (generation === worldGeneration) {
@@ -630,7 +654,7 @@ async function worldSend() {
   }
 }
 
-async function worldResync(fresh = false) {
+async function worldResync() {
   if (!worldNetworked()) return;
   const generation = worldGeneration, presenceBefore = worldPresenceChanges;
   try {
@@ -639,14 +663,9 @@ async function worldResync(fresh = false) {
     const snapshot = await response.json();
     if (generation !== worldGeneration || !Array.isArray(snapshot.players)) return;
     if (presenceBefore === worldPresenceChanges) document.dispatchEvent(new CustomEvent('presence:updated', { detail: snapshot.online }));
-    for (const player of snapshot.players) {
-      if (fresh && player.id === worldPlayerId) {
-        if (!worldSaved || player.revision >= worldSaved.revision) worldSaved = player;
-      }
-      else worldReceive(player);
-    }
+    for (const player of snapshot.players) worldReceive(player);
     worldConnected = worldOnline.has(worldPlayerId);
-    if (fresh) worldChangeScene('home');
+    if (!worldPlaced && !worldSending) worldChangeScene('home');
     else if (worldQueued) worldQueue(worldQueued);
     // Loading the session pauses CSS animation as well as movement. Resume
     // both when ready, while still respecting dialogs and window visibility.
@@ -666,9 +685,9 @@ document.addEventListener('adventure:pet', event => {
   if (worldPlayerId === event.detail.id) return;
   worldGeneration++; worldPlayerId = event.detail.id; worldHome = worldPlayerId;
   worldSaved = null; worldQueued = null; worldSending = false; worldConnected = false;
-  worldPlaced = false;
+  worldPlaced = false; worldSpawnRevision = null;
   worldPlayers.clear(); worldIntent = { x: 480, y: 475 };
-  worldResync(true);
+  worldResync();
 });
 document.addEventListener('home:visit', event => {
   if (!event.detail) return;
@@ -779,7 +798,7 @@ function worldSetWalking(walking) {
 }
 function worldModalOpen() { return Boolean(document.querySelector('dialog[open]')); }
 function worldIsPaused() {
-  return worldDashboard.hidden || document.hidden || !worldWindowActive || worldModalOpen() || (worldNetworked() && (!worldSaved || !worldConnected));
+  return worldDashboard.hidden || document.hidden || !worldWindowActive || worldModalOpen() || (worldNetworked() && (!worldPlaced || !worldConnected));
 }
 function worldSyncAnimation() {
   const paused = worldIsPaused();
@@ -822,6 +841,7 @@ homePet.addEventListener('click', () => worldOpenPlace('pet'));
 function worldChangeScene(scene, focus = true, home = worldPlayerId, confirmed = null) {
   if (worldNetworked() && !confirmed) {
     worldStop();
+    if (!worldPlaced) { scene = 'home'; home = worldPlayerId; }
     worldQueue({ scene, home: scene === 'home' ? home : null, x: 480, y: scene === 'home' ? 475 : 585, facing: 'down', moving: false });
     return;
   }

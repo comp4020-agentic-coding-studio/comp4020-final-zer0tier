@@ -98,6 +98,156 @@ async function networkPage(whileConnecting?: (p: ReturnType<typeof page>) => voi
   return { ...p, moves, send };
 }
 
+function pendingNetworkPage(saved: Partial<WorldPosition> = {}) {
+  const p = page();
+  const initial: WorldPosition = { id: 'owner', scene: 'home', home: 'owner', x: 760, y: 475, facing: 'left', moving: false, revision: 7, ...saved };
+  const snapshots: { reply: (response: Response) => void }[] = [];
+  const moves: { state: WorldPosition; reply: (response: Response) => void }[] = [];
+  p.window.fetch = (async (_url: string, options?: RequestInit) => {
+    if (options?.method !== 'POST') return new Promise<Response>(reply => snapshots.push({ reply }));
+    const state = { ...JSON.parse(String(options.body)), id: initial.id };
+    return new Promise<Response>(reply => moves.push({ state, reply }));
+  }) as typeof fetch;
+  const send = (state: Partial<WorldPosition> = {}) => p.window.document.dispatchEvent(new p.window.CustomEvent('world:updated', { detail: { ...initial, ...state } }));
+  const snapshot = (index = 0, player = initial) => snapshots[index].reply(Response.json({ online: ['owner'], players: [player] }));
+  p.window.document.dispatchEvent(new p.window.CustomEvent('adventure:pet', { detail: { id: initial.id } }));
+  return { ...p, initial, snapshots, moves, send, snapshot };
+}
+
+it.each([
+  { place: 'own home', saved: { x: 760 } },
+  { place: 'home doorway', saved: { x: 480, y: 565 } },
+  { place: 'town', saved: { scene: 'town', home: null, x: 700, y: 300 } },
+  { place: 'another home', saved: { home: 'neighbour', x: 700 } },
+] satisfies { place: string; saved: Partial<WorldPosition> }[])(
+  'waits at the default home spot instead of displaying the previous session in $place', async ({ saved }) => {
+    const p = pendingNetworkPage(saved);
+    try {
+      p.send(); // The socket can announce the saved position before either snapshot.
+      p.advance(20);
+      expect(p.$('world-stage').dataset.scene).toBe('home');
+      expect(p.$('world-visit-bar').hidden).toBe(true);
+      expect(p.position()).toEqual({ x: 480, y: 475 });
+      expect(p.$('world-avatar').dataset.walking).toBe('false');
+      p.snapshot();
+      await vi.waitFor(() => expect(p.moves).toHaveLength(1));
+      expect(p.moves[0].state).toMatchObject({ scene: 'home', home: 'owner', x: 480, y: 475, facing: 'down', moving: false, revision: 7 });
+      p.walk('d');
+      await new Promise(resolve => p.window.setTimeout(resolve, 70));
+      expect(p.moves).toHaveLength(1);
+      expect(p.position()).toEqual({ x: 480, y: 475 });
+      expect(p.$('world-avatar').dataset.walking).toBe('false');
+      p.moves[0].reply(Response.json({ ...p.moves[0].state, revision: 8 }));
+      await vi.waitFor(() => expect(p.$('world-avatar').dataset.paused).toBe('false'));
+      p.advance(20);
+      expect(p.position()).toEqual({ x: 480, y: 475 });
+      expect(p.$('world-avatar').dataset.walking).toBe('false');
+    } finally { p.window.close(); }
+  },
+);
+
+it.each(['socket', 'HTTP'])('places the new session once when its spawn confirmation arrives over %s first', async first => {
+  const p = pendingNetworkPage();
+  try {
+    p.send();
+    p.snapshot();
+    await vi.waitFor(() => expect(p.moves).toHaveLength(1));
+    const spawn = { ...p.moves[0].state, revision: 8 };
+    if (first === 'socket') p.send(spawn);
+    else p.moves[0].reply(Response.json(spawn));
+    await vi.waitFor(() => expect(p.$('world-avatar').dataset.paused).toBe('false'));
+    expect(p.position()).toEqual({ x: 480, y: 475 });
+    expect(p.$('world-avatar').dataset.walking).toBe('false');
+    if (first === 'socket') p.moves[0].reply(Response.json(spawn));
+    else p.send(spawn);
+    p.walk('d');
+    await vi.waitFor(() => expect(p.moves).toHaveLength(2));
+    expect(p.moves[1].state.x).toBeGreaterThan(480);
+    expect(p.moves[1].state.revision).toBe(8);
+  } finally { p.window.close(); }
+});
+
+it('does not reset a placed character when the initial snapshot arrives after the reconnect snapshot', async () => {
+  const p = pendingNetworkPage();
+  try {
+    p.window.document.dispatchEvent(new p.window.Event('realtime:resync'));
+    expect(p.snapshots).toHaveLength(2);
+    p.snapshot(1);
+    await vi.waitFor(() => expect(p.moves).toHaveLength(1));
+    p.moves[0].reply(Response.json({ ...p.moves[0].state, revision: 8 }));
+    await vi.waitFor(() => expect(p.$('world-avatar').dataset.paused).toBe('false'));
+    p.send({ x: 530, facing: 'right', moving: false, revision: 9 });
+    p.advance(20);
+    expect(p.position()).toEqual({ x: 530, y: 475 });
+    p.snapshot(0);
+    await new Promise(resolve => p.window.setTimeout(resolve, 70));
+    p.advance(20);
+    expect(p.moves).toHaveLength(1);
+    expect(p.position()).toEqual({ x: 530, y: 475 });
+    expect(p.$('world-avatar').dataset.walking).toBe('false');
+  } finally { p.window.close(); }
+});
+
+it('preserves the current position when an established session reconnects', async () => {
+  const p = pendingNetworkPage();
+  try {
+    p.snapshot();
+    await vi.waitFor(() => expect(p.moves).toHaveLength(1));
+    p.moves[0].reply(Response.json({ ...p.moves[0].state, revision: 8 }));
+    await vi.waitFor(() => expect(p.$('world-avatar').dataset.paused).toBe('false'));
+    const current = { ...p.initial, x: 530, facing: 'right' as const, revision: 9 };
+    p.send(current);
+    p.advance(20);
+    p.window.document.dispatchEvent(new p.window.Event('realtime:offline'));
+    p.window.document.dispatchEvent(new p.window.Event('realtime:resync'));
+    p.snapshot(1, current);
+    await vi.waitFor(() => expect(p.$('world-avatar').dataset.paused).toBe('false'));
+    p.advance(20);
+    expect(p.moves).toHaveLength(1);
+    expect(p.position()).toEqual({ x: 530, y: 475 });
+    expect(p.$('world-avatar').dataset.walking).toBe('false');
+  } finally { p.window.close(); }
+});
+
+it('retries initial placement with the latest revision after a saved-position conflict', async () => {
+  const p = pendingNetworkPage();
+  try {
+    p.snapshot();
+    await vi.waitFor(() => expect(p.moves).toHaveLength(1));
+    p.moves[0].reply(Response.json({ error: 'Your position changed in another window.', player: { ...p.initial, x: 720, revision: 8 } }, { status: 409 }));
+    await vi.waitFor(() => expect(p.moves).toHaveLength(2));
+    expect(p.moves[1].state).toMatchObject({ scene: 'home', home: 'owner', x: 480, y: 475, moving: false, revision: 8 });
+    expect(p.position()).toEqual({ x: 480, y: 475 });
+    expect(p.$('world-avatar').dataset.walking).toBe('false');
+    p.moves[1].reply(Response.json({ ...p.moves[1].state, revision: 9 }));
+    await vi.waitFor(() => expect(p.$('world-avatar').dataset.paused).toBe('false'));
+    expect(p.position()).toEqual({ x: 480, y: 475 });
+  } finally { p.window.close(); }
+});
+
+it('retries a temporary initial placement failure while the socket remains connected', async () => {
+  const p = pendingNetworkPage();
+  try {
+    p.snapshot();
+    await vi.waitFor(() => expect(p.moves).toHaveLength(1));
+    p.moves[0].reply(Response.json({ error: 'Temporarily unavailable.' }, { status: 503 }));
+    await new Promise(resolve => p.window.setTimeout(resolve, 70));
+    p.walk('d');
+    expect(p.moves).toHaveLength(1);
+    expect(p.position()).toEqual({ x: 480, y: 475 });
+    expect(p.$('world-avatar').dataset.paused).toBe('true');
+    expect(p.$('world-avatar').dataset.walking).toBe('false');
+    await vi.waitFor(() => expect(p.moves).toHaveLength(2), { timeout: 2000 });
+    expect(p.moves[1].state).toMatchObject({ scene: 'home', home: 'owner', x: 480, y: 475, moving: false, revision: 7 });
+    p.moves[1].reply(Response.json({ ...p.moves[1].state, revision: 8 }));
+    await vi.waitFor(() => expect(p.$('world-avatar').dataset.paused).toBe('false'));
+    expect(p.position()).toEqual({ x: 480, y: 475 });
+    p.walk('d');
+    await vi.waitFor(() => expect(p.moves).toHaveLength(3));
+    expect(p.moves[2].state.x).toBeGreaterThan(480);
+  } finally { p.window.close(); }
+});
+
 it('sizes the full scene as soon as sign-in reveals it, while the live snapshot is still pending', async () => {
   const p = page();
   try {

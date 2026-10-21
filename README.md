@@ -122,6 +122,9 @@ settings turn off these decorative animations. After sign-in or reconnection,
 animation resumes automatically once the live scene is ready.
 Home and town artwork starts loading with the page. Signing in sizes the scene
 immediately and reconnects the live session without the network-retry delay.
+After refreshing and signing in, your character appears directly at the default
+home spot once the server confirms it, without walking back from the previous
+session's position. Reconnecting during play keeps your current location.
 
 The room and town have gentle environmental animation: the fireplace flickers,
 the TV shows a moving landscape, bath water ripples, and the river and fountain
