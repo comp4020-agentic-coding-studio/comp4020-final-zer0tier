@@ -118,6 +118,8 @@ requested route position. Character animation
 pauses while a window is open or the game is in the background; reduced-motion
 settings turn off these decorative animations. After sign-in or reconnection,
 animation resumes automatically once the live scene is ready.
+Home and town artwork starts loading with the page. Signing in sizes the scene
+immediately and reconnects the live session without the network-retry delay.
 
 The room and town have gentle environmental animation: the fireplace flickers,
 the TV shows a moving landscape, bath water ripples, and the river and fountain
@@ -581,7 +583,8 @@ and the built-in `node:sqlite` for storage.
   accepts `{ scene, home, x, y, facing, moving, revision }` for the caller
   only; positions are saved in SQLite before broadcasting, and stale
   revisions are refused. Movement is coalesced to at most one request per
-  80 ms. `spec/world-realtime.test.ts` checks movement and presence delivery
+  50 ms, with short confirmed steps drawn at walking speed to reduce input lag.
+  `spec/world-realtime.test.ts` checks movement and presence delivery
   to multiple sockets within one second, offline visits, and online fights.
 - **Logs:** server stdout (also visible in `flyctl logs`) records `join`,
   `leave`, `action`, `broadcast`, `reject`, and `snapshot` events, each as

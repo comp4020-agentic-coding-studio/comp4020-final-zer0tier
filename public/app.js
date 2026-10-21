@@ -13,6 +13,7 @@ let pendingAppearance = null;
 let atHome = true;
 let savingSkills = false;
 let activeSocket = null;
+const sessionRefreshSockets = new WeakSet();
 let onlinePlayers = new Set();
 function updatePresence(players) {
   onlinePlayers = new Set(players);
@@ -1276,7 +1277,10 @@ function clearThefts() {
   clearInterval(battleRefreshTimer);
   battleRefreshTimer = null;
   savingSkills = false;
-  activeSocket?.close?.(); // refresh the socket's authenticated participant
+  if (activeSocket) {
+    sessionRefreshSockets.add(activeSocket);
+    activeSocket.close?.(4000, 'Session changed');
+  }
   revengePending = false;
   $("theft-list").setAttribute("aria-busy", "false");
   theftRequest++;
@@ -1554,13 +1558,15 @@ function connect() {
     }
     if (event.type === "pet:updated" && current && rules) renderFeed();
   });
-  ws.addEventListener("close", () => {
+  ws.addEventListener("close", (event) => {
     if (activeSocket !== ws) return;
     document.dispatchEvent(new CustomEvent('presence:updated', { detail: [] }));
     document.dispatchEvent(new CustomEvent('realtime:offline'));
     $("live").textContent = "Reconnecting…";
     $("live").dataset.state = "reconnecting";
-    setTimeout(connect, 1000);
+    // A connecting socket or proxy may report a different close code. Our
+    // own session refresh still needs to reconnect without the retry delay.
+    setTimeout(connect, sessionRefreshSockets.has(ws) ? 0 : 1000);
   });
 }
 connect();

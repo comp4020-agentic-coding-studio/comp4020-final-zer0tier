@@ -435,6 +435,8 @@ let worldFrame = 0;
 let worldLastFrame = 0;
 let worldKeys = new Set();
 let worldPath = [];
+const worldMoveInterval = 50;
+const worldWalkSpeed = 190;
 let worldPosition = { x: 480, y: 475 };
 // Render only confirmed travel, with the camera on the very same frame.
 let worldVisualPosition = { ...worldPosition };
@@ -538,10 +540,10 @@ function worldSnapVisual() {
 function worldAnimateVisual(now) {
   worldVisualFrame = 0;
   if (!worldTween) return;
-  const progress = Math.min(1, Math.max(0, (now - worldTween.start) / 80));
+  const progress = Math.min(1, Math.max(0, (now - worldTween.start) / worldTween.duration));
   const { from, to } = worldTween;
   worldVisualPosition = { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress };
-  worldDraw();
+  worldDrawPosition();
   if (progress < 1) worldVisualFrame = requestAnimationFrame(worldAnimateVisual);
   else {
     worldTween = null;
@@ -554,7 +556,10 @@ function worldPresent(player) {
     Math.hypot(player.x - worldVisualPosition.x, player.y - worldVisualPosition.y) > 100) {
     worldSnapVisual();
   } else if (changed && (worldTween?.to.x !== player.x || worldTween?.to.y !== player.y)) {
-    worldTween = { from: { ...worldVisualPosition }, to: { x: player.x, y: player.y }, start: performance.now() };
+    // A short first/last step should take only its actual travel time, not
+    // an entire network interval. All endpoints remain server-confirmed.
+    const duration = Math.min(worldMoveInterval, Math.hypot(player.x - worldVisualPosition.x, player.y - worldVisualPosition.y) / worldWalkSpeed * 1000);
+    worldTween = { from: { ...worldVisualPosition }, to: { x: player.x, y: player.y }, start: performance.now(), duration };
     if (!worldVisualFrame) worldVisualFrame = requestAnimationFrame(worldAnimateVisual);
   }
   worldAvatar.dataset.facing = player.facing;
@@ -581,15 +586,14 @@ function worldReceive(player) {
       worldIntentFacing = player.facing;
     }
     if (player.scene === 'home' && player.y > 558 && Math.abs(player.x - 480) < 55) worldChangeScene('town');
-  }
-  worldRenderPeers();
+  } else worldRenderPeers();
 }
 
 function worldQueue(state) {
   if (!worldNetworked() || worldApplying) return;
   worldIntentMoving = state.moving;
   worldQueued = state;
-  if (!worldSendTimer) worldSendTimer = setTimeout(worldSend, Math.max(0, 80 - (performance.now() - worldLastSent)));
+  if (!worldSendTimer) worldSendTimer = setTimeout(worldSend, Math.max(0, worldMoveInterval - (performance.now() - worldLastSent)));
 }
 async function worldSend() {
   worldSendTimer = 0;
@@ -985,13 +989,17 @@ function worldHighlight(destination) {
     for (const stroke of townOutlineStrokes) stroke.setAttribute('href', `/scenes/town-highlights.svg#${townAction}`);
   }
 }
-function worldDraw() {
+function worldDrawPosition() {
   const displayed = worldNetworked() ? worldVisualPosition : worldPosition;
   const transform = `translate3d(${displayed.x * worldView.width / 960}px, ${displayed.y * worldView.height / 640}px, 0) translate(-50%, -100%)`;
   if (worldAvatarTransform !== transform) {
     worldAvatar.style.transform = transform;
     worldAvatarTransform = transform;
   }
+  worldCamera();
+}
+function worldDraw() {
+  worldDrawPosition();
   const choices = worldTargets().map((target) => ({ target, distance: Math.hypot(target[0] - worldPosition.x, target[1] - worldPosition.y) })).sort((a, b) => a.distance - b.distance);
   const nearest = choices[0];
   // The pet's wider body clearance must still allow interaction from every
@@ -1004,7 +1012,6 @@ function worldDraw() {
   if (control.disabled !== disabled) control.disabled = disabled;
   if (control.textContent !== label) control.textContent = label;
   worldHighlight(destination);
-  worldCamera();
   worldRenderPeers();
 }
 // Dialogs and destination availability can change while the player stands
@@ -1038,11 +1045,11 @@ function worldTick(now) {
   let dx = 0, dy = 0;
   for (const key of worldKeys) { dx += worldDirections[key][0]; dy += worldDirections[key][1]; }
   const distance = Math.hypot(dx, dy);
-  if (distance) worldMove(dx / distance * 190 * seconds, dy / distance * 190 * seconds);
+  if (distance) worldMove(dx / distance * worldWalkSpeed * seconds, dy / distance * worldWalkSpeed * seconds);
   if (!worldKeys.size && worldPath.length) {
     // Spend the whole frame's travel, including across route corners. Stopping
     // for a frame at every grid node made floor-click walking visibly stutter.
-    let remaining = 190 * seconds;
+    let remaining = worldWalkSpeed * seconds;
     while (worldPath.length && remaining > 0) {
       const next = worldPath[0];
       const dx = next.x - worldPosition.x, dy = next.y - worldPosition.y;
@@ -1204,6 +1211,13 @@ function worldSyncSession() {
   }
   document.body.classList.toggle('world-playing', visible);
   if (!visible || !worldWasVisible) worldChangeScene('home', visible);
+  if (visible && !worldWasVisible) {
+    // Lay out the room immediately; a pending live position must not leave
+    // the initial scene cropped or waiting for the socket to reconnect.
+    worldArrangeScene(worldScene === 'home');
+    worldResize();
+    worldDraw();
+  }
   worldWasVisible = visible;
   worldSyncAnimation();
 }

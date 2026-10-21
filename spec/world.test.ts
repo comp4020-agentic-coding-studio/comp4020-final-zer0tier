@@ -97,6 +97,36 @@ async function networkPage(whileConnecting?: (p: ReturnType<typeof page>) => voi
   return { ...p, moves, send };
 }
 
+it('sizes the full scene as soon as sign-in reveals it, while the live snapshot is still pending', async () => {
+  const p = page();
+  try {
+    p.$('dashboard').hidden = true;
+    await vi.waitFor(() => expect(p.window.document.body.classList.contains('world-playing')).toBe(false));
+    p.window.fetch = (() => new Promise<Response>(() => {})) as typeof fetch;
+    p.window.document.dispatchEvent(new p.window.CustomEvent('adventure:pet', { detail: { id: 'owner' } }));
+    p.$('dashboard').hidden = false;
+    await vi.waitFor(() => expect(p.window.document.body.classList.contains('world-playing')).toBe(true));
+    const scale = Math.max(p.window.innerWidth / 960, p.window.innerHeight / 640);
+    expect(parseFloat(p.$('world-stage').style.getPropertyValue('--scene-width'))).toBe(960 * scale);
+    expect(parseFloat(p.$('world-stage').style.getPropertyValue('--scene-height'))).toBe(640 * scale);
+    expect(p.window.document.body.classList.contains('world-home')).toBe(true);
+    const position = p.position();
+    p.walk('d');
+    expect(p.position()).toEqual(position); // displaying the room does not invent a saved move
+  } finally { p.window.close(); }
+});
+
+it('draws a short confirmed step at walking speed without adding a full network interval of delay', async () => {
+  const p = await networkPage();
+  try {
+    p.send({ x: 483.04, facing: 'right', moving: true, revision: 2 });
+    expect(p.position().x).toBe(480);
+    p.advance(1);
+    expect(p.position().x).toBeCloseTo(483.04);
+    expect(p.$('world-avatar').dataset.walking).toBe('true');
+  } finally { p.window.close(); }
+});
+
 it('resumes character and scenery animation when sign-in finishes connecting', async () => {
   const p = await networkPage(p => {
     // Focus/visibility changes can pause the scene while the initial snapshot is pending.
