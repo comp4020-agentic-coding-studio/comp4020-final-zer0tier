@@ -436,6 +436,10 @@ let worldLastFrame = 0;
 let worldKeys = new Set();
 let worldPath = [];
 let worldPosition = { x: 480, y: 475 };
+// Render only confirmed travel, with the camera on the very same frame.
+let worldVisualPosition = { ...worldPosition };
+let worldVisualFrame = 0;
+let worldTween = null;
 let worldView = { width: 960, height: 640, viewportWidth: 960, viewportHeight: 640 };
 let worldCameraTransform = '';
 let worldAvatarTransform = '';
@@ -450,6 +454,7 @@ let worldHome = null;
 let worldSaved = null;
 let worldIntent = { ...worldPosition };
 let worldIntentFacing = 'down';
+let worldIntentMoving = false;
 let worldQueued = null;
 let worldSending = false;
 let worldSendTimer = 0;
@@ -524,9 +529,42 @@ function worldRenderPeers() {
   for (const [id, avatar] of worldPeers) if (!visible.has(id)) { avatar.remove(); worldPeers.delete(id); }
 }
 
+function worldSnapVisual() {
+  cancelAnimationFrame(worldVisualFrame);
+  worldVisualFrame = 0;
+  worldTween = null;
+  worldVisualPosition = { ...worldPosition };
+}
+function worldAnimateVisual(now) {
+  worldVisualFrame = 0;
+  if (!worldTween) return;
+  const progress = Math.min(1, Math.max(0, (now - worldTween.start) / 80));
+  const { from, to } = worldTween;
+  worldVisualPosition = { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress };
+  worldDraw();
+  if (progress < 1) worldVisualFrame = requestAnimationFrame(worldAnimateVisual);
+  else {
+    worldTween = null;
+    worldAvatar.dataset.walking = String(Boolean(worldSaved?.moving));
+  }
+}
+function worldPresent(player) {
+  const changed = worldVisualPosition.x !== player.x || worldVisualPosition.y !== player.y;
+  if (!changed || document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+    Math.hypot(player.x - worldVisualPosition.x, player.y - worldVisualPosition.y) > 100) {
+    worldSnapVisual();
+  } else if (changed && (worldTween?.to.x !== player.x || worldTween?.to.y !== player.y)) {
+    worldTween = { from: { ...worldVisualPosition }, to: { x: player.x, y: player.y }, start: performance.now() };
+    if (!worldVisualFrame) worldVisualFrame = requestAnimationFrame(worldAnimateVisual);
+  }
+  worldAvatar.dataset.facing = player.facing;
+  worldAvatar.dataset.walking = String(player.moving || Boolean(worldTween));
+  worldDraw();
+}
+
 function worldReceive(player) {
   if (!worldPlayerId) return;
-  if (!player || (worldPlayers.get(player.id)?.revision ?? -1) > player.revision) return;
+  if (!player || (worldPlayers.get(player.id)?.revision ?? -1) >= player.revision) return;
   worldPlayers.set(player.id, player);
   if (player.id === worldPlayerId && (!worldSaved || player.revision >= worldSaved.revision)) {
     worldSaved = player;
@@ -537,9 +575,7 @@ function worldReceive(player) {
       worldApplying = false;
     }
     worldPosition = { x: player.x, y: player.y };
-    worldAvatar.dataset.facing = player.facing;
-    worldAvatar.dataset.walking = String(player.moving);
-    worldDraw();
+    worldPresent(player);
     if (!worldQueued && !worldSending && !worldFrame) {
       worldIntent = { ...worldPosition };
       worldIntentFacing = player.facing;
@@ -551,6 +587,7 @@ function worldReceive(player) {
 
 function worldQueue(state) {
   if (!worldNetworked() || worldApplying) return;
+  worldIntentMoving = state.moving;
   worldQueued = state;
   if (!worldSendTimer) worldSendTimer = setTimeout(worldSend, Math.max(0, 80 - (performance.now() - worldLastSent)));
 }
@@ -674,7 +711,7 @@ function worldArrangeScene(atHome) {
   document.dispatchEvent(new CustomEvent('world:scene', { detail: { home: atHome && !worldVisiting() } }));
   worldStage.setAttribute('aria-describedby', 'home-controls-tip');
 }
-function worldCamera(point = worldPosition) {
+function worldCamera(point = worldNetworked() ? worldVisualPosition : worldPosition) {
   if (worldDashboard.hidden) return;
   const { width, height, viewportWidth, viewportHeight } = worldView;
   const offsetX = Math.max(viewportWidth - width, Math.min(0, viewportWidth / 2 - point.x * width / 960));
@@ -721,7 +758,9 @@ function worldStop() {
 function worldSetWalking(walking) {
   const value = String(walking);
   if (worldNetworked() && !worldApplying) {
-    if (!walking && (worldAvatar.dataset.walking === 'true' || worldQueued?.moving)) {
+    // The moving request may be in flight and not visible yet. Track intent
+    // so releasing a key always sends its stop, even before that first reply.
+    if (!walking && worldIntentMoving) {
       worldQueue({ scene: worldScene, home: worldHome, ...worldIntent, facing: worldIntentFacing, moving: false });
     }
     return;
@@ -789,6 +828,7 @@ function worldChangeScene(scene, focus = true, home = worldPlayerId, confirmed =
   worldById('home-feedback').hidden = true;
   worldArrangeScene(atHome);
   worldPosition = confirmed ? { x: confirmed.x, y: confirmed.y } : atHome ? { x: 480, y: 475 } : { x: 480, y: 585 };
+  worldSnapVisual();
   worldIntent = { ...worldPosition };
   worldIntentFacing = confirmed?.facing || 'down';
   worldRenderVisit();
@@ -943,7 +983,8 @@ function worldHighlight(destination) {
   }
 }
 function worldDraw() {
-  const transform = `translate3d(${worldPosition.x * worldView.width / 960}px, ${worldPosition.y * worldView.height / 640}px, 0) translate(-50%, -100%)`;
+  const displayed = worldNetworked() ? worldVisualPosition : worldPosition;
+  const transform = `translate3d(${displayed.x * worldView.width / 960}px, ${displayed.y * worldView.height / 640}px, 0) translate(-50%, -100%)`;
   if (worldAvatarTransform !== transform) {
     worldAvatar.style.transform = transform;
     worldAvatarTransform = transform;
@@ -1102,16 +1143,19 @@ worldStage.addEventListener('click', (event) => {
   worldStop();
   // Rounding a position beside a wall can put the first grid node *inside*
   // that wall. Choose a nearby free node with a clear approach instead.
-  const rounded = { x: Math.round(worldPosition.x / 20), y: Math.round(worldPosition.y / 20) };
+  // Continue from the requested travel rather than stepping back to an older
+  // acknowledgement when a new floor click arrives during a network request.
+  const origin = worldNetworked() ? worldIntent : worldPosition;
+  const rounded = { x: Math.round(origin.x / 20), y: Math.round(origin.y / 20) };
   const starts = [];
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
     const point = { x: rounded.x + dx, y: rounded.y + dy };
-    const distance = Math.hypot(point.x * 20 - worldPosition.x, point.y * 20 - worldPosition.y);
+    const distance = Math.hypot(point.x * 20 - origin.x, point.y * 20 - origin.y);
     const steps = Math.max(1, Math.ceil(distance / 4));
     let clear = true;
     for (let step = 1; step <= steps; step++) {
-      if (!worldWalkable(worldPosition.x + (point.x * 20 - worldPosition.x) * step / steps,
-        worldPosition.y + (point.y * 20 - worldPosition.y) * step / steps)) { clear = false; break; }
+      if (!worldWalkable(origin.x + (point.x * 20 - origin.x) * step / steps,
+        origin.y + (point.y * 20 - origin.y) * step / steps)) { clear = false; break; }
     }
     if (clear) starts.push({ point, distance });
   }

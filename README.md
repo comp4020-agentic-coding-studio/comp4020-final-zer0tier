@@ -111,7 +111,10 @@ rounded shapes, typefaces, and light or dark appearance.
 Your character shares the town's illustrated style and turns to face the
 direction you walk, with a steady facing direction during diagonal steps.
 Alternating footsteps and arm swings animate movement, with gentle breathing
-and blinking while you stand still. Character animation
+and blinking while you stand still. The character and camera move together
+between server-confirmed positions. Releasing a movement key stops walking
+even when a reply is delayed, and new floor clicks continue from the latest
+requested route position. Character animation
 pauses while a window is open or the game is in the background; reduced-motion
 settings turn off these decorative animations.
 

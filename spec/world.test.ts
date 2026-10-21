@@ -1,6 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
+import type { WorldPosition } from '../src/world.ts';
 
 function page() {
   const dom = new JSDOM(readFileSync('public/index.html', 'utf8'), {
@@ -78,6 +79,97 @@ function page() {
   return { dom, window, $, controls, lesson, study, play, destination, homeAction, openMenu, walk, position, advance };
 }
 
+async function networkPage() {
+  const p = page();
+  const initial: WorldPosition = { id: 'owner', scene: 'home', home: 'owner', x: 480, y: 475, facing: 'down', moving: false, revision: 0 };
+  const moves: { state: typeof initial; reply: (response: Response) => void }[] = [];
+  let initialized = false;
+  p.window.fetch = (async (_url: string, options?: RequestInit) => {
+    if (options?.method !== 'POST') return Response.json({ online: ['owner'], players: [initial] });
+    const state = { ...JSON.parse(String(options.body)), id: initial.id };
+    if (!initialized) { initialized = true; return Response.json({ ...state, revision: 1 }); }
+    return new Promise<Response>(reply => moves.push({ state, reply }));
+  }) as typeof fetch;
+  const send = (state: Partial<typeof initial>) => p.window.document.dispatchEvent(new p.window.CustomEvent('world:updated', { detail: { ...initial, ...state } }));
+  p.window.document.dispatchEvent(new p.window.CustomEvent('adventure:pet', { detail: { id: initial.id } }));
+  await vi.waitFor(() => expect(initialized).toBe(true));
+  return { ...p, moves, send };
+}
+
+it('stops a quick key tap even when its first movement acknowledgement arrives after key release', async () => {
+  const p = await networkPage();
+  try {
+    p.$('world-stage').dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    p.advance(1);
+    await vi.waitFor(() => expect(p.moves).toHaveLength(1));
+    expect(p.moves[0].state.moving).toBe(true);
+    p.$('world-stage').dispatchEvent(new p.window.KeyboardEvent('keyup', { key: 'd', bubbles: true }));
+    p.advance(1);
+    p.moves[0].reply(Response.json({ ...p.moves[0].state, revision: 2 }));
+    await vi.waitFor(() => expect(p.moves).toHaveLength(2));
+    expect(p.moves[1].state).toMatchObject({ x: p.moves[0].state.x, facing: 'right', moving: false });
+    p.moves[1].reply(Response.json({ ...p.moves[1].state, revision: 3 }));
+    await vi.waitFor(() => { p.advance(8); expect(p.$('world-avatar').dataset.walking).toBe('false'); });
+  } finally { p.window.close(); }
+});
+
+it('moves the following camera and character together between confirmed positions, and snaps room changes', async () => {
+  const p = await networkPage();
+  try {
+    Object.defineProperty(p.window, 'innerWidth', { value: 390, configurable: true });
+    p.window.dispatchEvent(new p.window.Event('resize'));
+    const before = p.position();
+    p.send({ x: 500, facing: 'right', moving: true, revision: 2 });
+    expect(p.position()).toEqual(before);
+    p.advance(2);
+    expect(p.position().x).toBeGreaterThan(before.x);
+    expect(p.position().x).toBeLessThan(500);
+    const cameraX = Number(p.$('world-stage').style.transform.match(/translate3d\(([-\d.e+]+)px/)![1]);
+    const scale = Math.max(p.window.innerWidth / 960, p.window.innerHeight / 640);
+    expect(cameraX + p.position().x * scale).toBeCloseTo(195);
+    // A duplicate HTTP acknowledgement must not restart the same animation.
+    p.send({ x: 500, facing: 'right', moving: true, revision: 2 });
+    p.advance(5);
+    expect(p.position().x).toBe(500);
+    p.send({ scene: 'town', home: null, x: 480, y: 585, moving: false, revision: 3 });
+    expect(p.position()).toEqual({ x: 480, y: 585 });
+    p.advance(8);
+    expect(p.position()).toEqual({ x: 480, y: 585 });
+  } finally { p.window.close(); }
+});
+
+it('replaces an unfinished movement animation when a newer position returns to its starting point', async () => {
+  const p = await networkPage();
+  try {
+    p.send({ x: 500, moving: true, revision: 2 });
+    p.send({ x: 480, moving: false, revision: 3 });
+    p.advance(8);
+    expect(p.position()).toEqual({ x: 480, y: 475 });
+    expect(p.$('world-avatar').dataset.walking).toBe('false');
+  } finally { p.window.close(); }
+});
+
+it('continues floor-click travel from the latest requested position while movement replies are delayed', async () => {
+  const p = await networkPage();
+  try {
+    p.$('world-stage').dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    p.advance(1);
+    await vi.waitFor(() => expect(p.moves).toHaveLength(1));
+    p.advance(24);
+    p.$('world-stage').dispatchEvent(new p.window.KeyboardEvent('keyup', { key: 'd', bubbles: true }));
+    // The confirmed position is still 480, but held input has requested x=556.
+    expect(p.position().x).toBe(480);
+    vi.spyOn(p.$('world-stage'), 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 960, height: 640 } as DOMRect);
+    p.$('world-stage').dispatchEvent(new p.window.MouseEvent('click', { bubbles: true, clientX: 700, clientY: 480 }));
+    p.advance(1);
+    p.moves[0].reply(Response.json({ ...p.moves[0].state, revision: 2 }));
+    await vi.waitFor(() => expect(p.moves).toHaveLength(2));
+    expect(p.moves[1].state.x).toBeGreaterThan(556);
+    expect(p.moves[1].state.facing).not.toBe('left');
+    p.moves[1].reply(Response.json({ ...p.moves[1].state, revision: 3 }));
+  } finally { p.window.close(); }
+});
+
 it('renders server-confirmed movement, shares only the current room, and removes disconnected visitors', async () => {
   const p = page();
   const saved = { id: 'owner', scene: 'home', home: 'owner', x: 480, y: 475, facing: 'down', moving: false, revision: 0 };
@@ -101,7 +193,7 @@ it('renders server-confirmed movement, shares only the current room, and removes
     expect(pending.state.x).toBeGreaterThan(before.x);
     expect(pending.state.facing).toBe('right');
     pending.reply(Response.json({ ...pending.state, revision: 2 }));
-    await vi.waitFor(() => expect(p.position().x).toBe(pending.state.x));
+    await vi.waitFor(() => { p.advance(8); expect(p.position().x).toBe(pending.state.x); });
 
     event('world:updated', { ...saved, id: 'guest', x: 530, revision: 4, moving: true });
     event('world:updated', { ...saved, id: 'elsewhere', home: 'elsewhere' });
