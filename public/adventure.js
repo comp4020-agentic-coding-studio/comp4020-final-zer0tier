@@ -690,7 +690,14 @@ function showBattle(replay = false, battle = state?.battle) {
       if (!await request({ action: 'battle-forfeit', battleId: battle.id, turnRevision })) {
         throw new Error(status.textContent || 'Could not withdraw. Try again.');
       }
-      document.dispatchEvent(new CustomEvent('battle:dismiss', { detail: { key: `adventure:${battle.id}` } }));
+      // A stale turn returns the current battle without withdrawing this pet.
+      // Keep its controls (or a newly finished result) until the server confirms.
+      if (state?.battle?.id !== battle.id) return;
+      if (state.abandoned && !state.battle.pending) {
+        document.dispatchEvent(new CustomEvent('battle:dismiss', { detail: { key: `adventure:${battle.id}` } }));
+      } else if (state.battle.playback?.status === 'active') {
+        throw new Error('The battle moved on before your pet could withdraw. Choose Forfeit again to leave.');
+      }
     },
     returnLabel: replay ? 'Back to records' : 'Return to map', resultResources: { hp, mp },
   } }));
@@ -897,7 +904,9 @@ async function teamRequest(body) {
     ++lobbyGeneration;
     lobby = result;
     if (body.action === 'invite') teamUp.querySelector('#team-invite-id').value = '';
-    if (lobby.run.state === 'exploring' && lobby.run.team) return openMap();
+    // The set-off broadcast may already have opened this run. Both paths
+    // consume the open lobby so a late response cannot enter a second time.
+    if (teamUp.open && lobby.run.state === 'exploring' && lobby.run.team) return openMap();
   } catch (error) {
     teamUp.querySelector('#team-error').textContent = error.message || 'Connection lost. Try again.';
   } finally {

@@ -745,6 +745,9 @@ hit. Each pet uses its own equipped skills and carried HP/MP. Every player
 sees the same saved battle from their own side and returns to the map
 separately. A player who forfeits withdraws only their own pet; the remaining
 teammates continue taking their turns.
+If another player moves before your withdrawal is saved, the battle stays
+open and asks you to choose **Forfeit** again. If that move ends the battle,
+its result stays open until you return to the map.
 
 **A knocked-out pet is out; the team plays on.** A pet at 0 HP after a
 battle (won or lost) has failed its run, exactly like a solo defeat, while
@@ -993,6 +996,8 @@ answers with the same view:
 Each accepted action saves first, then broadcasts `team:updated` with the
 team as saved. Setting off also broadcasts each member's `pet:updated`
 first, for the stamina and hygiene spent.
+The browser opens the shared run once whether the set-off response or its
+live update arrives first; a delayed confirmation does not start another run.
 
 Stale revisions return the current saved state without applying the
 action, including retries after a battle or a new run. Movement pauses

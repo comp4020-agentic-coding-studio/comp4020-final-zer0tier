@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import { createWorld } from '../src/adventure-world.ts';
 import type { AdventureBattle } from '../src/adventure.ts';
-import { coinEffect, simulateBattle, simulateTeamBattle, startBattle, takeBattleTurn } from '../src/combat.ts';
+import { coinEffect, forfeitBattle, simulateBattle, simulateTeamBattle, startBattle, takeBattleTurn } from '../src/combat.ts';
 import { ABILITIES } from '../src/combat.ts';
 import { COINS } from '../src/treasure.ts';
 import { baseUrl, freshId, getPet, getRules, must, signUp } from './helpers.ts';
@@ -1438,5 +1438,133 @@ it('posts a manual adventure skill only after selection and dismisses an obsolet
     expect($('adventure-status').textContent).toContain('restarted in another window');
     expect(bodies.filter(body => body.action === 'battle-skill')).toHaveLength(1);
     expect(bodies.some(body => body.action === 'continue')).toBe(false);
+  } finally { window.close(); }
+});
+
+it.each(['active', 'finished'])('keeps a stale forfeit visible when a teammate leaves the battle %s, then allows the next action', async (outcome) => {
+  const { window, $ } = page();
+  const pal = { id: 'pal', strength: 10, intelligence: 10, charisma: 10 };
+  const explorer = { ...pal, id: 'explorer' };
+  const monster = { id: 'monster:slime', name: 'Slime', monster: 'slime' as const,
+    strength: 1, intelligence: outcome === 'active' ? 50 : 1, charisma: 1 };
+  const playback = startBattle([pal, explorer], monster, [40, 40, 4], { random: () => 0 });
+  let saved: any = { ...map(), started: true, abandoned: false, battle: {
+    id: 'forfeit-race', floor: 1, enemyId: 'slime', enemyName: 'Slime', fighter: 1,
+    pending: true, won: false, playback, recovery: { hp: 0, mp: 0 },
+  } };
+  const bodies: any[] = [];
+  window.fetch = (async (_url: string, options: RequestInit) => {
+    const body = JSON.parse(options.body as string);
+    bodies.push(body);
+    let next = saved.battle.playback;
+    if (body.action === 'battle-forfeit') {
+      if (bodies.filter(sent => sent.action === 'battle-forfeit').length === 1) {
+        // This move reaches the server before the viewer's Forfeit request.
+        // A stale revision returns the newer state without withdrawing them.
+        expect(body.turnRevision).toBe(playback.revision);
+        next = takeBattleTurn(next, pal.id, 'claw-strike', next.revision);
+      } else {
+        expect(body.turnRevision).toBe(next.revision);
+        next = forfeitBattle(next, explorer.id, body.turnRevision);
+        saved = { ...saved, abandoned: true, hp: 0, battle: { ...saved.battle, pending: false } };
+      }
+    } else if (body.action === 'battle-skill') {
+      next = takeBattleTurn(next, explorer.id, body.ability, body.turnRevision);
+    } else if (body.action === 'continue') {
+      saved = { ...saved, battle: { ...saved.battle, pending: false } };
+    }
+    if ('error' in next) throw new Error(next.error);
+    saved = { ...saved, revision: `map-${bodies.length}`, battle: { ...saved.battle,
+      playback: next, won: next.status === 'finished' && next.winner !== monster.id } };
+    return Response.json(saved);
+  }) as typeof fetch;
+  try {
+    for (const script of ['confirm', 'battle', 'adventure']) window.eval(readFileSync(`public/${script}.js`, 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('battle-close')?.textContent).toBe('Forfeit'));
+    $('battle-close').click();
+    $('confirm-yes').click();
+    await vi.waitFor(() => expect(saved.battle.playback.status).toBe(outcome));
+    expect(saved.abandoned).toBe(false);
+    if (outcome === 'active') {
+      await vi.waitFor(() => expect($('battle-error').textContent).toContain('Choose Forfeit again'));
+      expect(($('battle-dialog') as HTMLDialogElement).open).toBe(true);
+      const skill = () => window.document.querySelector<HTMLButtonElement>('[data-skill="claw-strike"]')!;
+      await vi.waitFor(() => expect(skill().disabled).toBe(false));
+      skill().click();
+      await vi.waitFor(() => expect(bodies.some(body => body.action === 'battle-skill')).toBe(true));
+      await vi.waitFor(() => expect(($('battle-close') as HTMLButtonElement).disabled).toBe(false));
+      $('battle-close').click();
+      $('confirm-yes').click();
+      await vi.waitFor(() => expect(saved.abandoned).toBe(true));
+      await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement).open).toBe(false));
+      expect(saved.battle).toMatchObject({ pending: false, playback: { status: 'active', actor: 0 } });
+    } else {
+      await vi.waitFor(() => expect($('battle-close').textContent).toBe('Return to map'));
+      expect(($('battle-dialog') as HTMLDialogElement).open).toBe(true);
+      expect($('battle-status').textContent).toContain('Victory!');
+      expect(bodies.some(body => body.action === 'continue')).toBe(false);
+      $('battle-close').click();
+      await vi.waitFor(() => expect(saved.battle.pending).toBe(false));
+      await vi.waitFor(() => expect(($('adventure-dialog').querySelector('[data-direction="d"]') as HTMLButtonElement).disabled).toBe(false));
+    }
+  } finally { window.close(); }
+});
+
+it.each(['broadcast', 'response'])('enters a shared run once when the set-off %s arrives first', async (first) => {
+  const { window, $ } = page({ automaticEntry: false });
+  const members = ['explorer', 'pal'].map(id => ({ id, color: '#123456', appearance: 'cat', joined: true, waiting: null }));
+  const team = { id: 7, leader: 'explorer', status: 'forming', members };
+  let lobby: any = { team, invitations: [], size: 4, run: { team: null, state: 'new' } };
+  let saved: any = { ...map(), started: false, abandoned: false, team: null };
+  const bodies: any[] = [];
+  let finishSetOff: (response: Response) => void;
+  const broadcast = () => window.document.dispatchEvent(new window.CustomEvent('team:updated', {
+    detail: { ...team, status: 'exploring' },
+  }));
+  const requests = vi.fn(async (url: string, options?: RequestInit) => {
+    const body = options?.body ? JSON.parse(options.body as string) : {};
+    if (url === '/api/team') {
+      if (body.action === 'set-off') {
+        lobby = { ...lobby, team: null, run: { team: team.id, state: 'exploring', awaitingEntry: true } };
+        saved = { ...saved, started: true, awaitingEntry: true, cooldownUntil: Date.now() + 14_400_000,
+          team: { id: team.id, members: [{ ...members[1], x: 2, y: 2, floor: 1, hp: 15, maxHp: 15, status: 'exploring' }] } };
+        return new Promise<Response>(resolve => { finishSetOff = resolve; });
+      }
+      return Response.json(lobby);
+    }
+    bodies.push(body);
+    if (body.action === 'enter') {
+      if (!saved.awaitingEntry) {
+        saved = { ...saved, abandoned: true };
+        return Response.json({ error: 'Rest before another adventure.' }, { status: 429 });
+      }
+      saved = { ...saved, awaitingEntry: false, entryId: body.entryId, revision: 'joined-team' };
+    }
+    return Response.json(saved);
+  });
+  window.fetch = requests as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    window.document.dispatchEvent(new window.CustomEvent('adventure:pet', { detail: { ...members[0], activity: 'idle', coins: {} } }));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(($('team-dialog') as HTMLDialogElement).open).toBe(true));
+    $('team-set-off').click();
+    await vi.waitFor(() => expect(saved.awaitingEntry).toBe(true));
+    const response = Response.json(lobby);
+    if (first === 'broadcast') broadcast();
+    else finishSetOff!(response);
+    await vi.waitFor(() => expect(bodies.filter(body => body.action === 'enter')).toHaveLength(1));
+    await vi.waitFor(() => expect($('adventure-grid').getAttribute('aria-busy')).toBe('false'));
+    const entryId = saved.entryId;
+    if (first === 'broadcast') finishSetOff!(response);
+    else broadcast();
+    // Drain the delayed response and its map requests before checking the run.
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(bodies.filter(body => body.action === 'enter')).toHaveLength(1);
+    expect(saved).toMatchObject({ entryId, abandoned: false, awaitingEntry: false, team: { id: team.id } });
+    expect(($('adventure-dialog') as HTMLDialogElement).open).toBe(true);
+    expect(($('adventure-dialog').querySelector('[data-direction="d"]') as HTMLButtonElement).disabled).toBe(false);
+    expect($('adventure-status').textContent).not.toContain('Rest before another adventure');
   } finally { window.close(); }
 });
