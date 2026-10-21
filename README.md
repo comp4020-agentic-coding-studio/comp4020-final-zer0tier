@@ -104,7 +104,9 @@ and disappear when you move out of range or open a window. You can also
 click or tap an empty spot to walk there, or select an object directly. Clicked routes
 continue smoothly around furniture and your pet, and walking keeps the same
 speed across display refresh rates. Movement pauses while a window is open
-or you are typing. Home and town work on desktop and phones. Menus, windows,
+or you are typing. Keys held before sign-in or during a pause must be released
+and pressed again to start walking. Delayed movement updates play at normal
+walking speed without a catch-up sprint. Home and town work on desktop and phones. Menus, windows,
 and controls share the sign-in screen's warm orange and cream palette,
 rounded shapes, typefaces, and light or dark appearance.
 

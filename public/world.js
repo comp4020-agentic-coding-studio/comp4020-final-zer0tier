@@ -540,26 +540,29 @@ function worldSnapVisual() {
 function worldAnimateVisual(now) {
   worldVisualFrame = 0;
   if (!worldTween) return;
-  const progress = Math.min(1, Math.max(0, (now - worldTween.start) / worldTween.duration));
-  const { from, to } = worldTween;
-  worldVisualPosition = { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress };
-  worldDrawPosition();
-  if (progress < 1) worldVisualFrame = requestAnimationFrame(worldAnimateVisual);
-  else {
+  const { to, lastFrame } = worldTween;
+  const dx = to.x - worldVisualPosition.x, dy = to.y - worldVisualPosition.y;
+  const distance = Math.hypot(dx, dy);
+  const travel = Math.min(distance, Math.max(0, now - lastFrame) / 1000 * worldWalkSpeed);
+  worldTween.lastFrame = now;
+  if (travel === distance) {
+    worldVisualPosition = { ...to };
     worldTween = null;
     worldAvatar.dataset.walking = String(Boolean(worldSaved?.moving));
-  }
+  } else worldVisualPosition = { x: worldVisualPosition.x + dx / distance * travel, y: worldVisualPosition.y + dy / distance * travel };
+  worldDrawPosition();
+  if (worldTween) worldVisualFrame = requestAnimationFrame(worldAnimateVisual);
 }
 function worldPresent(player) {
   const changed = worldVisualPosition.x !== player.x || worldVisualPosition.y !== player.y;
-  if (!changed || document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
-    Math.hypot(player.x - worldVisualPosition.x, player.y - worldVisualPosition.y) > 100) {
+  if (!changed || document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     worldSnapVisual();
   } else if (changed && (worldTween?.to.x !== player.x || worldTween?.to.y !== player.y)) {
-    // A short first/last step should take only its actual travel time, not
-    // an entire network interval. All endpoints remain server-confirmed.
-    const duration = Math.min(worldMoveInterval, Math.hypot(player.x - worldVisualPosition.x, player.y - worldVisualPosition.y) / worldWalkSpeed * 1000);
-    worldTween = { from: { ...worldVisualPosition }, to: { x: player.x, y: player.y }, start: performance.now(), duration };
+    // Only the animation frame advances the sprite. Preserve its clock when
+    // retargeting so delayed replies cannot cause a sprint or lose travel time.
+    const to = { x: player.x, y: player.y };
+    if (worldTween) worldTween.to = to;
+    else worldTween = { to, lastFrame: performance.now() };
     if (!worldVisualFrame) worldVisualFrame = requestAnimationFrame(worldAnimateVisual);
   }
   worldAvatar.dataset.facing = player.facing;
@@ -1099,6 +1102,9 @@ function worldStartWalk(key) {
 document.addEventListener('keydown', (event) => {
   if (worldIsPaused() || event.altKey || event.ctrlKey || event.metaKey) return;
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  // A key held in the sign-in form (or across a pause) must be released and
+  // pressed again. Ongoing walking already runs on its own animation frame.
+  if (worldDirections[key] && event.repeat) return;
   if (key === 'Escape' && worldStage.contains(event.target)) { event.preventDefault(); worldOpenPlace('menu'); return; }
   // Adventure dialogs restore focus to their entrance. Direction keys should
   // resume walking from focused scene objects; Space/Enter still activate them.

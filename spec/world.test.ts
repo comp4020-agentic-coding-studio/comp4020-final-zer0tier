@@ -76,7 +76,8 @@ function page() {
     const scale = Math.max(window.innerWidth / 960, window.innerHeight / 640);
     return { x: Number(translation[1]) / scale, y: Number(translation[2]) / scale };
   };
-  return { dom, window, $, controls, lesson, study, play, destination, homeAction, openMenu, walk, position, advance };
+  const elapse = (milliseconds: number) => { clock += milliseconds; };
+  return { dom, window, $, controls, lesson, study, play, destination, homeAction, openMenu, walk, position, advance, elapse };
 }
 
 async function networkPage(whileConnecting?: (p: ReturnType<typeof page>) => void) {
@@ -124,6 +125,56 @@ it('draws a short confirmed step at walking speed without adding a full network 
     p.advance(1);
     expect(p.position().x).toBeCloseTo(483.04);
     expect(p.$('world-avatar').dataset.walking).toBe('true');
+  } finally { p.window.close(); }
+});
+
+it('requires a fresh movement key press after a key was held while signing in', async () => {
+  const p = await networkPage(p => {
+    p.$('password').dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    p.advance(60);
+  });
+  try {
+    const stage = p.$('world-stage'), before = p.position();
+    for (let repeat = 0; repeat < 10; repeat++) {
+      stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'a', repeat: true, bubbles: true }));
+      p.advance(3);
+    }
+    await new Promise(resolve => p.window.setTimeout(resolve, 80));
+    expect(p.moves).toHaveLength(0);
+    expect(p.position()).toEqual(before);
+    stage.dispatchEvent(new p.window.KeyboardEvent('keyup', { key: 'a', bubbles: true }));
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    p.advance(6);
+    await vi.waitFor(() => expect(p.moves).toHaveLength(1));
+    expect(p.moves[0].state.x).toBeCloseTo(before.x - 190 * .096);
+  } finally { p.window.close(); }
+});
+
+it.each([40, 120])('keeps delayed confirmed travel of %i units at normal walking speed', async distance => {
+  const p = await networkPage();
+  try {
+    const before = p.position();
+    p.send({ x: before.x - distance, facing: 'left', moving: true, revision: 2 });
+    expect(p.position()).toEqual(before);
+    for (let frame = 0; frame < Math.ceil(distance / (190 * .016)); frame++) {
+      const previous = p.position();
+      p.advance(1);
+      expect(Math.abs(p.position().x - previous.x)).toBeLessThanOrEqual(190 * .016 + .000001);
+    }
+    expect(p.position().x).toBeCloseTo(before.x - distance);
+  } finally { p.window.close(); }
+});
+
+it('keeps elapsed walking time when a confirmed position arrives between animation frames', async () => {
+  const p = await networkPage();
+  try {
+    p.send({ x: 460, facing: 'left', moving: true, revision: 2 });
+    p.advance(1);
+    expect(p.position().x).toBeCloseTo(480 - 190 * .016);
+    p.elapse(9);
+    p.send({ x: 450, facing: 'left', moving: true, revision: 3 });
+    p.advance(1, 7);
+    expect(p.position().x).toBeCloseTo(480 - 190 * .032);
   } finally { p.window.close(); }
 });
 
