@@ -227,10 +227,14 @@ it('clears the previous floor on account reset and ignores its late movement res
     window.eval(readFileSync('public/adventure.js', 'utf8'));
     $('adventure-open').click();
     const grove = map(5);
-    finishes[0](Response.json({ ...grove, enemies: grove.enemies.map(e => ({ ...e, moves: e.kind === 'slime-king'
-      ? [{ id: 'bump', name: 'Bump', mpCost: 5, description: 'Two-thirds of the target’s current HP, rounded up.' }] : [] })) }));
+    finishes[0](Response.json({ ...grove, enemies: grove.enemies.map(e => ({ ...e,
+      ...(e.kind === 'slime-king' ? { type: 'water', weakness: ['grass'] } : {}),
+      moves: e.kind === 'slime-king'
+        ? [{ id: 'bump', name: 'Bump', mpCost: 5, description: 'Two-thirds of the target’s current HP, rounded up.' }] : [] })) }));
     await vi.waitFor(() => expect($('adventure-title').textContent).toBe('Slime King’s grove'));
-    expect($('adventure-enemies').lastElementChild!.textContent).toMatch(/^Slime King · .* · Bump \(5 MP\): Two-thirds of the target’s current HP, rounded up\.$/);
+    expect($('adventure-enemies').lastElementChild!.textContent).toMatch(/^Slime King · Water type, weak to Grass · .* · Bump \(5 MP\): Two-thirds of the target’s current HP, rounded up\.$/);
+    // A saved map from before types still lists its monsters without a type.
+    expect($('adventure-enemies').firstElementChild!.textContent).not.toMatch(/type|undefined/);
     expect($('adventure-grid').querySelector('[data-enemy="slime-king"] use')?.getAttribute('href')).toBe('#monster-slime-king');
     expect($('adventure-grid').querySelectorAll('.adventure-marker-slime, .adventure-marker-goblin')).toHaveLength(0);
     $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
@@ -1407,8 +1411,9 @@ it('posts a manual adventure skill only after selection and dismisses an obsolet
   Object.defineProperty(window.document, 'hidden', { value: false });
   const explorer = { id: 'explorer', strength: 5, intelligence: 5, charisma: 5, equippedCoin: 'silver-coin' as const,
     equippedAbilities: ['claw-strike', 'firebolt'] as const };
-  const monster = { id: 'monster:f1-enemy-0', name: 'Slime', monster: 'slime' as const, strength: 10, intelligence: 1, charisma: 2 };
-  const playback = startBattle([explorer], monster, [20, 15]);
+  // Enough HP that Firebolt's super-effective hit on a Grass slime leaves the battle running.
+  const monster = { id: 'monster:f1-enemy-0', name: 'Slime', monster: 'slime' as const, strength: 10, intelligence: 1, charisma: 20 };
+  const playback = startBattle([explorer], monster, [20, 33]);
   let saved: any = { ...map(), battle: { id: 'manual-grass', enemyId: 'f1-enemy-0', enemyName: 'Slime',
     floor: 1, won: false, pending: true, playback, recovery: { hp: 0, mp: 0 } } };
   const bodies: any[] = [];

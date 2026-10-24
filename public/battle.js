@@ -120,10 +120,21 @@ function allyCards(battle) {
     $(`battle-mp-${card}`).setAttribute('aria-label', `${name} MP`);
   });
 }
+// The server saves each turn's effectiveness; older replays simply omit it.
+const typeName = type => type ? type[0].toUpperCase() + type.slice(1) : '';
+const effectText = step => step.effectiveness > 1 ? " It's super effective!" : step.effectiveness < 1 ? " It's not very effective…" : '';
 function describe(step) {
   const actor = fighterName(scene.battle.fighters[step.actor]);
   const target = fighterName(scene.battle.fighters[step.target]);
-  return `${actor} used ${step.name || 'Claw Strike'}${step.hits > 1 ? ` ×${step.hits}` : ''}: ${step.damage} damage to ${target}${step.mpCost ? ` (${step.mpCost} MP)` : ''}.`;
+  return `${actor} used ${step.name || 'Claw Strike'}${step.hits > 1 ? ` ×${step.hits}` : ''}: ${step.damage} damage to ${target}${step.mpCost ? ` (${step.mpCost} MP)` : ''}.${effectText(step)}`;
+}
+// How one of the viewer's skills fares against the saved monster's type. Only
+// a hint: the server's TYPE_CHART (src/combat.ts) decides the saved damage.
+function matchup(attack, battle) {
+  const monster = battle.monsterIndex === null || battle.monsterIndex === undefined ? null : battle.fighters[battle.monsterIndex];
+  if (!monster?.type || !attack.type || attack.type === 'normal') return '';
+  const strong = { fire: 'grass', water: 'earth', grass: 'water' }[attack.type];
+  return strong === monster.type ? ' · Super effective' : ' · Not very effective';
 }
 function abilityLabel(step) {
   if (!step) return;
@@ -225,8 +236,9 @@ function awaitChoice() {
     button.dataset.skill = attack.id;
     const name = document.createElement('strong'), cost = document.createElement('span');
     name.textContent = attack.name;
+    if (attack.type) button.dataset.type = attack.type;
     const affordable = attack.mpCost <= battle.mp[mine];
-    cost.textContent = `${attack.mpCost} MP${!affordable ? ' · Not enough MP' : ''}`;
+    cost.textContent = `${attack.type ? `${typeName(attack.type)} · ` : ''}${attack.mpCost} MP${matchup(attack, battle)}${!affordable ? ' · Not enough MP' : ''}`;
     button.append(name, cost);
     button.disabled = submitting || !myTurn || !affordable || battle.hp[mine] <= 0;
     button.addEventListener('click', () => chooseSkill(attack.id));
@@ -311,6 +323,13 @@ function play(next) {
   cards.forEach((fighterIndex, card) => {
     const fighter = fighters[fighterIndex];
     $(`battle-name-${card}`).textContent = fighter.id === next.viewer ? `${fighterName(fighter)} (you)` : fighterName(fighter);
+    const tag = $(`battle-type-${card}`) ?? document.createElement('p');
+    tag.id = `battle-type-${card}`;
+    tag.className = 'battle-type';
+    tag.hidden = !fighter.type;
+    tag.dataset.type = fighter.type ?? '';
+    tag.textContent = fighter.type ? `${typeName(fighter.type)} type` : '';
+    $(`battle-name-${card}`).after(tag);
     avatar(fighter, card);
   });
   meters(next.battle.initialHp ?? next.battle.fighters.map(f => f.maxHp), next.battle.initialMp ?? next.battle.fighters.map(f => f.maxMp));

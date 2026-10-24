@@ -110,6 +110,7 @@ guide.innerHTML = `
       <li>HP and MP carry between battles. A win gives back 20%.</li>
       <li>A coin toss decides who strikes first.</li>
       <li>Choose an equipped skill on your turn. Equip learned skills at your storage chest at home.</li>
+      <li>Monsters have types: Fire beats Grass, Water beats Earth, and Grass beats Water for double damage. Other elemental hits on a monster do half. Normal skills always hit evenly.</li>
       <li>Your coin always applies in solo battles. In a team, the pet with the highest total attributes supplies the coin.</li>
       <li>Teammates beside you join your battles.</li>
       <li>On a team, each chest opens once, for whoever gets there first.</li>
@@ -386,6 +387,7 @@ let sceneSignature = '', mapScene = null, terrain = null, actors = null;
 const actorNodes = new Map();
 let walkingPath = [], walkingTimer = 0, walkingGeneration = 0;
 const hiddenEnemy = enemy => enemy.hidden ?? enemy.kind !== 'slime-king';
+const typeName = type => type[0].toUpperCase() + type.slice(1);
 const onGrass = (x, y) => state?.grass?.[y]?.[x] === 'g';
 function stopWalking() { walkingGeneration++; walkingPath = []; clearTimeout(walkingTimer); }
 function resetScene() {
@@ -500,7 +502,8 @@ function renderMonsters() {
     const item = document.createElement('li');
     const moves = (enemy.moves ?? []).map(move => ` · ${move.name} (${move.mpCost} MP): ${move.description}`).join('');
     const where = hiddenEnemy(enemy) ? 'Hidden in tall grass' : `column ${enemy.x + 1}, row ${enemy.y + 1}`;
-    item.textContent = `${enemy.name} · ${where} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence} · STR ${enemy.strength} / INT ${enemy.intelligence} / CHA ${enemy.charisma}${moves}`;
+    const type = enemy.type ? ` · ${typeName(enemy.type)} type, weak to ${(enemy.weakness ?? []).map(typeName).join(' and ')}` : '';
+    item.textContent = `${enemy.name}${type} · ${where} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence} · STR ${enemy.strength} / INT ${enemy.intelligence} / CHA ${enemy.charisma}${moves}`;
     roster.append(item);
   }
   const rebuilt = makeTerrain();
@@ -612,7 +615,8 @@ function renderInventory() {
   abilities.replaceChildren();
   for (const ability of inventory.abilities.filter(a => a.learned)) {
     const row = document.createElement('li');
-    row.textContent = `${ability.name} · ${ability.mpCost} MP${ability.equipped ? ' · Equipped' : ''}. ${ability.description}`;
+    const type = ability.type && ability.type !== 'normal' ? `${typeName(ability.type)} · ` : '';
+    row.textContent = `${ability.name} · ${type}${ability.mpCost} MP${ability.equipped ? ' · Equipped' : ''}. ${ability.description}`;
     abilities.append(row);
   }
   const coins = adventure.querySelector('#adventure-coins');

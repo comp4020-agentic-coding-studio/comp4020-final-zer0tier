@@ -87,8 +87,10 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   battle replays never reroll drops. Preserve unlocked exits within a run.
 - Pet attacks require their owner's explicit skill choice on each turn;
   only monsters and the training bot choose attacks automatically. Keep
-  the existing damage and coin effects. In PvP (including revenge), the
-  pet with the highest Strength + Intelligence + Charisma supplies the coin;
+  the existing base damage and coin effects. Monsters have a type and pets
+  don't: Fire, Water, and Grass skills deal ×2 to the monster type they beat
+  and ×½ to the others, so PvP damage stays neutral. In PvP (including
+  revenge), the pet with the highest Strength + Intelligence + Charisma supplies the coin;
   in cooperative encounters use the strongest participating pet, and in
   solo encounters always use the player's coin. Compare unboosted attributes,
   with the initiating pet winning ties.

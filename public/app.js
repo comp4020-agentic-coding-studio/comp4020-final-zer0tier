@@ -32,6 +32,8 @@ document.addEventListener("world:scene", event => {
   renderSkills();
 });
 
+// "Fire · " for typed skills; Normal skills hit every monster for ×1.
+const typeLabel = (ability) => ability.type && ability.type !== "normal" ? `${ability.type[0].toUpperCase()}${ability.type.slice(1)} · ` : "";
 function renderSkills() {
   if (!current || !rules) return;
   const selected = current.equippedAbilities || ["claw-strike"];
@@ -46,7 +48,7 @@ function renderSkills() {
     row.className = "home-skill";
     row.dataset.equipped = String(equipped);
     const title = document.createElement("strong"), hint = document.createElement("small");
-    title.textContent = `${ability.name} · ${ability.mpCost} MP`;
+    title.textContent = `${ability.name} · ${typeLabel(ability)}${ability.mpCost} MP`;
     hint.textContent = learned ? ability.description : "Find this skill in a woodland treasure chest.";
     content.append(title, hint);
     const button = document.createElement("button");
@@ -1244,7 +1246,7 @@ function render(pet) {
   renderMeters(pet);
   if (rules) {
     $("learned-abilities").textContent = rules.fight.abilities.filter(a => (pet.abilities || ['claw-strike']).includes(a.id))
-      .map(a => `${a.name} (${a.mpCost} MP)`).join(' · ');
+      .map(a => `${a.name} (${typeLabel(a)}${a.mpCost} MP)`).join(' · ');
     renderSkills();
     renderBusy(pet);
     renderSchool(pet, previous);

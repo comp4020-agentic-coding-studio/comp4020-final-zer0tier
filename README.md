@@ -566,7 +566,8 @@ and the built-in `node:sqlite` for storage.
   touch, newest first), `GET /api/feed` what's been happening across the
   game (newest first), `GET /api/leaderboard?by=wins` (or `power`) the top
   10 players, and `GET /api/rules` the schools, courses, work locations,
-  items, and costs.
+  items, and costs, plus each battle skill's type and the type chart
+  (`fight.types`).
 - **Live battles** (participants only): `GET /api/battles` lists the signed-in
   pet's active Arena/revenge sessions; `GET /api/battles/:battle` reads one
   saved session. `POST /api/battles/:battle/turn` takes
@@ -811,7 +812,21 @@ them.
 Encounters use the Arena's turn-based battle scene, with the monster's own
 appearance, name, and attributes. Monsters use **Claw Strike**, which costs
 **0 MP**; players choose their pets' equipped skills, and damage uses the same
-power and luck rolls as Arena. The **Slime King** also knows **Bump** (5
+power and luck rolls as Arena.
+
+Every monster has a **type**, shown under its name in battle and in the Game
+guide's **Monster attributes**: **Slimes are Grass**, **Goblins are Earth**,
+and the **Slime King is Water**. Fire, Water, and Grass skills are **super
+effective (×2)** against the type they beat — Fire beats Grass, Water beats
+Earth, Grass beats Water — and **not very effective (×½, rounded up)**
+against the other monster types. Normal skills always hit for ×1. Each skill
+button shows its type and, against a monster, whether it is super or not
+very effective; the battle log says so after the hit. Pets have no type, so
+Arena and revenge damage stay neutral. A Gold Coin's double first strike
+applies after the type bonus. Battles saved before types replay with their
+original damage.
+
+The **Slime King** also knows **Bump** (5
 MP), which deals two-thirds of the pet's *current* HP, rounded up: a pet at
 70 HP takes 47. On its own turn, the king picks whichever affordable
 attack hits harder that turn. Bump wins while the pet's HP is high; Claw
@@ -875,8 +890,8 @@ below.
 
 Stand on a treasure chest and press Space or choose **Open chest**. Each
 chest awards one reward per run: **Food 30%, Soap 30%, Ability 20%,
-Hourglass 15%, Unfair coin 5%**. The two ability types have equal chances
-within the ability category; Copper, Silver, and Gold Coins have equal
+Hourglass 15%, Unfair coin 5%**. The four learnable skills have equal chances
+(5% each) within the ability category; Copper, Silver, and Gold Coins have equal
 chances within the coin category. Opened chests stay on the map, keep their
 reward, and can't be looted again. New adventures have fresh chests.
 Defeat, restarting, and signing out don't remove inventory.
@@ -900,16 +915,26 @@ including the permanently available Claw Strike. That loadout works in
 Adventure, Arena, and revenge and is fixed for a live battle. Duplicate drops say **already learned**,
 without stacking the ability or rerolling the reward.
 
-| Ability | MP cost | Damage |
-| --- | ---: | --- |
-| Claw Strike | 0 | Strength × battle luck, rounded, at least 1 |
-| Firebolt | 3 | Intelligence × 1.5 × battle luck, rounded, at least 1 |
-| Heavy Strike | 2 | Claw Strike damage × 1.5, rounded up |
+| Ability | Type | MP cost | Damage |
+| --- | --- | ---: | --- |
+| Claw Strike | Normal | 0 | Strength × battle luck, rounded, at least 1 |
+| Heavy Strike | Normal | 2 | Claw Strike damage × 1.5, rounded up |
+| Firebolt | Fire | 3 | Intelligence × 1.5 × battle luck, rounded, at least 1 |
+| Tide Crash | Water | 3 | Strength × 1.5 × battle luck, rounded, at least 1 |
+| Vine Lash | Grass | 3 | Charisma × 1.5 × battle luck, rounded, at least 1 |
+
+Each elemental skill scales with a different attribute, so a pet trained
+for Strength, Intelligence, or Charisma has a matching move. With four
+skills to learn and three free slots beside Claw Strike, choose a loadout
+for the monsters ahead: Firebolt for the Grass slimes, Tide Crash for the
+Earth goblins, and Vine Lash for the Water Slime King. Type bonuses apply
+only to monsters (see **Monster battles**).
 
 Choose one equipped skill on each of your pet's turns. At low MP you can
 still choose free Claw Strike; the game never chooses it for you.
-Saved playback includes each selected ability, MP spent, and
-remaining resources; replaying doesn't spend MP again.
+Saved playback includes each selected ability, its type, MP spent, any
+type `effectiveness` (2 or 0.5), and remaining resources; replaying doesn't
+spend MP again.
 
 ### Unfair coins
 
@@ -1001,7 +1026,9 @@ acknowledged battle playback is withheld until the run ends.
 The `grass` array matches the 16 × 16 terrain grid: `g` marks tall grass
 and `.` marks other tiles. Ordinary entries in `enemies` have
 `hidden: true` and omit coordinates and patrol routes; the Slime King has
-`hidden: false` with its visible `x` and `y`. A battle triggered by grass
+`hidden: false` with its visible `x` and `y`. Every enemy includes its
+`type` and `weakness` (the skill types that are super effective against
+it). A battle triggered by grass
 includes `battle.surprise: true`. Encounter seeds and counters stay on the
 server.
 

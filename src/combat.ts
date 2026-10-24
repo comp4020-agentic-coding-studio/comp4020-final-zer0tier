@@ -1,18 +1,46 @@
-import { type CoinId } from './treasure.ts';
+import type { CoinId } from './treasure.ts';
+// Monsters have a type and pets don't, so Arena and revenge stay neutral: a
+// typed skill only hits harder or softer against a monster.
+export const ELEMENTS = ['normal', 'fire', 'water', 'grass', 'earth'] as const;
+export type Element = (typeof ELEMENTS)[number];
+export const MONSTER_TYPES = { slime: 'grass', goblin: 'earth', 'slime-king': 'water' } as const satisfies Record<string, Element>;
+export type MonsterKind = keyof typeof MONSTER_TYPES;
+// Fire beats Grass, Water beats Earth and Grass beats Water. Each of those
+// is halved against the other monster types; Normal skills always hit ×1.
+export const TYPE_CHART: Record<Element, Partial<Record<Element, number>>> = {
+  normal: {}, earth: {},
+  fire: { grass: 2, water: 0.5, earth: 0.5 },
+  water: { earth: 2, grass: 0.5, water: 0.5 },
+  grass: { water: 2, grass: 0.5, earth: 0.5 },
+};
+export const effectiveness = (move: Element, target: Element | undefined): number =>
+  target ? TYPE_CHART[move][target] ?? 1 : 1;
+export const weaknessOf = (type: Element): Element[] => ELEMENTS.filter(move => effectiveness(move, type) > 1);
 // A saved, server-resolved battle. HP/MP belong to this fight, not daily care.
+// Each elemental skill deals one attribute × 1.5 × battle luck for 3 MP.
 export const ABILITIES = [
-  { id: 'claw-strike', name: 'Claw Strike', mpCost: 0, description: 'A free Strength-based attack.' },
-  { id: 'firebolt', name: 'Firebolt', mpCost: 3, description: 'Intelligence × 1.5, adjusted by battle luck and rounded.' },
-  { id: 'heavy-strike', name: 'Heavy Strike', mpCost: 2, description: 'Claw Strike damage × 1.5, rounded up.' },
+  { id: 'claw-strike', name: 'Claw Strike', type: 'normal', mpCost: 0, description: 'A free Strength-based attack.' },
+  { id: 'firebolt', name: 'Firebolt', type: 'fire', mpCost: 3, description: 'Intelligence × 1.5, adjusted by battle luck and rounded.' },
+  { id: 'heavy-strike', name: 'Heavy Strike', type: 'normal', mpCost: 2, description: 'Claw Strike damage × 1.5, rounded up.' },
+  { id: 'tide-crash', name: 'Tide Crash', type: 'water', mpCost: 3, description: 'Strength × 1.5, adjusted by battle luck and rounded.' },
+  { id: 'vine-lash', name: 'Vine Lash', type: 'grass', mpCost: 3, description: 'Charisma × 1.5, adjusted by battle luck and rounded.' },
 ] as const;
+// Chests teach every pet skill except the always-ready Claw Strike.
+export const LEARNABLE_ABILITIES = ABILITIES.filter(
+  (ability): ability is Exclude<(typeof ABILITIES)[number], { id: 'claw-strike' }> => ability.id !== 'claw-strike');
+export type LearnableAbilityId = (typeof LEARNABLE_ABILITIES)[number]['id'];
 // Monster-only moves: chests never teach these to pets.
 export const MONSTER_ABILITIES = [
-  { id: 'bump', name: 'Bump', mpCost: 5, description: 'Two-thirds of the target’s current HP, rounded up.' },
+  { id: 'bump', name: 'Bump', type: 'normal', mpCost: 5, description: 'Two-thirds of the target’s current HP, rounded up.' },
 ] as const;
 const ALL_ABILITIES = [...ABILITIES, ...MONSTER_ABILITIES];
 export type AbilityId = (typeof ALL_ABILITIES)[number]['id'];
 export type MonsterAbilityId = (typeof MONSTER_ABILITIES)[number]['id'];
-export type MonsterKind = 'slime' | 'goblin' | 'slime-king';
+// Battles saved before types lack each attack's type, so look it up by skill.
+const typeOf = (id: AbilityId): Element => ALL_ABILITIES.find(ability => ability.id === id)?.type ?? 'normal';
+// ×2 is exact and ×½ rounds up, so a typed hit always does at least 1 damage.
+const typed = (damage: number, move: Element, target: Element | undefined) =>
+  Math.ceil(damage * effectiveness(move, target));
 export interface PetStats {
   id: string; strength: number; intelligence: number; charisma: number;
   color?: string; appearance?: string;
@@ -25,12 +53,14 @@ export interface Fighter {
   id: string; maxHp: number; maxMp: number; damage: number;
   color: string; appearance: string; abilities: string[];
   name?: string; monster?: MonsterKind;
+  type?: Element; // monsters only; absent in older saved replays
 }
 // Indices into the battle's fighters. A one-on-one battle has two; a team's
 // Adventure battle lists its pets first and the monster last.
 export interface BattleTurn {
   actor: number; target: number; ability: AbilityId;
   name?: string; mpCost?: number; // absent in older saved replays
+  type?: Element; effectiveness?: number; // absent in older saved replays
   damage: number; hits: number; hp: number[]; mp: number[];
 }
 // How the turn order was decided, saved so every replay can show it. `toss`
@@ -66,7 +96,7 @@ function fighterOf(pet: PetStats, roll: number): Fighter {
   return {
     id: pet.id,
     ...(pet.name ? { name: pet.name } : {}),
-    ...(pet.monster ? { monster: pet.monster } : {}),
+    ...(pet.monster ? { monster: pet.monster, type: MONSTER_TYPES[pet.monster] } : {}),
     maxHp: pet.strength + pet.intelligence + pet.charisma,
     maxMp: pet.intelligence,
     damage: Math.max(1, Math.round(pet.strength * roll / (2 * pet.strength + pet.intelligence + pet.charisma))),
@@ -74,18 +104,24 @@ function fighterOf(pet: PetStats, roll: number): Fighter {
     abilities: ALL_ABILITIES.filter(ability => ability.id === 'claw-strike' || pet.abilities?.includes(ability.id)).map(ability => ability.id),
   };
 }
-// Fixed per-hit damage; Bump's depends on the target's HP, so each battle works it out per strike.
+// Fixed per-hit damage before type effectiveness; Bump's depends on the
+// target's HP, so each battle works it out per strike.
 function attacksOf(pet: PetStats, fighter: Fighter, roll: number) {
+  // An attribute × 1.5 × luck, at the same scale as Claw Strike's Strength.
+  const scaled = (attribute: number) =>
+    Math.max(1, Math.round(1.5 * attribute * roll / (2 * pet.strength + pet.intelligence + pet.charisma)));
   return ALL_ABILITIES.filter(ability => fighter.abilities.includes(ability.id)).map(ability => ({
     ...ability,
-    damage: ability.id === 'firebolt'
-      ? Math.max(1, Math.round(1.5 * pet.intelligence * roll / (2 * pet.strength + pet.intelligence + pet.charisma)))
+    damage: ability.id === 'firebolt' ? scaled(pet.intelligence)
+      : ability.id === 'tide-crash' ? scaled(pet.strength)
+      : ability.id === 'vine-lash' ? scaled(pet.charisma)
       : ability.id === 'heavy-strike' ? Math.ceil(fighter.damage * 1.5) : fighter.damage,
   }));
 }
 
 export interface BattleAttack {
   id: AbilityId; name: string; mpCost: number; description: string; damage: number;
+  type?: Element; // absent in battles saved before types
 }
 // Everything needed to resume a live fight is saved as plain JSON. `turns`
 // remains the replay format, while the current resources and turn are explicit.
@@ -145,18 +181,22 @@ function targetOf(battle: ActiveBattle, actor: number) {
   return battle.hp.reduce((target, hp, i) =>
     i !== battle.monsterIndex && hp > 0 && (target < 0 || hp > battle.hp[target]) ? i : target, -1);
 }
+// A fighter saved before types has none, so its battle keeps ×1 damage.
 function attackDamage(battle: ActiveBattle, target: number, attack: BattleAttack) {
-  return attack.id === 'bump' ? Math.ceil(battle.hp[target] * 2 / 3) : attack.damage;
+  const base = attack.id === 'bump' ? Math.ceil(battle.hp[target] * 2 / 3) : attack.damage;
+  return typed(base, attack.type ?? typeOf(attack.id), battle.fighters[target].type);
 }
 function strikeInPlace(battle: ActiveBattle, actor: number, attack: BattleAttack) {
   const target = targetOf(battle, actor);
   const boost = battle.goldPending && actor === battle.coinProvider ? 2 : 1;
   if (actor === battle.coinProvider) battle.goldPending = false;
   const damage = Math.min(battle.hp[target], attackDamage(battle, target, attack) * boost);
+  const type = attack.type ?? typeOf(attack.id), scale = effectiveness(type, battle.fighters[target].type);
   battle.hp[target] -= damage;
   battle.mp[actor] -= attack.mpCost;
   battle.turns.push({
     actor, target, ability: attack.id, name: attack.name, mpCost: attack.mpCost,
+    type, ...(scale !== 1 ? { effectiveness: scale } : {}),
     damage, hits: 1, hp: [...battle.hp], mp: [...battle.mp],
   });
   battle.revision++;
@@ -292,7 +332,7 @@ export function simulateBattle(
   const second = (1 - first) as 0 | 1;
   const turns: BattleTurn[] = [];
   const damageOf = (actor: 0 | 1, attack: (typeof attacks)[number][number]) =>
-    attack.id === 'bump' ? Math.ceil(hp[1 - actor] * 2 / 3) : attack.damage;
+    typed(attack.id === 'bump' ? Math.ceil(hp[1 - actor] * 2 / 3) : attack.damage, attack.type, fighters[1 - actor].type);
   // The hardest-hitting attack the fighter can afford right now, the cheaper on a tie.
   const choose = (actor: 0 | 1) => attacks[actor].filter(attack => attack.mpCost <= mp[actor]).reduce((best, attack) => {
     const gain = damageOf(actor, attack) - damageOf(actor, best);
@@ -306,9 +346,11 @@ export function simulateBattle(
     const boost = options?.doubleFirstStrike && actor === 0 && !zeroHasStruck ? 2 : 1;
     if (actor === 0) zeroHasStruck = true;
     const damage = Math.min(hp[target], damageOf(actor, attack) * hits * boost);
+    const scale = effectiveness(attack.type, fighters[target].type);
     hp[target] -= damage;
     mp[actor] -= attack.mpCost * hits;
-    turns.push({ actor, target, ability: attack.id, name: attack.name, mpCost: attack.mpCost * hits, damage, hits, hp: [...hp], mp: [...mp] });
+    turns.push({ actor, target, ability: attack.id, name: attack.name, mpCost: attack.mpCost * hits, type: attack.type,
+      ...(scale !== 1 ? { effectiveness: scale } : {}), damage, hits, hp: [...hp], mp: [...mp] });
   }
   while (hp[0] > 0 && hp[1] > 0) {
     // Very high HP builds can take thousands of identical turns. Group only
@@ -317,7 +359,7 @@ export function simulateBattle(
       const choices = [choose(0), choose(1)];
       // Bump hits for less each time, so only fixed-damage attacks are grouped.
       const rounds = choices.some(attack => attack.id === 'bump') ? 0 : Math.min(...choices.map((attack, actor) => Math.min(
-        Math.ceil(hp[1 - actor] / attack.damage) - 1,
+        Math.ceil(hp[1 - actor] / damageOf(actor as 0 | 1, attack)) - 1,
         attack.mpCost ? Math.floor(mp[actor] / attack.mpCost) : Infinity,
       )));
       if (rounds > 1) { strike(first, rounds, choices[first]); strike(second, rounds, choices[second]); }
@@ -348,7 +390,7 @@ export function simulateTeamBattle(
   const hp = [...initialHp], mp = [...initialMp];
   const turns: BattleTurn[] = [];
   const damageOf = (target: number, attack: (typeof attacks)[number][number]) =>
-    attack.id === 'bump' ? Math.ceil(hp[target] * 2 / 3) : attack.damage;
+    typed(attack.id === 'bump' ? Math.ceil(hp[target] * 2 / 3) : attack.damage, attack.type, fighters[target].type);
   let zeroHasStruck = false;
   function strike(actor: number, target: number) {
     const attack = attacks[actor].filter(a => a.mpCost <= mp[actor]).reduce((best, a) => {
@@ -358,9 +400,11 @@ export function simulateTeamBattle(
     const boost = options.doubleFirstStrike && actor === 0 && !zeroHasStruck ? 2 : 1;
     if (actor === 0) zeroHasStruck = true;
     const damage = Math.min(hp[target], damageOf(target, attack) * boost);
+    const scale = effectiveness(attack.type, fighters[target].type);
     hp[target] -= damage;
     mp[actor] -= attack.mpCost;
-    turns.push({ actor, target, ability: attack.id, name: attack.name, mpCost: attack.mpCost, damage, hits: 1, hp: [...hp], mp: [...mp] });
+    turns.push({ actor, target, ability: attack.id, name: attack.name, mpCost: attack.mpCost, type: attack.type,
+      ...(scale !== 1 ? { effectiveness: scale } : {}), damage, hits: 1, hp: [...hp], mp: [...mp] });
   }
   const standing = () => pets.map((_, i) => i).filter(i => hp[i] > 0);
   const petsStrike = () => { for (const i of standing()) if (hp[boss] > 0) strike(i, boss); };

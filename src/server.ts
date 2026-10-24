@@ -4,7 +4,7 @@ import {
 } from "./adventure.ts";
 import { accept, invite, leave, setOff, teamFor, type TeamOutcome } from "./teams.ts";
 import express from "express";
-import { ABILITIES } from "./combat.ts";
+import { ABILITIES, MONSTER_TYPES, TYPE_CHART } from "./combat.ts";
 import { COINS, TREASURE_RATES } from './treasure.ts';
 import { readFileSync } from "node:fs";
 import { createServer, STATUS_CODES } from "node:http";
@@ -349,6 +349,7 @@ app.get("/api/rules", (_req, res) => {
       cost: FIGHT_COST, needs: FIGHT_NEEDS, luck: LUCK, powerWeights: POWER_WEIGHTS, spoils: SPOILS,
       cooldownMinutes: FIGHT_COOLDOWN_MINUTES,
       abilities: ABILITIES,
+      types: { chart: TYPE_CHART, monsters: MONSTER_TYPES },
     },
     adventure: { cost: ADVENTURE_COST, cooldownMinutes: ADVENTURE_COOLDOWN_MINUTES },
     botId: BOT_ID,

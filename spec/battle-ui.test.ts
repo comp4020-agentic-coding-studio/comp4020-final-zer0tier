@@ -335,3 +335,37 @@ it('keeps the newest saved state when a live battle is queued behind another bat
     expect(scene.$('battle-close').textContent).toBe('Close');
   } finally { scene.close(); }
 });
+
+it('shows monster and skill types, matchup hints, and the saved super-effective result in live and replayed turns', () => {
+  const scene = manualScene();
+  try {
+    const caster = { id: 'pet', strength: 6, intelligence: 6, charisma: 6, equippedCoin: 'silver-coin' as const,
+      abilities: ['firebolt', 'tide-crash'] as const, equippedAbilities: ['firebolt', 'tide-crash'] as const };
+    const slime = { id: 'monster:slime', name: 'Slime', monster: 'slime' as const, strength: 1, intelligence: 1, charisma: 60 };
+    const battle = startBattle([caster], slime, [24, 64], { mp: [6, 1] });
+    scene.show(battle);
+    expect(scene.$('battle-name-1').textContent).toBe('Slime');
+    expect(scene.$('battle-type-1').hidden).toBe(false);
+    expect(scene.$('battle-type-1').textContent).toBe('Grass type');
+    expect(scene.$('battle-type-0').hidden).toBe(true);
+    expect(scene.skill('claw-strike').textContent).toBe('Claw StrikeNormal · 0 MP');
+    expect(scene.skill('firebolt').textContent).toBe('FireboltFire · 3 MP · Super effective');
+    expect(scene.skill('tide-crash').textContent).toBe('Tide CrashWater · 3 MP · Not very effective');
+    expect(scene.skill('firebolt').dataset.type).toBe('fire');
+    const updated = takeBattleTurn(battle, 'pet', 'firebolt', battle.revision);
+    if ('error' in updated) throw new Error(updated.error);
+    scene.show(updated);
+    expect(scene.$('battle-status').textContent).toBe("pet used Firebolt: 18 damage to Slime (3 MP). It's super effective!");
+    scene.flush();
+    const resisted = takeBattleTurn(updated, 'pet', 'tide-crash', updated.revision);
+    if ('error' in resisted) throw new Error(resisted.error);
+    scene.show(resisted);
+    expect(scene.$('battle-status').textContent).toBe("pet used Tide Crash: 5 damage to Slime (3 MP). It's not very effective…");
+    scene.flush();
+    // A fresh PvP battle has no types, so its hints and tags disappear again.
+    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:reset'));
+    scene.show(startBattle([caster], manualRival, [24, 26], { mp: [6, 4] }), { key: 'manual:pvp' });
+    expect(scene.$('battle-type-1').hidden).toBe(true);
+    expect(scene.skill('firebolt').textContent).toBe('FireboltFire · 3 MP');
+  } finally { scene.close(); }
+});

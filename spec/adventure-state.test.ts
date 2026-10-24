@@ -118,7 +118,7 @@ function openChest(id: string, roll: number, within = 0) {
 }
 
 it.each([
-  [0, 0, 'food'], [0.3, 0, 'soap'], [0.6, 0, 'firebolt'], [0.6, 0.9, 'heavy-strike'],
+  [0, 0, 'food'], [0.3, 0, 'soap'], [0.6, 0, 'firebolt'], [0.6, 0.3, 'heavy-strike'], [0.6, 0.6, 'tide-crash'], [0.6, 0.9, 'vine-lash'],
   [0.8, 0, 'hourglass'], [0.95, 0, 'copper-coin'], [0.95, 0.5, 'silver-coin'], [0.95, 0.9, 'gold-coin'],
 ] as const)('saves reward %s/%s (%s) once, preserving it and inventory across a process restart', (roll, within, item) => {
   const id = `treasure-${item}`, before = standOnChest(id);
@@ -128,7 +128,7 @@ it.each([
   expect(result.enemies).toEqual(before.enemies);
   if (item === 'food' || item === 'soap' || item === 'hourglass') {
     expect(pets.getPet(id)![item]).toBe(1);
-  } else if (item === 'firebolt' || item === 'heavy-strike') {
+  } else if (item === 'firebolt' || item === 'heavy-strike' || item === 'tide-crash' || item === 'vine-lash') {
     expect(pets.getPet(id)!.abilities).toContain(item);
     expect(result.chests[0].reward!.learned).toBe(true);
   } else expect(pets.getPet(id)!.coins[item]).toBe(1);
@@ -331,6 +331,10 @@ it("the Slime King Bumps for two-thirds of the pet's current HP while that beats
   const before = setupBattle(id, 'slime-king', [30, 10, 30]); // 70 HP, hits for 30; the king's Claw Strike is 18
   expect(before.enemies.find(e => e.kind === 'slime-king')!.moves).toEqual([expect.objectContaining({ id: 'bump', mpCost: 5 })]);
   expect(before.enemies.filter(e => e.kind !== 'slime-king').every(e => e.moves.length === 0)).toBe(true);
+  // The map tells the Game guide each monster's type and what beats it.
+  expect(before.enemies.map(e => [e.kind, e.type, e.weakness])).toEqual(expect.arrayContaining([
+    ['slime', 'grass', ['fire']], ['goblin', 'earth', ['water']], ['slime-king', 'water', ['grass']],
+  ]));
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5); // tails: the king strikes first
   try {
     const result = step(id, 'd');

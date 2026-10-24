@@ -197,3 +197,85 @@ it('the explicitly configured training bot may respond automatically, while the 
   expect(advanced.turns.map(turn => turn.actor)).toEqual([1, 0, 1]);
   expect(advanced.actor).toBe(0);
 });
+
+// A balanced caster: Claw Strike hits for 6 and each elemental skill for 9
+// before types, so ×2 is 18 and ×½ rounds up to 5.
+const caster: PetStats = {
+  id: 'caster', strength: 6, intelligence: 6, charisma: 6, equippedCoin: 'silver-coin',
+  abilities: ['firebolt', 'heavy-strike', 'tide-crash', 'vine-lash'],
+  equippedAbilities: ['claw-strike', 'firebolt', 'tide-crash', 'vine-lash'],
+};
+const target = (kind: 'slime' | 'goblin' | 'slime-king'): PetStats => ({ id: `monster:${kind}`, monster: kind, strength: 1, intelligence: 1, charisma: 200 });
+const hit = (battle: ActiveBattle, ability: string) => next(takeBattleTurn(battle, caster.id, ability, battle.revision)).turns[0];
+
+it.each([
+  ['slime', 'grass', { 'claw-strike': 6, firebolt: 18, 'tide-crash': 5, 'vine-lash': 5 }],
+  ['goblin', 'earth', { 'claw-strike': 6, firebolt: 5, 'tide-crash': 18, 'vine-lash': 5 }],
+  ['slime-king', 'water', { 'claw-strike': 6, firebolt: 5, 'tide-crash': 5, 'vine-lash': 18 }],
+] as const)('typed skills hit a %s (%s type) twice as hard when super effective and half as hard otherwise', (kind, type, expected) => {
+  const battle = startBattle([caster], target(kind), [power(caster), power(target(kind))], { mp: [20, 1] });
+  expect(battle.fighters[1]).toMatchObject({ monster: kind, type });
+  expect(battle.fighters[0]).not.toHaveProperty('type');
+  expect(battle.attacks[0].map(attack => [attack.id, attack.type, attack.damage])).toEqual([
+    ['claw-strike', 'normal', 6], ['firebolt', 'fire', 9], ['tide-crash', 'water', 9], ['vine-lash', 'grass', 9],
+  ]);
+  for (const [ability, damage] of Object.entries(expected)) {
+    const turn = hit(battle, ability);
+    expect(turn, ability).toMatchObject({ ability, damage, hp: [18, 202 - damage] });
+    const scale = damage === 18 ? 2 : damage === 5 ? 0.5 : undefined;
+    if (scale) expect(turn.effectiveness, ability).toBe(scale);
+    else expect(turn, ability).not.toHaveProperty('effectiveness');
+  }
+});
+
+it('keeps PvP neutral: pets have no type, so typed skills deal their base damage to another pet', () => {
+  const rivalPet: PetStats = { id: 'rival', strength: 1, intelligence: 1, charisma: 200 };
+  // The rival's larger total supplies the coin; heads (random 0) lets it lead
+  // with the caster still choosing every move after the rival's opening hit.
+  const opened = startBattle([caster], rivalPet, [power(caster), power(rivalPet)], { mode: 'pvp', mp: [20, 1], random: () => 0 });
+  const battle = next(takeBattleTurn(opened, rivalPet.id, 'claw-strike', opened.revision));
+  expect(battle.actor).toBe(0);
+  expect(battle.fighters.map(fighter => fighter.type)).toEqual([undefined, undefined]);
+  for (const [ability, damage] of [['claw-strike', 6], ['firebolt', 9], ['tide-crash', 9], ['vine-lash', 9]] as const) {
+    const turn = next(takeBattleTurn(battle, caster.id, ability, battle.revision)).turns[1];
+    expect(turn, ability).toMatchObject({ damage });
+    expect(turn, ability).not.toHaveProperty('effectiveness');
+  }
+});
+
+it('scales each elemental skill on its own attribute and keeps a halved hit at 1 damage or more', () => {
+  const lopsided: PetStats = { ...caster, strength: 2, intelligence: 4, charisma: 10 };
+  const battle = startBattle([lopsided], target('goblin'), [power(lopsided), power(target('goblin'))], { mp: [4, 1] });
+  // Attribute × 1.5 at the same scale as Claw Strike's Strength (2).
+  expect(battle.attacks[0].map(attack => [attack.id, attack.damage])).toEqual([
+    ['claw-strike', 2], ['firebolt', 6], ['tide-crash', 3], ['vine-lash', 15],
+  ]);
+  const weak: PetStats = { id: 'weak', strength: 1, intelligence: 3, charisma: 1, equippedCoin: 'silver-coin', abilities: ['firebolt'], equippedAbilities: ['firebolt'] };
+  const king = target('slime-king');
+  const small = startBattle([weak], king, [power(weak) / 3, power(king)], { mp: [5, 1] });
+  expect(small.attacks[0].find(attack => attack.id === 'firebolt')!.damage).toBe(2);
+  expect(next(takeBattleTurn(small, weak.id, 'firebolt', small.revision)).turns[0]).toMatchObject({ damage: 1, effectiveness: 0.5 });
+});
+
+it('Gold doubles a super-effective first hit, and a monster’s own attacks still deal their usual damage', () => {
+  const gold = { ...caster, equippedCoin: 'gold-coin' as const };
+  const slime: PetStats = { ...target('slime'), strength: 4, intelligence: 1, charisma: 60 };
+  let battle = startBattle([gold], slime, [power(gold), power(slime)], { mp: [20, 1] });
+  // Gold puts the slime first; its free Claw Strike ignores the pet's (absent) type.
+  expect(battle.turns[0]).toMatchObject({ actor: 1, ability: 'claw-strike', damage: 4, type: 'normal' });
+  expect(battle.turns[0]).not.toHaveProperty('effectiveness');
+  battle = next(takeBattleTurn(battle, gold.id, 'firebolt', battle.revision));
+  // 9 base × 2 for Fire on Grass × 2 for Gold's first strike.
+  expect(battle.turns[1]).toMatchObject({ actor: 0, ability: 'firebolt', damage: 36, effectiveness: 2, hp: [14, 29] });
+});
+
+it('replays and resumes battles saved before types without type effects', () => {
+  const kept = startBattle([caster], target('slime'), [power(caster), power(target('slime'))], { mp: [20, 1] });
+  // A battle saved before types has no fighter or attack types.
+  const legacy = JSON.parse(JSON.stringify(kept)) as ActiveBattle;
+  delete legacy.fighters[1].type;
+  for (const attacks of legacy.attacks) for (const attack of attacks) delete attack.type;
+  expect(hit(legacy, 'firebolt')).toMatchObject({ damage: 9 });
+  expect(hit(legacy, 'firebolt')).not.toHaveProperty('effectiveness');
+  expect(hit(kept, 'firebolt')).toMatchObject({ damage: 18, effectiveness: 2 });
+});

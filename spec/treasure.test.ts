@@ -10,12 +10,18 @@ it.each([
 
 it('allocates 30/30/20/15/5 percent of the random range, with equal choices within abilities and coins', () => {
   const categories: Record<string, number> = {}, items: Record<string, number> = {};
-  for (let n = 0; n < 6000; n++) {
+  // 12 evenly spaced second rolls divide exactly into 4 skills and 3 coins.
+  for (let n = 0; n < 12000; n++) {
     let call = 0;
-    const reward = rollTreasure(() => call++ === 0 ? (n + 0.5) / 6000 : (n % 6 + 0.5) / 6);
+    const reward = rollTreasure(() => call++ === 0 ? (n + 0.5) / 12000 : (n % 12 + 0.5) / 12);
     categories[reward.category] = (categories[reward.category] || 0) + 1;
     items[reward.id] = (items[reward.id] || 0) + 1;
   }
-  expect(categories).toEqual({ food: 1800, soap: 1800, ability: 1200, hourglass: 900, coin: 300 });
-  expect(items).toMatchObject({ firebolt: 600, 'heavy-strike': 600, 'copper-coin': 100, 'silver-coin': 100, 'gold-coin': 100 });
+  expect(categories).toEqual({ food: 3600, soap: 3600, ability: 2400, hourglass: 1800, coin: 600 });
+  expect(items).toMatchObject({
+    firebolt: 600, 'heavy-strike': 600, 'tide-crash': 600, 'vine-lash': 600,
+    'copper-coin': 200, 'silver-coin': 200, 'gold-coin': 200,
+  });
+  expect(items).not.toHaveProperty('claw-strike');
+  expect(items).not.toHaveProperty('bump');
 });

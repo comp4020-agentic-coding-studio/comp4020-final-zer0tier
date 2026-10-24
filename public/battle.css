@@ -12,6 +12,17 @@
 .battle-stage { display: grid; grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr); align-items: center; gap: 12px; margin: 24px 0; padding: 18px 12px; background: radial-gradient(ellipse at center, var(--bg-glow), var(--bg)); border-radius: 18px; }
 .battle-fighter { min-width: 0; position: relative; }
 .battle-fighter h3 { font-size: 1rem; text-align: center; margin: 0; overflow-wrap: anywhere; }
+/* Monster types and typed skills share one colour each, with text beside it. */
+#battle-dialog { --type-fire: #c2410c; --type-water: #0e7490; --type-grass: #3f7d3a; --type-earth: #8a5a2b; }
+@media (prefers-color-scheme: dark) {
+  #battle-dialog { --type-fire: #fdba74; --type-water: #67e8f9; --type-grass: #a3d977; --type-earth: #e0b483; }
+}
+#battle-dialog [data-type="fire"] { --type: var(--type-fire); }
+#battle-dialog [data-type="water"] { --type: var(--type-water); }
+#battle-dialog [data-type="grass"] { --type: var(--type-grass); }
+#battle-dialog [data-type="earth"] { --type: var(--type-earth); }
+.battle-type { width: fit-content; margin: 4px auto 0; padding: 1px 10px; border: 1px solid currentColor; border-radius: 999px; color: var(--type, var(--muted)); font-size: .72rem; font-weight: 700; }
+.battle-type[hidden] { display: none; }
 .battle-avatar { width: 116px; max-width: 100%; margin: 12px auto; }
 .battle-avatar svg { width: 100%; display: block; }
 .battle-monster { fill: none; stroke: var(--fg); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
@@ -53,7 +64,15 @@
 .battle-skill:hover:not(:disabled) { border-color: var(--primary); background: var(--bg-glow); }
 .battle-skill:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
 .battle-skill:disabled { opacity: .55; cursor: not-allowed; }
+.battle-skill[data-type]:not([data-type="normal"]) { border-left: 6px solid var(--type); }
+.battle-skill[data-type]:not([data-type="normal"]) span { color: var(--type); }
 .battle-fighter.taking-turn h3::before { content: '› '; color: var(--primary); }
+#battle-dialog[data-ability="tide-crash"] .battle-fighter.hit::after {
+  content: ''; width: 44px; height: 30px; border-radius: 50% 50% 40% 40%;
+  background: radial-gradient(circle at 40% 35%, #e0fbff 12%, #5fd0e6 50%, #1d7f9c 80%);
+  box-shadow: 0 0 14px #5fd0e688; animation: skill-flare 450ms both;
+}
+#battle-dialog[data-ability="vine-lash"] .battle-fighter.hit::after { content: '❦'; font-size: 3.2rem; color: #4f9a45; }
 #battle-dialog[data-ability="firebolt"] .battle-fighter.hit::after {
   content: ''; width: 38px; height: 38px; border-radius: 50% 50% 50% 8%;
   background: radial-gradient(circle, #fff4bb 10%, #ffa34c 45%, #d55139 70%);

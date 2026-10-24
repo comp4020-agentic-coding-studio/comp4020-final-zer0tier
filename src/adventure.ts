@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { db, transaction } from './db.ts';
-import { ABILITIES, forfeitBattle, MONSTER_ABILITIES, startBattle, takeBattleTurn, type ActiveBattle, type Battle } from './combat.ts';
+import {
+  ABILITIES, forfeitBattle, MONSTER_ABILITIES, MONSTER_TYPES, startBattle, takeBattleTurn, weaknessOf, type ActiveBattle, type Battle,
+} from './combat.ts';
 import {
   ADVENTURE_COOLDOWN_MINUTES, ADVENTURE_COST, busyNow, consumeHourglass, findItem, getPet, ITEMS, LUCK, MAX_CARE,
   powerOf, spendForAdventure, use, type Pet,
@@ -126,6 +128,7 @@ function view(saved: Progress) {
     enemies: floor.enemies.map(({ x, y, route: _route, leg: _leg, ...enemy }) => ({
       ...enemy, ...(enemy.kind === 'slime-king' ? { x, y } : {}),
       hidden: enemy.kind !== 'slime-king', alerted: false,
+      type: MONSTER_TYPES[enemy.kind], weakness: weaknessOf(MONSTER_TYPES[enemy.kind]),
       moves: MONSTER_ABILITIES.filter(a => MONSTER_MOVES[enemy.kind].includes(a.id)),
     })),
     up: floor.up, down: floor.down, revision: saved.revision,
