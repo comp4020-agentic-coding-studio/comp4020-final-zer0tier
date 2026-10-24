@@ -24,7 +24,7 @@ import {
 import { TIME_SCALE } from "./clock.ts";
 import { recentFeed } from "./feed.ts";
 import { followUp } from "./followups.ts";
-import { attachRealtime, broadcast, clientsInRoom, isOnline, refreshPresence } from "./realtime.ts";
+import { attachRealtime, broadcast, cancelStop, clientsInRoom, isOnline, refreshPresence } from "./realtime.ts";
 import { moveWorld, worldPosition } from './world.ts';
 import { logEvent, ROOM } from "./logging.ts";
 import { logRequest } from "./request-logging.ts";
@@ -142,6 +142,7 @@ app.post('/api/world', (req, res) => {
   if (!id) return void res.status(401).json({ error: 'Sign in first.' });
   const outcome = moveWorld(id, req.body);
   if ('error' in outcome) return void res.status(outcome.status).json(outcome);
+  cancelStop(id);
   broadcast({ type: 'world:updated', player: outcome });
   res.json(outcome);
 });

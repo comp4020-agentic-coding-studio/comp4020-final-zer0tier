@@ -48,6 +48,11 @@ the point of the game, not boxes to tick:
   trigger. I killed the server halfway through a shift and started it again.
   The pet was still working, the shift finished and paid on time, and the
   player was still signed in.
+  If another process briefly locks the database, live connections and
+  finishing lessons or shifts wait and retry instead of stopping the server:
+  presence catches up, and a finish is announced once the lock clears.
+  *Enforced:* `spec/realtime-resilience.test.ts` holds the lock on a private
+  server while players connect, leave, and finish a lesson.
 - **Interacting is fair.** Fights follow published rules (power is
   2 × Strength + Intelligence + Charisma, with limited luck), so training
   shows in the results. The bot `0` is a fair opponent nobody can control: it
