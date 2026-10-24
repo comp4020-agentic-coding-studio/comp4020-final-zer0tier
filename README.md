@@ -442,7 +442,9 @@ with the same keyboard or floor-click controls. Everyone in the same home
 sees each other's character positions, direction, and walking in real time.
 Players in a different home are not drawn in yours. Select the pet to see
 its appearance, activity, balance, and visiting actions; **Leave home** or
-the front door returns to town. Town also shows the players walking there.
+the front door returns to town. The game menu's **Pet details** still shows
+your own pet; feeding, cleaning, and playing with it wait until you are home.
+Town also shows the players walking there.
 Signing out or losing the live connection removes your character; reconnecting
 resyncs the saved positions. Closing one of several connected tabs does not
 make the player offline.

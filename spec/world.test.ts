@@ -503,6 +503,32 @@ it('opens the visited pet controls from the home hotspot and leaves personal car
   } finally { p.window.close(); }
 });
 
+it("opens your own pet's details from the game menu while visiting and keeps its care for your own home", () => {
+  const p = page();
+  try {
+    p.window.document.dispatchEvent(new p.window.CustomEvent('home:visit', { detail: { id: 'neighbour' } }));
+    p.openMenu();
+    p.$('world-pet-details').click();
+    expect(p.$('world-dialog').dataset.place).toBe('pet');
+    expect(p.$('world-panel-visit').hidden).toBe(true);
+    expect(p.$('pet-name').closest('[hidden]')).toBeNull();
+    for (const id of ['home-feed', 'home-clean', 'world-play']) expect(p.$(id).closest('[hidden]'), id).not.toBeNull();
+    expect(p.$('town-care-hint').closest('[hidden]')).toBeNull();
+    p.$('world-dialog-close').click();
+    // The pet in the room is still the neighbour's.
+    p.homeAction('pet');
+    expect(p.$('world-dialog').dataset.place).toBe('visit');
+    p.$('world-dialog-close').click();
+    p.window.document.dispatchEvent(new p.window.CustomEvent('home:leave'));
+    p.$('town-home').click();
+    p.homeAction('pet');
+    expect(p.$('world-dialog').dataset.place).toBe('pet');
+    expect(p.$('home-feed').closest('[hidden]')).toBeNull();
+    expect(p.$('world-play').closest('[hidden]')).toBeNull();
+    expect(p.$('town-care-hint').closest('[hidden]')).not.toBeNull();
+  } finally { p.window.close(); }
+});
+
 it('keeps the live pet and gameplay controls while navigating between home and town', () => {
   const p = page();
   try {

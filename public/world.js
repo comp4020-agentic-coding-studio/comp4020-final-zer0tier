@@ -488,6 +488,8 @@ visitBar.querySelector('button').addEventListener('click', () => worldById('visi
 function worldRenderVisit() {
   const visiting = worldVisiting();
   const hotspot = worldShell.querySelector('[data-home-action="pet"]');
+  // The room's pet is the neighbour's; the game menu's Pet details stays yours.
+  hotspot.dataset.place = visiting ? 'visit' : 'pet';
   hotspot.setAttribute('aria-label', visiting ? `Visit ${worldHome}'s pet` : 'Spend time with your pet: care and details');
   hotspot.querySelector('.hotspot-label').textContent = visiting ? `${worldHome}'s pet` : 'Your companion';
   homePet.hidden = Boolean(visiting);
@@ -730,14 +732,17 @@ function worldMessage(text, feedback = true) {
   }
 }
 function worldArrangeScene(atHome) {
+  // Caring for your own pet waits until you are back in your own home.
+  const ownHome = atHome && !worldVisiting();
   for (const selector of ['.world-heading', '.world-layout > .world-companion', '.scene-caption', '.world-controls', '.world-nav']) worldShell.querySelector(selector).hidden = true;
   worldById('home-controls-tip').hidden = false;
   worldById('home-pet-label').hidden = true;
-  for (const selector of ['.home-care', '.home-play', '#home-care-hint', '#home-interaction-label']) document.querySelector(selector).hidden = !atHome;
+  for (const selector of ['.home-care', '.home-play', '#home-care-hint', '#home-interaction-label']) document.querySelector(selector).hidden = !ownHome;
+  worldById('town-care-hint').hidden = ownHome;
   if (!worldDashboard.hidden) worldPanels.menu.append(worldById('signout'));
   else signoutAnchor.after(worldById('signout'));
   document.body.classList.toggle('world-home', atHome && !worldDashboard.hidden);
-  document.dispatchEvent(new CustomEvent('world:scene', { detail: { home: atHome && !worldVisiting() } }));
+  document.dispatchEvent(new CustomEvent('world:scene', { detail: { home: ownHome } }));
   worldStage.setAttribute('aria-describedby', 'home-controls-tip');
 }
 function worldCamera(point = worldNetworked() ? worldVisualPosition : worldPosition) {
@@ -808,7 +813,6 @@ function worldSyncAnimation() {
   if (paused) worldStop();
 }
 function worldOpenPlace(name) {
-  if (name === 'pet' && worldVisiting()) name = 'visit';
   if (worldDashboard.hidden || !worldPlaces[name]) return;
   worldStop();
   const panelName = name === 'backpack' ? 'shop' : name;
@@ -870,7 +874,6 @@ function worldChangeScene(scene, focus = true, home = worldPlayerId, confirmed =
   worldById('world-home').toggleAttribute('aria-current', atHome);
   worldById('world-town').toggleAttribute('aria-current', !atHome);
   (atHome ? worldById('world-home') : worldById('world-town')).setAttribute('aria-current', 'page');
-  worldById('town-care-hint').hidden = atHome;
   worldStage.setAttribute('aria-label', `${worldVisiting() ? `${worldHome}'s home` : atHome ? 'Your home' : 'Town map'}. Move with W A S D or arrow keys. Press Space near an object to interact.`);
   worldMessage(atHome ? '' : 'The day is yours. Select a building, or walk over and press Space.', false);
   worldResize();
@@ -899,7 +902,7 @@ worldById('home-clean').addEventListener('click', () => worldCare('soap'));
 for (const button of worldShell.querySelectorAll('[data-home-action]')) {
   button.addEventListener('click', () => {
     const action = button.dataset.homeAction;
-    if (worldVisiting() && ['pet', 'feed', 'clean', 'bed', 'couch'].includes(action)) return worldOpenPlace('visit');
+    if (worldVisiting() && ['feed', 'clean', 'bed', 'couch'].includes(action)) return worldOpenPlace('visit');
     if (action === 'tv') worldOpenPlace('journal');
     if (action === 'bed') worldOpenPlace('appearance');
     if (action === 'chest') worldOpenPlace('backpack');
