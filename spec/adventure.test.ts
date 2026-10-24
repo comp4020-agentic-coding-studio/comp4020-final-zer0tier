@@ -132,8 +132,11 @@ it('saves exactly one seeded grass encounter for concurrent moves and retries, i
   expect(continued.battle.playback).toEqual(continued.failed ? result.battle.playback : null);
   expect(await (await post('/api/adventure', continuation, id)).json()).toEqual(continued);
   expect(await (await post('/api/adventure', request, id)).json()).toEqual(continued);
-  // The forged strength and reward are ignored; only a real win trains +1, once.
-  expect(await getPet(id)).toEqual({ ...pet, strength: pet.strength + (result.battle.won ? 1 : 0) });
+  // The forged strength and reward are ignored; only a real win trains its
+  // saved +1 (a random attribute for Claw Strike), once.
+  const gain: Record<string, number> = result.battle.trained ?? {};
+  expect(Object.values(gain).reduce((sum, amount) => sum + amount, 0)).toBe(result.battle.won ? 1 : 0);
+  expect(await getPet(id)).toEqual({ ...pet, ...Object.fromEntries(Object.entries(gain).map(([a, amount]) => [a, pet[a] + amount])) });
 });
 
 it('requires a saved map revision and cannot move another account using a previous login’s revision', async () => {
@@ -167,19 +170,23 @@ it('pet:updated — a woodland victory trains the pet once and reaches both wind
       const timer = setTimeout(() => reject(new Error('no trained pet:updated within 1s')), 1000);
       ws.addEventListener('message', ({ data }) => {
         const event = JSON.parse(String(data));
-        if (event.type === 'pet:updated' && event.pet.id === id && event.pet.strength > before.strength) { clearTimeout(timer); resolve(event.pet); }
+        const total = (p: any) => p.strength + p.intelligence + p.charisma;
+        if (event.type === 'pet:updated' && event.pet.id === id && total(event.pet) > total(before)) { clearTimeout(timer); resolve(event.pet); }
       });
     }));
     state = await finishBattle(id, state);
-    expect(state.battle).toMatchObject({ won: true, trained: { strength: 1 } });
+    // Claw Strike is Normal, so the win grows one random attribute by exactly 1.
+    expect(state.battle).toMatchObject({ won: true });
+    const [[attribute, amount]] = Object.entries(state.battle.trained) as [string, number][];
+    expect(amount).toBe(1);
     const pet = await getPet(id);
-    expect(pet).toMatchObject({ strength: before.strength + 1, intelligence: before.intelligence, charisma: before.charisma });
+    expect(pet).toMatchObject({ ...Object.fromEntries(['strength', 'intelligence', 'charisma'].map(a => [a, before[a] + (a === attribute ? 1 : 0)])) });
     for (const update of await Promise.all(updates)) expect(update).toEqual(pet);
     // Replaying the finishing move cannot train again.
     const retried = await post('/api/adventure', { action: 'battle-skill', battleId: state.battle.id,
       turnRevision: state.battle.playback.revision - 1, ability: 'claw-strike' }, id);
     expect(retried.status).toBe(200);
-    expect((await getPet(id)).strength).toBe(before.strength + 1);
+    expect((await getPet(id))[attribute]).toBe(before[attribute] + 1);
   } finally { windows.forEach(ws => ws.close()); }
 });
 

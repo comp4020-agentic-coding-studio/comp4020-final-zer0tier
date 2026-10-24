@@ -18,21 +18,26 @@ export const effectiveness = (move: Element, target: Element | undefined): numbe
 export const weaknessOf = (type: Element): Element[] => ELEMENTS.filter(move => effectiveness(move, type) > 1);
 // A saved, server-resolved battle. HP/MP belong to this fight, not daily care.
 // Each elemental skill deals one attribute × 1.5 × battle luck for 3 MP.
-// `trains` is the attribute a win grows when this skill lands the final blow.
+// `trains` is the main attribute a win grows when this skill lands the final
+// blow; Normal skills have none (`null`), so their win grows a random one.
 export const ABILITIES = [
-  { id: 'claw-strike', name: 'Claw Strike', type: 'normal', trains: 'strength', mpCost: 0, description: 'A free Strength-based attack.' },
+  { id: 'claw-strike', name: 'Claw Strike', type: 'normal', trains: null, mpCost: 0, description: 'A free Strength-based attack.' },
   { id: 'firebolt', name: 'Firebolt', type: 'fire', trains: 'intelligence', mpCost: 3, description: 'Intelligence × 1.5, adjusted by battle luck and rounded.' },
-  { id: 'heavy-strike', name: 'Heavy Strike', type: 'normal', trains: 'strength', mpCost: 2, description: 'Claw Strike damage × 1.5, rounded up.' },
+  { id: 'heavy-strike', name: 'Heavy Strike', type: 'normal', trains: null, mpCost: 2, description: 'Claw Strike damage × 1.5, rounded up.' },
   { id: 'tide-crash', name: 'Tide Crash', type: 'water', trains: 'strength', mpCost: 3, description: 'Strength × 1.5, adjusted by battle luck and rounded.' },
   { id: 'vine-lash', name: 'Vine Lash', type: 'grass', trains: 'charisma', mpCost: 3, description: 'Charisma × 1.5, adjusted by battle luck and rounded.' },
 ] as const;
-export type TrainedAttribute = (typeof ABILITIES)[number]['trains'];
-// A winning pet grows the attribute behind its own last hit. A pet that never
+const TRAINABLE = ['strength', 'intelligence', 'charisma'] as const;
+export type TrainedAttribute = (typeof TRAINABLE)[number];
+// A winning pet grows the main attribute behind its own last hit, or a random
+// one when that hit was a Normal skill. Rolled once when the win is settled
+// and saved with it, so a replay or retry never rerolls. A pet that never
 // struck (its opponent forfeited, or its teammates did all the work) gains
 // nothing, so a forfeit can't hand out free training.
-export function battleTraining(battle: Battle, petIndex: number): TrainedAttribute | undefined {
+export function battleTraining(battle: Battle, petIndex: number, random = Math.random): TrainedAttribute | undefined {
   const last = battle.turns.findLast(turn => turn.actor === petIndex && turn.damage > 0);
-  return last && (ABILITIES.find(ability => ability.id === last.ability)?.trains ?? 'strength');
+  if (!last) return undefined;
+  return ABILITIES.find(ability => ability.id === last.ability)?.trains ?? TRAINABLE[Math.floor(random() * TRAINABLE.length)];
 }
 // Chests teach every pet skill except the always-ready Claw Strike.
 export const LEARNABLE_ABILITIES = ABILITIES.filter(

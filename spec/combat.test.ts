@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { ABILITIES, coinEffect, MONSTER_ABILITIES, simulateBattle, simulateTeamBattle } from '../src/combat.ts';
+import { ABILITIES, battleTraining, coinEffect, MONSTER_ABILITIES, simulateBattle, simulateTeamBattle } from '../src/combat.ts';
 
 const a = { id: 'a', strength: 5, intelligence: 7, charisma: 3 };
 const b = { id: 'b', strength: 5, intelligence: 5, charisma: 5 };
@@ -183,4 +183,25 @@ it('a team can win with a pet knocked out; tails puts the monster first, and Gol
     [2, 0, [1, 3, 7]], [0, 2, [1, 3, 5]], [1, 2, [1, 3, 2]], [2, 1, [1, 0, 2]], [0, 2, [1, 0, 0]],
   ]);
   expect(costly.winner).toBe('rex');
+});
+
+it('a win trains the final hit’s main attribute, or a random one for a Normal skill, and nothing without a hit', () => {
+  const win = (ability: string) => ({ fighters: [], winner: 'a', turns: [
+    { actor: 0, target: 1, ability: 'claw-strike', damage: 3, hits: 1, hp: [10, 7], mp: [5, 5] },
+    { actor: 1, target: 0, ability: 'firebolt', damage: 4, hits: 1, hp: [6, 7], mp: [5, 2] },
+    { actor: 0, target: 1, ability, damage: 7, hits: 1, hp: [6, 0], mp: [5, 2] },
+  ] }) as unknown as Parameters<typeof battleTraining>[0];
+  // Elemental skills always train their own attribute, whatever the roll.
+  for (const roll of [0, 0.5, 0.99]) {
+    expect(battleTraining(win('firebolt'), 0, () => roll)).toBe('intelligence');
+    expect(battleTraining(win('tide-crash'), 0, () => roll)).toBe('strength');
+    expect(battleTraining(win('vine-lash'), 0, () => roll)).toBe('charisma');
+  }
+  // Normal skills have no main attribute, so the roll picks one of the three evenly.
+  for (const ability of ['claw-strike', 'heavy-strike']) {
+    expect([0, 0.34, 0.67].map(roll => battleTraining(win(ability), 0, () => roll))).toEqual(['strength', 'intelligence', 'charisma']);
+  }
+  // Only the pet's own last hit counts, and a pet that never hit trains nothing.
+  expect(battleTraining(win('vine-lash'), 1, () => 0)).toBe('intelligence');
+  expect(battleTraining({ ...win('firebolt'), turns: [] }, 0)).toBeUndefined();
 });

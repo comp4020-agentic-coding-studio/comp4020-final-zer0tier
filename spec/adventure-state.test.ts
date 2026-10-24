@@ -222,13 +222,20 @@ it.each(['slime', 'goblin', 'slime-king'] as const)('saves a %s victory, removes
   const continued = continueRun(id);
   expect(afterRestart(id)).toEqual(continued);
   expect(continued.battle!.playback).toEqual(kind === 'slime-king' ? result.battle!.playback : null);
-  // The win trains once: Claw Strike grows Strength; the Slime King grows all three.
-  const gain = kind === 'slime-king' ? { strength: 1, intelligence: 1, charisma: 1 } : { strength: 1 };
-  expect(result.battle!.trained).toEqual(gain);
+  // The win trains once. Claw Strike is Normal, so it grows one random
+  // attribute by 1; the Slime King grows all three.
+  const gain = result.battle!.trained!;
+  if (kind === 'slime-king') expect(gain).toEqual({ strength: 1, intelligence: 1, charisma: 1 });
+  else {
+    expect(Object.values(gain)).toEqual([1]);
+    expect(['strength', 'intelligence', 'charisma']).toContain(Object.keys(gain)[0]);
+  }
   expect(pets.getPet(id)).toEqual({
-    ...pet, strength: pet!.strength + 1,
+    ...pet, strength: pet!.strength + (gain.strength ?? 0),
     intelligence: pet!.intelligence + (gain.intelligence ?? 0), charisma: pet!.charisma + (gain.charisma ?? 0),
   });
+  // A restart replays the saved gain without rolling or training again.
+  expect(afterRestart(id).battle.trained).toEqual(gain);
 });
 
 it.each([[0, true], [0.049999, true], [0.05, false], [0.999999, false]] as const)(
@@ -239,7 +246,8 @@ it.each([[0, true], [0.049999, true], [0.05, false], [0.999999, false]] as const
       const fought = step(id, 'd');
       expect(fought.exit).toEqual({ keyFound: dropped, unlocked: false, dropRate: 0.05 });
       expect(fought.battle!.keyDrop).toEqual(dropped ? { floor: 1, name: 'Floor Key' } : undefined);
-      expect(random).toHaveBeenCalledTimes(4);
+      // A coin toss, two luck rolls, the key roll, and the Normal win's attribute roll.
+      expect(random).toHaveBeenCalledTimes(5);
       expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(fought);
       expect(adventure.patrolAdventure(id)).toEqual(fought);
       expect(afterRestart(id)).toEqual(fought);
@@ -247,7 +255,8 @@ it.each([[0, true], [0.049999, true], [0.05, false], [0.999999, false]] as const
       expect(continued.battle!.keyDrop).toEqual(fought.battle!.keyDrop);
       expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(continued);
       expect(afterRestart(id)).toEqual(continued);
-      expect(random).toHaveBeenCalledTimes(4);
+      // Replays, reads and restarts never roll the key or the attribute again.
+      expect(random).toHaveBeenCalledTimes(5);
     } finally { random.mockRestore(); }
   },
 );
@@ -268,7 +277,8 @@ it('does not roll keys for defeats, an already found key, an unlocked gate, or t
       const fought = step(id, 'd');
       expect(fought.battle!.won).toBe(kind !== 'defeat');
       expect(fought.battle!.keyDrop).toBeUndefined();
-      expect(random).toHaveBeenCalledTimes(3);
+      // A coin toss and two luck rolls, plus the attribute roll for a Normal-skill win.
+      expect(random).toHaveBeenCalledTimes(kind === 'defeat' ? 3 : 4);
       if (kind === 'boss') expect(fought.exit).toBeNull();
     } finally { random.mockRestore(); }
   }
@@ -362,15 +372,17 @@ it('carries HP/MP across battles and floors, restoring 20% of maximum rounded up
     const result = step(id, 'd');
     expect(result.battle!.playback!.initialHp).toEqual([17, 6]);
     expect(result.battle!.playback!.initialMp).toEqual([0, 1]);
-    // Recovery uses the maximum before the win; Claw Strike's win then trains
-    // Strength, raising the maximum without refilling the HP it adds.
-    expect(result).toMatchObject({ hp: 21, mp: 2, maxHp: 32, maxMp: 7, battle: { recovery: { hp: 7, mp: 2 }, trained: { strength: 1 } } });
+    // Recovery uses the maximum before the win. Claw Strike is Normal, so the
+    // win trains a random attribute: at a 0.5 roll, Intelligence. That raises
+    // the maximum HP (the attribute sum) and MP without refilling either.
+    expect(result).toMatchObject({ hp: 21, mp: 2, maxHp: 32, maxMp: 8, battle: { recovery: { hp: 7, mp: 2 }, trained: { intelligence: 1 } } });
     expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(result);
     expect(adventure.adventureFor(id)).toEqual(result);
     const continued = continueRun(id);
     expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(continued);
-    // One coin toss, a luck roll for each fighter, and one key drop roll.
-    expect(random).toHaveBeenCalledTimes(4);
+    // One coin toss, a luck roll for each fighter, one key drop roll, and the
+    // Normal win's attribute roll; replaying the saved battle rolls nothing.
+    expect(random).toHaveBeenCalledTimes(5);
     grantFloorKey(id);
     db.prepare('UPDATE adventures SET x = ?, y = ? WHERE player_id = ?').run(13, 13, id);
     expect(adventure.changeFloor(id, 'descend', continued.revision)).toMatchObject({ floor: 2, hp: 21, mp: 2 });
@@ -385,9 +397,10 @@ it('carries HP/MP across battles and floors, restoring 20% of maximum rounded up
     db.prepare('UPDATE adventures SET x = ?, y = ?, hp = ?, mp = ? WHERE player_id = ?').run(3, 11, 30, 6, id);
     readyGrassBattle(id, 'f1-enemy-2');
     const capped = step(id, 'd');
-    // Two earlier wins trained Strength to a 33 maximum: recovery fills the
-    // missing 6 HP to full, then this win's +1 raises the maximum to 34.
-    expect(capped).toMatchObject({ hp: 33, mp: 7, maxHp: 34, battle: { recovery: { hp: 6, mp: 1 } } });
+    // Two earlier Normal wins trained Intelligence (at a 0.5 roll), raising
+    // the maximums to 33 HP and 9 MP. Recovery fills the missing 6 HP to full
+    // and adds 2 MP; then this win's +1 raises the maximums to 34 and 10.
+    expect(capped).toMatchObject({ hp: 33, mp: 8, maxHp: 34, maxMp: 10, battle: { recovery: { hp: 6, mp: 2 }, trained: { intelligence: 1 } } });
     expect(afterRestart(id)).toEqual(capped);
   } finally { random.mockRestore(); }
 });
@@ -472,12 +485,12 @@ it("a Copper coin adds HP/MP to one monster battle as a shield, without changing
     expect(result.battle!.playback!.initialMp![0]).toBe(8);
     expect(result.battle!.playback!.turns[0]).toMatchObject({ actor: 1, damage: 3, hp: [31, 6] });
     // The shield took the whole hit; its unused MP is gone, and nothing is recovered past full.
-    // The win's own +1 Strength raises the maximum without refilling it.
-    expect(result).toMatchObject({ hp: 31, mp: 7, maxHp: 32, maxMp: 7, battle: { won: true, after: { hp: 31, mp: 7 } } });
+    // The Normal win trains Intelligence at a 0.5 roll, raising both maximums without refilling.
+    expect(result).toMatchObject({ hp: 31, mp: 7, maxHp: 32, maxMp: 8, battle: { won: true, after: { hp: 31, mp: 7 } } });
   } finally { random.mockRestore(); }
-  // Copper's +1 to every attribute never sticks: only the victory's +1 Strength does.
+  // Copper's +1 to every attribute never sticks: only the victory's +1 Intelligence does.
   expect(pets.getPet(id)).toMatchObject({
-    strength: realStats.strength + 1, intelligence: realStats.intelligence, charisma: realStats.charisma,
+    strength: realStats.strength, intelligence: realStats.intelligence + 1, charisma: realStats.charisma,
   });
 });
 
@@ -748,7 +761,9 @@ it('reveals accumulated exact battle records only after leaving, and a later ent
     expect(adventure.leaveAdventure(id, second.revision)).toEqual(left);
     expect(adventure.leaveAdventure(id, left.revision)).toEqual(left);
     expect(afterRestart(id)).toEqual(left);
-    expect(random).toHaveBeenCalledTimes(8);
+    // Two battles of four rolls, plus an attribute roll for each Normal-skill
+    // win; leaving and restarting roll nothing more.
+    expect(random).toHaveBeenCalledTimes(10);
     const fresh = enter(id, 'records-next-entry');
     expect(fresh).toMatchObject({ records: [], battleCount: 0, battle: null, abandoned: false });
     expect(adventure.leaveAdventure(id, left.revision)).toEqual(fresh);

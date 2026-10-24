@@ -398,12 +398,14 @@ or award money again. Motion effects respect reduced-motion settings.
 whichever side attacked — an attacker who loses pays the defender. Fights
 with the bot are practice: no money changes hands.
 
-**Winning also trains your pet: +1 to the attribute behind its final hit.**
-Claw Strike, Heavy Strike, and Tide Crash train Strength; Firebolt trains
-Intelligence; Vine Lash trains Charisma. So the way you fight decides how
-your pet grows. The battle result says what was gained. Practice against
-the bot, losing, and winning by your opponent's forfeit (without landing a
-hit) train nothing, so wins can't be farmed.
+**Winning also trains your pet: +1 to the main attribute of its final hit.**
+Tide Crash trains Strength, Firebolt trains Intelligence, and Vine Lash
+trains Charisma. Normal skills (Claw Strike and Heavy Strike) have no main
+attribute, so a win with one adds +1 to a random attribute instead, like
+Electives. So the way you fight decides how your pet grows. The attribute is
+chosen once when the win is saved, and the battle result says what was
+gained. Practice against the bot, losing, and winning by your opponent's
+forfeit (without landing a hit) train nothing, so wins can't be farmed.
 
 After attacking a pet, the attacker must wait **an hour** before attacking
 that same pet again. The pet it attacked can hit straight back (unless it
@@ -859,9 +861,10 @@ MP after a win. The server applies this recovery once, alongside the
 outcome. Defeating the Slime King completes the woodland.
 
 Each victory also **trains every pet still standing that landed a hit**:
-+1 to the attribute behind its own final hit, as in the Arena (Strength for
-Claw Strike, Heavy Strike, and Tide Crash; Intelligence for Firebolt;
-Charisma for Vine Lash). **Beating the Slime King gives +1 to all three.**
++1 to the main attribute of its own final hit, as in the Arena (Strength for
+Tide Crash, Intelligence for Firebolt, Charisma for Vine Lash, and a random
+attribute for Normal Claw Strike or Heavy Strike). **Beating the Slime King
+gives +1 to all three.**
 A knocked-out pet, or one whose teammates finished the monster before it
 struck, gains nothing. The gain is saved once with the victory, raises the
 maximum HP/MP without refilling them, and appears in the battle result.

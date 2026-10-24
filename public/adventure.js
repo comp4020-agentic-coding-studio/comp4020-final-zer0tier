@@ -108,7 +108,7 @@ guide.innerHTML = `
       <li>Clear paths are safe. Standing still never starts an encounter.</li>
       <li>The Slime King guards the final grove. Walk up to it to battle.</li>
       <li>HP and MP carry between battles. A win gives back 20%.</li>
-      <li>Each win trains your pet: +1 to the attribute behind your final hit (Strength for Claw Strike, Heavy Strike and Tide Crash, Intelligence for Firebolt, Charisma for Vine Lash). Beating the Slime King gives +1 to all three.</li>
+      <li>Each win trains your pet: +1 to the main attribute of your final hit (Strength for Tide Crash, Intelligence for Firebolt, Charisma for Vine Lash), or a random one for Claw Strike and Heavy Strike. Beating the Slime King gives +1 to all three.</li>
       <li>A coin toss decides who strikes first.</li>
       <li>Choose an equipped skill on your turn. Equip learned skills at your storage chest at home.</li>
       <li>Monsters have types: Fire beats Grass, Water beats Earth, and Grass beats Water for double damage. Other elemental hits on a monster do half. Normal skills always hit evenly.</li>

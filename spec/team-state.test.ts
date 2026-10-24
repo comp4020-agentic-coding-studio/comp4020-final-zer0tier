@@ -183,7 +183,9 @@ it('rolls one shared Floor Key per team victory, saves it in each replay, and le
     for (const member of [lead, near, far]) {
       expect(adventure.adventureFor(member).exit).toEqual({ keyFound: true, unlocked: false, dropRate: 0.05 });
     }
-    expect(random).toHaveBeenCalledTimes(5); // coin, three fighter luck rolls, one drop
+    // The coin, three fighter luck rolls, one drop, and the attribute roll for
+    // the only pet that struck (the lead's Normal Claw Strike won at once).
+    expect(random).toHaveBeenCalledTimes(6);
     expect(adventure.moveAdventure(lead, 'd', before.revision)).toEqual(fought);
     // Shared map updates do not invalidate a distant teammate's own movement revision.
     expect(ok(adventure.changeFloor(far, 'descend', remoteBefore.revision))).toMatchObject({
@@ -195,7 +197,9 @@ it('rolls one shared Floor Key per team victory, saves it in each replay, and le
     ok(adventure.continueAdventure(near, ally.battle!.id, ally.revision));
     expect(adventure.adventureFor(lead).exit!.unlocked).toBe(true);
     expect(adventure.adventureFor(near).battle!.keyDrop).toEqual(fought.battle!.keyDrop);
-    expect(random).toHaveBeenCalledTimes(5);
+    // The near teammate never struck, so it trains nothing, and replays roll nothing more.
+    expect(adventure.adventureFor(near).battle).not.toHaveProperty('trained');
+    expect(random).toHaveBeenCalledTimes(6);
     place(lead, 13, 13);
     expect(ok(adventure.changeFloor(lead, 'descend', adventure.adventureFor(lead).revision))).toMatchObject({ floor: 2 });
   } finally { random.mockRestore(); }
@@ -233,12 +237,13 @@ it('a knocked-out teammate is out of the run while the rest explore on, and reco
   let result;
   try { result = step(lead, 'd'); } finally { random.mockRestore(); }
   expect(result.battle!.playback!.turns.map(t => [t.actor, t.target, t.hp])).toEqual([[2, 1, [3, 0, 10]], [0, 2, [3, 0, 0]]]);
-  expect(result).toMatchObject({ hp: 3 + 7, failed: false, battle: { won: true, recovery: { hp: 7, mp: 0 }, trained: { strength: 1 } } });
+  // The lead's Normal Claw Strike won, so it trains a random attribute: at a 0.5 roll, Intelligence.
+  expect(result).toMatchObject({ hp: 3 + 7, failed: false, battle: { won: true, recovery: { hp: 7, mp: 0 }, trained: { intelligence: 1 } } });
   const knocked = adventure.adventureFor(weak);
   expect(knocked).toMatchObject({ hp: 0, failed: true, battle: { won: true, fighter: 1, recovery: { hp: 0, mp: 0 }, after: { hp: 0 } } });
   // Only the pet still standing, whose Claw Strike won, trains; the fallen one gains nothing.
   expect(knocked.battle).not.toHaveProperty('trained');
-  expect(pets.getPet(lead)!.strength).toBe(stats.lead.strength + 1);
+  expect(pets.getPet(lead)).toMatchObject({ strength: stats.lead.strength, intelligence: stats.lead.intelligence + 1, charisma: stats.lead.charisma });
   expect(pets.getPet(weak)).toMatchObject({ strength: stats.weak.strength, intelligence: stats.weak.intelligence, charisma: stats.weak.charisma });
   expect(result.team!.members).toEqual([expect.objectContaining({ id: weak, status: 'defeated' })]);
   // The fallen pet can't move on, and starts over alone when it's ready.
