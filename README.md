@@ -398,6 +398,13 @@ or award money again. Motion effects respect reduced-motion settings.
 whichever side attacked — an attacker who loses pays the defender. Fights
 with the bot are practice: no money changes hands.
 
+**Winning also trains your pet: +1 to the attribute behind its final hit.**
+Claw Strike, Heavy Strike, and Tide Crash train Strength; Firebolt trains
+Intelligence; Vine Lash trains Charisma. So the way you fight decides how
+your pet grows. The battle result says what was gained. Practice against
+the bot, losing, and winning by your opponent's forfeit (without landing a
+hit) train nothing, so wins can't be farmed.
+
 After attacking a pet, the attacker must wait **an hour** before attacking
 that same pet again. The pet it attacked can hit straight back (unless it
 attacked that pet itself within the last hour). If someone attacks you, a
@@ -580,7 +587,8 @@ and the built-in `node:sqlite` for storage.
   /api/battles/:battle/forfeit` takes `{ "revision": 0 }`. A session holds
   its persisted battle, current actor, HP/MP, selected skills, and numeric
   turn revision. Wrong-player, stale, unknown-skill, and insufficient-MP
-  actions cannot advance the fight.
+  actions cannot advance the fight. A finished Arena win over another player
+  saves `result.trained: { pet, attribute, amount }`.
 - **Real time:** the server broadcasts a `pet:updated` event over the
   socket after every change, a `fight:finished` event after each fight
   (with the `spoils` the winner took), a `feed:added` event for each new
@@ -850,6 +858,14 @@ maximums. For example, maximums of 31 HP and 7 MP restore up to 7 HP and 2
 MP after a win. The server applies this recovery once, alongside the
 outcome. Defeating the Slime King completes the woodland.
 
+Each victory also **trains every pet still standing that landed a hit**:
++1 to the attribute behind its own final hit, as in the Arena (Strength for
+Claw Strike, Heavy Strike, and Tide Crash; Intelligence for Firebolt;
+Charisma for Vine Lash). **Beating the Slime King gives +1 to all three.**
+A knocked-out pet, or one whose teammates finished the monster before it
+struck, gains nothing. The gain is saved once with the victory, raises the
+maximum HP/MP without refilling them, and appears in the battle result.
+
 **Defeat ends the adventure.** HP stays at zero, and movement and stairs
 are disabled. Completing the woodland, losing, or choosing **End
 adventure** opens the result panel with battle records, the next-start
@@ -888,8 +904,8 @@ The cooldown begins when the fresh run does and doesn't interrupt that run.
 After it ends, the result panel shows a compact progress bar, the time
 remaining, and **Skip wait (use Hourglass)**. Town also shows the saved
 cooldown. Adventure doesn't alter Arena wins/losses. Monster victories
-grant recovery and can drop a missing Floor Key; chests grant the items
-below.
+grant recovery and attribute training and can drop a missing Floor Key;
+chests grant the items below.
 
 ### Treasure and inventory
 
@@ -1040,7 +1056,8 @@ server.
 The current floor's `exit` is `{ keyFound, unlocked, dropRate: 0.05 }`,
 or `null` on the final floor, which has no down stairs. A successful key
 drop is recorded as `battle.keyDrop: { floor, name: "Floor Key" }` in the
-saved battle. Both the key and the unlocked gate are shared by the team;
+saved battle, and a pet's victory training as `battle.trained` (for example
+`{ "strength": 1 }`). Both the key and the unlocked gate are shared by the team;
 neither is a backpack item. Existing saved floors without exit state
 migrate to unlocked exits.
 

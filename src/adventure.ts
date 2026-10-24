@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { db, transaction } from './db.ts';
 import {
-  ABILITIES, forfeitBattle, MONSTER_ABILITIES, MONSTER_TYPES, startBattle, takeBattleTurn, weaknessOf, type ActiveBattle, type Battle,
+  ABILITIES, battleTraining, forfeitBattle, MONSTER_ABILITIES, MONSTER_TYPES, startBattle, takeBattleTurn, weaknessOf,
+  type ActiveBattle, type Battle,
 } from './combat.ts';
 import {
   ADVENTURE_COOLDOWN_MINUTES, ADVENTURE_COST, busyNow, consumeHourglass, findItem, getPet, ITEMS, LUCK, MAX_CARE,
-  powerOf, spendForAdventure, use, type Pet,
+  powerOf, spendForAdventure, train, use, type Pet,
 } from './pets.ts';
 import { grantTreasure } from './inventory.ts';
 import { COINS, rollTreasure } from './treasure.ts';
@@ -23,6 +24,7 @@ export type AdventureBattle = {
   attacked?: true; // legacy battle where a patrolling monster caught the pet
   surprise?: true; // hidden monster encountered by walking into tall grass
   keyDrop?: { floor: number; name: 'Floor Key' };
+  trained?: Partial<Record<'strength' | 'intelligence' | 'charisma', number>>; // this pet's victory gain
 };
 export const ADVENTURE_RECORD_LIMIT = 50;
 type BattleRecords = { total: number; battles: AdventureBattle[] };
@@ -164,7 +166,9 @@ function busyRefusal(id: string) {
 // Position, removed monsters, and the exact playback are one atomic write.
 // A stale retry (even after Continue) cannot apply the same movement twice.
 // A team run's map is the team's, written alongside.
-function save(id: string, saved: Progress) {
+// `trained` is a finished victory's attribute gain. It is written only with
+// the revision it belongs to, so a stale retry can never train a pet twice.
+function save(id: string, saved: Progress, trained?: AdventureBattle['trained']) {
   transaction(() => {
     const written = db.prepare('UPDATE adventures SET x = ?, y = ?, floor = ?, world_json = ?, battle_json = ?, records_json = ?, entry_id = ?, awaiting_entry = ?, hp = ?, mp = ?, cooldown_until = ?, abandoned = ?, team_id = ?, started = 1, revision = ? WHERE player_id = ? AND revision = ?')
       .run(saved.x, saved.y, saved.floor, saved.teamId === null ? JSON.stringify(saved.world) : null, saved.battle ? JSON.stringify(saved.battle) : null,
@@ -173,6 +177,7 @@ function save(id: string, saved: Progress) {
     if (written.changes === 1 && saved.teamId !== null) {
       db.prepare('UPDATE teams SET world_json = ? WHERE id = ?').run(JSON.stringify(saved.world), saved.teamId);
     }
+    if (written.changes === 1 && trained) train(id, trained);
   });
   return adventureFor(id);
 }
@@ -216,10 +221,18 @@ function saveBattle(saved: Progress, participants: Progress[], playback: ActiveB
       mp: standing ? Math.min(Math.ceil(fighter.maxMp * 0.2), fighter.maxMp - fighter.mp) : 0,
     };
     fighter.hp += recovery.hp; fighter.mp += recovery.mp;
+    // Each pet still standing grows the attribute behind its own last hit; the
+    // Slime King, the woodland's final boss, grows all three. A pet that never
+    // struck (its teammates finished the monster first) gains nothing.
+    const attribute = standing ? battleTraining(playback, index) : undefined;
+    const trained = !attribute ? undefined : monster.monster === 'slime-king'
+      ? { strength: 1, intelligence: 1, charisma: 1 }
+      : { [attribute]: 1 };
     fighter.battle = {
       ...fighter.battle!, won, playback, recovery,
       ...(finished ? { after: { hp: fighter.hp, mp: fighter.mp } } : {}),
       ...(keyDrop ? { keyDrop: { floor: encounter.floor, name: 'Floor Key' as const } } : {}),
+      ...(trained ? { trained } : {}),
     };
     if (finished) {
       fighter.records.total++;
@@ -231,7 +244,7 @@ function saveBattle(saved: Progress, participants: Progress[], playback: ActiveB
     fighter.world = saved.world;
   }
   return transaction(() => {
-    for (const fighter of participants) save(fighter.id, fighter);
+    for (const fighter of participants) save(fighter.id, fighter, finished ? fighter.battle?.trained : undefined);
     return adventureFor(saved.id);
   });
 }
@@ -257,6 +270,12 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = fal
     };
   });
   return saveBattle(saved, participants, playback);
+}
+
+// The pets in this player's current battle, whose saved rows a win may train.
+export function battleFighters(id: string): string[] {
+  const battle = load(id).battle;
+  return battle?.pending ? battle.playback.fighters.filter(fighter => !fighter.monster).map(fighter => fighter.id) : [];
 }
 
 function battleParticipants(saved: Progress): Progress[] {

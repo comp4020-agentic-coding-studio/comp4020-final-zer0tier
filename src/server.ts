@@ -1,6 +1,6 @@
 import {
   abandonAdventure, adventureFor, changeFloor, continueAdventure, enterAdventure, leaveAdventure, moveAdventure, openAdventureChest, patrolAdventure,
-  restartAdventure, skipAdventureCooldown, useAdventureItem, adventureBattleSkill, forfeitAdventureBattle,
+  restartAdventure, skipAdventureCooldown, useAdventureItem, adventureBattleSkill, forfeitAdventureBattle, battleFighters,
 } from "./adventure.ts";
 import { accept, invite, leave, setOff, teamFor, type TeamOutcome } from "./teams.ts";
 import express from "express";
@@ -202,6 +202,9 @@ app.post("/api/adventure", (req, res) => {
   }
   const inventoryAction = ['open-chest', 'use-item', 'restart', 'enter', 'skip-cooldown'].includes(req.body?.action);
   const before = inventoryAction ? getPet(id) : undefined;
+  // A won battle trains every pet still standing, so compare each fighter.
+  const fighters = ['battle-skill', 'battle-forfeit'].includes(req.body?.action) ? battleFighters(id) : [];
+  const fightersBefore = fighters.map(fighter => getPet(fighter));
   const result = req.body?.action === 'open-chest' ? openAdventureChest(id, req.body.revision)
     : req.body?.action === 'use-item' ? useAdventureItem(id, req.body.item, req.body.revision)
     : req.body?.action === 'battle-skill' ? adventureBattleSkill(id, req.body.battleId, req.body.turnRevision, req.body.ability)
@@ -223,6 +226,10 @@ app.post("/api/adventure", (req, res) => {
       followUp();
     }
   }
+  const trained = fighters.map(fighter => getPet(fighter)!)
+    .filter((pet, index) => JSON.stringify(pet) !== JSON.stringify(fightersBefore[index]));
+  for (const pet of trained) broadcast({ type: 'pet:updated', pet });
+  if (trained.length) followUp();
   if ("error" in result) return void res.status(result.status).json({ error: result.error });
   res.json(result);
 });

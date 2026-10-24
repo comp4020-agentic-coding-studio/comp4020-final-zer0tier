@@ -228,13 +228,18 @@ it('a knocked-out teammate is out of the run while the rest explore on, and reco
   // On tails the goblin strikes first, at whichever pet has more HP: the weak
   // one (4 HP, to the lead's 3) falls, then the lead finishes the goblin.
   db.prepare('UPDATE adventures SET hp = ? WHERE player_id = ?').run(3, lead);
+  const stats = { lead: pets.getPet(lead)!, weak: pets.getPet(weak)! };
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
   let result;
   try { result = step(lead, 'd'); } finally { random.mockRestore(); }
   expect(result.battle!.playback!.turns.map(t => [t.actor, t.target, t.hp])).toEqual([[2, 1, [3, 0, 10]], [0, 2, [3, 0, 0]]]);
-  expect(result).toMatchObject({ hp: 3 + 7, failed: false, battle: { won: true, recovery: { hp: 7, mp: 0 } } });
+  expect(result).toMatchObject({ hp: 3 + 7, failed: false, battle: { won: true, recovery: { hp: 7, mp: 0 }, trained: { strength: 1 } } });
   const knocked = adventure.adventureFor(weak);
   expect(knocked).toMatchObject({ hp: 0, failed: true, battle: { won: true, fighter: 1, recovery: { hp: 0, mp: 0 }, after: { hp: 0 } } });
+  // Only the pet still standing, whose Claw Strike won, trains; the fallen one gains nothing.
+  expect(knocked.battle).not.toHaveProperty('trained');
+  expect(pets.getPet(lead)!.strength).toBe(stats.lead.strength + 1);
+  expect(pets.getPet(weak)).toMatchObject({ strength: stats.weak.strength, intelligence: stats.weak.intelligence, charisma: stats.weak.charisma });
   expect(result.team!.members).toEqual([expect.objectContaining({ id: weak, status: 'defeated' })]);
   // The fallen pet can't move on, and starts over alone when it's ready.
   ok(adventure.continueAdventure(weak, knocked.battle!.id, knocked.revision));

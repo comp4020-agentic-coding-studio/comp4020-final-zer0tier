@@ -2,7 +2,9 @@ import { TIME_SCALE, realMs } from "./clock.ts";
 import { db, transaction } from "./db.ts";
 import { record } from "./feed.ts";
 import { randomUUID } from "node:crypto";
-import { ABILITIES, startBattle, takeBattleTurn, forfeitBattle, type ActiveBattle, type AbilityId, type Battle } from "./combat.ts";
+import {
+  ABILITIES, battleTraining, startBattle, takeBattleTurn, forfeitBattle, type ActiveBattle, type AbilityId, type Battle,
+} from "./combat.ts";
 import { inventoryFor } from "./inventory.ts";
 import { logEvent, ROOM } from "./logging.ts";
 import { clientsInRoom } from "./realtime.ts";
@@ -535,6 +537,15 @@ export function collectSupplies(id: string): Outcome {
   return { pet: getPet(id)! };
 }
 
+// A battle victory's attribute gain, written by the caller's transaction
+// together with the saved result it belongs to.
+const growAttributes = db.prepare(
+  "UPDATE pets SET strength = strength + ?, intelligence = intelligence + ?, charisma = charisma + ? WHERE id = ?",
+);
+export function train(id: string, gains: Partial<Record<Attribute, number>>): void {
+  growAttributes.run(gains.strength ?? 0, gains.intelligence ?? 0, gains.charisma ?? 0, id);
+}
+
 // Fights ---------------------------------------------------------------------
 
 // Strength counts double; brains and charm help too.
@@ -790,8 +801,10 @@ export interface BattleSession {
   defender: string;
   sourceId: number | null;
   battle: ActiveBattle;
-  result?: { fight?: Fight; theft?: Theft; won?: boolean; reward?: number };
+  result?: { fight?: Fight; theft?: Theft; won?: boolean; reward?: number; trained?: Training };
 }
+// The attribute a winning pet gained, saved with the result it came from.
+export interface Training { pet: string; attribute: Attribute; amount: number }
 interface SessionRow {
   id: string; kind: BattleSession['kind']; player_a: string; player_b: string; source_id: number | null;
   state_json: string; meta_json: string; result_json: string | null;
@@ -837,7 +850,7 @@ function createBattleSession(kind: BattleSession['kind'], attacker: string, defe
 }
 export type BattleSessionOutcome = {
   session: BattleSession; attacker: Pet; defender: Pet; fight?: Fight;
-  theft?: Theft; won?: boolean; reward?: number; battle?: ActiveBattle; victim?: Pet; thief?: Pet;
+  theft?: Theft; won?: boolean; reward?: number; trained?: Training; battle?: ActiveBattle; victim?: Pet; thief?: Pet;
 } | { status: number; error: string };
 function sessionOutcome(session: BattleSession): Exclude<BattleSessionOutcome, { error: string }> {
   const attacker = getPet(session.attacker)!, defender = getPet(session.defender)!;
@@ -862,8 +875,16 @@ export function actInBattle(id: string, battleId: string, action: 'turn' | 'forf
       if (session.kind === 'arena') {
         const winner = won ? attacker : defender, loser = won ? defender : attacker;
         winner.wins++; loser.losses++;
-        const spoils = attacker.id === BOT_ID || defender.id === BOT_ID ? 0 : spoilsFrom(loser);
+        const practice = attacker.id === BOT_ID || defender.id === BOT_ID;
+        const spoils = practice ? 0 : spoilsFrom(loser);
         loser.money -= spoils; winner.money += spoils;
+        // Beating another player trains the attribute behind the winning blow.
+        // The bot is practice, with no cooldown, so it trains nothing.
+        const trained = practice ? undefined : battleTraining(battle, won ? 0 : 1);
+        if (trained) {
+          winner[trained]++;
+          result.trained = { pet: winner.id, attribute: trained, amount: 1 };
+        }
         write(attacker); write(defender);
         const metadata = JSON.parse(row.meta_json) as Record<string, number>;
         const { lastInsertRowid } = insertFight.run(attacker.id, defender.id, winner.id,

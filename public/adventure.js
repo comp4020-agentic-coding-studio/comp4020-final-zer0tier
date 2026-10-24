@@ -108,6 +108,7 @@ guide.innerHTML = `
       <li>Clear paths are safe. Standing still never starts an encounter.</li>
       <li>The Slime King guards the final grove. Walk up to it to battle.</li>
       <li>HP and MP carry between battles. A win gives back 20%.</li>
+      <li>Each win trains your pet: +1 to the attribute behind your final hit (Strength for Claw Strike, Heavy Strike and Tide Crash, Intelligence for Firebolt, Charisma for Vine Lash). Beating the Slime King gives +1 to all three.</li>
       <li>A coin toss decides who strikes first.</li>
       <li>Choose an equipped skill on your turn. Equip learned skills at your storage chest at home.</li>
       <li>Monsters have types: Fire beats Grass, Water beats Earth, and Grass beats Water for double damage. Other elemental hits on a monster do half. Normal skills always hit evenly.</li>
@@ -641,6 +642,12 @@ async function equipCoin(button, coinId) {
     button.disabled = false;
   }
 }
+// What this pet's victory trained, from the saved battle: "+1 Strength".
+function trainedText(trained) {
+  const gains = Object.entries(trained ?? {}).filter(([, amount]) => amount > 0);
+  if (gains.length === 3 && gains.every(([, amount]) => amount === gains[0][1])) return ` +${gains[0][1]} to each attribute.`;
+  return gains.map(([attribute, amount]) => ` +${amount} ${attribute[0].toUpperCase()}${attribute.slice(1)}.`).join('');
+}
 // In a team battle the team can win while this pet is knocked out.
 function battleResult(battle) {
   const knockedOut = battle.after?.hp === 0;
@@ -648,7 +655,7 @@ function battleResult(battle) {
   const keyDrop = battle.keyDrop ? ` Found a Floor Key! The stairs on floor ${battle.keyDrop.floor} can now be unlocked.` : '';
   if (battle.won && knockedOut) return `${team} defeated ${battle.enemyName} on floor ${battle.floor}, but your pet was knocked out. Its adventure is over; your teammates explore on.${keyDrop}`;
   return battle.won
-    ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${keyDrop}${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}`
+    ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${trainedText(battle.trained)}${keyDrop}${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}`
     : `${battle.enemyName} defeated ${team === 'You' ? 'you' : 'your team'}. Adventure failed. Start a new adventure to try again.`;
 }
 function renderRecords() {

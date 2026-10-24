@@ -18,13 +18,22 @@ export const effectiveness = (move: Element, target: Element | undefined): numbe
 export const weaknessOf = (type: Element): Element[] => ELEMENTS.filter(move => effectiveness(move, type) > 1);
 // A saved, server-resolved battle. HP/MP belong to this fight, not daily care.
 // Each elemental skill deals one attribute × 1.5 × battle luck for 3 MP.
+// `trains` is the attribute a win grows when this skill lands the final blow.
 export const ABILITIES = [
-  { id: 'claw-strike', name: 'Claw Strike', type: 'normal', mpCost: 0, description: 'A free Strength-based attack.' },
-  { id: 'firebolt', name: 'Firebolt', type: 'fire', mpCost: 3, description: 'Intelligence × 1.5, adjusted by battle luck and rounded.' },
-  { id: 'heavy-strike', name: 'Heavy Strike', type: 'normal', mpCost: 2, description: 'Claw Strike damage × 1.5, rounded up.' },
-  { id: 'tide-crash', name: 'Tide Crash', type: 'water', mpCost: 3, description: 'Strength × 1.5, adjusted by battle luck and rounded.' },
-  { id: 'vine-lash', name: 'Vine Lash', type: 'grass', mpCost: 3, description: 'Charisma × 1.5, adjusted by battle luck and rounded.' },
+  { id: 'claw-strike', name: 'Claw Strike', type: 'normal', trains: 'strength', mpCost: 0, description: 'A free Strength-based attack.' },
+  { id: 'firebolt', name: 'Firebolt', type: 'fire', trains: 'intelligence', mpCost: 3, description: 'Intelligence × 1.5, adjusted by battle luck and rounded.' },
+  { id: 'heavy-strike', name: 'Heavy Strike', type: 'normal', trains: 'strength', mpCost: 2, description: 'Claw Strike damage × 1.5, rounded up.' },
+  { id: 'tide-crash', name: 'Tide Crash', type: 'water', trains: 'strength', mpCost: 3, description: 'Strength × 1.5, adjusted by battle luck and rounded.' },
+  { id: 'vine-lash', name: 'Vine Lash', type: 'grass', trains: 'charisma', mpCost: 3, description: 'Charisma × 1.5, adjusted by battle luck and rounded.' },
 ] as const;
+export type TrainedAttribute = (typeof ABILITIES)[number]['trains'];
+// A winning pet grows the attribute behind its own last hit. A pet that never
+// struck (its opponent forfeited, or its teammates did all the work) gains
+// nothing, so a forfeit can't hand out free training.
+export function battleTraining(battle: Battle, petIndex: number): TrainedAttribute | undefined {
+  const last = battle.turns.findLast(turn => turn.actor === petIndex && turn.damage > 0);
+  return last && (ABILITIES.find(ability => ability.id === last.ability)?.trains ?? 'strength');
+}
 // Chests teach every pet skill except the always-ready Claw Strike.
 export const LEARNABLE_ABILITIES = ABILITIES.filter(
   (ability): ability is Exclude<(typeof ABILITIES)[number], { id: 'claw-strike' }> => ability.id !== 'claw-strike');

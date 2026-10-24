@@ -222,7 +222,13 @@ it.each(['slime', 'goblin', 'slime-king'] as const)('saves a %s victory, removes
   const continued = continueRun(id);
   expect(afterRestart(id)).toEqual(continued);
   expect(continued.battle!.playback).toEqual(kind === 'slime-king' ? result.battle!.playback : null);
-  expect(pets.getPet(id)).toEqual(pet);
+  // The win trains once: Claw Strike grows Strength; the Slime King grows all three.
+  const gain = kind === 'slime-king' ? { strength: 1, intelligence: 1, charisma: 1 } : { strength: 1 };
+  expect(result.battle!.trained).toEqual(gain);
+  expect(pets.getPet(id)).toEqual({
+    ...pet, strength: pet!.strength + 1,
+    intelligence: pet!.intelligence + (gain.intelligence ?? 0), charisma: pet!.charisma + (gain.charisma ?? 0),
+  });
 });
 
 it.each([[0, true], [0.049999, true], [0.05, false], [0.999999, false]] as const)(
@@ -356,7 +362,9 @@ it('carries HP/MP across battles and floors, restoring 20% of maximum rounded up
     const result = step(id, 'd');
     expect(result.battle!.playback!.initialHp).toEqual([17, 6]);
     expect(result.battle!.playback!.initialMp).toEqual([0, 1]);
-    expect(result).toMatchObject({ hp: 21, mp: 2, maxHp: 31, maxMp: 7, battle: { recovery: { hp: 7, mp: 2 } } });
+    // Recovery uses the maximum before the win; Claw Strike's win then trains
+    // Strength, raising the maximum without refilling the HP it adds.
+    expect(result).toMatchObject({ hp: 21, mp: 2, maxHp: 32, maxMp: 7, battle: { recovery: { hp: 7, mp: 2 }, trained: { strength: 1 } } });
     expect(adventure.moveAdventure(id, 'd', before.revision)).toEqual(result);
     expect(adventure.adventureFor(id)).toEqual(result);
     const continued = continueRun(id);
@@ -377,7 +385,9 @@ it('carries HP/MP across battles and floors, restoring 20% of maximum rounded up
     db.prepare('UPDATE adventures SET x = ?, y = ?, hp = ?, mp = ? WHERE player_id = ?').run(3, 11, 30, 6, id);
     readyGrassBattle(id, 'f1-enemy-2');
     const capped = step(id, 'd');
-    expect(capped).toMatchObject({ hp: 31, mp: 7, battle: { recovery: { hp: 4, mp: 1 } } });
+    // Two earlier wins trained Strength to a 33 maximum: recovery fills the
+    // missing 6 HP to full, then this win's +1 raises the maximum to 34.
+    expect(capped).toMatchObject({ hp: 33, mp: 7, maxHp: 34, battle: { recovery: { hp: 6, mp: 1 } } });
     expect(afterRestart(id)).toEqual(capped);
   } finally { random.mockRestore(); }
 });
@@ -462,10 +472,12 @@ it("a Copper coin adds HP/MP to one monster battle as a shield, without changing
     expect(result.battle!.playback!.initialMp![0]).toBe(8);
     expect(result.battle!.playback!.turns[0]).toMatchObject({ actor: 1, damage: 3, hp: [31, 6] });
     // The shield took the whole hit; its unused MP is gone, and nothing is recovered past full.
-    expect(result).toMatchObject({ hp: 31, mp: 7, maxHp: 31, maxMp: 7, battle: { won: true, after: { hp: 31, mp: 7 } } });
+    // The win's own +1 Strength raises the maximum without refilling it.
+    expect(result).toMatchObject({ hp: 31, mp: 7, maxHp: 32, maxMp: 7, battle: { won: true, after: { hp: 31, mp: 7 } } });
   } finally { random.mockRestore(); }
+  // Copper's +1 to every attribute never sticks: only the victory's +1 Strength does.
   expect(pets.getPet(id)).toMatchObject({
-    strength: realStats.strength, intelligence: realStats.intelligence, charisma: realStats.charisma,
+    strength: realStats.strength + 1, intelligence: realStats.intelligence, charisma: realStats.charisma,
   });
 });
 

@@ -231,7 +231,7 @@ loadRules().then((loaded) => {
   $("skip").addEventListener("click", () => perform($("skip"), "use/hourglass", "care-error"));
   $("collect-supplies").addEventListener("click", () => perform($("collect-supplies"), "collect-supplies", "care-error"));
   $("fight-cost").textContent =
-    `${costText(rules.fight.cost)} · winner takes ${rules.fight.spoils.share * 100}% of the loser's money`;
+    `${costText(rules.fight.cost)} · winner takes ${rules.fight.spoils.share * 100}% of the loser's money and +1 to the attribute behind their final hit (not against the bot)`;
   $("visit-rules").textContent =
     `Visit a pet to steal $${rules.steal.min}–$${rules.steal.max}. Each pet can be robbed once per day across all players; resets at midnight ${rules.steal.resetTimezone}.`;
   for (const minutes of rules.work.shiftMinutes) {
@@ -918,6 +918,8 @@ function showLiveBattle(session) {
   const owner = current.id;
   const result = session.result;
   let text = result?.fight ? describeFight(result.fight).text : "The battle is over.";
+  // A win over another player trains the attribute behind the winning blow.
+  if (result?.trained?.pet === owner) text += ` +${result.trained.amount} ${LABELS[result.trained.attribute]}.`;
   if (session.kind === "revenge" && result) {
     text = session.attacker === owner
       ? result.won ? `Recovered $${result.reward} and gained +1 to each attribute.` : "The revenge attempt is used. No extra money was lost."
