@@ -237,6 +237,37 @@ shares one map, and visits now reach the owner. Both moved because the shared
 version is what makes it interactable with other people. I still haven't
 written the crit 9 decision record with the alternatives I didn't take.
 
+## Testing it with a room full of people
+
+The showcase is a room of people playing at once, and the README promises
+every change reaches every window within a second. I had never checked that
+with more than two players, so I had the agent write `scripts/load-test.ts`
+([`8c8fee8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/8c8fee8)).
+It signs up a crowd and walks everyone around town the way the browser does,
+one saved step every 50 ms, timing how long each step takes to reach the
+others.
+
+On my laptop, with 50 players a step typically took 390 ms to arrive, and each
+player's position updated only 2.5 times a second instead of 20, while the
+server's CPU sat at 16%. The agent traced this to SQLite waiting about 7 ms for
+the disk to confirm every save, which caps the server near 130 saves a second
+however many people are walking. It first flagged memory peaking at 316 MB,
+then reran with the server's memory capped at 64 MB: it held at 207 MB and kept
+working, so that was Node clearing memory lazily, not a leak.
+
+To test the real deployment, I backed up the live database first. The test
+accounts were all named `loadtest-…`, and afterwards a script deleted every row
+naming one in a single transaction
+([`be1ba6f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/be1ba6f)).
+The agent rehearsed both scripts on a local copy, but Claude Code's safety
+check stopped it writing to the live machine, so I ran the backup and cleanup
+myself. On Fly, steps typically arrived in 18, 50 and 87 ms with 10, 30 and 50
+players, and none took longer than 0.4 s. Nothing was refused or lost, and the
+machine never restarted, though I didn't get memory readings from it. At 50
+players, movement thinned to about 10 updates a second. One line,
+`PRAGMA synchronous = NORMAL`, restored the full 20 on a throwaway copy, but it
+could lose the last moment of saves in a power cut, so I haven't taken it.
+
 ## Next
 
 Make every action log who did it, not just touches and helps: sign-in, fights,
@@ -246,3 +277,5 @@ one option I didn't take (polling instead of WebSockets, or broadcasting only
 to the players involved). Play with other people to judge what the spec can't:
 whether helping is worth a $15 food, and whether teams need a smaller entry
 cost. And decide between trading and recruiting pets as the next interaction.
+Decide whether smoother movement in a crowd is worth the small risk
+`synchronous = NORMAL` puts on the last moment of saves.
