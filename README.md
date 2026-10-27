@@ -614,8 +614,10 @@ and the built-in `node:sqlite` for storage.
   Positions use their own SQLite connection with `synchronous = NORMAL`, so
   a step doesn't wait for the disk; everything else keeps the default full
   sync. `scripts/load-test.ts` walks a crowd around town and times each
-  step's delivery: with 50 players on one core, every step reached every
-  other player at the full 20 updates a second, typically within 10 ms.
+  step's delivery. On the deployed app, every step reached every other
+  player within 0.25 s with 50 players, typically within 50 ms with 30,
+  and nothing was lost. Up to 30 players each walker sends 18–20 updates a
+  second; at 50 it drops to about 11, as each step goes out to 49 others.
   `spec/world-realtime.test.ts` checks movement and presence delivery
   to multiple sockets within one second, offline visits, and online fights.
 - **Logs:** server stdout (also visible in `flyctl logs`) records `join`,

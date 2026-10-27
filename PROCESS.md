@@ -272,7 +272,14 @@ the last moment of anything, money included. Instead, only character
 positions moved to a second connection that skips the disk wait, while
 pets, money and fights keep full sync. Locally, 50 players then walked at
 the full 20 updates a second, with steps typically arriving in 9 ms instead
-of 390 ms. I also measured two other fixes and dropped both. Sending
+of 390 ms. On Fly the gain was much smaller: at 50 players, 9.9 became 11.4
+updates a second, and the worst delay fell from 373 to 249 ms. Fly's disk
+was never the main limit there. The server used under half its CPU and
+peaked at 148 MB, so what's left is sending each step out to 49 others,
+which only sending steps to people in the same scene would cut. For a room
+of about 30 it stays near full smoothness, so I stopped there rather than
+risk that change before the deadline. I also measured two other fixes and
+dropped both. Sending
 positions every 100 ms would have undone an earlier change that cut input
 lag. Logging fewer movement lines saved no measurable CPU, and the README
 promises every request is logged.
