@@ -10,7 +10,8 @@
 // Without --url it starts its own server on a throwaway database, pinned to
 // one CPU core (the Fly machine has one shared core), so neither the spec's
 // database nor the deployed game is touched. --url aims it at a server you
-// started yourself instead, and signs up real accounts there.
+// started yourself instead, and signs up real accounts there, all named
+// `loadtest-<run>-<n>` so they can be found and removed afterwards.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -297,8 +298,9 @@ try {
   const crowd: Player[] = [];
   const most = Math.max(...stages);
   for (let i = 0; i < most; i += 4) {
-    crowd.push(...await Promise.all(Array.from({ length: Math.min(4, most - i) }, (_, j) => signUp(base, `lt${run}-${i + j}`))));
+    crowd.push(...await Promise.all(Array.from({ length: Math.min(4, most - i) }, (_, j) => signUp(base, `loadtest-${run}-${i + j}`))));
   }
+  console.log(`Signed up ${crowd.length} players as loadtest-${run}-0 … loadtest-${run}-${crowd.length - 1}`);
   for (const n of stages) problems.push(...report(await runStage(base, crowd.slice(0, n))));
   if (serverErrors.trim()) problems.push(`the server wrote to stderr:\n${serverErrors.trim().slice(0, 2000)}`);
 } finally {
