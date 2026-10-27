@@ -38,7 +38,7 @@ it('two players team up, set off together, and explore one shared map with their
   expect(start).toMatchObject({ x: 2, y: 2, floor: 1, started: true, team: { id: forming.id, members: [{ id: mate, x: 2, y: 2, status: 'exploring' }] } });
   const moved = await map(mate, { direction: 's', revision: (await map(mate)).revision });
   expect(moved).toMatchObject({ x: 2, y: 3, team: { members: [{ id: leader, x: 2, y: 2 }] } });
-  expect((await map(leader)).team.members).toMatchObject([{ id: mate, x: 2, y: 3, hp: 15, maxHp: 15 }]);
+  expect((await map(leader)).team.members).toMatchObject([{ id: mate, x: 2, y: 3, hp: 25, maxHp: 25 }]);
   // Back in the Team up window, both are on their run, not forming a team.
   expect(await (await team(leader)).json()).toMatchObject({ team: null, run: { team: forming.id, state: 'exploring' } });
 });

@@ -3,9 +3,10 @@ import { db, transaction } from "./db.ts";
 import { record } from "./feed.ts";
 import { randomUUID } from "node:crypto";
 import {
-  ABILITIES, battleTraining, startBattle, takeBattleTurn, forfeitBattle, type ActiveBattle, type AbilityId, type Battle,
+  ABILITIES, battleTraining, startBattle, takeBattleTurn, forfeitBattle, mainAttribute, maxHpFor, maxMpFor, balancedStats, type ActiveBattle, type AbilityId, type Battle,
 } from "./combat.ts";
-import { inventoryFor } from "./inventory.ts";
+import { inventoryFor, grantTreasure } from "./inventory.ts";
+import { JOBS, SKILLS, jobLevel, type JobId } from './skills.ts';
 import { logEvent, ROOM } from "./logging.ts";
 import { clientsInRoom } from "./realtime.ts";
 import { isCoinId, type CoinId } from "./treasure.ts";
@@ -39,6 +40,8 @@ export interface Pet extends ReturnType<typeof inventoryFor> {
   soap: number;
   hourglass: number;
   jobs: Record<LocationId, number>; // index into that location's ranks
+  skillJobs: Partial<Record<JobId, number>>; // completed game minutes per specialization
+  combat?: { type: string; maxHp: number; maxMp: number; balanced: boolean };
   wins: number;
   losses: number;
   equippedCoin: CoinId | null; // global to the pet; applies in Adventure, Arena, and revenge
@@ -52,7 +55,7 @@ export type Attribute = "strength" | "intelligence" | "charisma";
 const ATTRIBUTES: Attribute[] = ["strength", "intelligence", "charisma"];
 
 type Care = "stamina" | "hygiene";
-export type Reward = Record<Attribute, number> & { money: number; credits: number };
+export type Reward = Record<Attribute, number> & { money: number; credits: number; job?: { id: JobId; minutes: number } };
 type Needs = Record<Care, number>;
 
 // Stamina and hygiene both run from 0 to this; new pets start full.
@@ -160,7 +163,7 @@ const select = db.prepare(
   `SELECT id, color, appearance, strength, intelligence, charisma, money, activity, school, credits, stamina, hygiene, food, soap,
           hourglass, construction_rank, office_rank, theatre_rank, task, busy_since, busy_until, reward, wins, losses,
           steal_available_at AS stealAvailableAt, supplies_available_at AS suppliesAvailableAt, equipped_coin AS equippedCoin,
-          equipped_abilities AS equippedAbilities
+          equipped_abilities AS equippedAbilities, skill_jobs AS skillJobs
      FROM pets WHERE id = ?`,
 );
 // The bot first, then the newest pets, so a player who just joined is easy to
@@ -175,11 +178,12 @@ const save = db.prepare(
   `UPDATE pets SET strength = ?, intelligence = ?, charisma = ?, money = ?, school = ?, credits = ?,
      stamina = ?, hygiene = ?, food = ?, soap = ?, hourglass = ?, construction_rank = ?, office_rank = ?, theatre_rank = ?,
      activity = ?, task = ?, busy_since = ?, busy_until = ?, reward = ?, wins = ?, losses = ?, color = ?, appearance = ?,
-     equipped_coin = ?, equipped_abilities = ?
+     equipped_coin = ?, equipped_abilities = ?, skill_jobs = ?
    WHERE id = ?`,
 );
 
-type Row = Omit<Pet, "jobs" | "busySince" | "busyUntil" | "reward" | "abilities" | "coins" | "equippedAbilities"> & {
+type Row = Omit<Pet, "jobs" | "skillJobs" | "combat" | "busySince" | "busyUntil" | "reward" | "abilities" | "coins" | "equippedAbilities"> & {
+  skillJobs: string;
   equippedAbilities: string;
   construction_rank: number;
   office_rank: number;
@@ -192,11 +196,13 @@ type Row = Omit<Pet, "jobs" | "busySince" | "busyUntil" | "reward" | "abilities"
 export function getPet(id: string): Pet | undefined {
   const row = select.get(id) as Row | undefined;
   if (!row) return undefined;
-  const { construction_rank, office_rank, theatre_rank, busy_since, busy_until, reward, equippedAbilities, ...pet } = row;
+  const { construction_rank, office_rank, theatre_rank, busy_since, busy_until, reward, equippedAbilities, skillJobs, ...pet } = row;
   return {
     ...pet,
     ...inventoryFor(id),
     equippedAbilities: JSON.parse(equippedAbilities) as AbilityId[],
+    skillJobs: JSON.parse(skillJobs),
+    combat: { type: mainAttribute(pet), maxHp: maxHpFor(pet), maxMp: maxMpFor(pet), balanced: balancedStats(pet) },
     busySince: busy_since,
     busyUntil: busy_until,
     reward: reward === null ? null : (JSON.parse(reward) as Reward),
@@ -289,6 +295,7 @@ function finishIfDue(pet: Pet, now: number): boolean {
   for (const attribute of ATTRIBUTES) pet[attribute] += reward[attribute];
   pet.money += reward.money;
   pet.credits += reward.credits;
+  if (reward.job) pet.skillJobs = { ...pet.skillJobs, [reward.job.id]: (pet.skillJobs[reward.job.id] ?? 0) + reward.job.minutes };
   const level = schoolOf(pet);
   const school = SCHOOLS[level];
   if (school.creditsToAdvance !== null && pet.credits >= school.creditsToAdvance) {
@@ -309,20 +316,27 @@ function finishIfDue(pet: Pet, now: number): boolean {
 
 // Saves the pet, and tells the feed if it just moved up a school or a job.
 function write(pet: Pet): void {
-  const before = getPet(pet.id)!;
-  save.run(
-    pet.strength, pet.intelligence, pet.charisma, pet.money, pet.school, pet.credits,
-    pet.stamina, pet.hygiene, pet.food, pet.soap, pet.hourglass,
-    pet.jobs.construction, pet.jobs.office, pet.jobs.theatre,
-    pet.activity, pet.task, pet.busySince, pet.busyUntil, pet.reward === null ? null : JSON.stringify(pet.reward),
-    pet.wins, pet.losses, pet.color, pet.appearance, pet.equippedCoin, JSON.stringify(pet.equippedAbilities), pet.id,
-  );
-  if (pet.school !== before.school) record({ kind: "school", pet: pet.id, school: pet.school });
-  for (const location of LOCATIONS) {
-    if (pet.jobs[location.id] > before.jobs[location.id]) {
-      record({ kind: "promoted", pet: pet.id, location: location.id, rank: pet.jobs[location.id] });
+  transaction(() => {
+    const before = getPet(pet.id)!;
+    save.run(
+      pet.strength, pet.intelligence, pet.charisma, pet.money, pet.school, pet.credits,
+      pet.stamina, pet.hygiene, pet.food, pet.soap, pet.hourglass,
+      pet.jobs.construction, pet.jobs.office, pet.jobs.theatre,
+      pet.activity, pet.task, pet.busySince, pet.busyUntil, pet.reward === null ? null : JSON.stringify(pet.reward),
+      pet.wins, pet.losses, pet.color, pet.appearance, pet.equippedCoin, JSON.stringify(pet.equippedAbilities), JSON.stringify(pet.skillJobs), pet.id,
+    );
+    for (const skill of SKILLS) {
+      if (!pet.abilities.includes(skill.id) && skill.source.channel === 'job' && jobLevel(pet.skillJobs[skill.source.job] ?? 0) >= skill.source.level) {
+        grantTreasure(pet.id, { category: 'ability', id: skill.id, name: skill.name, quantity: 1 });
+      }
     }
-  }
+    if (pet.school !== before.school) record({ kind: "school", pet: pet.id, school: pet.school });
+    for (const location of LOCATIONS) {
+      if (pet.jobs[location.id] > before.jobs[location.id]) {
+        record({ kind: "promoted", pet: pet.id, location: location.id, rank: pet.jobs[location.id] });
+      }
+    }
+  });
 }
 
 // Finishes the pet's activity if it's due. The scheduler calls this when one
@@ -444,14 +458,16 @@ export const hourlyPay = (pet: Pet, locationId: LocationId): number => {
   return location.ranks[pet.jobs[location.id]].wage + pet[location.attribute];
 };
 
-export function work(id: string, locationId: LocationId, minutes: number): Outcome {
+export function work(id: string, locationId: LocationId, minutes: number, jobId?: unknown): Outcome {
   const location = findLocation(locationId)!;
   return act(id, (pet) => {
+    const job = JOBS.find(j => j.id === (jobId ?? JOBS.find(j => j.location === locationId)!.id) && j.location === locationId);
+    if (!job) return 'Choose a job specialization at this workplace.';
     const cost = shiftCost(minutes);
     const refusal = busy(pet) ?? spend(pet, cost, cost, "work");
     if (refusal) return refusal;
     const money = Math.round((hourlyPay(pet, locationId) * minutes) / 60);
-    start(pet, "working", location.name, minutes, { ...noReward(), money });
+    start(pet, "working", location.name, minutes, { ...noReward(), money, job: { id: job.id, minutes } });
     return undefined;
   });
 }

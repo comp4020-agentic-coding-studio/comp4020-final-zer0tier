@@ -111,7 +111,9 @@ guide.innerHTML = `
       <li>Each win trains your pet: +1 to the main attribute of your final hit (Strength for Tide Crash, Intelligence for Firebolt, Charisma for Vine Lash), or a random one for Claw Strike and Heavy Strike. Beating the Slime King gives +1 to all three.</li>
       <li>A coin toss decides who strikes first.</li>
       <li>Choose an equipped skill on your turn. Equip learned skills at your storage chest at home.</li>
-      <li>Monsters have types: Fire beats Grass, Water beats Earth, and Grass beats Water for double damage. Other elemental hits on a monster do half. Normal skills always hit evenly.</li>
+      <li>Your highest stat determines your type when it leads both others by at least 20%. STR beats CHA, CHA beats INT, INT beats STR: +20% damage and 20% damage mitigation. Normal is neutral.</li>
+      <li>STR raises Max HP; INT raises Max MP from 5. Basic attacks restore MP. Higher CHA grants evasion; sure-hit attacks ignore it.</li>
+      <li>Learn skills from job specializations, monster victories (25% chance; boss guaranteed), and treasure scrolls. Check your home skill book for each source and required floor.</li>
       <li>Your coin always applies in solo battles. In a team, the pet with the highest total attributes supplies the coin.</li>
       <li>Teammates beside you join your battles.</li>
       <li>On a team, each chest opens once, for whoever gets there first.</li>
@@ -388,7 +390,7 @@ let sceneSignature = '', mapScene = null, terrain = null, actors = null;
 const actorNodes = new Map();
 let walkingPath = [], walkingTimer = 0, walkingGeneration = 0;
 const hiddenEnemy = enemy => enemy.hidden ?? enemy.kind !== 'slime-king';
-const typeName = type => type[0].toUpperCase() + type.slice(1);
+const typeName = type => ['str', 'cha', 'int'].includes(type) ? type.toUpperCase() : type[0].toUpperCase() + type.slice(1);
 const onGrass = (x, y) => state?.grass?.[y]?.[x] === 'g';
 function stopWalking() { walkingGeneration++; walkingPath = []; clearTimeout(walkingTimer); }
 function resetScene() {
@@ -504,7 +506,8 @@ function renderMonsters() {
     const moves = (enemy.moves ?? []).map(move => ` · ${move.name} (${move.mpCost} MP): ${move.description}`).join('');
     const where = hiddenEnemy(enemy) ? 'Hidden in tall grass' : `column ${enemy.x + 1}, row ${enemy.y + 1}`;
     const type = enemy.type ? ` · ${typeName(enemy.type)} type, weak to ${(enemy.weakness ?? []).map(typeName).join(' and ')}` : '';
-    item.textContent = `${enemy.name}${type} · ${where} · HP ${enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.intelligence} · STR ${enemy.strength} / INT ${enemy.intelligence} / CHA ${enemy.charisma}${moves}`;
+    const drops = enemy.skillDrops?.length ? ` · Skill drops: ${enemy.skillDrops.map(s => s.name).join(', ')}` : '';
+    item.textContent = `${enemy.name}${type} · ${where} · HP ${enemy.maxHp ?? enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.maxMp ?? enemy.intelligence} · STR ${enemy.strength} / INT ${enemy.intelligence} / CHA ${enemy.charisma}${moves}${drops}`;
     roster.append(item);
   }
   const rebuilt = makeTerrain();
@@ -653,9 +656,10 @@ function battleResult(battle) {
   const knockedOut = battle.after?.hp === 0;
   const team = (battle.playback?.fighters.length ?? 0) > 2 ? 'Your team' : 'You';
   const keyDrop = battle.keyDrop ? ` Found a Floor Key! The stairs on floor ${battle.keyDrop.floor} can now be unlocked.` : '';
+  const skillDrop = battle.skillDrop ? ` ${battle.skillDrop.learned ? 'Learned' : 'Found an already learned scroll:'} ${battle.skillDrop.name}! Equip skills at your home chest.` : '';
   if (battle.won && knockedOut) return `${team} defeated ${battle.enemyName} on floor ${battle.floor}, but your pet was knocked out. Its adventure is over; your teammates explore on.${keyDrop}`;
   return battle.won
-    ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${trainedText(battle.trained)}${keyDrop}${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}`
+    ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${trainedText(battle.trained)}${keyDrop}${skillDrop}${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}`
     : `${battle.enemyName} defeated ${team === 'You' ? 'you' : 'your team'}. Adventure failed. Start a new adventure to try again.`;
 }
 function renderRecords() {

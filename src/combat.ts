@@ -1,432 +1,325 @@
-import type { CoinId } from './treasure.ts';
-// Monsters have a type and pets don't, so Arena and revenge stay neutral: a
-// typed skill only hits harder or softer against a monster.
-export const ELEMENTS = ['normal', 'fire', 'water', 'grass', 'earth'] as const;
-export type Element = (typeof ELEMENTS)[number];
-export const MONSTER_TYPES = { slime: 'grass', goblin: 'earth', 'slime-king': 'water' } as const satisfies Record<string, Element>;
-export type MonsterKind = keyof typeof MONSTER_TYPES;
-// Fire beats Grass, Water beats Earth and Grass beats Water. Each of those
-// is halved against the other monster types; Normal skills always hit ×1.
-export const TYPE_CHART: Record<Element, Partial<Record<Element, number>>> = {
-  normal: {}, earth: {},
-  fire: { grass: 2, water: 0.5, earth: 0.5 },
-  water: { earth: 2, grass: 0.5, water: 0.5 },
-  grass: { water: 2, grass: 0.5, earth: 0.5 },
+import * as legacy from './legacy-combat.ts';
+import { SKILLS, CHEST_SKILLS, type Attribute, type AttributeType, type SkillId } from './skills.ts';
+export { coinEffect, simulateBattle, simulateTeamBattle } from './legacy-combat.ts';
+export type { CoinEffect, Initiative, BattleActionError, MonsterKind, MonsterAbilityId } from './legacy-combat.ts';
+export type TrainedAttribute = Attribute;
+export type AbilityId = legacy.AbilityId | SkillId;
+export type Element = legacy.Element | AttributeType;
+export const ELEMENTS = ['normal', 'str', 'cha', 'int'] as const;
+export const TYPE_CHART = { normal: {}, str: { cha: 1.2, int: 0.8 }, cha: { int: 1.2, str: 0.8 }, int: { str: 1.2, cha: 0.8 } };
+// Kept for old clients; new monster views derive their type from their stats.
+export const MONSTER_TYPES = { slime: 'str', goblin: 'str', 'slime-king': 'str' } as const;
+export const effectiveness = (a: Element, b: Element | undefined): number => {
+  if (!b) return 1;
+  return (TYPE_CHART as Record<string, Record<string, number>>)[a]?.[b] ?? 1;
 };
-export const effectiveness = (move: Element, target: Element | undefined): number =>
-  target ? TYPE_CHART[move][target] ?? 1 : 1;
-export const weaknessOf = (type: Element): Element[] => ELEMENTS.filter(move => effectiveness(move, type) > 1);
-// A saved, server-resolved battle. HP/MP belong to this fight, not daily care.
-// Each elemental skill deals one attribute × 1.5 × battle luck for 3 MP.
-// `trains` is the main attribute a win grows when this skill lands the final
-// blow; Normal skills have none (`null`), so their win grows a random one.
+export const weaknessOf = (type: Element) => ELEMENTS.filter(t => effectiveness(t, type) > 1);
+const trainsFor = (type: AttributeType): Attribute | null => ({ str: 'strength', cha: 'charisma', int: 'intelligence', normal: null } as const)[type];
+// Existing learned moves remain usable. Only the 30 new skills have acquisition sources.
 export const ABILITIES = [
-  { id: 'claw-strike', name: 'Claw Strike', type: 'normal', trains: null, mpCost: 0, description: 'A free Strength-based attack.' },
-  { id: 'firebolt', name: 'Firebolt', type: 'fire', trains: 'intelligence', mpCost: 3, description: 'Intelligence × 1.5, adjusted by battle luck and rounded.' },
-  { id: 'heavy-strike', name: 'Heavy Strike', type: 'normal', trains: null, mpCost: 2, description: 'Claw Strike damage × 1.5, rounded up.' },
-  { id: 'tide-crash', name: 'Tide Crash', type: 'water', trains: 'strength', mpCost: 3, description: 'Strength × 1.5, adjusted by battle luck and rounded.' },
-  { id: 'vine-lash', name: 'Vine Lash', type: 'grass', trains: 'charisma', mpCost: 3, description: 'Charisma × 1.5, adjusted by battle luck and rounded.' },
-] as const;
-const TRAINABLE = ['strength', 'intelligence', 'charisma'] as const;
-export type TrainedAttribute = (typeof TRAINABLE)[number];
-// A winning pet grows the main attribute behind its own last hit, or a random
-// one when that hit was a Normal skill. Rolled once when the win is settled
-// and saved with it, so a replay or retry never rerolls. A pet that never
-// struck (its opponent forfeited, or its teammates did all the work) gains
-// nothing, so a forfeit can't hand out free training.
-export function battleTraining(battle: Battle, petIndex: number, random = Math.random): TrainedAttribute | undefined {
-  const last = battle.turns.findLast(turn => turn.actor === petIndex && turn.damage > 0);
-  if (!last) return undefined;
-  return ABILITIES.find(ability => ability.id === last.ability)?.trains ?? TRAINABLE[Math.floor(random() * TRAINABLE.length)];
+  ...legacy.ABILITIES.map(a => ({ ...a, type: a.id === 'firebolt' ? 'int' as const : a.id === 'tide-crash' ? 'str' as const : a.id === 'vine-lash' ? 'cha' as const : 'normal' as const,
+    category: a.id === 'claw-strike' ? 'Basic' as const : 'Attack' as const,
+    power: a.id === 'claw-strike' ? 40 : 60, accuracy: 100 as number | 'sure-hit',
+    description: a.id === 'claw-strike' ? 'A free STR-based starter attack. Restore 1 MP, even on a miss.' : `Legacy skill. ${a.description}` })),
+  ...SKILLS.map(s => ({ ...s, trains: trainsFor(s.type) })),
+];
+export const LEARNABLE_ABILITIES = CHEST_SKILLS;
+export type LearnableAbilityId = SkillId | Exclude<legacy.AbilityId, 'claw-strike' | 'bump'>;
+export const MONSTER_ABILITIES = legacy.MONSTER_ABILITIES;
+export type Stats = Record<Attribute, number>;
+export type PetStats = Omit<legacy.PetStats, 'abilities' | 'equippedAbilities'> & { abilities?: readonly AbilityId[]; equippedAbilities?: readonly AbilityId[] };
+export type Fighter = Omit<legacy.Fighter, 'type'> & { type?: Element; baseStats?: Stats; stats?: Stats; luck?: number };
+export type BattleTurn = Omit<legacy.BattleTurn, 'ability' | 'type'> & {
+  ability: AbilityId; type?: Element; missed?: boolean; events?: string[]; maxHp?: number[]; maxMp?: number[]; types?: Element[];
+};
+export type Battle = Omit<legacy.Battle, 'fighters' | 'turns'> & {
+  fighters: Fighter[]; turns: BattleTurn[]; initialMaxHp?: number[]; initialMaxMp?: number[]; initialTypes?: Element[];
+};
+export type BattleAttack = Omit<legacy.BattleAttack, 'id' | 'type'> & {
+  id: AbilityId; type?: Element; power?: number; accuracy?: number | 'sure-hit'; category?: string;
+  currentMpCost?: number; unavailable?: string; hitChance?: number;
+};
+export type Effect = { id: string; name: string; expires: number; attribute?: Attribute | 'all'; amount?: number };
+export type FighterState = { effects: Effect[]; lastMissed: boolean; surcharge: boolean };
+export type ActiveBattle = Omit<legacy.ActiveBattle, keyof Battle | 'attacks'> & Battle & {
+  attacks: BattleAttack[][]; rulesVersion?: 2; states?: FighterState[]; fieldUntil?: number; rng?: number;
+  restoredHp?: number[]; restoredMp?: number[]; resourceBonus?: { hp: number; mp: number }[];
+};
+export type StartBattleOptions = legacy.StartBattleOptions;
+export const isActiveBattle = (battle: Battle): battle is ActiveBattle => 'status' in battle && 'actor' in battle && 'revision' in battle;
+export const maxHpFor = (stats: Stats) => Math.max(1, Math.floor(10 + 3 * stats.strength));
+export const maxMpFor = (stats: Stats) => 5 + Math.floor(Math.max(0, stats.intelligence - 5) / 5);
+export function mainAttribute(stats: Stats): AttributeType {
+  const ordered = (['strength', 'charisma', 'intelligence'] as Attribute[]).sort((a, b) => stats[b] - stats[a]);
+  const [first, second] = ordered;
+  if (stats[first] > stats[second] && stats[first] >= stats[second] * 1.2) return ({ strength: 'str', charisma: 'cha', intelligence: 'int' } as const)[first];
+  return 'normal';
 }
-// Chests teach every pet skill except the always-ready Claw Strike.
-export const LEARNABLE_ABILITIES = ABILITIES.filter(
-  (ability): ability is Exclude<(typeof ABILITIES)[number], { id: 'claw-strike' }> => ability.id !== 'claw-strike');
-export type LearnableAbilityId = (typeof LEARNABLE_ABILITIES)[number]['id'];
-// Monster-only moves: chests never teach these to pets.
-export const MONSTER_ABILITIES = [
-  { id: 'bump', name: 'Bump', type: 'normal', mpCost: 5, description: 'Two-thirds of the target’s current HP, rounded up.' },
-] as const;
-const ALL_ABILITIES = [...ABILITIES, ...MONSTER_ABILITIES];
-export type AbilityId = (typeof ALL_ABILITIES)[number]['id'];
-export type MonsterAbilityId = (typeof MONSTER_ABILITIES)[number]['id'];
-// Battles saved before types lack each attack's type, so look it up by skill.
-const typeOf = (id: AbilityId): Element => ALL_ABILITIES.find(ability => ability.id === id)?.type ?? 'normal';
-// ×2 is exact and ×½ rounds up, so a typed hit always does at least 1 damage.
-const typed = (damage: number, move: Element, target: Element | undefined) =>
-  Math.ceil(damage * effectiveness(move, target));
-export interface PetStats {
-  id: string; strength: number; intelligence: number; charisma: number;
-  color?: string; appearance?: string;
-  name?: string; monster?: MonsterKind;
-  abilities?: readonly AbilityId[];
-  equippedCoin?: CoinId | null;
-  equippedAbilities?: readonly AbilityId[];
+export const balancedStats = (stats: Stats) => {
+  const values = [stats.strength, stats.charisma, stats.intelligence];
+  return Math.max(...values) <= 1.2 * Math.min(...values);
+};
+export function withAttributeBonus<T extends PetStats>(pet: T, bonus: number): T {
+  return { ...pet, strength: pet.strength + bonus, charisma: pet.charisma + bonus, intelligence: pet.intelligence + bonus };
 }
-export interface Fighter {
-  id: string; maxHp: number; maxMp: number; damage: number;
-  color: string; appearance: string; abilities: string[];
-  name?: string; monster?: MonsterKind;
-  type?: Element; // monsters only; absent in older saved replays
+export function battleTraining(battle: Battle, index: number, random = Math.random): Attribute | undefined {
+  const last = battle.turns.findLast(t => t.actor === index && t.damage > 0);
+  if (!last) return;
+  return ABILITIES.find(a => a.id === last.ability)?.trains ?? (['strength', 'intelligence', 'charisma'] as const)[Math.floor(random() * 3)];
 }
-// Indices into the battle's fighters. A one-on-one battle has two; a team's
-// Adventure battle lists its pets first and the monster last.
-export interface BattleTurn {
-  actor: number; target: number; ability: AbilityId;
-  name?: string; mpCost?: number; // absent in older saved replays
-  type?: Element; effectiveness?: number; // absent in older saved replays
-  damage: number; hits: number; hp: number[]; mp: number[];
-}
-// How the turn order was decided, saved so every replay can show it. `toss`
-// is null when the acting pet's Silver or Gold Coin fixed the order instead.
-export interface Initiative {
-  toss: 'heads' | 'tails' | null; coin: CoinId | null;
-  provider?: number; providerId?: string;
-}
-export interface Battle {
-  fighters: Fighter[]; turns: BattleTurn[]; winner: string;
-  initialHp?: number[]; initialMp?: number[]; // absent in older saved replays
-  initiative?: Initiative; // absent in older saved replays
-}
-// This effect is relative to the pet supplying the coin: heads/Silver put its
-// side first, while tails/Gold put the opposing side first.
-export interface CoinEffect extends Initiative { first: 0 | 1; doubleFirstStrike: boolean; attributeBonus: number }
-export function coinEffect(coin: CoinId | null | undefined, random = Math.random): CoinEffect {
-  if (coin === 'silver-coin') return { first: 0, doubleFirstStrike: false, attributeBonus: 0, toss: null, coin };
-  if (coin === 'gold-coin') return { first: 1, doubleFirstStrike: true, attributeBonus: 0, toss: null, coin };
-  const first = random() < 0.5 ? 0 : 1;
-  return {
-    first, doubleFirstStrike: false, attributeBonus: coin === 'copper-coin' ? 1 : 0,
-    toss: first === 0 ? 'heads' : 'tails', coin: coin ?? null,
-  };
-}
-// Copper's +1/attribute (and the HP/MP it implies) only ever applies for this
-// fight's calculations; nothing is written back to the pet.
-export function withAttributeBonus(pet: PetStats, bonus: number): PetStats {
-  if (!bonus) return pet;
-  return { ...pet, strength: pet.strength + bonus, intelligence: pet.intelligence + bonus, charisma: pet.charisma + bonus };
-}
-function fighterOf(pet: PetStats, roll: number): Fighter {
-  return {
-    id: pet.id,
-    ...(pet.name ? { name: pet.name } : {}),
-    ...(pet.monster ? { monster: pet.monster, type: MONSTER_TYPES[pet.monster] } : {}),
-    maxHp: pet.strength + pet.intelligence + pet.charisma,
-    maxMp: pet.intelligence,
-    damage: Math.max(1, Math.round(pet.strength * roll / (2 * pet.strength + pet.intelligence + pet.charisma))),
-    color: pet.color ?? "#f59e0b", appearance: pet.appearance ?? "blob",
-    abilities: ALL_ABILITIES.filter(ability => ability.id === 'claw-strike' || pet.abilities?.includes(ability.id)).map(ability => ability.id),
-  };
-}
-// Fixed per-hit damage before type effectiveness; Bump's depends on the
-// target's HP, so each battle works it out per strike.
-function attacksOf(pet: PetStats, fighter: Fighter, roll: number) {
-  // An attribute × 1.5 × luck, at the same scale as Claw Strike's Strength.
-  const scaled = (attribute: number) =>
-    Math.max(1, Math.round(1.5 * attribute * roll / (2 * pet.strength + pet.intelligence + pet.charisma)));
-  return ALL_ABILITIES.filter(ability => fighter.abilities.includes(ability.id)).map(ability => ({
-    ...ability,
-    damage: ability.id === 'firebolt' ? scaled(pet.intelligence)
-      : ability.id === 'tide-crash' ? scaled(pet.strength)
-      : ability.id === 'vine-lash' ? scaled(pet.charisma)
-      : ability.id === 'heavy-strike' ? Math.ceil(fighter.damage * 1.5) : fighter.damage,
-  }));
-}
-
-export interface BattleAttack {
-  id: AbilityId; name: string; mpCost: number; description: string; damage: number;
-  type?: Element; // absent in battles saved before types
-}
-// Everything needed to resume a live fight is saved as plain JSON. `turns`
-// remains the replay format, while the current resources and turn are explicit.
-export interface ActiveBattle extends Battle {
-  status: 'active' | 'finished';
-  actor: number | null;
-  hp: number[]; mp: number[];
-  revision: number;
-  attacks: BattleAttack[][];
-  coinProvider: number;
-  order: number[];
-  cursor: number;
-  monsterIndex: number | null;
-  automaticIds: string[];
-  goldPending: boolean;
-  forfeited: number[];
-}
-export interface BattleActionError { error: string; status: number }
-export interface StartBattleOptions {
-  mode?: 'pvp' | 'monster';
-  hp?: number[]; mp?: number[];
-  random?: () => number;
-  // Only the server's fixed training bot belongs here. Human participants must
-  // always select their own move, including when they disconnect.
-  automaticIds?: string[];
-}
-
-export function isActiveBattle(battle: Battle): battle is ActiveBattle {
-  return 'status' in battle && 'actor' in battle && 'revision' in battle;
-}
-
-function attributeTotal(pet: PetStats) {
-  return pet.strength + pet.intelligence + pet.charisma;
-}
-function battlePower(pet: PetStats) {
-  return 2 * pet.strength + pet.intelligence + pet.charisma;
-}
-function battleFinished(battle: ActiveBattle) {
-  if (battle.monsterIndex !== null) {
-    if (battle.hp[battle.monsterIndex] <= 0) battle.winner = battle.fighters[0].id;
-    else if (!battle.hp.some((hp, i) => i !== battle.monsterIndex && hp > 0)) {
-      battle.winner = battle.fighters[battle.monsterIndex].id;
-    }
-  } else if (battle.hp.some(hp => hp <= 0)) {
-    battle.winner = battle.fighters[battle.hp[0] > 0 ? 0 : 1].id;
+const total = (p: Stats) => p.strength + p.charisma + p.intelligence;
+const powerOf = (p: Stats) => total(p) + p.strength;
+const has = (b: ActiveBattle, i: number, id: string) => b.states![i].effects.some(e => e.id === id && e.expires > b.revision);
+function effectiveStats(b: ActiveBattle, i: number): Stats {
+  const base = b.fighters[i].baseStats!;
+  const stats = { ...base };
+  for (const key of ['strength', 'charisma', 'intelligence'] as const) {
+    const amounts = b.states![i].effects.filter(e => (e.attribute === key || e.attribute === 'all') && e.expires > b.revision).map(e => e.amount ?? 0);
+    // Recasts refresh; different boosts/debuffs use the strongest of each sign.
+    stats[key] = Math.max(0, base[key] * (1 + Math.max(0, ...amounts)) * (1 + Math.min(0, ...amounts)));
   }
-  if (!battle.winner) return false;
-  battle.status = 'finished';
-  battle.actor = null;
-  return true;
+  return stats;
 }
-function targetOf(battle: ActiveBattle, actor: number) {
-  if (battle.monsterIndex === null) return 1 - actor;
-  if (actor !== battle.monsterIndex) return battle.monsterIndex;
-  // Preserve the monster's existing targeting rule: most remaining HP,
-  // keeping the earlier teammate on a tie.
-  return battle.hp.reduce((target, hp, i) =>
-    i !== battle.monsterIndex && hp > 0 && (target < 0 || hp > battle.hp[target]) ? i : target, -1);
+function targetOf(b: ActiveBattle, actor: number): number {
+  if (b.monsterIndex === null) return 1 - actor;
+  if (actor !== b.monsterIndex) return b.monsterIndex;
+  return b.hp.reduce((best, hp, i) => i !== b.monsterIndex && hp > 0 && (best < 0 || hp > b.hp[best]) ? i : best, -1);
 }
-// A fighter saved before types has none, so its battle keeps ×1 damage.
-function attackDamage(battle: ActiveBattle, target: number, attack: BattleAttack) {
-  const base = attack.id === 'bump' ? Math.ceil(battle.hp[target] * 2 / 3) : attack.damage;
-  return typed(base, attack.type ?? typeOf(attack.id), battle.fighters[target].type);
+function normalBonus(b: ActiveBattle, actor: number) {
+  return mainAttribute(b.fighters[actor].stats!) === 'normal' && balancedStats(b.fighters[actor].stats!);
 }
-function strikeInPlace(battle: ActiveBattle, actor: number, attack: BattleAttack) {
-  const target = targetOf(battle, actor);
-  const boost = battle.goldPending && actor === battle.coinProvider ? 2 : 1;
-  if (actor === battle.coinProvider) battle.goldPending = false;
-  const damage = Math.min(battle.hp[target], attackDamage(battle, target, attack) * boost);
-  const type = attack.type ?? typeOf(attack.id), scale = effectiveness(type, battle.fighters[target].type);
-  battle.hp[target] -= damage;
-  battle.mp[actor] -= attack.mpCost;
-  battle.turns.push({
-    actor, target, ability: attack.id, name: attack.name, mpCost: attack.mpCost,
-    type, ...(scale !== 1 ? { effectiveness: scale } : {}),
-    damage, hits: 1, hp: [...battle.hp], mp: [...battle.mp],
+function typeScale(b: ActiveBattle, actor: number, target: number): number {
+  if ((b.fieldUntil ?? 0) > b.revision) return 1;
+  const scale = effectiveness(b.fighters[actor].type ?? 'normal', b.fighters[target].type);
+  return scale > 1 ? (has(b, actor, 'peer-review') ? 1.4 : 1.2)
+    : scale < 1 ? (has(b, target, 'peer-review') ? 0.6 : 0.8) : 1;
+}
+function hitChance(b: ActiveBattle, actor: number, target: number, attack: BattleAttack): number {
+  if (attack.accuracy === 'sure-hit' || !attack.power) return 1;
+  const gap = Math.max(0, b.fighters[target].stats!.charisma - b.fighters[actor].stats!.charisma);
+  const evasion = has(b, target, 'feral-maul') ? 0 : Math.min(0.3, gap * 0.01) * (has(b, target, 'phantom-perfume') ? 2 : 1);
+  return Math.max(0, Math.min(1, ((attack.accuracy ?? 100) + (has(b, actor, 'peer-review') ? 25 : 0)) / 100 - evasion));
+}
+function baseDamage(b: ActiveBattle, actor: number, target: number, attack: BattleAttack): number {
+  if (attack.id === 'bump') return Math.ceil(b.hp[target] * 2 / 3);
+  if (!attack.power) return 0;
+  const stats = b.fighters[actor].stats!, rival = b.fighters[target].stats!;
+  const attribute = attack.type === 'int' ? stats.intelligence : attack.type === 'cha' ? stats.charisma
+    : attack.type === 'normal' && !['claw-strike', 'heavy-strike'].includes(attack.id) ? total(stats) / 3 : stats.strength;
+  let power = attack.power;
+  if (attack.id === 'dazzling-riposte' && b.states![target].lastMissed) power *= 2;
+  if (attack.id === 'vip-velvet-rope') power += 2 * Math.max(0, stats.charisma - rival.charisma);
+  let damage = attribute * power / 40 * b.fighters[actor].luck!;
+  if (attack.id === 'titans-relic-press') damage += b.hp[actor] * 0.15;
+  if (attack.id === 'gravity-formula') damage += b.fighters[target].maxHp * 0.1;
+  if (attack.id === 'mind-gap') damage *= 1 + 0.1 * Math.max(0, b.mp[actor] - b.mp[target]);
+  if (attack.id === 'jack-of-all-trades' && normalBonus(b, actor)) damage *= 1.25;
+  return Math.max(1, Math.round(damage));
+}
+function costOf(b: ActiveBattle, actor: number, attack: BattleAttack) {
+  return attack.mpCost + (attack.mpCost > 0 && b.states![actor].surcharge ? 2 : 0);
+}
+function unavailable(b: ActiveBattle, actor: number, attack: BattleAttack) {
+  if (costOf(b, actor, attack) > b.mp[actor]) return 'Not enough MP';
+  if (attack.id === 'bloodlust-crash' && b.hp[actor] <= Math.ceil(b.fighters[actor].maxHp * 0.15)) return 'Needs more than 15% Max HP';
+  if (attack.id === 'golden-ratio' && !normalBonus(b, actor)) return 'Requires balanced Normal stats (within 20%)';
+  return undefined;
+}
+function refresh(b: ActiveBattle) {
+  b.fighters.forEach((f, i) => {
+    b.states![i].effects = b.states![i].effects.filter(e => e.expires > b.revision);
+    f.stats = effectiveStats(b, i);
+    f.type = has(b, i, 'equalizer-field') ? 'normal' : mainAttribute(f.stats);
+    f.maxHp = maxHpFor(f.stats); f.maxMp = maxMpFor(f.stats);
+    b.hp[i] = Math.min(b.hp[i], f.maxHp); b.mp[i] = Math.min(b.mp[i], f.maxMp);
   });
-  battle.revision++;
-  battle.cursor = (battle.cursor + 1) % battle.order.length;
-}
-function advanceInPlace(battle: ActiveBattle) {
-  while (!battleFinished(battle)) {
-    while (battle.hp[battle.order[battle.cursor]] <= 0) {
-      battle.cursor = (battle.cursor + 1) % battle.order.length;
+  b.attacks.forEach((attacks, i) => {
+    const target = targetOf(b, i);
+    for (const attack of attacks) {
+      attack.currentMpCost = costOf(b, i, attack);
+      attack.unavailable = unavailable(b, i, attack);
+      if (target >= 0) { attack.damage = baseDamage(b, i, target, attack); attack.hitChance = hitChance(b, i, target, attack); }
     }
-    const actor = battle.order[battle.cursor];
-    battle.actor = actor;
-    if (actor !== battle.monsterIndex && !battle.automaticIds.includes(battle.fighters[actor].id)) return;
-    const target = targetOf(battle, actor);
-    const attack = battle.attacks[actor].filter(move => move.mpCost <= battle.mp[actor]).reduce((best, move) => {
-      const gain = attackDamage(battle, target, move) - attackDamage(battle, target, best);
-      return gain > 0 || (gain === 0 && move.mpCost < best.mpCost) ? move : best;
-    });
-    strikeInPlace(battle, actor, attack);
+  });
+}
+function addEffect(b: ActiveBattle, i: number, id: string, name: string, turns: number, attribute?: Attribute | 'all', amount?: number) {
+  b.states![i].effects = b.states![i].effects.filter(e => e.id !== id);
+  b.states![i].effects.push({ id, name, expires: b.revision + 1 + turns * b.order.length, attribute, amount });
+}
+function roll(b: ActiveBattle) {
+  let seed = b.rng || 1;
+  seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+  b.rng = seed >>> 0;
+  return b.rng / 0x100000000;
+}
+function strike(b: ActiveBattle, actor: number, attack: BattleAttack, random?: () => number) {
+  const target = targetOf(b, actor), id = attack.id;
+  const events: string[] = [];
+  const scale = typeScale(b, actor, target);
+  // Mind Gap's MP comparison and HP bonuses are taken before paying costs.
+  const base = baseDamage(b, actor, target, attack);
+  const paid = costOf(b, actor, attack);
+  b.mp[actor] -= paid;
+  if (attack.mpCost > 0) b.states![actor].surcharge = false;
+  if (id === 'bloodlust-crash') {
+    const paidHp = Math.ceil(b.fighters[actor].maxHp * 0.15);
+    b.hp[actor] -= paidHp; events.push(`Sacrificed ${paidHp} HP`);
+  }
+  const missed = Boolean(attack.power) && (random?.() ?? roll(b)) >= hitChance(b, actor, target, attack);
+  b.states![actor].lastMissed = missed;
+  const boost = attack.power && b.goldPending && actor === b.coinProvider ? 2 : 1;
+  if (attack.power && actor === b.coinProvider) b.goldPending = false;
+  let damage = 0;
+  const restoreMp = (i: number, amount: number) => {
+    const gained = Math.min(amount, b.fighters[i].maxMp - b.mp[i]);
+    b.mp[i] += gained;
+    b.restoredMp![i] += gained;
+    if (gained) events.push(`${b.fighters[i].name ?? b.fighters[i].id} restored ${gained} MP`);
+  };
+  const heal = (fraction: number) => {
+    const healed = Math.min(Math.ceil(b.fighters[actor].maxHp * fraction), b.fighters[actor].maxHp - b.hp[actor]);
+    b.hp[actor] += healed; b.restoredHp![actor] += healed; events.push(`Healed ${healed} HP`);
+  };
+  if (missed) {
+    events.push('Missed');
+    if (has(b, target, 'phantom-perfume')) restoreMp(target, 2);
+  } else if (attack.power) {
+    damage = Math.max(1, Math.round(base * scale * boost * (has(b, target, 'hardhat-guard') ? 0.7 : 1)));
+    if (has(b, target, 'mana-barrier')) {
+      const absorbed = Math.min(b.mp[target], Math.floor(damage / 2));
+      b.mp[target] -= absorbed; damage -= absorbed;
+      if (absorbed) events.push(`Mana Barrier absorbed ${absorbed} damage for ${absorbed} MP`);
+    }
+    damage = Math.min(b.hp[target], damage); b.hp[target] -= damage;
+    if (has(b, target, 'hardhat-guard')) restoreMp(target, 1);
+  }
+  if (id === 'claw-strike') restoreMp(actor, 1);
+  if (id === 'heavy-breath-slam' || id === 'service-smile') restoreMp(actor, 2);
+  if (id === 'paperplane-dart') restoreMp(actor, 3);
+  const effect = (who: number, turns: number, name: string, attr?: Attribute | 'all', amount?: number) => {
+    addEffect(b, who, id, name, turns, attr, amount); events.push(`${name} (${turns} turns)`);
+  };
+  if (id === 'service-smile') effect(actor, 1, 'CHA +10%', 'charisma', 0.1);
+  if (!missed) {
+    if (id === 'humble-pie') effect(target, 2, 'CHA −25%', 'charisma', -0.25);
+    if (id === 'hecklers-jab') effect(target, 2, 'CHA −20%', 'charisma', -0.2);
+    if (id === 'feral-maul') effect(target, 1, 'Pinned: no evasion');
+    if (id === 'apex-roar') effect(target, 3, 'CHA −35%', 'charisma', -0.35);
+    if (id === 'gym-pump') effect(actor, 3, 'STR +25%', 'strength', 0.25);
+    if (id === 'makeover-glow') effect(actor, 3, 'CHA +40%', 'charisma', 0.4);
+    if (id === 'hardhat-guard') effect(actor, 2, 'Damage −30%; +1 MP on hit');
+    if (id === 'phantom-perfume') effect(actor, 2, 'Double evasion; +2 MP on miss');
+    if (id === 'peer-review') effect(actor, 2, 'Type bonus 40%; accuracy +25');
+    if (id === 'mana-barrier') effect(actor, 2, 'Mana Barrier');
+    if (id === 'sirens-lure') { b.states![target].surcharge = true; events.push('Target’s next paid skill costs +2 MP'); }
+    if (id === 'synapse-shock' || id === 'crown-jewel-beam') {
+      const drained = Math.min(3, b.mp[target]); b.mp[target] -= drained;
+      events.push(`Target lost ${drained} MP`);
+      if (id === 'crown-jewel-beam') restoreMp(actor, drained);
+    }
+    if (id === 'standing-ovation') {
+      b.states![actor].effects = b.states![actor].effects.filter(e => !e.attribute || (e.amount ?? 0) >= 0);
+      refresh(b); heal(0.35); events.push('Stat debuffs cleansed');
+    }
+    if (id === 'coffee-break') {
+      effect(actor, 2, 'INT +20%', 'intelligence', 0.2); refresh(b); restoreMp(actor, Math.ceil(b.fighters[actor].maxMp * 0.5));
+    }
+    if (id === 'jack-of-all-trades' && normalBonus(b, actor)) restoreMp(actor, 1);
+    if (id === 'equalizer-field') {
+      effect(target, 3, 'Normal type'); b.fieldUntil = b.revision + 1 + 3 * b.order.length;
+      events.push('All type advantages disabled');
+    }
+    if (id === 'golden-ratio') { heal(0.2); effect(actor, 3, 'All stats +15%', 'all', 0.15); }
+  }
+  b.revision++; refresh(b);
+  b.turns.push({ actor, target, ability: id, name: attack.name, mpCost: paid, type: attack.type,
+    ...(scale !== 1 && attack.power ? { effectiveness: scale } : {}),
+    damage, hits: missed || !attack.power ? 0 : 1, missed, events, hp: [...b.hp], mp: [...b.mp],
+    maxHp: b.fighters.map(f => f.maxHp), maxMp: b.fighters.map(f => f.maxMp), types: b.fighters.map(f => f.type ?? 'normal') });
+  b.cursor = (b.cursor + 1) % b.order.length;
+}
+function finished(b: ActiveBattle) {
+  if (b.monsterIndex !== null) {
+    if (b.hp[b.monsterIndex] <= 0) b.winner = b.fighters[0].id;
+    else if (!b.hp.some((hp, i) => i !== b.monsterIndex && hp > 0)) b.winner = b.fighters[b.monsterIndex].id;
+  } else if (b.hp.some(hp => hp <= 0)) b.winner = b.fighters[b.hp[0] > 0 ? 0 : 1].id;
+  if (!b.winner) return false;
+  b.status = 'finished'; b.actor = null; return true;
+}
+function advance(b: ActiveBattle, random?: () => number) {
+  while (!finished(b)) {
+    while (b.hp[b.order[b.cursor]] <= 0) b.cursor = (b.cursor + 1) % b.order.length;
+    const actor = b.order[b.cursor]; b.actor = actor;
+    refresh(b);
+    if (actor !== b.monsterIndex && !b.automaticIds.includes(b.fighters[actor].id)) return;
+    const choices = b.attacks[actor].filter(a => a.power && !a.unavailable);
+    const attack = choices.reduce((best, a) => a.damage * (a.hitChance ?? 1) > best.damage * (best.hitChance ?? 1) ? a : best);
+    strike(b, actor, attack, random);
   }
 }
-function copyBattle(battle: ActiveBattle): ActiveBattle {
-  // Structured cloning prevents an invalid/stale request or a failed database
-  // transaction from changing the caller's previously persisted snapshot.
-  return structuredClone(battle);
-}
-
-/** Start a fight without selecting any human pet's move. Rolls use raw stats. */
-export function startBattle(
-  pets: PetStats[], opponent: PetStats, rolls: number[], options: StartBattleOptions = {},
-): ActiveBattle {
-  const mode = options.mode ?? (opponent.monster ? 'monster' : 'pvp');
+export function startBattle(pets: PetStats[], opponent: PetStats, rolls: number[], options: StartBattleOptions = {}): ActiveBattle {
+  const mode = options.mode ?? (opponent.monster ? 'monster' : 'pvp'), all = [...pets, opponent];
   if (!pets.length || (mode === 'pvp' && pets.length !== 1)) throw new Error('Choose the battle participants.');
-  const all = [...pets, opponent];
-  if (new Set(all.map(pet => pet.id)).size !== all.length) throw new Error('Each fighter must be different.');
-  if (all.some(pet => ![pet.strength, pet.intelligence, pet.charisma].every(value => Number.isFinite(value) && value >= 0)
-    || attributeTotal(pet) <= 0)) throw new Error('Fighter attributes must be valid.');
+  if (new Set(all.map(p => p.id)).size !== all.length) throw new Error('Each fighter must be different.');
+  if (all.some(p => ![p.strength, p.intelligence, p.charisma].every(n => Number.isFinite(n) && n >= 0) || total(p) <= 0)) throw new Error('Fighter attributes must be valid.');
   if (all.some((_, i) => !Number.isFinite(rolls[i]) || rolls[i] < 0)) throw new Error('Each fighter needs a valid battle roll.');
-
   const candidates = mode === 'monster' ? pets : all;
-  const provider = candidates.reduce((strongest, pet, i) =>
-    attributeTotal(pet) > attributeTotal(candidates[strongest]) ? i : strongest, 0);
-  const effect = coinEffect(all[provider].equippedCoin, options.random);
-  const prepared = all.map((pet, i) => {
-    const monster = mode === 'monster' && i === pets.length;
-    const selected = monster ? pet.abilities : pet.equippedAbilities ?? pet.abilities;
-    const abilities = [...new Set(selected ?? [])].filter(id =>
-      (monster ? ALL_ABILITIES : ABILITIES).some(ability => ability.id === id));
-    return withAttributeBonus({ ...pet, abilities }, i === provider ? effect.attributeBonus : 0);
+  const provider = candidates.reduce((best, p, i) => total(p) > total(candidates[best]) ? i : best, 0);
+  const coin = legacy.coinEffect(all[provider].equippedCoin, options.random);
+  const prepared = all.map((p, i) => withAttributeBonus(p, i === provider ? coin.attributeBonus : 0));
+  const fighters: Fighter[] = prepared.map((p, i) => {
+    const selected = p.monster ? p.abilities : p.equippedAbilities ?? p.abilities;
+    const allowed = p.monster ? [...ABILITIES, ...MONSTER_ABILITIES] : ABILITIES;
+    const abilities = ['claw-strike', ...new Set((selected ?? []).filter(id => id !== 'claw-strike' && allowed.some(a => a.id === id)))];
+    const stats = { strength: p.strength, intelligence: p.intelligence, charisma: p.charisma };
+    return { id: p.id, name: p.name, monster: p.monster, baseStats: stats, stats, type: mainAttribute(p), luck: rolls[i] / powerOf(all[i]),
+      maxHp: maxHpFor(p), maxMp: maxMpFor(p), damage: Math.max(1, Math.round(p.strength * rolls[i] / powerOf(all[i]))),
+      color: p.color ?? '#f59e0b', appearance: p.appearance ?? 'blob', abilities };
   });
-  const adjustedRolls = rolls.map((roll, i) => roll * battlePower(prepared[i]) / battlePower(all[i]));
-  const fighters = prepared.map((pet, i) => fighterOf(pet, adjustedRolls[i]));
-  const attacks = prepared.map((pet, i) => attacksOf(pet, fighters[i], adjustedRolls[i]));
-  const initialHp = fighters.map((fighter, i) => {
-    const carried = options.hp?.[i] ?? attributeTotal(all[i]);
-    return carried <= 0 ? 0 : Math.min(fighter.maxHp, carried + (i === provider ? effect.attributeBonus * 3 : 0));
+  const attacks: BattleAttack[][] = fighters.map(f => f.abilities.map(id => {
+    const def = ABILITIES.find(a => a.id === id);
+    if (def) return { ...def, damage: 0 };
+    return { ...MONSTER_ABILITIES[0], power: 1, accuracy: 100, damage: 0 };
+  }));
+  const initialHp = fighters.map((f, i) => {
+    const hp = options.hp?.[i] ?? maxHpFor(all[i]);
+    return hp <= 0 ? 0 : Math.min(f.maxHp, hp + f.maxHp - maxHpFor(all[i]));
   });
-  const initialMp = fighters.map((fighter, i) => Math.max(0, Math.min(fighter.maxMp,
-    (options.mp?.[i] ?? all[i].intelligence) + (i === provider ? effect.attributeBonus : 0))));
-  const monsterIndex = mode === 'monster' ? pets.length : null;
-  const petOrder = pets.map((_, i) => i);
-  const order = monsterIndex === null
-    ? effect.first === 0 ? [provider, 1 - provider] : [1 - provider, provider]
-    : effect.first === 0 ? [...petOrder, monsterIndex] : [monsterIndex, ...petOrder];
-  const battle: ActiveBattle = {
-    fighters, attacks, turns: [], winner: '', status: 'active', actor: null,
-    initialHp, initialMp, hp: [...initialHp], mp: [...initialMp], revision: 0,
-    initiative: { toss: effect.toss, coin: effect.coin, provider, providerId: all[provider].id },
-    coinProvider: provider, goldPending: effect.doubleFirstStrike,
-    order, cursor: 0, monsterIndex, automaticIds: [...new Set(options.automaticIds ?? [])],
-    forfeited: [],
-  };
-  advanceInPlace(battle);
-  return battle;
+  const initialMp = fighters.map((f, i) => Math.max(0, Math.min(f.maxMp, (options.mp?.[i] ?? maxMpFor(all[i])) + f.maxMp - maxMpFor(all[i]))));
+  const monsterIndex = mode === 'monster' ? pets.length : null, petOrder = pets.map((_, i) => i);
+  const order = monsterIndex === null ? coin.first === 0 ? [provider, 1 - provider] : [1 - provider, provider]
+    : coin.first === 0 ? [...petOrder, monsterIndex] : [monsterIndex, ...petOrder];
+  const b: ActiveBattle = { fighters, attacks, initialHp, initialMp, hp: [...initialHp], mp: [...initialMp], turns: [], winner: '', status: 'active', actor: null,
+    initialMaxHp: fighters.map(f => f.maxHp), initialMaxMp: fighters.map(f => f.maxMp), initialTypes: fighters.map(f => f.type!),
+    restoredHp: all.map(() => 0), restoredMp: all.map(() => 0),
+    resourceBonus: fighters.map((f, i) => ({ hp: f.maxHp - maxHpFor(all[i]), mp: f.maxMp - maxMpFor(all[i]) })),
+    revision: 0, coinProvider: provider, goldPending: coin.doubleFirstStrike, order, cursor: 0, monsterIndex,
+    automaticIds: [...new Set(options.automaticIds ?? [])], forfeited: [], rulesVersion: 2,
+    states: fighters.map(() => ({ effects: [], lastMissed: false, surcharge: false })), fieldUntil: 0,
+    rng: Math.floor((options.random?.() ?? Math.random()) * 0x100000000) || 1,
+    initiative: { toss: coin.toss, coin: coin.coin, provider, providerId: all[provider].id } };
+  refresh(b); advance(b, options.random); return b;
 }
-
-/** Validate and resolve one selected pet move, then any following monster move. */
-export function takeBattleTurn(
-  battle: ActiveBattle, actorId: string, ability: unknown, revision: unknown,
-): ActiveBattle | BattleActionError {
-  if (!Number.isInteger(revision) || revision !== battle.revision) {
-    return { error: 'The battle has moved on. Choose a move for the current turn.', status: 409 };
-  }
+export function takeBattleTurn(battle: ActiveBattle, actorId: string, ability: unknown, revision: unknown, random?: () => number): ActiveBattle | legacy.BattleActionError {
+  if (battle.rulesVersion !== 2) return legacy.takeBattleTurn(battle as legacy.ActiveBattle, actorId, ability, revision) as ActiveBattle | legacy.BattleActionError;
+  if (!Number.isInteger(revision) || revision !== battle.revision) return { error: 'The battle has moved on. Choose a move for the current turn.', status: 409 };
   if (battle.status !== 'active' || battle.actor === null) return { error: 'This battle has ended.', status: 409 };
   const actor = battle.actor;
   if (battle.fighters[actor].id !== actorId) return { error: 'Wait for your pet’s turn.', status: 403 };
-  if (actor === battle.monsterIndex || battle.automaticIds.includes(actorId)) {
-    return { error: 'This fighter’s move is controlled by the game.', status: 403 };
-  }
-  const attack = battle.attacks[actor].find(move => move.id === ability);
+  if (actor === battle.monsterIndex || battle.automaticIds.includes(actorId)) return { error: 'This fighter’s move is controlled by the game.', status: 403 };
+  const next = structuredClone(battle); refresh(next);
+  const attack = next.attacks[actor].find(a => a.id === ability);
   if (!attack) return { error: 'Choose one of your equipped skills.', status: 400 };
-  if (attack.mpCost > battle.mp[actor]) return { error: 'Your pet does not have enough MP for that skill.', status: 409 };
-  const next = copyBattle(battle);
-  strikeInPlace(next, actor, attack);
-  advanceInPlace(next);
-  return next;
+  if (attack.unavailable) return { error: attack.unavailable, status: 409 };
+  strike(next, actor, attack, random); advance(next, random); return next;
 }
-
-/** Remove only this participant; remaining teammates retain their own turns. */
-export function forfeitBattle(
-  battle: ActiveBattle, actorId: string, revision?: unknown,
-): ActiveBattle | BattleActionError {
-  if (revision !== undefined && (!Number.isInteger(revision) || revision !== battle.revision)) {
-    return { error: 'The battle has moved on. Refresh it before leaving.', status: 409 };
-  }
-  const actor = battle.fighters.findIndex(fighter => fighter.id === actorId);
-  if (actor < 0 || actor === battle.monsterIndex || battle.automaticIds.includes(actorId)) {
-    return { error: 'You are not a player in this battle.', status: 403 };
-  }
+export function forfeitBattle(battle: ActiveBattle, actorId: string, revision?: unknown): ActiveBattle | legacy.BattleActionError {
+  if (battle.rulesVersion !== 2) return legacy.forfeitBattle(battle as legacy.ActiveBattle, actorId, revision) as ActiveBattle | legacy.BattleActionError;
+  if (revision !== undefined && (!Number.isInteger(revision) || revision !== battle.revision)) return { error: 'The battle has moved on. Refresh it before leaving.', status: 409 };
+  const actor = battle.fighters.findIndex(f => f.id === actorId);
+  if (actor < 0 || actor === battle.monsterIndex || battle.automaticIds.includes(actorId)) return { error: 'You are not a player in this battle.', status: 403 };
   if (battle.status !== 'active') return { error: 'This battle has ended.', status: 409 };
   if (battle.forfeited.includes(actor)) return battle;
-  const next = copyBattle(battle);
-  next.hp[actor] = 0;
-  next.forfeited.push(actor);
-  next.revision++;
-  advanceInPlace(next);
-  return next;
-}
-
-export function simulateBattle(
-  a: PetStats, b: PetStats, rolls: [number, number],
-  // A coin's effect can be spread in whole; its attribute bonus must already be
-  // applied to `a` (withAttributeBonus), so it is ignored here.
-  options?: { hp?: [number, number]; mp?: [number, number] } & Partial<CoinEffect>,
-): Battle {
-  const fighters = [a, b].map((pet, i) => fighterOf(pet, rolls[i])) as [Fighter, Fighter];
-  const attacks = [a, b].map((pet, i) => attacksOf(pet, fighters[i], rolls[i]));
-  const initialHp = fighters.map((f, i) => Math.max(0, Math.min(f.maxHp, options?.hp?.[i] ?? f.maxHp))) as [number, number];
-  const initialMp = fighters.map((f, i) => Math.max(0, Math.min(f.maxMp, options?.mp?.[i] ?? f.maxMp))) as [number, number];
-  const hp: [number, number] = [...initialHp];
-  const mp: [number, number] = [...initialMp];
-  const first: 0 | 1 = options?.first ?? (rolls[0] > rolls[1] ? 0 : 1);
-  const second = (1 - first) as 0 | 1;
-  const turns: BattleTurn[] = [];
-  const damageOf = (actor: 0 | 1, attack: (typeof attacks)[number][number]) =>
-    typed(attack.id === 'bump' ? Math.ceil(hp[1 - actor] * 2 / 3) : attack.damage, attack.type, fighters[1 - actor].type);
-  // The hardest-hitting attack the fighter can afford right now, the cheaper on a tie.
-  const choose = (actor: 0 | 1) => attacks[actor].filter(attack => attack.mpCost <= mp[actor]).reduce((best, attack) => {
-    const gain = damageOf(actor, attack) - damageOf(actor, best);
-    return gain > 0 || (gain === 0 && attack.mpCost < best.mpCost) ? attack : best;
-  });
-  // Gold's "first attack deals double damage" always refers to fighter 0's own
-  // first strike, whichever turn order it lands on.
-  let zeroHasStruck = false;
-  function strike(actor: 0 | 1, hits = 1, attack = choose(actor)) {
-    const target = (1 - actor) as 0 | 1;
-    const boost = options?.doubleFirstStrike && actor === 0 && !zeroHasStruck ? 2 : 1;
-    if (actor === 0) zeroHasStruck = true;
-    const damage = Math.min(hp[target], damageOf(actor, attack) * hits * boost);
-    const scale = effectiveness(attack.type, fighters[target].type);
-    hp[target] -= damage;
-    mp[actor] -= attack.mpCost * hits;
-    turns.push({ actor, target, ability: attack.id, name: attack.name, mpCost: attack.mpCost * hits, type: attack.type,
-      ...(scale !== 1 ? { effectiveness: scale } : {}), damage, hits, hp: [...hp], mp: [...mp] });
-  }
-  while (hp[0] > 0 && hp[1] > 0) {
-    // Very high HP builds can take thousands of identical turns. Group only
-    // non-lethal middle rounds, stopping when either fighter changes ability.
-    if (turns.length >= 60) {
-      const choices = [choose(0), choose(1)];
-      // Bump hits for less each time, so only fixed-damage attacks are grouped.
-      const rounds = choices.some(attack => attack.id === 'bump') ? 0 : Math.min(...choices.map((attack, actor) => Math.min(
-        Math.ceil(hp[1 - actor] / damageOf(actor as 0 | 1, attack)) - 1,
-        attack.mpCost ? Math.floor(mp[actor] / attack.mpCost) : Infinity,
-      )));
-      if (rounds > 1) { strike(first, rounds, choices[first]); strike(second, rounds, choices[second]); }
-    }
-    strike(first);
-    if (hp[second] > 0) strike(second);
-  }
-  const initiative = options?.toss !== undefined ? { initiative: { toss: options.toss, coin: options.coin ?? null } } : {};
-  return { fighters, turns, winner: hp[0] > 0 ? a.id : b.id, initialHp, initialMp, ...initiative };
-}
-
-// Teammates fighting one monster together in Adventure: pets first, monster
-// last. A round is every pet still standing striking the monster in order,
-// then the monster striking whichever pet has the most HP left (the earlier
-// on a tie); `first: 1` puts the monster's strike first. A pet at 0 HP drops
-// out, and the battle ends once the monster or every pet is down. Every
-// strike does at least 1 damage, so the monster's HP bounds its length.
-export function simulateTeamBattle(
-  pets: PetStats[], monster: PetStats, rolls: number[],
-  // As in simulateBattle, the coin is the first pet's own, its attribute bonus already applied.
-  options: { hp: number[]; mp: number[] } & Partial<CoinEffect>,
-): Battle {
-  const all = [...pets, monster], boss = pets.length;
-  const fighters = all.map((pet, i) => fighterOf(pet, rolls[i]));
-  const attacks = all.map((pet, i) => attacksOf(pet, fighters[i], rolls[i]));
-  const initialHp = fighters.map((f, i) => Math.max(0, Math.min(f.maxHp, options.hp[i] ?? f.maxHp)));
-  const initialMp = fighters.map((f, i) => Math.max(0, Math.min(f.maxMp, options.mp[i] ?? f.maxMp)));
-  const hp = [...initialHp], mp = [...initialMp];
-  const turns: BattleTurn[] = [];
-  const damageOf = (target: number, attack: (typeof attacks)[number][number]) =>
-    typed(attack.id === 'bump' ? Math.ceil(hp[target] * 2 / 3) : attack.damage, attack.type, fighters[target].type);
-  let zeroHasStruck = false;
-  function strike(actor: number, target: number) {
-    const attack = attacks[actor].filter(a => a.mpCost <= mp[actor]).reduce((best, a) => {
-      const gain = damageOf(target, a) - damageOf(target, best);
-      return gain > 0 || (gain === 0 && a.mpCost < best.mpCost) ? a : best;
-    });
-    const boost = options.doubleFirstStrike && actor === 0 && !zeroHasStruck ? 2 : 1;
-    if (actor === 0) zeroHasStruck = true;
-    const damage = Math.min(hp[target], damageOf(target, attack) * boost);
-    const scale = effectiveness(attack.type, fighters[target].type);
-    hp[target] -= damage;
-    mp[actor] -= attack.mpCost;
-    turns.push({ actor, target, ability: attack.id, name: attack.name, mpCost: attack.mpCost, type: attack.type,
-      ...(scale !== 1 ? { effectiveness: scale } : {}), damage, hits: 1, hp: [...hp], mp: [...mp] });
-  }
-  const standing = () => pets.map((_, i) => i).filter(i => hp[i] > 0);
-  const petsStrike = () => { for (const i of standing()) if (hp[boss] > 0) strike(i, boss); };
-  const monsterStrikes = () => strike(boss, standing().reduce((most, i) => hp[i] > hp[most] ? i : most));
-  while (hp[boss] > 0 && standing().length) {
-    if (options.first === 1) { monsterStrikes(); if (standing().length) petsStrike(); }
-    else { petsStrike(); if (hp[boss] > 0) monsterStrikes(); }
-  }
-  const initiative = options.toss !== undefined ? { initiative: { toss: options.toss, coin: options.coin ?? null } } : {};
-  return { fighters, turns, winner: hp[boss] > 0 ? monster.id : pets[0].id, initialHp, initialMp, ...initiative };
+  const next = structuredClone(battle); next.hp[actor] = 0; next.forfeited.push(actor); next.revision++;
+  advance(next); return next;
 }

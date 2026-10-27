@@ -185,6 +185,7 @@ if (!columns.has("steal_available_at")) db.exec("ALTER TABLE pets ADD COLUMN ste
 if (!columns.has("supplies_available_at")) db.exec("ALTER TABLE pets ADD COLUMN supplies_available_at INTEGER");
 if (!columns.has("equipped_coin")) db.exec("ALTER TABLE pets ADD COLUMN equipped_coin TEXT");
 if (!columns.has("equipped_abilities")) db.exec("ALTER TABLE pets ADD COLUMN equipped_abilities TEXT NOT NULL DEFAULT '[\"claw-strike\"]'");
+if (!columns.has("skill_jobs")) db.exec("ALTER TABLE pets ADD COLUMN skill_jobs TEXT NOT NULL DEFAULT '{}'");
 const fightColumns = new Set(
   (db.prepare("SELECT name FROM pragma_table_info('fights')").all() as { name: string }[]).map((c) => c.name),
 );

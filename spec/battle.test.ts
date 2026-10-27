@@ -18,7 +18,7 @@ it('fight:finished delivers the same saved Claw Strike battle to both windows wi
     const res = await post(`/api/pets/${attacker}/fight/${defender}`);
     expect(res.status).toBe(200);
     const { fight } = await finishBattle(await res.json());
-    expect(fight.battle.fighters.map((f: any)=>[f.maxHp,f.maxMp])).toEqual([[15,5],[15,5]]);
+    expect(fight.battle.fighters.map((f: any)=>[f.maxHp,f.maxMp])).toEqual([[25,5],[25,5]]);
     expect(fight.battle.winner).toBe(fight.winner);
     // The pre-battle coin toss is saved: heads means the attacker struck first.
     expect(fight.battle.initiative).toMatchObject({ toss: expect.stringMatching(/^(heads|tails)$/), coin: null });

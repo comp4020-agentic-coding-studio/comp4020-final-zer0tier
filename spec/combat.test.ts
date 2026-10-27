@@ -1,5 +1,6 @@
+// Compatibility coverage for battles saved before the attribute-skill update.
 import { expect, it } from 'vitest';
-import { ABILITIES, battleTraining, coinEffect, MONSTER_ABILITIES, simulateBattle, simulateTeamBattle } from '../src/combat.ts';
+import { ABILITIES, battleTraining, coinEffect, MONSTER_ABILITIES, simulateBattle, simulateTeamBattle } from '../src/legacy-combat.ts';
 
 const a = { id: 'a', strength: 5, intelligence: 7, charisma: 3 };
 const b = { id: 'b', strength: 5, intelligence: 5, charisma: 5 };

@@ -1451,8 +1451,8 @@ it.each(['active', 'finished'])('keeps a stale forfeit visible when a teammate l
   const pal = { id: 'pal', strength: 10, intelligence: 10, charisma: 10 };
   const explorer = { ...pal, id: 'explorer' };
   const monster = { id: 'monster:slime', name: 'Slime', monster: 'slime' as const,
-    strength: 1, intelligence: outcome === 'active' ? 50 : 1, charisma: 1 };
-  const playback = startBattle([pal, explorer], monster, [40, 40, 4], { random: () => 0 });
+    strength: outcome === 'active' ? 50 : 1, intelligence: 1, charisma: 1 };
+  const playback = startBattle([pal, explorer], monster, [40, 40, 4], { random: () => 0, hp: [40, 40, outcome === 'active' ? 160 : 10] });
   let saved: any = { ...map(), started: true, abandoned: false, battle: {
     id: 'forfeit-race', floor: 1, enemyId: 'slime', enemyName: 'Slime', fighter: 1,
     pending: true, won: false, playback, recovery: { hp: 0, mp: 0 },

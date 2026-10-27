@@ -32,8 +32,8 @@ document.addEventListener("world:scene", event => {
   renderSkills();
 });
 
-// "Fire · " for typed skills; Normal skills hit every monster for ×1.
-const typeLabel = (ability) => ability.type && ability.type !== "normal" ? `${ability.type[0].toUpperCase()}${ability.type.slice(1)} · ` : "";
+const typeLabel = (ability) => ability.type && ability.type !== "normal" ? `${ability.type.toUpperCase()} · ` : "";
+$("home-skill-filter").addEventListener("change", renderSkills);
 function renderSkills() {
   if (!current || !rules) return;
   const selected = current.equippedAbilities || ["claw-strike"];
@@ -41,7 +41,13 @@ function renderSkills() {
     ? "Equip up to four skills before heading out. Claw Strike is always ready."
     : "Return to your storage chest at home to change battle skills.";
   const focus = document.activeElement?.dataset.equipSkill;
-  $("home-skill-list").replaceChildren(...rules.fight.abilities.map(ability => {
+  const filter = $("home-skill-filter").value;
+  const known = current.abilities || ["claw-strike"];
+  const combat = current.combat;
+  $("home-pet-type").textContent = combat ? `${combat.type.toUpperCase()} type · ${combat.maxHp} Max HP · ${combat.maxMp} Max MP. STR beats CHA, CHA beats INT, INT beats STR: +20% damage and 20% mitigation. Normal is neutral.` : '';
+  $("home-skill-list").replaceChildren(...rules.fight.abilities.filter(ability =>
+    (ability.source || ability.id === 'claw-strike' || known.includes(ability.id)) &&
+    (filter === 'all' || (filter === 'learned' ? known.includes(ability.id) : ability.type === filter))).map(ability => {
     const learned = (current.abilities || ["claw-strike"]).includes(ability.id);
     const equipped = selected.includes(ability.id);
     const row = document.createElement("div"), content = document.createElement("div");
@@ -49,7 +55,9 @@ function renderSkills() {
     row.dataset.equipped = String(equipped);
     const title = document.createElement("strong"), hint = document.createElement("small");
     title.textContent = `${ability.name} · ${typeLabel(ability)}${ability.mpCost} MP`;
-    hint.textContent = learned ? ability.description : "Find this skill in a woodland treasure chest.";
+    const stats = ability.category ? `${ability.category} · Power ${ability.power} · ${ability.accuracy === 'sure-hit' ? 'Sure-hit' : `${ability.accuracy}% accuracy`}. ` : '';
+    const source = ability.source?.label ?? (ability.id === 'claw-strike' ? 'Starter skill.' : 'Legacy skill; retained by pets that already learned it.');
+    hint.textContent = `${stats}${ability.description} ${learned ? 'Learned · ' : ''}${source}`;
     content.append(title, hint);
     const button = document.createElement("button");
     button.type = "button"; button.className = "chip-btn chip-buy"; button.dataset.equipSkill = ability.id;
@@ -259,17 +267,25 @@ loadRules().then((loaded) => {
         <div><div class="location-name"></div><div class="location-rank"></div></div>
       </div>
       <div class="location-pay"><span class="pay"></span> <small class="pay-length"></small></div>
+      <label class="job-label">Job specialization <select class="job-select"></select></label>
+      <p class="help job-progress"></p>
       <button type="button" class="btn work-btn">Work here</button>
       <div class="location-next">
         <span class="location-next-text"></span>
         <button type="button" class="chip-btn upgrade-btn">Upgrade</button>
       </div>`;
     card.querySelector(".location-name").textContent = location.name;
+    const jobSelect = card.querySelector('.job-select');
+    for (const job of rules.work.jobs ?? []) {
+      if (job.location !== location.id) continue;
+      const option = document.createElement('option'); option.value = job.id; option.textContent = job.name; jobSelect.append(option);
+    }
+    jobSelect.addEventListener('change', () => { if (current) renderControls(current); });
     const work = card.querySelector(".work-btn");
     const upgrade = card.querySelector(".upgrade-btn");
     work.setAttribute("aria-label", `Work a shift at the ${location.name}`);
     work.addEventListener("click", () =>
-      perform(work, `work/${location.id}`, "work-error", { minutes: shiftMinutes }),
+      perform(work, `work/${location.id}`, "work-error", { minutes: shiftMinutes, ...(jobSelect.value ? { job: jobSelect.value } : {}) }),
     );
     upgrade.addEventListener("click", () => perform(upgrade, `upgrade/${location.id}`, "work-error"));
     $("locations").append(card);
@@ -450,6 +466,13 @@ function renderControls(pet) {
     work.textContent = `Work ${lengthText(shiftMinutes)}`;
     card.querySelector(".pay-length").textContent = `for ${lengthText(shiftMinutes)}`;
     work.disabled = busy.has(work) || workBlock !== "";
+    const selectedJob = card.querySelector('.job-select');
+    selectedJob.disabled = work.disabled;
+    const minutes = pet.skillJobs?.[selectedJob.value] ?? 0;
+    const level = (rules.work.jobLevelMinutes ?? []).filter(required => minutes >= required).length;
+    const teaches = rules.fight.abilities.filter(a => a.source?.channel === 'job' && a.source.job === selectedJob.value);
+    const upcoming = rules.work.jobLevelMinutes?.[level];
+    card.querySelector('.job-progress').textContent = `Lv.${level} · ${minutes} minutes completed${level === 0 ? ' · Complete your first shift to reach Lv.1' : upcoming ? ` · ${upcoming - minutes} more minutes to Lv.${level + 1}` : ' · Mastered'}. ${teaches.map(a => `${a.name} at Lv.${a.source.level}${pet.abilities?.includes(a.id) ? ' (learned)' : ''}`).join(' · ')}. Skills unlock when a shift finishes.`;
 
     const text = card.querySelector(".location-next-text");
     const upgrade = card.querySelector(".upgrade-btn");

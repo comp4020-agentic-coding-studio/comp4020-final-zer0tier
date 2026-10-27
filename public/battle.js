@@ -91,14 +91,16 @@ function avatar(fighter, index) {
   }
   $(`battle-avatar-${index}`).replaceChildren(svg);
 }
-function meters(hp, mp) {
+function meters(hp, mp, snapshot) {
   cards.forEach((fighterIndex, card) => {
     const fighter = scene.battle.fighters[fighterIndex];
-    for (const [kind, value, max] of [['hp', hp[fighterIndex], fighter.maxHp], ['mp', mp[fighterIndex], fighter.maxMp]]) {
+    for (const [kind, value, max] of [['hp', hp[fighterIndex], snapshot?.maxHp?.[fighterIndex] ?? fighter.maxHp], ['mp', mp[fighterIndex], snapshot?.maxMp?.[fighterIndex] ?? fighter.maxMp]]) {
       $(`battle-${kind}-${card}`).max = Math.max(1, max);
       $(`battle-${kind}-${card}`).value = value;
       $(`battle-${kind}-text-${card}`).textContent = `${value} / ${max}`;
     }
+    const tag = $(`battle-type-${card}`), type = snapshot?.types?.[fighterIndex] ?? fighter.type;
+    if (tag && type) { tag.textContent = `${typeName(type)} type`; tag.dataset.type = type; tag.hidden = false; }
   });
 }
 // One small card per teammate fighting alongside the viewer's pet.
@@ -121,16 +123,24 @@ function allyCards(battle) {
   });
 }
 // The server saves each turn's effectiveness; older replays simply omit it.
-const typeName = type => type ? type[0].toUpperCase() + type.slice(1) : '';
+const typeName = type => ['str', 'cha', 'int'].includes(type) ? type.toUpperCase() : type ? type[0].toUpperCase() + type.slice(1) : '';
 const effectText = step => step.effectiveness > 1 ? " It's super effective!" : step.effectiveness < 1 ? " It's not very effective…" : '';
 function describe(step) {
   const actor = fighterName(scene.battle.fighters[step.actor]);
   const target = fighterName(scene.battle.fighters[step.target]);
-  return `${actor} used ${step.name || 'Claw Strike'}${step.hits > 1 ? ` ×${step.hits}` : ''}: ${step.damage} damage to ${target}${step.mpCost ? ` (${step.mpCost} MP)` : ''}.${effectText(step)}`;
+  return `${actor} used ${step.name || 'Claw Strike'}${step.hits > 1 ? ` ×${step.hits}` : ''}: ${step.missed ? 'missed' : step.damage ? `${step.damage} damage to ${target}` : 'support skill'}${step.mpCost ? ` (${step.mpCost} MP)` : ''}.${effectText(step)}${step.events?.length ? ` ${step.events.join('. ')}.` : ''}`;
 }
 // How one of the viewer's skills fares against the saved monster's type. Only
 // a hint: the server's TYPE_CHART (src/combat.ts) decides the saved damage.
 function matchup(attack, battle) {
+  if (battle.rulesVersion === 2) {
+    if (!attack.power || battle.fieldUntil > battle.revision) return '';
+    const mine = battle.fighters.findIndex(f => f.id === scene.viewer);
+    const opponent = battle.monsterIndex ?? (1 - mine);
+    const ownType = battle.fighters[mine]?.type, otherType = battle.fighters[opponent]?.type;
+    const beats = { str: 'cha', cha: 'int', int: 'str' };
+    return beats[ownType] === otherType ? ' · Type advantage' : beats[otherType] === ownType ? ' · Type disadvantage' : '';
+  }
   const monster = battle.monsterIndex === null || battle.monsterIndex === undefined ? null : battle.fighters[battle.monsterIndex];
   if (!monster?.type || !attack.type || attack.type === 'normal') return '';
   const strong = { fire: 'grass', water: 'earth', grass: 'water' }[attack.type];
@@ -175,14 +185,14 @@ function advance() {
   animating = true;
   dialog.dataset.waiting = 'false';
   abilityLabel(step);
-  meters(step.hp, step.mp);
+  meters(step.hp, step.mp, step);
   addLog(step);
   $('battle-status').textContent = describe(step);
   cards.forEach((_, card) => $(`battle-fighter-${card}`).classList.remove('striking', 'hit', 'taking-turn'));
   if (!reducedMotion.matches) {
     void $('battle-fighter-0').offsetWidth;
     $(`battle-fighter-${cards.indexOf(step.actor)}`).classList.add('striking');
-    $(`battle-fighter-${cards.indexOf(step.target)}`).classList.add('hit');
+    if (step.damage > 0) $(`battle-fighter-${cards.indexOf(step.target)}`).classList.add('hit');
   }
   timer = setTimeout(advance, reducedMotion.matches ? 350 : 750);
 }
@@ -214,6 +224,16 @@ function awaitChoice() {
   if (!scene?.manual || scene.battle.status !== 'active') return;
   const battle = scene.battle;
   meters(battle.hp, battle.mp);
+  cards.forEach((index, card) => {
+    const summary = $(`battle-effects-${card}`) ?? document.createElement('p');
+    summary.id = `battle-effects-${card}`; summary.className = 'battle-effects';
+    const effects = battle.states?.[index]?.effects ?? [];
+    summary.textContent = effects.map(e => `${e.name} (${Math.ceil((e.expires - battle.revision) / battle.order.length)} turns)`).join(' · ')
+      + (battle.states?.[index]?.surcharge ? ' · Next paid skill +2 MP' : '')
+      + (battle.fieldUntil > battle.revision ? ' · Type advantages disabled' : '');
+    summary.hidden = !summary.textContent;
+    $(`battle-fighter-${card}`).append(summary);
+  });
   cards.forEach((_, card) => {
     $(`battle-fighter-${card}`).classList.remove('striking', 'hit');
     $(`battle-fighter-${card}`).classList.toggle('taking-turn', cards[card] === battle.actor);
@@ -225,7 +245,7 @@ function awaitChoice() {
   $('battle-mode').textContent = `Turn ${battle.turns.length + 1} · ${myTurn ? 'Your move' : 'Waiting'}`;
   $('battle-status').textContent = myTurn ? 'What will your pet do?' : `Waiting for ${fighter ? fighterName(fighter) : 'the next player'} to choose a skill…`;
   $('battle-ability-name').textContent = myTurn ? 'Choose a skill' : 'Their turn';
-  $('battle-ability-cost').textContent = myTurn ? 'Skills use MP. Claw Strike is always free.' : 'Your pet will wait for your next choice.';
+  $('battle-ability-cost').textContent = myTurn ? 'Basic attacks restore MP. Choose a skill below.' : 'Your pet will wait for your next choice.';
   $('battle-skills').hidden = false;
   const choices = battle.attacks?.[mine] ?? [];
   const focused = document.activeElement?.dataset.skill;
@@ -237,10 +257,14 @@ function awaitChoice() {
     const name = document.createElement('strong'), cost = document.createElement('span');
     name.textContent = attack.name;
     if (attack.type) button.dataset.type = attack.type;
-    const affordable = attack.mpCost <= battle.mp[mine];
-    cost.textContent = `${attack.type ? `${typeName(attack.type)} · ` : ''}${attack.mpCost} MP${matchup(attack, battle)}${!affordable ? ' · Not enough MP' : ''}`;
-    button.append(name, cost);
-    button.disabled = submitting || !myTurn || !affordable || battle.hp[mine] <= 0;
+    const mpCost = attack.currentMpCost ?? attack.mpCost;
+    const affordable = mpCost <= battle.mp[mine];
+    const reason = attack.unavailable || (!affordable ? 'Not enough MP' : '');
+    cost.textContent = `${attack.type ? `${typeName(attack.type)} · ` : ''}${mpCost} MP${matchup(attack, battle)}${reason ? ` · ${reason}` : ''}`;
+    const detail = document.createElement('span'); detail.className = 'battle-skill-detail';
+    detail.textContent = `${attack.power !== undefined ? `Power ${attack.power} · ${attack.accuracy === 'sure-hit' ? 'Sure-hit' : `${Math.round((attack.hitChance ?? (attack.accuracy ?? 100) / 100) * 100)}% hit chance`}. ` : ''}${attack.description ?? ''}`;
+    button.append(name, cost, detail);
+    button.disabled = submitting || !myTurn || Boolean(reason) || battle.hp[mine] <= 0;
     button.addEventListener('click', () => chooseSkill(attack.id));
     return button;
   }));
@@ -332,7 +356,8 @@ function play(next) {
     $(`battle-name-${card}`).after(tag);
     avatar(fighter, card);
   });
-  meters(next.battle.initialHp ?? next.battle.fighters.map(f => f.maxHp), next.battle.initialMp ?? next.battle.fighters.map(f => f.maxMp));
+  meters(next.battle.initialHp ?? next.battle.fighters.map(f => f.maxHp), next.battle.initialMp ?? next.battle.fighters.map(f => f.maxMp),
+    { maxHp: next.battle.initialMaxHp, maxMp: next.battle.initialMaxMp, types: next.battle.initialTypes });
   if (!dialog.open) dialog.showModal();
   if (next.manual && !next.battle.turns.length) advance();
   else timer = setTimeout(advance, reducedMotion.matches ? 150 : 650);

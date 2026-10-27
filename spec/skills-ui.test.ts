@@ -23,7 +23,9 @@ it('equips learned skills from the home chest, waits for the server, and disable
     window.eval(readFileSync('public/app.js', 'utf8'));
     await vi.waitFor(() => expect(skill('firebolt')).not.toBeNull());
     expect(skill('claw-strike').disabled).toBe(true);
-    expect(skill('heavy-strike').disabled).toBe(true);
+    expect(skill('heavy-breath-slam').disabled).toBe(true);
+    expect(skill('heavy-strike')).toBeNull(); // unobtainable legacy moves only appear when already owned
+    expect(skill('heavy-breath-slam').closest('.home-skill')!.textContent).toContain('Mover Lv.1');
     expect(skill('firebolt').getAttribute('aria-pressed')).toBe('false');
     skill('firebolt').click();
     expect(requests).toHaveBeenCalledWith(`/api/pets/${pet.id}/equip-skills`, expect.objectContaining({

@@ -118,7 +118,7 @@ it('saves exactly one seeded grass encounter for concurrent moves and retries, i
   }
   expect(result.battle).toMatchObject({ pending: true, surprise: true });
   expect(result.enemies).toHaveLength(result.battle.won ? 3 : 4);
-  expect(result.battle.playback.fighters[0]).toMatchObject({ id, maxHp: 15, maxMp: 5 });
+  expect(result.battle.playback.fighters[0]).toMatchObject({ id, maxHp: 25, maxMp: 5 });
   expect(result.battle.playback.fighters[1].id).toBe(`monster:${result.battle.enemyId}`);
   expect(await (await sendAction(id, { direction: 's' })).json()).toEqual(result);
   expect(await (await sendAction(id, { action: 'descend' })).json()).toEqual(result);
@@ -136,7 +136,12 @@ it('saves exactly one seeded grass encounter for concurrent moves and retries, i
   // saved +1 (a random attribute for Claw Strike), once.
   const gain: Record<string, number> = result.battle.trained ?? {};
   expect(Object.values(gain).reduce((sum, amount) => sum + amount, 0)).toBe(result.battle.won ? 1 : 0);
-  expect(await getPet(id)).toEqual({ ...pet, ...Object.fromEntries(Object.entries(gain).map(([a, amount]) => [a, pet[a] + amount])) });
+  const { combat: _beforeCombat, abilities: known, ...beforePet } = pet;
+  const { combat, abilities, ...afterPet } = await getPet(id);
+  expect(afterPet).toEqual({ ...beforePet, ...Object.fromEntries(Object.entries(gain).map(([a, amount]) => [a, pet[a] + amount])) });
+  expect(abilities).toEqual(result.battle.skillDrop?.learned ? [...known, result.battle.skillDrop.id] : known);
+  expect(combat.maxHp).toBe(10 + 3 * afterPet.strength);
+  expect(combat.maxMp).toBe(5 + Math.floor(Math.max(0, afterPet.intelligence - 5) / 5));
 });
 
 it('requires a saved map revision and cannot move another account using a previous login’s revision', async () => {
@@ -271,7 +276,7 @@ it('pet:updated — concurrent fresh entries reset once, charge once, and reach 
     }));
     for (const result of results) expect(result).toEqual(results[0]);
     const fresh = results[0], pet = await getPet(id);
-    expect(fresh).toMatchObject({ entryId: 'second-entry', floor: 1, x: 2, y: 2, hp: 15, battle: null, records: [], battleCount: 0 });
+    expect(fresh).toMatchObject({ entryId: 'second-entry', floor: 1, x: 2, y: 2, hp: 25, battle: null, records: [], battleCount: 0 });
     expect(pet).toMatchObject({ stamina: original.stamina - 40, hygiene: original.hygiene - 20 });
     for (const update of await Promise.all(updates)) expect(update).toEqual(pet);
     expect(await (await post('/api/adventure', request, id)).json()).toEqual(fresh);

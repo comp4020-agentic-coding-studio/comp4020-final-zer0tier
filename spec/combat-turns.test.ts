@@ -1,8 +1,9 @@
+// Compatibility coverage for battles saved before the attribute-skill update.
 import { expect, it } from 'vitest';
 import {
   forfeitBattle, startBattle, takeBattleTurn,
   type ActiveBattle, type BattleActionError, type PetStats,
-} from '../src/combat.ts';
+} from '../src/legacy-combat.ts';
 
 const pet: PetStats = { id: 'pet', strength: 5, intelligence: 6, charisma: 9 };
 const rival: PetStats = { id: 'rival', strength: 4, intelligence: 4, charisma: 14 };

@@ -116,3 +116,15 @@
 @keyframes battle-monster-breathe { 50% { transform: translateY(.3px) scale(1.025, .98); } }
 @keyframes battle-wild-arrival { from { opacity: 0; transform: translateY(18px) scale(.85); } 70% { transform: translateY(-4px) scale(1.03); } }
 @media (prefers-reduced-motion: reduce) { .battle-monster, .battle-monster .monster-body { animation: none !important; } }
+
+.battle-skill-detail { font-size: .8rem; line-height: 1.4; font-weight: normal; }
+.battle-effects { font-size: .8rem; line-height: 1.4; overflow-wrap: anywhere; }
+#battle-dialog [data-type="str"] { --type: #a12c27; }
+#battle-dialog [data-type="cha"] { --type: #803c8f; }
+#battle-dialog [data-type="int"] { --type: #245b96; }
+
+@media (prefers-color-scheme: dark) {
+  #battle-dialog [data-type="str"] { --type: #fca5a5; }
+  #battle-dialog [data-type="cha"] { --type: #e9b0f0; }
+  #battle-dialog [data-type="int"] { --type: #93c5fd; }
+}

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { db, transaction } from './db.ts';
 import {
-  ABILITIES, battleTraining, forfeitBattle, MONSTER_ABILITIES, MONSTER_TYPES, startBattle, takeBattleTurn, weaknessOf,
+  ABILITIES, battleTraining, forfeitBattle, MONSTER_ABILITIES, mainAttribute, maxHpFor, maxMpFor, startBattle, takeBattleTurn, weaknessOf,
   type ActiveBattle, type Battle,
 } from './combat.ts';
 import {
@@ -9,7 +9,8 @@ import {
   powerOf, spendForAdventure, train, use, type Pet,
 } from './pets.ts';
 import { grantTreasure } from './inventory.ts';
-import { COINS, rollTreasure } from './treasure.ts';
+import { COINS, rollTreasure, type TreasureReward } from './treasure.ts';
+import { monsterSkills, MONSTER_SKILL_DROP_RATE } from './skills.ts';
 import {
   createWorld, directions, FLOOR_COUNT, FLOOR_KEY_DROP_RATE, grassEncounter, MONSTER_MOVES, nearby, prepareExit, prepareGrass, samePoint, SIZE, walkable, type Enemy, type Floor, type Point,
 } from './adventure-world.ts';
@@ -24,6 +25,7 @@ export type AdventureBattle = {
   attacked?: true; // legacy battle where a patrolling monster caught the pet
   surprise?: true; // hidden monster encountered by walking into tall grass
   keyDrop?: { floor: number; name: 'Floor Key' };
+  skillDrop?: TreasureReward;
   trained?: Partial<Record<'strength' | 'intelligence' | 'charisma', number>>; // this pet's victory gain
 };
 export const ADVENTURE_RECORD_LIMIT = 50;
@@ -77,7 +79,7 @@ function load(id: string): Progress {
       a.patrolled_at, a.team_id, t.world_json AS team_world, a.started, a.records_json, a.entry_id, a.awaiting_entry
     FROM adventures a LEFT JOIN teams t ON t.id = a.team_id WHERE a.player_id = ?`).get(id) as SavedAdventure;
   const pet = getPet(id)!;
-  const maxHp = pet.strength + pet.intelligence + pet.charisma, maxMp = pet.intelligence;
+  const maxHp = maxHpFor(pet), maxMp = maxMpFor(pet);
   const hp = Math.min(saved.hp ?? maxHp, maxHp), mp = Math.min(saved.mp ?? maxMp, maxMp);
   const team = saved.team_id !== null;
   const world: Floor[] = team ? JSON.parse(saved.team_world!) : saved.world_json ? JSON.parse(saved.world_json) : createWorld();
@@ -130,7 +132,8 @@ function view(saved: Progress) {
     enemies: floor.enemies.map(({ x, y, route: _route, leg: _leg, ...enemy }) => ({
       ...enemy, ...(enemy.kind === 'slime-king' ? { x, y } : {}),
       hidden: enemy.kind !== 'slime-king', alerted: false,
-      type: MONSTER_TYPES[enemy.kind], weakness: weaknessOf(MONSTER_TYPES[enemy.kind]),
+      type: mainAttribute(enemy), weakness: weaknessOf(mainAttribute(enemy)), maxHp: maxHpFor(enemy), maxMp: maxMpFor(enemy),
+      skillDrops: monsterSkills(enemy.kind, floor.number).map(s => ({ id: s.id, name: s.name })),
       moves: MONSTER_ABILITIES.filter(a => MONSTER_MOVES[enemy.kind].includes(a.id)),
     })),
     up: floor.up, down: floor.down, revision: saved.revision,
@@ -195,55 +198,68 @@ function activeBattle(battle: Battle): battle is ActiveBattle {
 // Every participant saves the same turn state. The map and rewards change only
 // when its final turn resolves; retries cannot award recovery or a key twice.
 function saveBattle(saved: Progress, participants: Progress[], playback: ActiveBattle) {
-  const encounter = saved.battle!, finished = playback.status === 'finished';
-  const monster = playback.fighters.at(-1)!;
-  const won = finished && playback.winner !== monster.id;
-  const floor = saved.world[encounter.floor - 1];
-  const keyDrop = won && floor.down && floor.exit && !floor.exit.keyFound && !floor.exit.unlocked
-    && Math.random() < FLOOR_KEY_DROP_RATE;
-  if (keyDrop) floor.exit!.keyFound = true;
-  if (won) {
-    const enemy = floor.enemies.find(enemy => enemy.id === encounter.enemyId);
-    floor.enemies = floor.enemies.filter(enemy => enemy.id !== encounter.enemyId);
-    // Only the initiating pet advances onto a defeated visible boss's tile.
-    const leader = participants.find(fighter => fighter.id === playback.fighters[0].id);
-    if (leader && enemy && playback.hp[0] > 0 && !encounter.surprise) {
-      leader.x = enemy.x; leader.y = enemy.y;
-    }
-  }
-  for (const fighter of participants) {
-    const index = playback.fighters.findIndex(member => member.id === fighter.id);
-    fighter.hp = Math.min(playback.hp[index], fighter.hp);
-    fighter.mp = Math.min(playback.mp[index], fighter.mp);
-    const standing = won && fighter.hp > 0 && !fighter.abandoned;
-    const recovery = {
-      hp: standing ? Math.min(Math.ceil(fighter.maxHp * 0.2), fighter.maxHp - fighter.hp) : 0,
-      mp: standing ? Math.min(Math.ceil(fighter.maxMp * 0.2), fighter.maxMp - fighter.mp) : 0,
-    };
-    fighter.hp += recovery.hp; fighter.mp += recovery.mp;
-    // Each pet still standing grows the attribute behind its own last hit; the
-    // Slime King, the woodland's final boss, grows all three. A pet that never
-    // struck (its teammates finished the monster first) gains nothing.
-    const attribute = standing ? battleTraining(playback, index) : undefined;
-    const trained = !attribute ? undefined : monster.monster === 'slime-king'
-      ? { strength: 1, intelligence: 1, charisma: 1 }
-      : { [attribute]: 1 };
-    fighter.battle = {
-      ...fighter.battle!, won, playback, recovery,
-      ...(finished ? { after: { hp: fighter.hp, mp: fighter.mp } } : {}),
-      ...(keyDrop ? { keyDrop: { floor: encounter.floor, name: 'Floor Key' as const } } : {}),
-      ...(trained ? { trained } : {}),
-    };
-    if (finished) {
-      fighter.records.total++;
-      fighter.records.battles.push({ ...fighter.battle, pending: false });
-      fighter.records.battles = fighter.records.battles.slice(-ADVENTURE_RECORD_LIMIT);
-    }
-    // Loaders may have read the team map separately; save the current shared
-    // world with each row so one participant cannot restore a defeated enemy.
-    fighter.world = saved.world;
-  }
   return transaction(() => {
+    const encounter = saved.battle!, finished = playback.status === 'finished';
+    const monster = playback.fighters.at(-1)!;
+    const won = finished && playback.winner !== monster.id;
+    const floor = saved.world[encounter.floor - 1];
+    const keyDrop = won && floor.down && floor.exit && !floor.exit.keyFound && !floor.exit.unlocked
+      && Math.random() < FLOOR_KEY_DROP_RATE;
+    if (keyDrop) floor.exit!.keyFound = true;
+    if (won) {
+      const enemy = floor.enemies.find(enemy => enemy.id === encounter.enemyId);
+      floor.enemies = floor.enemies.filter(enemy => enemy.id !== encounter.enemyId);
+      // Only the initiating pet advances onto a defeated visible boss's tile.
+      const leader = participants.find(fighter => fighter.id === playback.fighters[0].id);
+      if (leader && enemy && playback.hp[0] > 0 && !encounter.surprise) {
+        leader.x = enemy.x; leader.y = enemy.y;
+      }
+    }
+    for (const fighter of participants) {
+      const index = playback.fighters.findIndex(member => member.id === fighter.id);
+      // Healing and basic MP recovery must survive the return to exploration.
+      // Temporary stat buffs can never raise the run's permanent resource caps.
+      const carryHp = playback.rulesVersion === 2
+        ? playback.initialHp![index] - (playback.resourceBonus?.[index].hp ?? 0) + (playback.restoredHp?.[index] ?? 0) : fighter.hp;
+      const carryMp = playback.rulesVersion === 2
+        ? playback.initialMp![index] - (playback.resourceBonus?.[index].mp ?? 0) + (playback.restoredMp?.[index] ?? 0) : fighter.mp;
+      fighter.hp = Math.min(playback.hp[index], fighter.maxHp, carryHp);
+      fighter.mp = Math.min(playback.mp[index], fighter.maxMp, carryMp);
+      const standing = won && fighter.hp > 0 && !fighter.abandoned;
+      const recovery = {
+        hp: standing ? Math.min(Math.ceil(fighter.maxHp * 0.2), fighter.maxHp - fighter.hp) : 0,
+        mp: standing ? Math.min(Math.ceil(fighter.maxMp * 0.2), fighter.maxMp - fighter.mp) : 0,
+      };
+      fighter.hp += recovery.hp; fighter.mp += recovery.mp;
+      // Each pet still standing grows the attribute behind its own last hit; the
+      // Slime King, the woodland's final boss, grows all three. A pet that never
+      // struck (its teammates finished the monster first) gains nothing.
+      const attribute = standing ? battleTraining(playback, index) : undefined;
+      const trained = !attribute ? undefined : monster.monster === 'slime-king'
+        ? { strength: 1, intelligence: 1, charisma: 1 }
+        : { [attribute]: 1 };
+      fighter.battle = {
+        ...fighter.battle!, won, playback, recovery,
+        ...(finished ? { after: { hp: fighter.hp, mp: fighter.mp } } : {}),
+        ...(keyDrop ? { keyDrop: { floor: encounter.floor, name: 'Floor Key' as const } } : {}),
+        ...(trained ? { trained } : {}),
+      };
+      if (standing && monster.monster && (monster.monster === 'slime-king' || Math.random() < MONSTER_SKILL_DROP_RATE)) {
+        const eligible = monsterSkills(monster.monster, encounter.floor);
+        const unlearned = eligible.filter(s => !fighter.pet.abilities.includes(s.id));
+        const pool = unlearned.length ? unlearned : eligible;
+        const skill = pool[Math.floor(Math.random() * pool.length)];
+        if (skill) fighter.battle.skillDrop = grantTreasure(fighter.id, { category: 'ability', id: skill.id, name: skill.name, quantity: 1 });
+      }
+      if (finished) {
+        fighter.records.total++;
+        fighter.records.battles.push({ ...fighter.battle, pending: false });
+        fighter.records.battles = fighter.records.battles.slice(-ADVENTURE_RECORD_LIMIT);
+      }
+      // Loaders may have read the team map separately; save the current shared
+      // world with each row so one participant cannot restore a defeated enemy.
+      fighter.world = saved.world;
+    }
     for (const fighter of participants) save(fighter.id, fighter, finished ? fighter.battle?.trained : undefined);
     return adventureFor(saved.id);
   });
@@ -258,8 +274,8 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = fal
   const roll = (stats: Parameters<typeof powerOf>[0]) => powerOf(stats) * (LUCK.min + Math.random() * (LUCK.max - LUCK.min));
   const playback = startBattle(participants.map(fighter => fighter.pet), monster,
     [...participants.map(fighter => roll(fighter.pet)), roll(monster)], {
-      mode: 'monster', hp: [...participants.map(fighter => fighter.hp), monster.strength + monster.intelligence + monster.charisma],
-      mp: [...participants.map(fighter => fighter.mp), monster.intelligence],
+      mode: 'monster', hp: [...participants.map(fighter => fighter.hp), maxHpFor(monster)],
+      mp: [...participants.map(fighter => fighter.mp), maxMpFor(monster)],
     });
   const battleId = randomUUID();
   participants.forEach((fighter, index) => {
@@ -482,7 +498,7 @@ export function startTeamRun(teamId: number, ids: readonly string[]): void {
     db.prepare(`UPDATE adventures SET x = ?, y = ?, floor = ?, world_json = NULL, battle_json = NULL, records_json = NULL,
         entry_id = NULL, awaiting_entry = 1, hp = ?, mp = ?, cooldown_until = ?,
         abandoned = 0, patrolled_at = NULL, team_id = ?, started = 1, revision = ? WHERE player_id = ?`)
-      .run(2, 2, 1, strength + intelligence + charisma, intelligence, now + realMs(ADVENTURE_COOLDOWN_MINUTES), teamId, randomUUID(), id);
+      .run(2, 2, 1, maxHpFor({ strength, intelligence, charisma }), maxMpFor({ strength, intelligence, charisma }), now + realMs(ADVENTURE_COOLDOWN_MINUTES), teamId, randomUUID(), id);
   }
 }
 
@@ -536,7 +552,7 @@ export function openAdventureChest(id: string, revision: unknown) {
     const busy = busyRefusal(id);
     if (busy) return busy;
     // Each chest holds one reward per run, so on a team's map it goes to whoever opens it first.
-    chest.reward = grantTreasure(id, rollTreasure());
+    chest.reward = grantTreasure(id, rollTreasure(Math.random, saved.floor));
     if (saved.teamId !== null) chest.openedBy = id;
     return save(id, saved);
   });

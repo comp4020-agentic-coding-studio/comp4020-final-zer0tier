@@ -316,7 +316,10 @@ round up, pay rounds to the nearest dollar.
 | Theatre           | Charisma     | Usher        | Actor                  | Star                   |
 
 Every pet starts at rank 1 everywhere. Once its attribute reaches the next
-rank's requirement, **Upgrade** moves it up for good.
+rank's requirement, **Upgrade** moves it up for good. Each workplace also
+has a **Job specialization** selector: its progress shows completed minutes,
+the next mastery level, and the combat skill it teaches. Mastery grows when
+a shift finishes, independently of wage rank. See the skill table below.
 
 ### Shop
 
@@ -367,8 +370,8 @@ pack.
 
 Press **Fight** to open a turn-based battle in a small window. Every pet
 starts out knowing only **Claw Strike**, which costs **0 MP**. Each Arena
-fight starts with full **HP = Strength + Intelligence + Charisma** and
-**MP = Intelligence**. These are battle resources, not stamina or hygiene,
+fight starts with full **HP = 10 + 3 × Strength** and
+**MP = 5 + floor(max(0, Intelligence − 5) / 5)**. A new pet has 25 HP and 5 MP. These are battle resources, not stamina or hygiene,
 and they reset each Arena fight. Adventure keeps its own HP/MP between
 encounters — see below.
 
@@ -379,7 +382,7 @@ decides who strikes first — a fair 50/50 by default, unless the coin
 provider's equipped Unfair Coin overrides it (see below). Pets alternate
 turns until one reaches 0 HP. **Each player chooses an equipped skill on
 their own turn**; their pet never chooses or attacks automatically.
-Claw Strike stays free, while other skills spend MP. Unaffordable skills
+Claw Strike stays free and restores 1 MP. Learned basics restore 2–3 MP; other skills spend MP. Unaffordable skills
 are disabled. The surviving pet wins; going first alone no longer
 guarantees victory. The winner gets a win and the loser a loss.
 
@@ -403,8 +406,8 @@ whichever side attacked — an attacker who loses pays the defender. Fights
 with the bot are practice: no money changes hands.
 
 **Winning also trains your pet: +1 to the main attribute of its final hit.**
-Tide Crash trains Strength, Firebolt trains Intelligence, and Vine Lash
-trains Charisma. Normal skills (Claw Strike and Heavy Strike) have no main
+STR skills train Strength, INT skills train Intelligence, and CHA skills
+train Charisma. Normal skills (including Claw Strike) have no main
 attribute, so a win with one adds +1 to a random attribute instead, like
 Electives. So the way you fight decides how your pet grows. The attribute is
 chosen once when the win is saved, and the battle result says what was
@@ -756,8 +759,8 @@ never reset the run, move monsters, or start a battle.
 
 For initial balancing, floor-one slimes have STR/INT/CHA **3/1/2**, and
 goblins have **5/3/2**. Each deeper floor adds **2/1/1**. The floor-five
-Slime King has **18/10/12**. Maximum HP is the sum of attributes; maximum MP
-is Intelligence. A new run starts with full resources. Current HP/MP carry
+Slime King has **18/10/12**. Maximum HP is **10 + 3 × STR**; maximum MP
+is **5 + floor(max(0, INT − 5) / 5)**, for pets and monsters alike. A new run starts with full resources. Current HP/MP carry
 between battles and floors during one run. A server restart doesn't
 refill them; entering a new adventure does. Training raises the maximums
 without refilling current HP/MP.
@@ -840,24 +843,30 @@ appearance, name, and attributes. Monsters use **Claw Strike**, which costs
 **0 MP**; players choose their pets' equipped skills, and damage uses the same
 power and luck rolls as Arena.
 
-Every monster has a **type**, shown under its name in battle and in the Game
-guide's **Monster attributes**: **Slimes are Grass**, **Goblins are Earth**,
-and the **Slime King is Water**. Fire, Water, and Grass skills are **super
-effective (×2)** against the type they beat — Fire beats Grass, Water beats
-Earth, Grass beats Water — and **not very effective (×½, rounded up)**
-against the other monster types. Normal skills always hit for ×1. Each skill
-button shows its type and, against a monster, whether it is super or not
-very effective; the battle log says so after the hit. Pets have no type, so
-Arena and revenge damage stay neutral. A Gold Coin's double first strike
-applies after the type bonus. Battles saved before types replay with their
-original damage.
+Pets and monsters derive their **type** from their current effective stats.
+The highest stat must be at least 20% above both others: STR beats CHA,
+CHA beats INT, and INT beats STR. The advantaged fighter deals 20% more
+damage and takes 20% less damage from the disadvantaged fighter. Normal
+is neutral. This applies in Adventure, Arena, and revenge. A skill's
+attribute determines its damage stat; the fighter's type determines the
+matchup. Buffs and debuffs can change types during battle. If no stat
+qualifies, the pet is Normal; Normal skill perks additionally require
+all three stats within 20% (maximum ≤ 1.2 × minimum). Exactly 20% dominance
+counts as a specialized type, so Golden Ratio remains unavailable there.
+
+Evasion is 1 percentage point per positive CHA difference, capped at 30%.
+Phantom Perfume doubles that bonus, capped at 60%. Accuracy minus evasion
+is the final hit chance, clamped to 0–100%; sure-hit skills ignore both.
+Utilities and defenses cannot miss. Peer Review adds 25 percentage points
+before that final clamp. Type bonuses, Guard, and Gold apply to damage
+before final rounding. Old saved battles finish under their original rules.
 
 The **Slime King** also knows **Bump** (5
 MP), which deals two-thirds of the pet's *current* HP, rounded up: a pet at
 70 HP takes 47. On its own turn, the king picks whichever affordable
 attack hits harder that turn. Bump wins while the pet's HP is high; Claw
-Strike takes over as it falls. Its 10 MP allow at most two Bumps per
-battle. The Game guide's **Monster attributes** lists Bump beside the Slime King. Pets can't
+Strike takes over as it falls. Its 6 MP allow one opening Bump;
+free Claw Strikes can restore MP for another. Type mitigation and shields also apply. The Game guide's **Monster attributes** lists Bump beside the Slime King. Pets can't
 learn it. A solo player's coin always applies, even against a stronger
 monster. In a team battle, the strongest participating pet supplies the
 coin. Monsters never supply coins. The scene starts at the pet's saved HP/MP (plus any Copper shield),
@@ -873,8 +882,8 @@ outcome. Defeating the Slime King completes the woodland.
 
 Each victory also **trains every pet still standing that landed a hit**:
 +1 to the main attribute of its own final hit, as in the Arena (Strength for
-Tide Crash, Intelligence for Firebolt, Charisma for Vine Lash, and a random
-attribute for Normal Claw Strike or Heavy Strike). **Beating the Slime King
+STR skills, Intelligence for INT skills, Charisma for CHA skills, and a random
+attribute for Normal skills). **Beating the Slime King
 gives +1 to all three.**
 A knocked-out pet, or one whose teammates finished the monster before it
 struck, gains nothing. The gain is saved once with the victory, raises the
@@ -925,8 +934,8 @@ chests grant the items below.
 
 Stand on a treasure chest and press Space or choose **Open chest**. Each
 chest awards one reward per run: **Food 30%, Soap 30%, Ability 20%,
-Hourglass 15%, Unfair coin 5%**. The four learnable skills have equal chances
-(5% each) within the ability category; Copper, Silver, and Gold Coins have equal
+Hourglass 15%, Unfair coin 5%**. Eligible relic scrolls have equal chances
+within the ability category, gated by their minimum floor below; Copper, Silver, and Gold Coins have equal
 chances within the coin category. Opened chests stay on the map, keep their
 reward, and can't be looted again. New adventures have fresh chests.
 Defeat, restarting, and signing out don't remove inventory.
@@ -950,26 +959,75 @@ including the permanently available Claw Strike. That loadout works in
 Adventure, Arena, and revenge and is fixed for a live battle. Duplicate drops say **already learned**,
 without stacking the ability or rerolling the reward.
 
-| Ability | Type | MP cost | Damage |
-| --- | --- | ---: | --- |
-| Claw Strike | Normal | 0 | Strength × battle luck, rounded, at least 1 |
-| Heavy Strike | Normal | 2 | Claw Strike damage × 1.5, rounded up |
-| Firebolt | Fire | 3 | Intelligence × 1.5 × battle luck, rounded, at least 1 |
-| Tide Crash | Water | 3 | Strength × 1.5 × battle luck, rounded, at least 1 |
-| Vine Lash | Grass | 3 | Charisma × 1.5 × battle luck, rounded, at least 1 |
+**30 learnable combat skills** appear in the home skill book with power,
+accuracy, effects, and the exact acquisition source. Claw Strike remains a
+starter fallback; previously learned Firebolt, Heavy Strike, Tide Crash,
+and Vine Lash are retained but no longer drop from chests.
 
-Each elemental skill scales with a different attribute, so a pet trained
-for Strength, Intelligence, or Charisma has a matching move. With four
-skills to learn and three free slots beside Claw Strike, choose a loadout
-for the monsters ahead: Firebolt for the Grass slimes, Tide Crash for the
-Earth goblins, and Vine Lash for the Water Slime King. Type bonuses apply
-only to monsters (see **Monster battles**).
+Job specializations teach 16 skills. Choose a specialization at its workplace
+and complete shifts: Lv.1 after the first shift, Lv.2 at 60 total minutes,
+Lv.3 at 180, Lv.4 at 360, and Lv.5 at 600. Job mastery is separate from wage
+promotions. An Hourglass completes the scheduled job's progress too.
 
-Choose one equipped skill on each of your pet's turns. At low MP you can
-still choose free Claw Strike; the game never chooses it for you.
-Saved playback includes each selected ability, its type, MP spent, any
-type `effectiveness` (2 or 0.5), and remaining resources; replaying doesn't
-spend MP again.
+Monster victories have a 25% chance to teach an eligible technique to each
+surviving participant; the Slime King guarantees Bloodlust Crash. Drops
+prefer unlearned skills in that monster's eligible pool. Existing woodland
+monsters carry the themed technique scrolls listed below. Six relic scrolls
+come only from chests. All rewards persist and retries cannot award them twice.
+
+Damage starts at the scaling attribute × Power / 40 × the battle luck roll.
+Normal hybrid moves use the average of all three stats. HP bonuses are added
+before mitigation. MP recovery cannot exceed the current maximum. Bloodlust
+costs rounded-up HP and cannot knock out its caster. Mind Gap measures the MP
+difference before paying its cost. Siren's surcharge affects the next paid
+skill; free skills neither pay nor consume it, preserving a recovery route.
+Mana Barrier absorbs at most the available MP, at one MP per damage.
+
+Timed effects last their listed number of rounds (one action per fighter).
+Recasting refreshes duration; for each stat, only the strongest positive and
+strongest negative modifier apply. Stat buffs change maximum resources but
+do not refill them; expiry clamps excess resources. Golden Ratio's all-stat
+buff lasts three turns. Healing and MP recovery carry back into Adventure,
+subject to the pet's permanent caps. Equalizer disables advantages for all
+fighters but does not make unbalanced stats qualify for Normal skill perks.
+
+| Skill | Attribute | Category | Power | Accuracy | MP | Acquisition source | Effect |
+| --- | --- | --- | ---: | --- | ---: | --- | --- |
+| Heavy Breath Slam | STR | Basic | 40 | 100% | 0 | Part-Time Job (Mover Lv.1) | STR damage. Restore 2 MP, even on a miss. |
+| Lumberjack Sweep | STR | Attack | 55 | Sure-hit | 2 | Part-Time Job (Logger Lv.2) | Cannot miss; ignores CHA evasion. |
+| Humble Pie | STR | Attack | 65 | 95% | 3 | Part-Time Job (Bouncer Lv.3) | On hit: target CHA −25% for 2 turns. |
+| Feral Maul | STR | Attack | 75 | 90% | 3 | Monster Drop (Wild Beast scroll: Goblin, floor 1+) | On hit: pin the target, setting evasion to 0 for 1 turn. |
+| Bloodlust Crash | STR | Finisher | 115 | 90% | 4 | Monster Drop (Alpha Boss scroll: Slime King, floor 5+) | Pay 15% Max HP to cast. Cannot use if that would knock you out. |
+| Titan’s Relic Press | STR | Finisher | 95 | 95% | 5 | Treasure Box (Ruins Chest, floor 2+) | Add 15% of your current HP to damage before mitigation. |
+| Gym Pump | STR | Utility | 0 | 100% | 2 | Part-Time Job (Gym Trainer Lv.2) | STR +25% for 3 turns, increasing damage and Max HP. Does not heal. |
+| Apex Roar | STR | Utility | 0 | 100% | 3 | Monster Drop (Apex Predator scroll: Goblin, floor 3+) | Target CHA −35% for 3 turns. Cannot miss. |
+| Hardhat Guard | STR | Defensive | 0 | 100% | 2 | Part-Time Job (Construction Lv.3) | Take 30% less damage for 2 turns. Recover 1 MP each time an attack hits you. |
+| Service Smile | CHA | Basic | 35 | 100% | 0 | Part-Time Job (Cafe Waiter Lv.1) | CHA damage. Restore 2 MP and gain CHA +10% for 1 turn, even on a miss. |
+| Heckler’s Jab | CHA | Attack | 60 | 100% | 2 | Part-Time Job (Street Performer Lv.2) | On hit: target CHA −20% for 2 turns. |
+| Dazzling Riposte | CHA | Attack | 65 | 95% | 3 | Monster Drop (Fey Creature scroll: Slime, floor 1+) | 130 Power if the target missed an attack on its last turn. |
+| Siren’s Lure | CHA | Attack | 70 | 95% | 4 | Monster Drop (Siren/Mimic scroll: Slime, floor 3+) | On hit: target’s next paid skill costs 2 extra MP. Free basics stay free. |
+| VIP Velvet Rope | CHA | Finisher | 85 | 95% | 6 | Part-Time Job (Idol Stage Lv.5) | Add 2 Power for each point your CHA exceeds the target’s. |
+| Crown Jewel Beam | CHA | Finisher | 115 | 90% | 7 | Treasure Box (Royal Vault, floor 3+) | On hit: drain up to 3 MP from the target into your own pool. |
+| Makeover Glow | CHA | Utility | 0 | 100% | 3 | Part-Time Job (Stylist Lv.3) | CHA +40% for 3 turns. |
+| Phantom Perfume | CHA | Defensive | 0 | 100% | 4 | Treasure Box (Mirage Chest, floor 2+) | Double CHA evasion (up to 60%) for 2 turns. Restore 2 MP whenever an attack misses you. |
+| Standing Ovation | CHA | Defensive | 0 | 100% | 5 | Part-Time Job (Theater Actor Lv.4) | Cleanse all stat debuffs and heal 35% Max HP. |
+| Paperplane Dart | INT | Basic | 40 | Sure-hit | 0 | Part-Time Job (Librarian Lv.1) | INT damage; cannot miss. Restore 3 MP. |
+| Synapse Shock | INT | Attack | 55 | 95% | 3 | Monster Drop (Mind Slime scroll: Slime, floor 2+) | On hit: destroy up to 3 of the target’s MP. |
+| Gravity Formula | INT | Attack | 60 | 95% | 4 | Part-Time Job (Lab Assistant Lv.2) | Add 10% of target Max HP to damage before mitigation. |
+| Laser Trajectory | INT | Attack | 75 | Sure-hit | 5 | Part-Time Job (Alchemist Lv.3) | Cannot miss; ignores CHA evasion. |
+| Mind Gap | INT | Finisher | 90 | 90% | 8 | Monster Drop (Elder Construct scroll: Goblin, floor 4+) | Damage +10% per MP you have over the target, measured before paying the cost. |
+| Forbidden Grimoire | INT | Finisher | 140 | 85% | 12 | Treasure Box (Ancient Archive, floor 5+) | A 140 Power INT spell. Requires at least 12 current MP. |
+| Peer Review | INT | Utility | 0 | 100% | 3 | Part-Time Job (Tutor Lv.3) | For 2 turns, your favorable type bonus and mitigation become 40%; accuracy +25 percentage points. |
+| Mana Barrier | INT | Defensive | 0 | 100% | 3 | Treasure Box (Crystal Chest, floor 1+) | For 2 turns, redirect half of incoming damage to MP, at 1 MP per damage. Overflow hits HP. |
+| Coffee Break | INT | Defensive | 0 | 100% | 0 | Part-Time Job (Researcher Lv.4) | INT +20% for 2 turns; restore 50% of the resulting Max MP. Takes your turn. |
+| Jack of All Trades | Normal | Attack | 70 | Sure-hit | 2 | Part-Time Job (Freelancer Lv.3) | Scales with average STR/CHA/INT. Balanced Normal pets deal +25% damage and recover 1 MP. |
+| Equalizer Field | Normal | Utility | 0 | 100% | 3 | Monster Drop (Chameleon Beast scroll: Goblin, floor 2+) | For 3 turns, target becomes Normal and all type advantages on the field are disabled. |
+| Golden Ratio | Normal | Finisher | 110 | 100% | 5 | Treasure Box (Sacred Shrine, floor 4+) | Requires balanced Normal stats. On hit: heal 20% Max HP and gain all stats +15% for 3 turns. |
+
+Choose one equipped skill on each turn. Buttons show current MP cost,
+hit chance, and any restriction; battle messages show misses, recovery,
+shield absorption and effects. Saved playback retains each turn's resource
+caps and types. Replaying never spends MP or rerolls an outcome.
 
 ### Unfair coins
 
@@ -998,13 +1056,11 @@ other participants' coins are ignored. Copper's bonus never
 persists: the pet's real attributes, and its saved maximum HP/MP, are
 unchanged once the battle ends.
 
-In Adventure, where HP/MP carry between battles, Copper's extra 3 HP and 1
-MP are a **shield** on top of what the pet brings in: a pet at 10 / 31 HP
-starts the fight at 13 / 34. Damage spends the shield first, and whatever's
-left of it disappears afterward, so Copper never heals — that pet leaves
-the fight with at most 10 HP (before a victory's recovery). Arena and
-revenge start every fighter at full, so there the bonus simply raises
-HP/MP for that fight.
+In Adventure, Copper adds 3 temporary HP. Its +1 INT adds a temporary MP
+only when it crosses the next five-point MP threshold. The unused bonus
+cannot become permanent healing; actual skill healing and MP regeneration
+are retained, then victory recovery is applied. Arena and revenge start at
+full resources, so the bonus raises their starting caps for that fight.
 
 The private `POST /api/adventure` accepts an empty body to read the saved
 state without starting or resetting a run. Its response includes an opaque

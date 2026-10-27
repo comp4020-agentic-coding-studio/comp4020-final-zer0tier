@@ -5,6 +5,7 @@ import {
 import { accept, invite, leave, setOff, teamFor, type TeamOutcome } from "./teams.ts";
 import express from "express";
 import { ABILITIES, MONSTER_TYPES, TYPE_CHART } from "./combat.ts";
+import { JOBS, JOB_LEVEL_MINUTES, MONSTER_SKILL_DROP_RATE } from './skills.ts';
 import { COINS, TREASURE_RATES } from './treasure.ts';
 import { readFileSync } from "node:fs";
 import { createServer, STATUS_CODES } from "node:http";
@@ -351,7 +352,7 @@ app.get("/api/rules", (_req, res) => {
     locations: LOCATIONS,
     maxCare: MAX_CARE,
     study: { cost: STUDY_COST, needs: STUDY_NEEDS, minutes: STUDY_MINUTES },
-    work: { costPerHour: WORK_COST_PER_HOUR, shiftMinutes: SHIFT_MINUTES },
+    work: { costPerHour: WORK_COST_PER_HOUR, shiftMinutes: SHIFT_MINUTES, jobs: JOBS, jobLevelMinutes: JOB_LEVEL_MINUTES },
     timeScale: TIME_SCALE,
     fight: {
       cost: FIGHT_COST, needs: FIGHT_NEEDS, luck: LUCK, powerWeights: POWER_WEIGHTS, spoils: SPOILS,
@@ -359,7 +360,7 @@ app.get("/api/rules", (_req, res) => {
       abilities: ABILITIES,
       types: { chart: TYPE_CHART, monsters: MONSTER_TYPES },
     },
-    adventure: { cost: ADVENTURE_COST, cooldownMinutes: ADVENTURE_COOLDOWN_MINUTES },
+    adventure: { cost: ADVENTURE_COST, cooldownMinutes: ADVENTURE_COOLDOWN_MINUTES, skillDropRate: MONSTER_SKILL_DROP_RATE },
     botId: BOT_ID,
     steal: STEAL,
     leaderboardSize: LEADERBOARD_SIZE,
@@ -419,7 +420,7 @@ app.post("/api/pets/:id/work/:location", (req, res) => {
     res.status(400).json({ error: `minutes must be one of ${SHIFT_MINUTES.join(", ")}` });
     return;
   }
-  const outcome = work(req.params.id, location.id, minutes);
+  const outcome = work(req.params.id, location.id, minutes, req.body?.job);
   if ("pet" in outcome) {
     logEvent("action_result", {
       user: req.params.id, room: ROOM, client_in_room: clientsInRoom(), action: "work", location: location.id, minutes,

@@ -163,7 +163,7 @@ const manualPet = {
   equippedCoin: 'silver-coin' as const, equippedAbilities: ['firebolt', 'heavy-strike'] as const,
 };
 const manualRival = { id: 'rival', strength: 4, intelligence: 4, charisma: 14 };
-const manualBattle = () => startBattle([manualPet], manualRival, [36, 26], { mp: [2, 4] });
+const manualBattle = () => startBattle([manualPet], manualRival, [36, 26], { mp: [2, 4], random: () => 0 });
 const microtasks = async () => { await Promise.resolve(); await Promise.resolve(); };
 
 it('opens a live battle with zero attacks, waits indefinitely for a choice, and exposes no live replay, skip or attack log', () => {
@@ -175,7 +175,7 @@ it('opens a live battle with zero attacks, waits indefinitely for a choice, and 
     scene.flush();
     expect((scene.$('battle-dialog') as HTMLDialogElement).open).toBe(true);
     expect(scene.$('battle-status').textContent).toBe('What will your pet do?');
-    expect(scene.$('battle-hp-text-0').textContent).toBe('31 / 31');
+    expect(scene.$('battle-hp-text-0').textContent).toBe('25 / 25');
     expect(scene.$('battle-hp-text-1').textContent).toBe('22 / 22');
     expect(scene.$('battle-skip').hidden).toBe(true);
     expect(scene.$('battle-replay').hidden).toBe(true);
@@ -213,14 +213,14 @@ it('submits only the selected affordable skill with its saved revision and waits
     expect(scene.$('battle-skills').getAttribute('aria-busy')).toBe('true');
     expect(scene.skill('claw-strike').disabled).toBe(true);
     expect(scene.$('battle-hp-text-1').textContent).toBe('22 / 22');
-    expect(scene.$('battle-mp-text-0').textContent).toBe('2 / 6');
+    expect(scene.$('battle-mp-text-0').textContent).toBe('2 / 5');
     const updated = takeBattleTurn(battle, 'pet', 'heavy-strike', 0);
     if ('error' in updated) throw new Error(updated.error);
     scene.show(updated, { onChoose });
     release();
     await microtasks();
     scene.flush();
-    expect(scene.$('battle-mp-text-0').textContent).toBe('0 / 6');
+    expect(scene.$('battle-mp-text-0').textContent).toBe('0 / 5');
     expect(scene.$('battle-hp-text-1').textContent).toBe('14 / 22');
     expect(scene.$('battle-status').textContent).toContain('Waiting for rival');
     expect(scene.skill('claw-strike').disabled).toBe(true);
@@ -250,13 +250,13 @@ it('waits for the opponent and animates only newly saved turns without replaying
     expect(scene.timers.size).toBe(1);
     scene.flush();
     expect(scene.$('battle-status').textContent).toBe('What will your pet do?');
-    expect(scene.$('battle-hp-text-0').textContent).toBe('27 / 31');
+    expect(scene.$('battle-hp-text-0').textContent).toBe('21 / 25');
     expect(scene.skill('claw-strike').disabled).toBe(false);
     scene.show(updated, handlers);
     expect(scene.timers.size).toBe(0);
     expect(scene.$('battle-status').textContent).toBe('What will your pet do?');
     scene.show(battle, handlers);
-    expect(scene.$('battle-hp-text-0').textContent).toBe('27 / 31');
+    expect(scene.$('battle-hp-text-0').textContent).toBe('21 / 25');
     expect(scene.$('battle-status').textContent).toBe('What will your pet do?');
     expect(requests).toBe(0);
   } finally { scene.close(); }
@@ -290,7 +290,7 @@ it('asks the game confirmation before forfeiting by button or Escape and renders
     if ('error' in ended) throw new Error(ended.error);
     scene.show(ended, { onForfeit, result: 'Your pet withdrew.' });
     scene.flush();
-    expect(scene.$('battle-hp-text-0').textContent).toBe('0 / 31');
+    expect(scene.$('battle-hp-text-0').textContent).toBe('0 / 25');
     expect(scene.$('battle-status').textContent).toContain('Defeat. Your pet withdrew.');
     expect(scene.$('battle-skills').hidden).toBe(true);
     expect(scene.$('battle-replay').hidden).toBe(true);
@@ -336,36 +336,24 @@ it('keeps the newest saved state when a live battle is queued behind another bat
   } finally { scene.close(); }
 });
 
-it('shows monster and skill types, matchup hints, and the saved super-effective result in live and replayed turns', () => {
+it('shows dynamic types, acquisition-era skills, costs, restrictions and status effects', () => {
   const scene = manualScene();
   try {
-    const caster = { id: 'pet', strength: 6, intelligence: 6, charisma: 6, equippedCoin: 'silver-coin' as const,
-      abilities: ['firebolt', 'tide-crash'] as const, equippedAbilities: ['firebolt', 'tide-crash'] as const };
-    const slime = { id: 'monster:slime', name: 'Slime', monster: 'slime' as const, strength: 1, intelligence: 1, charisma: 60 };
-    const battle = startBattle([caster], slime, [24, 64], { mp: [6, 1] });
+    const caster = { id: 'pet', strength: 20, intelligence: 40, charisma: 20, equippedCoin: 'silver-coin' as const,
+      abilities: ['paperplane-dart', 'mana-barrier', 'golden-ratio'] as const };
+    const slime = { id: 'monster:slime', name: 'Slime', monster: 'slime' as const, strength: 50, intelligence: 1, charisma: 1 };
+    const battle = startBattle([caster], slime, [120, 102], { mp: [12, 5], random: () => 0 });
     scene.show(battle);
-    expect(scene.$('battle-name-1').textContent).toBe('Slime');
-    expect(scene.$('battle-type-1').hidden).toBe(false);
-    expect(scene.$('battle-type-1').textContent).toBe('Grass type');
-    expect(scene.$('battle-type-0').hidden).toBe(true);
-    expect(scene.skill('claw-strike').textContent).toBe('Claw StrikeNormal · 0 MP');
-    expect(scene.skill('firebolt').textContent).toBe('FireboltFire · 3 MP · Super effective');
-    expect(scene.skill('tide-crash').textContent).toBe('Tide CrashWater · 3 MP · Not very effective');
-    expect(scene.skill('firebolt').dataset.type).toBe('fire');
-    const updated = takeBattleTurn(battle, 'pet', 'firebolt', battle.revision);
+    expect(scene.$('battle-type-1').textContent).toBe('STR type');
+    expect(scene.$('battle-type-0').textContent).toBe('INT type');
+    expect(scene.skill('paperplane-dart').textContent).toContain('Type advantage');
+    expect(scene.skill('paperplane-dart').textContent).toContain('Sure-hit');
+    expect(scene.skill('golden-ratio').disabled).toBe(true);
+    expect(scene.skill('golden-ratio').textContent).toContain('Requires balanced Normal stats');
+    const updated = takeBattleTurn(battle, 'pet', 'mana-barrier', 0, () => 0);
     if ('error' in updated) throw new Error(updated.error);
-    scene.show(updated);
-    expect(scene.$('battle-status').textContent).toBe("pet used Firebolt: 18 damage to Slime (3 MP). It's super effective!");
-    scene.flush();
-    const resisted = takeBattleTurn(updated, 'pet', 'tide-crash', updated.revision);
-    if ('error' in resisted) throw new Error(resisted.error);
-    scene.show(resisted);
-    expect(scene.$('battle-status').textContent).toBe("pet used Tide Crash: 5 damage to Slime (3 MP). It's not very effective…");
-    scene.flush();
-    // A fresh PvP battle has no types, so its hints and tags disappear again.
-    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:reset'));
-    scene.show(startBattle([caster], manualRival, [24, 26], { mp: [6, 4] }), { key: 'manual:pvp' });
-    expect(scene.$('battle-type-1').hidden).toBe(true);
-    expect(scene.skill('firebolt').textContent).toBe('FireboltFire · 3 MP');
+    scene.show(updated); scene.flush();
+    expect(scene.$('battle-effects-0').textContent).toContain('Mana Barrier');
+    expect(scene.$('battle-mp-text-0').textContent).toBe(`${updated.mp[0]} / 12`);
   } finally { scene.close(); }
 });

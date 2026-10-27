@@ -17,12 +17,13 @@ export type TreasureReward = {
 };
 
 // A second roll only chooses within a category; it never changes its weight.
-export function rollTreasure(random = Math.random): TreasureReward {
+export function rollTreasure(random = Math.random, floor = 5): TreasureReward {
   const roll = random() * 100;
   if (roll < 30) return { category: 'food', id: 'food', name: 'Food', quantity: 1 };
   if (roll < 60) return { category: 'soap', id: 'soap', name: 'Soap', quantity: 1 };
   if (roll < 80) {
-    const { id, name } = LEARNABLE_ABILITIES[Math.floor(random() * LEARNABLE_ABILITIES.length)];
+    const eligible = LEARNABLE_ABILITIES.filter(a => a.source.channel === 'chest' && a.source.floor <= floor);
+    const { id, name } = eligible[Math.floor(random() * eligible.length)];
     return { category: 'ability', id, name, quantity: 1 };
   }
   if (roll < 95) return { category: 'hourglass', id: 'hourglass', name: 'Hourglass', quantity: 1 };
