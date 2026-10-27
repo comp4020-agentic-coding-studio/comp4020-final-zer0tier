@@ -1,4 +1,4 @@
-import { db } from './db.ts';
+import { db, worldDb } from './db.ts';
 import { getPet, isValidId } from './pets.ts';
 
 export interface WorldPosition {
@@ -22,10 +22,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS world_positions (
   moving INTEGER NOT NULL DEFAULT 0,
   revision INTEGER NOT NULL DEFAULT 0
 )`);
-const initial = db.prepare("INSERT OR IGNORE INTO world_positions (player_id, scene, home, x, y, facing) VALUES (?, 'home', ?, 480, 475, 'down')");
-const read = db.prepare('SELECT player_id AS id, scene, home, x, y, facing, moving, revision FROM world_positions WHERE player_id = ?');
-const write = db.prepare('UPDATE world_positions SET scene = ?, home = ?, x = ?, y = ?, facing = ?, moving = ?, revision = revision + 1 WHERE player_id = ? AND revision = ?');
-const stop = db.prepare('UPDATE world_positions SET moving = 0, revision = revision + 1 WHERE player_id = ? AND moving != 0');
+// Positions go through worldDb, which doesn't wait for the disk (see db.ts).
+const initial = worldDb.prepare("INSERT OR IGNORE INTO world_positions (player_id, scene, home, x, y, facing) VALUES (?, 'home', ?, 480, 475, 'down')");
+const read = worldDb.prepare('SELECT player_id AS id, scene, home, x, y, facing, moving, revision FROM world_positions WHERE player_id = ?');
+const write = worldDb.prepare('UPDATE world_positions SET scene = ?, home = ?, x = ?, y = ?, facing = ?, moving = ?, revision = revision + 1 WHERE player_id = ? AND revision = ?');
+const stop = worldDb.prepare('UPDATE world_positions SET moving = 0, revision = revision + 1 WHERE player_id = ? AND moving != 0');
 export function stopWorld(id: string): WorldPosition { stop.run(id); return worldPosition(id); }
 
 export function worldPosition(id: string): WorldPosition {

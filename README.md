@@ -53,6 +53,10 @@ the point of the game, not boxes to tick:
   presence catches up, and a finish is announced once the lock clears.
   *Enforced:* `spec/realtime-resilience.test.ts` holds the lock on a private
   server while players connect, leave, and finish a lesson.
+  The one thing a power cut could lose is the last moment of where a
+  character was walking: positions are saved without waiting for the disk
+  to confirm, so a room full of people can walk at once. Pets, money and
+  fights always wait for that confirmation.
 - **Interacting is fair.** Fights follow published rules (power is
   2 × Strength + Intelligence + Charisma, with limited luck), so training
   shows in the results. The bot `0` is a fair opponent nobody can control: it
@@ -607,6 +611,11 @@ and the built-in `node:sqlite` for storage.
   only; positions are saved in SQLite before broadcasting, and stale
   revisions are refused. Movement is coalesced to at most one request per
   50 ms, with short confirmed steps drawn at walking speed to reduce input lag.
+  Positions use their own SQLite connection with `synchronous = NORMAL`, so
+  a step doesn't wait for the disk; everything else keeps the default full
+  sync. `scripts/load-test.ts` walks a crowd around town and times each
+  step's delivery: with 50 players on one core, every step reached every
+  other player at the full 20 updates a second, typically within 10 ms.
   `spec/world-realtime.test.ts` checks movement and presence delivery
   to multiple sockets within one second, offline visits, and online fights.
 - **Logs:** server stdout (also visible in `flyctl logs`) records `join`,

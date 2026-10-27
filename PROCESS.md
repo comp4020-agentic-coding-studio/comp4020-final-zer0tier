@@ -264,9 +264,18 @@ check stopped it writing to the live machine, so I ran the backup and cleanup
 myself. On Fly, steps typically arrived in 18, 50 and 87 ms with 10, 30 and 50
 players, and none took longer than 0.4 s. Nothing was refused or lost, and the
 machine never restarted, though I didn't get memory readings from it. At 50
-players, movement thinned to about 10 updates a second. One line,
-`PRAGMA synchronous = NORMAL`, restored the full 20 on a throwaway copy, but it
-could lose the last moment of saves in a power cut, so I haven't taken it.
+players, movement thinned to about 10 updates a second.
+
+The obvious fix, `PRAGMA synchronous = NORMAL` for the whole database,
+restored the full 20 on a throwaway copy, but a power cut could then lose
+the last moment of anything, money included. Instead, only character
+positions moved to a second connection that skips the disk wait, while
+pets, money and fights keep full sync. Locally, 50 players then walked at
+the full 20 updates a second, with steps typically arriving in 9 ms instead
+of 390 ms. I also measured two other fixes and dropped both. Sending
+positions every 100 ms would have undone an earlier change that cut input
+lag. Logging fewer movement lines saved no measurable CPU, and the README
+promises every request is logged.
 
 ## Next
 
@@ -277,5 +286,3 @@ one option I didn't take (polling instead of WebSockets, or broadcasting only
 to the players involved). Play with other people to judge what the spec can't:
 whether helping is worth a $15 food, and whether teams need a smaller entry
 cost. And decide between trading and recruiting pets as the next interaction.
-Decide whether smoother movement in a crowd is worth the small risk
-`synchronous = NORMAL` puts on the last moment of saves.

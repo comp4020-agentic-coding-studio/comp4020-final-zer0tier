@@ -8,6 +8,15 @@ mkdirSync(dataDir, { recursive: true });
 
 export const db = new DatabaseSync(join(dataDir, "virtuepets.db"));
 
+// Where characters stand changes up to 20 times a second per walking player,
+// and waiting for the disk to confirm each step capped the whole server near
+// 130-500 saved steps a second (scripts/load-test.ts). This second connection
+// skips that wait. A crash of the app still loses nothing; a power cut may
+// lose the last moment of walking, never a pet, money or a fight, which stay
+// on `db` with the default full sync. Only src/world.ts uses it.
+export const worldDb = new DatabaseSync(join(dataDir, "virtuepets.db"));
+worldDb.exec("PRAGMA synchronous = NORMAL");
+
 // Runs `action` as one transaction, or as part of the one already open, and
 // rolls it back if `action` throws.
 export function transaction<T>(action: () => T): T {
