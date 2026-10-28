@@ -60,6 +60,7 @@ const skillVisuals = {
   'vine-lash': visual('cha', 'vine', '<g class="fx-core"><path d="M14 84C91 86 6 15 82 16"/><path class="fx-solid" d="M43 65Q10 64 19 41q24-1 24 24Zm6-24Q45 15 67 9q17 23-18 32Z"/></g>'),
   'bump': visual('str', 'bump', '<g class="fx-core">'+burst+'</g><g class="fx-detail"><circle cx="50" cy="50" r="16"/></g>', { pose: 'slam', duration: 580 }),
 };
+const bossChargeVisual = visual('str', 'charge', '<g class="fx-core"><path class="fx-solid" d="m24 40-5-22 20 9 11-17 11 17 20-9-5 22Z"/><ellipse cx="50" cy="65" rx="28" ry="17"/></g><g class="fx-detail">'+rings+'</g>', { target: 'self', cue: 'Charging', pose: 'brace', duration: 780 });
 let portraitAnimations = [];
 let nextTurnDelay = null;
 let nextTurnAt = 0;
@@ -122,7 +123,7 @@ function animatePortrait(card, pose, duration, direction = 1) {
 }
 function showSkillVisuals(step) {
   clearSkillVisuals();
-  const profile = skillVisuals[step.ability] ?? skillVisuals['claw-strike'];
+  const profile = step.telegraph ? bossChargeVisual : skillVisuals[step.ability] ?? skillVisuals['claw-strike'];
   const actorCard = cards.indexOf(step.actor), targetCard = cards.indexOf(step.target);
   const direction = actorCard === 1 ? -1 : 1;
   const recipients = profile.target === 'field' ? cards.map((_, card) => card)
@@ -168,6 +169,7 @@ function buildDialog() {
     <header class="battle-heading"><div><p id="battle-mode">Turn-based battle</p><h2 id="battle-title">Claws at the ready</h2></div>
       <button type="button" id="battle-close" class="chip-btn chip-buy" aria-label="Close battle">Close</button></header>
     <p id="battle-initiative" class="battle-initiative" hidden></p>
+    <p id="battle-strategy" class="battle-strategy" hidden></p>
     <div class="battle-stage">
       <div class="battle-woodland-art" aria-hidden="true"><svg viewBox="0 0 600 220" preserveAspectRatio="xMidYMax slice">
         <use href="/scenes/adventure-atlas.svg#tree" x="-38" y="-14" width="190" height="190"/>
@@ -187,7 +189,10 @@ function buildDialog() {
     <section class="battle-allies" id="battle-allies" aria-label="Teammates in this battle" hidden></section>
     <div class="battle-ability"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 4-5 24M18 4l-5 24M27 4l-5 24"/></svg>
       <div><strong id="battle-ability-name">Choose a skill</strong><span id="battle-ability-cost">Your pet is ready</span></div></div>
-    <p id="battle-status" role="status" aria-live="polite"></p>
+    <div role="status" aria-live="polite" aria-atomic="true">
+      <p id="battle-status"></p>
+      <p id="battle-intent" class="battle-intent" hidden></p>
+    </div>
     <div id="battle-skills" class="battle-skills" role="group" aria-label="Choose your pet's skill" hidden></div>
     <p id="battle-error" class="error" role="alert"></p>
     <details class="battle-log"><summary>Attack log</summary><ol id="battle-log"></ol></details>
@@ -243,6 +248,18 @@ function avatar(fighter, index) {
     const use = document.createElementNS(svg.namespaceURI, 'use');
     use.setAttribute('href', `#${monster.id}`);
     svg.append(use);
+    const gearArt = {
+      bruiser: '<path d="m10 1 8 3v6c0 5-5 8-8 10-3-2-8-5-8-10V4Z"/><path d="M10 5v10M5 9h10" fill="none"/>',
+      caster: '<path d="M1 3q5-3 9 0 4-3 9 0v15q-5-3-9 0-4-3-9 0Z"/><path d="M10 4v13M4 7h3m-3 4h3m6-4h3m-3 4h3" fill="none"/>',
+      dodger: '<path d="M1 4q9 4 18 0v8q-4 7-9 0-5 7-9 0Z"/><path d="m4 8 3 1m6 0 3-1" fill="none"/>',
+    };
+    if (gearArt[fighter.tactic] && (fighter.tactic !== 'bruiser' || fighter.abilities.includes('hardhat-guard'))) {
+      const gear = document.createElementNS(svg.namespaceURI, 'g');
+      gear.setAttribute('class', 'monster-gear'); gear.dataset.tactic = fighter.tactic;
+      gear.setAttribute('transform', 'translate(15 16) scale(.34)');
+      gear.innerHTML = gearArt[fighter.tactic];
+      svg.append(gear);
+    }
   } else if (symbol) {
     const use = document.createElementNS(svg.namespaceURI, 'use');
     use.setAttribute('href', `#${symbol.id}`);
@@ -289,6 +306,7 @@ const effectText = step => step.effectiveness > 1 ? " It's super effective!" : s
 function describe(step) {
   const actor = fighterName(scene.battle.fighters[step.actor]);
   const target = fighterName(scene.battle.fighters[step.target]);
+  if (step.telegraph) return `${actor} is charging ${step.name} at ${target}. ${step.events?.join('. ') ?? ''}.`;
   return `${actor} used ${step.name || 'Claw Strike'}${step.hits > 1 ? ` ×${step.hits}` : ''}: ${step.missed ? 'missed' : step.damage ? `${step.damage} damage to ${target}` : 'support skill'}${step.mpCost ? ` (${step.mpCost} MP)` : ''}.${effectText(step)}${step.events?.length ? ` ${step.events.join('. ')}.` : ''}`;
 }
 // How one of the viewer's skills fares against the saved monster's type. Only
@@ -309,8 +327,8 @@ function matchup(attack, battle) {
 }
 function abilityLabel(step) {
   if (!step) return;
-  $('battle-ability-name').textContent = step.name || 'Claw Strike';
-  $('battle-ability-cost').textContent = `${step.mpCost || 0} MP · ${step.damage} damage`;
+  $('battle-ability-name').textContent = `${step.telegraph ? 'Charging ' : ''}${step.name || 'Claw Strike'}`;
+  $('battle-ability-cost').textContent = step.telegraph ? 'No MP spent · Lands on the next boss turn' : `${step.mpCost || 0} MP · ${step.damage} damage`;
   dialog.dataset.ability = step.ability || 'claw-strike';
 }
 const fighterName = fighter => fighter.name || fighter.id;
@@ -337,6 +355,7 @@ function addLog(step) {
   $('battle-log').append(li);
 }
 function advance() {
+  $('battle-intent').hidden = true;
   if (!dialog.open || !scene) return;
   syncBattleMotion();
   if (motionPaused) { scheduleAdvance(0); return; }
@@ -356,6 +375,7 @@ function advance() {
 }
 function finish() {
   cancelAdvance(); clearSkillVisuals();
+  $('battle-intent').hidden = true;
   animating = false;
   if (!scene) return;
   if (scene.manual && scene.battle.status === 'active') return awaitChoice();
@@ -383,6 +403,16 @@ function awaitChoice() {
   if (!scene?.manual || scene.battle.status !== 'active') return;
   const battle = scene.battle;
   meters(battle.hp, battle.mp);
+  const intent = battle.monsterIntent, warning = $('battle-intent');
+  warning.textContent = '';
+  warning.hidden = !intent;
+  if (intent) {
+    const target = battle.fighters[intent.target];
+    const attack = battle.attacks[battle.monsterIndex]?.find(a => a.id === intent.ability);
+    if (battle.hp[intent.target] <= 0) warning.textContent = 'Bump interrupted: its target has left. The boss will use Claw Strike instead.';
+    else if (attack?.unavailable) warning.textContent = 'Bump interrupted: not enough MP. The boss will use Claw Strike instead.';
+    else warning.textContent = `Bump incoming · Target: ${fighterName(target)}${target.id === scene.viewer ? ' (you)' : ''}. On the next boss turn, it deals two-thirds of current HP before mitigation. Guard to reduce damage, or lower the boss below ${attack?.currentMpCost ?? 5} MP to interrupt it.`;
+  }
   cards.forEach((index, card) => {
     const summary = $(`battle-effects-${card}`) ?? document.createElement('p');
     summary.id = `battle-effects-${card}`; summary.className = 'battle-effects';
@@ -491,6 +521,10 @@ function play(next) {
   $('battle-close').disabled = false;
   $('battle-error').textContent = '';
   $('battle-skills').hidden = true;
+  $('battle-intent').hidden = true;
+  const enemy = next.battle.fighters.find(f => f.monster && f.strategy);
+  $('battle-strategy').textContent = enemy ? `${fighterName(enemy)}: ${enemy.strategy}` : '';
+  $('battle-strategy').hidden = !enemy;
   dialog.dataset.encounter = next.encounter || '';
   dialog.dataset.manual = String(Boolean(next.manual));
   $('battle-title').textContent = next.title || 'Arena battle';

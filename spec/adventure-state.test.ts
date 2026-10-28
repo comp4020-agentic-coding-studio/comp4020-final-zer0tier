@@ -346,22 +346,27 @@ it('persists replenished monsters only after a grass step, and refreshes cannot 
   expect(afterRestart(id)).toEqual(replenished);
 });
 
-it("the Slime King Bumps for two-thirds of the pet's current HP while that beats its Claw Strike", () => {
+it('new encounters publish varied builds and persist a boss warning before Bump lands', () => {
   const id = 'bumped';
   const before = setupBattle(id, 'slime-king', [40, 10, 40]); // 130 HP, hits for 40; the king's Claw Strike is 18
   expect(before.enemies.find(e => e.kind === 'slime-king')!.moves).toEqual([expect.objectContaining({ id: 'bump', mpCost: 5 })]);
-  expect(before.enemies.filter(e => e.kind !== 'slime-king').every(e => e.moves.length === 0)).toBe(true);
+  expect(before.enemies.filter(e => e.kind !== 'slime-king').every(e => e.moves.length > 0)).toBe(true);
+  expect(before.enemies.find(e => e.name === 'Mind Slime')!.strategy).toContain('Synapse Shock');
   // The map tells the Game guide each monster's type and what beats it.
   expect(before.enemies.map(e => [e.kind, e.type, e.weakness])).toEqual(expect.arrayContaining([
-    ['slime', 'str', ['int']], ['goblin', 'str', ['int']], ['slime-king', 'str', ['int']],
+    ['slime', 'str', ['int']], ['goblin', 'str', ['int']], ['slime', 'int', ['cha']], ['goblin', 'cha', ['str']], ['slime-king', 'str', ['int']],
   ]));
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5); // tails: the king strikes first
   try {
-    const result = step(id, 'd');
+    const warning = adventure.moveAdventure(id, 'd', before.revision);
+    if ('error' in warning) throw new Error(warning.error);
+    expect(warning.battle!.playback!.turns[0]).toMatchObject({ actor: 1, ability: 'bump', telegraph: true, damage: 0, mpCost: 0 });
+    expect(warning.battle!.playback).toHaveProperty('monsterIntent', { ability: 'bump', target: 0 });
+    expect(afterRestart(id)).toEqual(warning);
+    const result = finishBattle(id);
     expect(result.battle!.playback!.fighters[1].abilities).toEqual(['claw-strike', 'bump']);
     const playback = result.battle!.playback!;
-    expect(playback.turns[0]).toMatchObject({ actor: 1, ability: 'bump', damage: Math.ceil(playback.initialHp![0] * 2 / 3) });
-    expect(playback.turns.some(t => t.actor === 1 && t.ability === 'claw-strike')).toBe(true);
+    expect(playback.turns[2]).toMatchObject({ actor: 1, ability: 'bump', damage: Math.ceil(playback.initialHp![0] * 2 / 3), mpCost: 5 });
     expect(result).toMatchObject({ completed: true, battle: { won: true } });
   } finally { random.mockRestore(); }
 });
@@ -441,7 +446,7 @@ it("a Silver coin forces the pet to attack first against a much stronger goblin"
 
 it("a Gold coin makes the pet attack second but doubles its own first hit", () => {
   const id = 'coin-gold';
-  setupBattle(id, 'goblin', [3, 1, 5]); // maxHp 9, per-hit damage scales with luck
+  setupBattle(id, 'goblin', [3, 1, 5]); // maxHp 19, per-hit damage scales with luck
   grantCoin(id, 'gold-coin');
   expect(pets.equipCoin(id, 'gold-coin')).not.toHaveProperty('error');
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.5); // luck factor exactly 1.0
@@ -451,7 +456,7 @@ it("a Gold coin makes the pet attack second but doubles its own first hit", () =
     expect(turns[0].actor).toBe(1); // the goblin, not the pet, strikes first
     const petTurns = turns.filter(t => t.actor === 0);
     expect(result.battle!.playback!.fighters[0].damage).toBe(3);
-    expect(petTurns[0].damage).toBe(5); // 3 × Gold's 2 × STR target's 0.8 mitigation, rounded
+    expect(petTurns[0].damage).toBe(3); // round(3 × Gold's 2 × STR mitigation 0.8 × Guard 0.7)
   } finally { random.mockRestore(); }
 });
 
@@ -490,9 +495,11 @@ it("a Copper shield absorbs damage for a hurt pet first but never heals it", () 
     const result = step(id, 'd');
     expect(result.battle!.playback!.initialHp![0]).toBe(13);
     expect(result.battle!.playback!.initialMp![0]).toBe(2);
-    expect(result.battle!.playback!.turns[0]).toMatchObject({ actor: 1, damage: 5, hp: [8, 25] });
-    // 3 of the 5 damage came off the shield: 10 → 8, then a victory's 7 HP / 2 MP recovery.
-    expect(result).toMatchObject({ hp: 13, mp: 5, battle: { won: true, recovery: { hp: 10, mp: 1 }, after: { hp: 13, mp: 5 } } });
+    expect(result.battle!.playback!.turns[0]).toMatchObject({ actor: 1, ability: 'hardhat-guard', damage: 0, hp: [13, 25] });
+    const firstHit = result.battle!.playback!.turns.find(t => t.actor === 1 && t.damage > 0)!;
+    expect(firstHit.damage).toBe(5);
+    expect(firstHit.hp[0]).toBe(8); // The shield absorbs 3 of the first 5 damage.
+    expect(result).toMatchObject({ hp: 13, mp: 5, battle: { won: true, recovery: { hp: 10, mp: 0 }, after: { hp: 13, mp: 5 } } });
   } finally { random.mockRestore(); }
 });
 

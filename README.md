@@ -757,9 +757,25 @@ Map refreshes use the existing `{ "action": "patrol" }` request to read
 saved progress, including teammates' positions. These background refreshes
 never reset the run, move monsters, or start a battle.
 
-For initial balancing, floor-one slimes have STR/INT/CHA **3/1/2**, and
-goblins have **5/3/2**. Each deeper floor adds **2/1/1**. The floor-five
-Slime King has **18/10/12**. Maximum HP is **10 + 3 × STR**; maximum MP
+New floors contain four enemy builds. Their stats and growth are STR/INT/CHA:
+
+| Enemy | Type | Floor-one stats | Added per deeper floor | Battle behavior |
+| --- | --- | --- | --- | --- |
+| Slime | STR | 3/1/2 | 2/1/1 | Heavy Breath Slam restores 2 MP. A straightforward starter opponent. |
+| Goblin Bruiser | STR | 5/3/2 | 2/1/1 | Uses Hardhat Guard between attacks and Heavy Breath Slam to recover MP. From floor 2, Feral Maul can pin evasive pets. |
+| Mind Slime | INT | 3/6/2 | 1/3/1 | Prioritizes Synapse Shock when its target has at least 3 MP; Paperplane Dart restores 3 MP. From floor 3, Gravity Formula adds damage based on the target's Max HP. |
+| Glimmer Goblin | CHA | 3/2/6 | 1/1/3 | Raises CHA with Makeover Glow, restores MP with Service Smile, and punishes a miss with Dazzling Riposte when affordable. |
+
+Bruisers and dodgers avoid recasting an active buff; a likely finishing hit
+takes priority over setup. All builds obey the same skill costs, accuracy,
+effects, and type triangle as pets. The battle scene and Game guide describe
+their strategies and the guide lists their skills. Names and small shields, books, or masks
+distinguish the variants; their underlying slime/goblin species keep the same
+skill-drop pools. Replenished grass encounters use these builds too. Existing
+saved enemies without a build keep their previous moves and stats, and
+already-started battles keep their saved behavior.
+
+The floor-five Slime King has **18/10/12**. Maximum HP is **10 + 3 × STR**; maximum MP
 is **5 + floor(max(0, INT − 5) / 5)**, for pets and monsters alike. A new run starts with full resources. Current HP/MP carry
 between battles and floors during one run. A server restart doesn't
 refill them; entering a new adventure does. Training raises the maximums
@@ -839,9 +855,9 @@ them.
 ### Monster battles
 
 Encounters use the Arena's turn-based battle scene, with the monster's own
-appearance, name, and attributes. Monsters use **Claw Strike**, which costs
-**0 MP**; players choose their pets' equipped skills, and damage uses the same
-power and luck rolls as Arena.
+appearance, name, and attributes. Monsters choose their build's skills
+automatically and retain the free **Claw Strike** as a fallback. Players choose
+their pets' equipped skills, and damage uses the same power and luck rolls as Arena.
 
 Pets and monsters derive their **type** from their current effective stats.
 The highest stat must be at least 20% above both others: STR beats CHA,
@@ -861,13 +877,22 @@ Utilities and defenses cannot miss. Peer Review adds 25 percentage points
 before that final clamp. Type bonuses, Guard, and Gold apply to damage
 before final rounding. Old saved battles finish under their original rules.
 
-The **Slime King** also knows **Bump** (5
-MP), which deals two-thirds of the pet's *current* HP, rounded up: a pet at
-70 HP takes 47. On its own turn, the king picks whichever affordable
-attack hits harder that turn. Bump wins while the pet's HP is high; Claw
-Strike takes over as it falls. Its 6 MP allow one opening Bump;
-free Claw Strikes can restore MP for another. Type mitigation and shields also apply. The Game guide's **Monster attributes** lists Bump beside the Slime King. Pets can't
-learn it. A solo player's coin always applies, even against a stronger
+The **Slime King** also knows **Bump** (5 MP), which deals two-thirds of the
+target's *current* HP at impact, rounded up: a pet at 70 HP takes 47 before
+type mitigation and shields. When Bump is its strongest affordable attack,
+the king spends a full turn **charging**, dealing no damage and spending no
+MP. A visible warning names the target and stays beside the skill choices.
+Every living teammate gets a turn before the king releases Bump. The target
+stays fixed even if another pet heals to higher HP.
+
+Use Hardhat Guard or Mana Barrier to reduce the hit, defeat the king during
+the charge, or drain its MP below Bump's current cost to interrupt it. MP is
+paid only when Bump is released. If it cannot pay, or its target withdraws,
+the king uses Claw Strike instead and records the interruption. Its 6 MP
+allow one Bump; free Claw Strikes restore MP for another. Charging, target,
+and results are saved, so reconnecting cannot skip the response turn or
+reroll an attack. Old battles without this behavior keep their original rules.
+Pets cannot learn Bump. A solo player's coin always applies, even against a stronger
 monster. In a team battle, the strongest participating pet supplies the
 coin. Monsters never supply coins. The scene starts at the pet's saved HP/MP (plus any Copper shield),
 and each monster starts at full HP/MP.
@@ -920,7 +945,8 @@ grant more recovery, or resurrect a monster.
 All 30 learnable skills have distinct animated vector effects, including
 shields and healing on the caster, a field effect on every fighter, and
 visible misses. Claw Strike, retained legacy skills, and the Slime King's
-Bump have their own effects too. Basics are brief; finishers take about a
+Bump have their own effects too, with a separate crown-and-rings animation
+on the king while it charges. Basics are brief; finishers take about a
 second. Effects use saved results, pause in hidden tabs or behind another
 dialog, and clear between turns and when the battle closes. Reduced-motion
 mode shows static skill artwork and the same result text without pet motion.
@@ -1132,8 +1158,11 @@ The `grass` array matches the 16 × 16 terrain grid: `g` marks tall grass
 and `.` marks other tiles. Ordinary entries in `enemies` have
 `hidden: true` and omit coordinates and patrol routes; the Slime King has
 `hidden: false` with its visible `x` and `y`. Every enemy includes its
-`type` and `weakness` (the skill types that are super effective against
-it). A battle triggered by grass
+`type` and `weakness` (the pet types with an advantage against it), plus
+`moves`; new builds also include `build` and `strategy`. Active boss battles
+may include `monsterIntent: { ability: "bump", target }`, with a fighter index
+for the locked target. A charge is a saved turn with `telegraph: true`,
+zero damage, and zero MP cost. A battle triggered by grass
 includes `battle.surprise: true`. Encounter seeds and counters stay on the
 server.
 

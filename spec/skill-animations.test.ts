@@ -206,3 +206,53 @@ it('retains distinct legacy move effects and animates the boss’s automatic Bum
     expect(s.$('.skill-vfx').parentElement!.id).toBe('battle-avatar-0');
   } finally { s.close(); }
 });
+
+it.each([false, true])('shows a saved boss charge on the caster and a persistent target warning (reduced motion: %s)', reduce => {
+  const s = screen(reduce);
+  try {
+    const king = { id: 'king', name: 'Slime King', monster: 'slime-king' as const, strength: 18, intelligence: 10, charisma: 12,
+      abilities: ['bump'] as const, tactic: 'boss' as const, strategy: 'Charges Bump before attacking.' };
+    const b = startBattle([{ ...pet, equippedCoin: undefined }], king, [200, 58], { random: () => 0.6 });
+    s.show(b); s.tick();
+    expect(s.$('.skill-vfx').dataset.motion).toBe('charge');
+    expect(s.$('.skill-vfx').parentElement!.id).toBe('battle-avatar-1');
+    expect(s.$('.skill-vfx').classList.contains('is-still')).toBe(reduce);
+    expect(s.$('.battle-cue').textContent).toBe('Charging');
+    expect(s.$('#battle-ability-cost').textContent).toContain('No MP spent');
+    s.tick();
+    expect(s.$('#battle-intent').hidden).toBe(false);
+    expect(s.$('#battle-intent').textContent).toContain('Target: pet (you)');
+    expect(s.$('#battle-intent').textContent).toContain('below 5 MP');
+    expect(s.$('#battle-intent').closest('[role="status"]')?.getAttribute('aria-atomic')).toBe('true');
+    expect(s.$('#battle-strategy').textContent).toContain('Charges Bump');
+    expect(s.$('[data-skill="hardhat-guard"]')).toHaveProperty('disabled', false);
+    s.reset(); s.show(JSON.parse(JSON.stringify(b))); s.tick(); s.tick();
+    expect(s.$('#battle-intent').hidden).toBe(false);
+    const after = move(b, 'hardhat-guard'); s.show(after);
+    expect(s.$('#battle-intent').hidden).toBe(true);
+    s.tick();
+    expect(s.$('.skill-vfx').dataset.motion).toBe('bump');
+    expect(s.$('.skill-vfx').parentElement!.id).toBe('battle-avatar-0');
+    s.tick();
+    expect(s.$('#battle-intent').hidden).toBe(true);
+    s.reset(); s.show(initial());
+    expect(s.$('#battle-intent').hidden).toBe(true);
+    expect(s.$('#battle-strategy').hidden).toBe(true);
+  } finally { s.close(); }
+});
+
+it('updates the boss warning after a teammate drains MP, before the next player chooses', () => {
+  const s = screen(true);
+  try {
+    const king = { id: 'king', monster: 'slime-king' as const, strength: 18, intelligence: 10, charisma: 12,
+      abilities: ['bump'] as const, tactic: 'boss' as const };
+    const b = startBattle([{ ...pet, intelligence: 15, equippedCoin: undefined }, { ...pet, id: 'ally', strength: 5, equippedCoin: undefined }],
+      king, [165, 110, 58], { random: () => 0.6 });
+    s.show(b); s.tick(); s.tick();
+    s.show(move(b, 'synapse-shock')); s.tick();
+    expect(s.$('#battle-intent').hidden).toBe(false);
+    expect(s.$('#battle-intent').textContent).toContain('Bump interrupted: not enough MP');
+    expect(s.$('#battle-status').textContent).toContain('Waiting for ally');
+    expect(s.$('[data-skill="hardhat-guard"]')).toHaveProperty('disabled', true);
+  } finally { s.close(); }
+});

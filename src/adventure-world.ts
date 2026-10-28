@@ -1,6 +1,6 @@
 // Pure map and movement rules, shared by persistence and focused rule tests.
 import { randomInt } from 'node:crypto';
-import type { MonsterAbilityId } from './combat.ts';
+import { MONSTER_BUILDS, type MonsterBuildId } from './monsters.ts';
 import type { TreasureReward } from './treasure.ts';
 export const SIZE = 16;
 export const FLOOR_COUNT = 5;
@@ -13,6 +13,7 @@ export type Enemy = Point & {
   strength: number;
   intelligence: number;
   charisma: number;
+  build?: MonsterBuildId;
   // Kept in saved maps for compatibility; ordinary monsters now hide in grass.
   route: [Point, Point];
   leg: 0 | 1;
@@ -35,9 +36,7 @@ export type Floor = {
   // Legacy patrol timestamp; no longer advances monsters.
   patrolledAt?: number;
 };
-// What each kind knows besides the free Claw Strike. Looked up by kind rather
-// than saved on each enemy, so maps saved before a move existed get it too.
-export const MONSTER_MOVES: Record<Enemy['kind'], readonly MonsterAbilityId[]> = { slime: [], goblin: [], 'slime-king': ['bump'] };
+export { MONSTER_MOVES } from './monsters.ts';
 export const samePoint = (a: Point, b: Point): boolean => a.x === b.x && a.y === b.y;
 export const nearby = (a: Point, b: Point): boolean => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= 1;
 export const directions = { w: [0, -1], a: [-1, 0], s: [0, 1], d: [1, 0] } as const;
@@ -46,13 +45,14 @@ export const walkable = (floor: Floor, point: Point): boolean => floor.tiles[poi
 function ordinaryEnemies(number: number, wave = 0): Enemy[] {
   const index = number - 1;
   const routes = [[[6, 2], [9, 2]], [[10, 5], [13, 5]], [[4, 11], [4, 8]], [[9, 12], [6, 12]]];
+  const builds = ['woodland-slime', 'goblin-bruiser', 'mind-slime', 'glimmer-goblin'] as const;
   return routes.map(([[x, y], [postX, postY]], i) => {
-    const goblin = i % 2 === 1;
+    const build = builds[i], profile = MONSTER_BUILDS[build];
+    const [strength, intelligence, charisma] = profile.stats.map((stat, i) => stat + index * profile.growth[i]);
     return {
       id: wave ? `f${number}-wave-${wave}-enemy-${i}` : `f${number}-enemy-${i}`,
-      x, y, kind: goblin ? 'goblin' : 'slime', name: goblin ? 'Goblin' : 'Slime',
-      strength: (goblin ? 5 : 3) + index * 2, intelligence: (goblin ? 3 : 1) + index,
-      charisma: 2 + index, route: [{ x, y }, { x: postX, y: postY }], leg: 1,
+      x, y, build, kind: profile.kind, name: profile.name,
+      strength, intelligence, charisma, route: [{ x, y }, { x: postX, y: postY }], leg: 1,
     };
   });
 }
@@ -68,7 +68,7 @@ export function createWorld(): Floor[] {
     // coordinates are legacy data; only the boss occupies a visible map tile.
     const enemies = ordinaryEnemies(number);
     if (number === FLOOR_COUNT) enemies.push({
-      id: 'slime-king', kind: 'slime-king', name: 'Slime King', x: 10, y: 11,
+      id: 'slime-king', kind: 'slime-king', build: 'slime-king', name: 'Slime King', x: 10, y: 11,
       strength: 18, intelligence: 10, charisma: 12, route: [{ x: 10, y: 11 }, { x: 12, y: 11 }], leg: 1,
     });
     const tiles = Array.from({ length: SIZE }, (_, y) => Array.from({ length: SIZE }, (_, x) => {

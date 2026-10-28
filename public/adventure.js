@@ -113,6 +113,8 @@ guide.innerHTML = `
       <li>Choose an equipped skill on your turn. Equip learned skills at your storage chest at home.</li>
       <li>Your highest stat determines your type when it leads both others by at least 20%. STR beats CHA, CHA beats INT, INT beats STR: +20% damage and 20% damage mitigation. Normal is neutral.</li>
       <li>STR raises Max HP; INT raises Max MP from 5. Basic attacks restore MP. Higher CHA grants evasion; sure-hit attacks ignore it.</li>
+      <li>Bruisers guard, CHA dodgers punish misses, and INT casters drain MP. Check each enemy's strategy and skills below.</li>
+      <li>The Slime King spends a turn charging Bump at a named target. Guard, drain its MP, or defeat it before its next turn.</li>
       <li>Learn skills from job specializations, monster victories (25% chance; boss guaranteed), and treasure scrolls. Check your home skill book for each source and required floor.</li>
       <li>Your coin always applies in solo battles. In a team, the pet with the highest total attributes supplies the coin.</li>
       <li>Teammates beside you join your battles.</li>
@@ -507,7 +509,8 @@ function renderMonsters() {
     const where = hiddenEnemy(enemy) ? 'Hidden in tall grass' : `column ${enemy.x + 1}, row ${enemy.y + 1}`;
     const type = enemy.type ? ` · ${typeName(enemy.type)} type, weak to ${(enemy.weakness ?? []).map(typeName).join(' and ')}` : '';
     const drops = enemy.skillDrops?.length ? ` · Skill drops: ${enemy.skillDrops.map(s => s.name).join(', ')}` : '';
-    item.textContent = `${enemy.name}${type} · ${where} · HP ${enemy.maxHp ?? enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.maxMp ?? enemy.intelligence} · STR ${enemy.strength} / INT ${enemy.intelligence} / CHA ${enemy.charisma}${moves}${drops}`;
+    const strategy = enemy.strategy ? ` · ${enemy.strategy}` : '';
+    item.textContent = `${enemy.name}${type} · ${where} · HP ${enemy.maxHp ?? enemy.strength + enemy.intelligence + enemy.charisma} · MP ${enemy.maxMp ?? enemy.intelligence} · STR ${enemy.strength} / INT ${enemy.intelligence} / CHA ${enemy.charisma}${strategy}${moves}${drops}`;
     roster.append(item);
   }
   const rebuilt = makeTerrain();
@@ -523,7 +526,7 @@ function renderMonsters() {
   for (const enemy of state.enemies.filter(enemy => !hiddenEnemy(enemy))) {
     const key = `enemy:${enemy.id}`;
     active.add(key);
-    const node = placeActor(key, enemy, `adventure-marker-${enemy.kind}`, mapIcon(enemy.kind), `${enemy.name} · HP ${enemy.strength + enemy.intelligence + enemy.charisma}`);
+    const node = placeActor(key, enemy, `adventure-marker-${enemy.kind}`, mapIcon(enemy.kind), `${enemy.name} · HP ${enemy.maxHp ?? enemy.strength + enemy.intelligence + enemy.charisma}`);
     node.dataset.enemy = enemy.id;
   }
   for (const [key, entry] of actorNodes) {

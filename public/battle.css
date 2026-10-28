@@ -21,11 +21,12 @@
 #battle-dialog [data-type="water"] { --type: var(--type-water); }
 #battle-dialog [data-type="grass"] { --type: var(--type-grass); }
 #battle-dialog [data-type="earth"] { --type: var(--type-earth); }
-.battle-type { width: fit-content; margin: 4px auto 0; padding: 1px 10px; border: 1px solid currentColor; border-radius: 999px; color: var(--type, var(--muted)); font-size: .72rem; font-weight: 700; }
+.battle-type { width: fit-content; margin: 4px auto 0; padding: 1px 10px; border: 1px solid currentColor; border-radius: 999px; background: var(--surface); color: var(--type, var(--muted)); font-size: .72rem; font-weight: 700; }
 .battle-type[hidden] { display: none; }
 .battle-avatar { width: 116px; max-width: 100%; margin: 12px auto; }
 .battle-avatar svg { width: 100%; display: block; }
 .battle-monster { fill: none; stroke: var(--fg); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.monster-gear { fill: currentColor; stroke: var(--fg); stroke-width: 2; paint-order: stroke fill; }
 #battle-close { min-height: 44px; }
 .battle-versus { text-align: center; font-weight: 800; font-size: .8rem; color: var(--muted); }
 .battle-fighter label { display: flex; justify-content: space-between; gap: 6px; font-size: .78rem; font-variant-numeric: tabular-nums; }
@@ -45,6 +46,9 @@
 .battle-ability svg { width: 30px; height: 30px; flex-shrink: 0; stroke: var(--primary); stroke-width: 3; fill: none; stroke-linecap: round; }
 .battle-ability span { display: block; color: var(--muted); font-size: .8rem; }
 #battle-status { min-height: 3.2em; font-weight: 700; font-size: .9rem; overflow-wrap: anywhere; }
+.battle-strategy { margin: 10px 0 0; color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
+.battle-intent { padding: 12px; border: 1px solid var(--stamina); border-left-width: 4px; border-radius: 10px; background: var(--bg-glow); color: var(--fg); font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; }
+.battle-intent[hidden], .battle-strategy[hidden] { display: none; }
 .battle-log { font-size: .8rem; color: var(--muted); }
 .battle-log summary { padding: 8px 0; }
 #battle-log { max-height: 120px; overflow-y: auto; padding-left: 24px; }
@@ -139,6 +143,7 @@
 .skill-vfx[data-motion="wave"] { --fx-motion: fx-wave; }
 .skill-vfx[data-motion="vine"] { --fx-motion: fx-vine; }
 .skill-vfx[data-motion="bump"] { --fx-motion: fx-bump; }
+.skill-vfx[data-motion="charge"] { --fx-motion: fx-charge; }
 
 @keyframes fx-presence { 0% { opacity: 0; } 16%, 78% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes fx-echo { 0%, 15% { opacity: 0; transform: scale(.5); } 40% { opacity: .9; } 100% { opacity: 0; transform: scale(1.12); } }
@@ -180,6 +185,7 @@
 @keyframes fx-wave { from { transform: translateX(calc(-22px * var(--fx-direction))) scale(.7, .4); } 55% { transform: scale(1.08, 1.1); } to { transform: translateY(8px) scale(1.1, .7); } }
 @keyframes fx-vine { from { transform: rotate(-75deg) scale(.5); } 55% { transform: rotate(15deg) scale(1.03); } to { transform: rotate(-8deg); } }
 @keyframes fx-bump { from { transform: scale(.2); } 40% { transform: scale(1.1, .85); } 70% { transform: scale(.9, 1.06); } to { transform: scale(1.12); } }
+@keyframes fx-charge { from { transform: translateY(6px) scale(.65); } 55% { transform: translateY(2px) scale(1.05, .9); } to { transform: translateY(-3px) scale(1.08); } }
 @media (max-width: 480px) {
   #battle-dialog { padding: 16px; }
   .battle-stage { gap: 4px; padding: 14px 8px; grid-template-columns: minmax(0,1fr) 24px minmax(0,1fr); }

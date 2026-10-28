@@ -11,8 +11,9 @@ import {
 import { grantTreasure } from './inventory.ts';
 import { COINS, rollTreasure, type TreasureReward } from './treasure.ts';
 import { monsterSkills, MONSTER_SKILL_DROP_RATE } from './skills.ts';
+import { monsterBuild, monsterMoves } from './monsters.ts';
 import {
-  createWorld, directions, FLOOR_COUNT, FLOOR_KEY_DROP_RATE, grassEncounter, MONSTER_MOVES, nearby, prepareExit, prepareGrass, samePoint, SIZE, walkable, type Enemy, type Floor, type Point,
+  createWorld, directions, FLOOR_COUNT, FLOOR_KEY_DROP_RATE, grassEncounter, nearby, prepareExit, prepareGrass, samePoint, SIZE, walkable, type Enemy, type Floor, type Point,
 } from './adventure-world.ts';
 import { realMs, TIME_SCALE } from './clock.ts';
 
@@ -134,7 +135,8 @@ function view(saved: Progress) {
       hidden: enemy.kind !== 'slime-king', alerted: false,
       type: mainAttribute(enemy), weakness: weaknessOf(mainAttribute(enemy)), maxHp: maxHpFor(enemy), maxMp: maxMpFor(enemy),
       skillDrops: monsterSkills(enemy.kind, floor.number).map(s => ({ id: s.id, name: s.name })),
-      moves: MONSTER_ABILITIES.filter(a => MONSTER_MOVES[enemy.kind].includes(a.id)),
+      strategy: monsterBuild(enemy)?.strategy,
+      moves: [...ABILITIES, ...MONSTER_ABILITIES].filter(a => monsterMoves(enemy, floor.number).some(id => id === a.id)),
     })),
     up: floor.up, down: floor.down, revision: saved.revision,
     battle: saved.battle ? { ...saved.battle, playback: saved.battle.pending || recordsAvailable ? saved.battle.playback : null } : null,
@@ -269,8 +271,10 @@ function saveBattle(saved: Progress, participants: Progress[], playback: ActiveB
 // monsters choose attacks automatically: a pet's saved turn waits for its owner.
 function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = false) {
   const allies = alliesOf(saved), participants = [saved, ...allies];
-  const monster = { ...enemy, id: `monster:${enemy.id}`, monster: enemy.kind, abilities: MONSTER_MOVES[enemy.kind],
-    color: { slime: '#0891b2', goblin: '#15803d', 'slime-king': '#c026d3' }[enemy.kind] };
+  const build = monsterBuild(enemy);
+  const monster = { ...enemy, id: `monster:${enemy.id}`, monster: enemy.kind, abilities: monsterMoves(enemy, saved.floor),
+    tactic: build?.tactic, strategy: build?.strategy,
+    color: build?.color ?? { slime: '#0891b2', goblin: '#15803d', 'slime-king': '#c026d3' }[enemy.kind] };
   const roll = (stats: Parameters<typeof powerOf>[0]) => powerOf(stats) * (LUCK.min + Math.random() * (LUCK.max - LUCK.min));
   const playback = startBattle(participants.map(fighter => fighter.pet), monster,
     [...participants.map(fighter => roll(fighter.pet)), roll(monster)], {
