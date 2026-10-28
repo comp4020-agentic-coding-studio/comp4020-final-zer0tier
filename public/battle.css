@@ -67,27 +67,119 @@
 .battle-skill[data-type]:not([data-type="normal"]) { border-left: 6px solid var(--type); }
 .battle-skill[data-type]:not([data-type="normal"]) span { color: var(--type); }
 .battle-fighter.taking-turn h3::before { content: '› '; color: var(--primary); }
-#battle-dialog[data-ability="tide-crash"] .battle-fighter.hit::after {
-  content: ''; width: 44px; height: 30px; border-radius: 50% 50% 40% 40%;
-  background: radial-gradient(circle at 40% 35%, #e0fbff 12%, #5fd0e6 50%, #1d7f9c 80%);
-  box-shadow: 0 0 14px #5fd0e688; animation: skill-flare 450ms both;
+/* Portrait-local effects cannot expand the dialog or cover its controls.
+   One core and one accent group animate with transforms/opacity only. */
+.battle-avatar { position: relative; isolation: isolate; }
+.skill-vfx {
+  position: absolute; inset: -10%; z-index: 2; pointer-events: none;
+  --fx: #e89c48; --fx-ink: #783e21; --fx-motion: fx-claw;
+  animation: fx-presence var(--fx-duration) ease-out both;
 }
-#battle-dialog[data-ability="vine-lash"] .battle-fighter.hit::after { content: '❦'; font-size: 3.2rem; color: #4f9a45; }
-#battle-dialog[data-ability="firebolt"] .battle-fighter.hit::after {
-  content: ''; width: 38px; height: 38px; border-radius: 50% 50% 50% 8%;
-  background: radial-gradient(circle, #fff4bb 10%, #ffa34c 45%, #d55139 70%);
-  box-shadow: 0 0 16px #f6a34988; transform: rotate(-45deg); animation: skill-flare 450ms both;
+.skill-vfx[data-palette="str"] { --fx: #ed8b5e; --fx-ink: #88382d; }
+.skill-vfx[data-palette="cha"] { --fx: #e9a2d1; --fx-ink: #703968; }
+.skill-vfx[data-palette="int"] { --fx: #8dd9ec; --fx-ink: #235b83; }
+.skill-vfx svg { width: 100%; height: 100%; overflow: visible; fill: none; stroke: var(--fx-ink); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.skill-vfx .fx-solid { fill: var(--fx); }
+.skill-vfx .fx-paper { fill: #fff8e6; }
+.skill-vfx .fx-ribbon { stroke: var(--fx); stroke-width: 7; }
+.skill-vfx .fx-core, .skill-vfx .fx-detail { transform-box: view-box; transform-origin: 50% 50%; }
+/* Fade once at the wrapper, so easing cannot make the artwork disappear
+   before a slower finisher reaches its impact. */
+.skill-vfx .fx-core { animation: var(--fx-motion) var(--fx-duration) cubic-bezier(.22,.7,.3,1) both; }
+.skill-vfx .fx-detail { animation: fx-echo var(--fx-duration) ease-out both; stroke: var(--fx-ink); }
+.battle-cue {
+  position: absolute; z-index: 3; left: 50%; top: 3%; transform: translateX(-50%);
+  max-width: 140%; padding: 2px 8px; border: 1px solid #af7250; border-radius: 8px;
+  background: #fff8e6; color: #743e24; font-size: .85rem; font-weight: 800;
+  line-height: 1.35; white-space: nowrap; pointer-events: none;
+  animation: fx-cue 650ms ease-out both;
 }
-#battle-dialog[data-ability="heavy-strike"] .battle-fighter.hit::after { content: '✦'; font-size: 3.5rem; color: var(--stamina); }
-@keyframes skill-flare { from { opacity: 0; scale: .3; } 45% { opacity: 1; scale: 1.2; } to { opacity: 0; scale: 1.5; } }
-.battle-fighter.striking .battle-avatar { animation: claw-lunge 350ms ease-out; }
-#battle-fighter-1.striking .battle-avatar { animation-name: claw-lunge-back; }
-.battle-fighter.hit .battle-avatar { animation: claw-hit 350ms ease-out; }
-.battle-fighter.hit::after { content: '╱╱╱'; position: absolute; top: 30%; left: 30%; color: var(--error); font-size: 2.5rem; font-weight: 900; pointer-events: none; animation: claw-slash 450ms both; }
-@keyframes claw-lunge { 50% { transform: translateX(24px) rotate(8deg); } }
-@keyframes claw-lunge-back { 50% { transform: translateX(-24px) rotate(-8deg); } }
-@keyframes claw-hit { 35% { transform: translateY(-6px) rotate(-6deg); opacity: .5; } }
-@keyframes claw-slash { from { opacity: 0; transform: scale(.5); } 40% { opacity: 1; } to { opacity: 0; transform: scale(1.3); } }
+.battle-cue[data-outcome="damage"] { color: #9b3029; }
+.battle-cue[data-outcome="support"] { color: #285d4c; }
+.battle-cue[data-outcome="miss"] { color: #65487d; }
+.skill-vfx.is-miss .fx-core { animation-name: fx-whiff; }
+.skill-vfx.is-miss .fx-detail { display: none; }
+.skill-vfx.is-still, .skill-vfx.is-still * { animation: none !important; }
+.skill-vfx.is-still { opacity: .85; }
+.skill-vfx.is-still.is-miss { opacity: .35; }
+#battle-dialog.battle-motion-paused *, #battle-dialog:not([open]) * { animation-play-state: paused !important; }
+
+.skill-vfx[data-motion="breath"] { --fx-motion: fx-breath; }
+.skill-vfx[data-motion="sweep"] { --fx-motion: fx-sweep; }
+.skill-vfx[data-motion="pie"] { --fx-motion: fx-pie; }
+.skill-vfx[data-motion="maul"] { --fx-motion: fx-maul; }
+.skill-vfx[data-motion="bloodlust"] { --fx-motion: fx-bloodlust; }
+.skill-vfx[data-motion="titan"] { --fx-motion: fx-titan; }
+.skill-vfx[data-motion="pump"] { --fx-motion: fx-pump; }
+.skill-vfx[data-motion="roar"] { --fx-motion: fx-roar; }
+.skill-vfx[data-motion="hardhat"] { --fx-motion: fx-hardhat; }
+.skill-vfx[data-motion="smile"] { --fx-motion: fx-smile; }
+.skill-vfx[data-motion="heckle"] { --fx-motion: fx-heckle; }
+.skill-vfx[data-motion="riposte"] { --fx-motion: fx-riposte; }
+.skill-vfx[data-motion="siren"] { --fx-motion: fx-siren; }
+.skill-vfx[data-motion="velvet"] { --fx-motion: fx-velvet; }
+.skill-vfx[data-motion="crown"] { --fx-motion: fx-crown; }
+.skill-vfx[data-motion="makeover"] { --fx-motion: fx-makeover; }
+.skill-vfx[data-motion="perfume"] { --fx-motion: fx-perfume; }
+.skill-vfx[data-motion="ovation"] { --fx-motion: fx-ovation; }
+.skill-vfx[data-motion="dart"] { --fx-motion: fx-dart; }
+.skill-vfx[data-motion="synapse"] { --fx-motion: fx-synapse; }
+.skill-vfx[data-motion="gravity"] { --fx-motion: fx-gravity; }
+.skill-vfx[data-motion="laser"] { --fx-motion: fx-laser; }
+.skill-vfx[data-motion="mind"] { --fx-motion: fx-mind; }
+.skill-vfx[data-motion="grimoire"] { --fx-motion: fx-grimoire; }
+.skill-vfx[data-motion="review"] { --fx-motion: fx-review; }
+.skill-vfx[data-motion="barrier"] { --fx-motion: fx-barrier; }
+.skill-vfx[data-motion="coffee"] { --fx-motion: fx-coffee; }
+.skill-vfx[data-motion="jack"] { --fx-motion: fx-jack; }
+.skill-vfx[data-motion="equalizer"] { --fx-motion: fx-equalizer; }
+.skill-vfx[data-motion="golden"] { --fx-motion: fx-golden; }
+.skill-vfx[data-motion="hammer"] { --fx-motion: fx-hammer; }
+.skill-vfx[data-motion="flame"] { --fx-motion: fx-flame; }
+.skill-vfx[data-motion="wave"] { --fx-motion: fx-wave; }
+.skill-vfx[data-motion="vine"] { --fx-motion: fx-vine; }
+.skill-vfx[data-motion="bump"] { --fx-motion: fx-bump; }
+
+@keyframes fx-presence { 0% { opacity: 0; } 16%, 78% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes fx-echo { 0%, 15% { opacity: 0; transform: scale(.5); } 40% { opacity: .9; } 100% { opacity: 0; transform: scale(1.12); } }
+@keyframes fx-cue { from { opacity: 0; transform: translate(-50%, 6px); } 30%, 80% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -12px); } }
+@keyframes fx-whiff { from { transform: translateX(calc(-35px * var(--fx-direction))) rotate(-20deg) scale(.65); opacity: .5; } to { transform: translateX(calc(35px * var(--fx-direction))) rotate(15deg) scale(.5); opacity: 0; } }
+@keyframes fx-breath { 0% { transform: translateY(-16px) scale(.6); } 45% { transform: translateY(12px) scale(1.06, .82); } 100% { transform: translateY(5px) scale(1.12); } }
+@keyframes fx-sweep { from { transform: rotate(-70deg) scale(.75); } 65% { transform: rotate(22deg); } to { transform: rotate(35deg); } }
+@keyframes fx-pie { from { transform: translateX(calc(-28px * var(--fx-direction))) rotate(-35deg) scale(.65); } 50% { transform: rotate(12deg) scale(1.08); } to { transform: rotate(-5deg) scale(1.13, .8); } }
+@keyframes fx-maul { 0% { transform: scale(1.15, 1.4); } 45% { transform: scale(.95, .8); } 70% { transform: scale(1, 1.06); } 100% { transform: none; } }
+@keyframes fx-bloodlust { 0% { transform: rotate(-40deg) scale(.2); } 35% { transform: rotate(12deg) scale(1.15); } 55% { transform: rotate(-5deg) scale(.92); } 100% { transform: scale(1.1); } }
+@keyframes fx-titan { 0% { transform: translateY(-32px) scale(.85); } 40% { transform: translateY(9px) scale(1.08, .85); } 55%, 78% { transform: translateY(2px); } 100% { } }
+@keyframes fx-pump { 0%, 60% { transform: translateY(10px); } 30%, 85% { transform: translateY(-13px); } 100% { transform: translateY(-8px); } }
+@keyframes fx-roar { from { transform: scale(.3, .8); } 55% { transform: scale(1.05); } to { transform: scale(1.15, .9); } }
+@keyframes fx-hardhat { from { transform: translateY(-18px) scale(.6); } 45% { transform: translateY(3px) scale(1.05); } 70% { transform: none; } to { transform: scale(.95); } }
+@keyframes fx-smile { from { transform: translateY(12px) rotate(-12deg) scale(.6); } 55% { transform: rotate(8deg); } to { transform: translateY(-10px) rotate(-4deg); } }
+@keyframes fx-heckle { from { transform: translateX(calc(-25px * var(--fx-direction))) rotate(-16deg); } 40% { transform: translateX(4px) rotate(8deg); } 65% { transform: rotate(-5deg); } to { transform: none; } }
+@keyframes fx-riposte { 0% { transform: translate(-12px, 16px) rotate(-45deg) scale(.65); } 45% { transform: translate(6px, -8px) rotate(10deg); } 100% { transform: translate(12px, -14px) rotate(16deg); } }
+@keyframes fx-siren { from { transform: rotate(-18deg) scale(.5); } 50% { transform: rotate(10deg) scale(1.03); } to { transform: translateY(-12px) rotate(-5deg); } }
+@keyframes fx-velvet { from { transform: scaleX(.1); } 45% { transform: scaleX(1.08); } 70% { transform: scaleX(.96); } to { transform: scaleX(1); } }
+@keyframes fx-crown { from { transform: translateY(-24px) scale(.7); } 40% { transform: translateY(0); } 70% { transform: scale(1.08); } to { transform: translateY(5px); } }
+@keyframes fx-makeover { from { transform: rotateY(75deg) rotate(-12deg) scale(.75); } 55% { transform: rotateY(0) rotate(5deg); } to { transform: rotate(-5deg) scale(1.05); } }
+@keyframes fx-perfume { from { transform: translateY(15px) rotate(-10deg) scale(.75); } 45% { transform: rotate(5deg); } 75% { transform: translateY(-6px) rotate(-3deg); } to { transform: translateY(-12px); } }
+@keyframes fx-ovation { 0%, 50% { transform: scaleX(1.1) rotate(-4deg); } 25%, 75% { transform: scaleX(.83) rotate(4deg); } to { transform: translateY(-8px); } }
+@keyframes fx-dart { from { transform: translate(calc(-32px * var(--fx-direction)), 14px) rotate(-15deg) scale(.5); } 65% { transform: translate(3px, -3px) scale(1); } to { transform: translate(calc(20px * var(--fx-direction)), -12px) scale(.8); } }
+@keyframes fx-synapse { from { transform: scale(.45) rotate(-12deg); } 35% { transform: scale(1.07) rotate(3deg); } 65% { transform: scale(.94) rotate(-3deg); } to { transform: scale(1.02); } }
+@keyframes fx-gravity { from { transform: scale(1.25); } 45% { transform: scale(.73); } 75% { transform: scale(.95); } to { transform: scale(.6); } }
+@keyframes fx-laser { 0%, 15% { transform: scaleX(.05); } 35%, 65% { transform: scaleX(1); } to { transform: scaleX(1.1) scaleY(.3); } }
+@keyframes fx-mind { from { transform: rotate(-35deg) scale(.65); } 50% { transform: rotate(10deg) scale(1.04); } to { transform: rotate(25deg) scale(.85); } }
+@keyframes fx-grimoire { from { transform: translateY(18px) scaleX(.15); } 35% { transform: scaleX(1.04); } 70% { transform: translateY(-5px); } to { transform: translateY(-14px); } }
+@keyframes fx-review { from { transform: translate(-8px, 12px) rotate(-10deg) scale(.8); } 50% { transform: translate(3px, -3px) rotate(3deg); } to { transform: translateY(-8px); } }
+@keyframes fx-barrier { from { transform: scale(.3) rotate(-30deg); } 45% { transform: scale(1.06) rotate(4deg); } 75% { transform: scale(.96); } to { transform: scale(1.03); } }
+@keyframes fx-coffee { from { transform: translateY(16px) rotate(-8deg); } 45% { transform: translateY(-4px) rotate(5deg); } to { transform: translateY(-10px) rotate(0); } }
+@keyframes fx-jack { from { transform: rotate(-120deg) scale(.45); } 65% { transform: rotate(5deg) scale(1); } to { transform: rotate(15deg) scale(.85); } }
+@keyframes fx-equalizer { from { transform: scale(1, .15); } 45% { transform: scale(1.05, 1.05); } to { transform: scale(1.1, .9); } }
+@keyframes fx-golden { from { transform: rotate(-90deg) scale(.3); } 55% { transform: rotate(0) scale(1.04); } to { transform: rotate(15deg) scale(1.08); } }
+@keyframes fx-claw { from { transform: translate(12px, -16px) scale(.6); } 50% { transform: translate(-2px, 4px) scale(1); } to { transform: translate(-8px, 10px); } }
+@keyframes fx-hammer { from { transform: rotate(-60deg) translateY(-14px); } 50% { transform: rotate(8deg) translateY(5px); } to { transform: rotate(0); } }
+@keyframes fx-flame { from { transform: translateX(calc(-30px * var(--fx-direction))) scale(.45); } 45% { transform: scale(1.04, 1.12) rotate(8deg); } to { transform: translateY(-12px) scale(.7, 1.1); } }
+@keyframes fx-wave { from { transform: translateX(calc(-22px * var(--fx-direction))) scale(.7, .4); } 55% { transform: scale(1.08, 1.1); } to { transform: translateY(8px) scale(1.1, .7); } }
+@keyframes fx-vine { from { transform: rotate(-75deg) scale(.5); } 55% { transform: rotate(15deg) scale(1.03); } to { transform: rotate(-8deg); } }
+@keyframes fx-bump { from { transform: scale(.2); } 40% { transform: scale(1.1, .85); } 70% { transform: scale(.9, 1.06); } to { transform: scale(1.12); } }
 @media (max-width: 480px) {
   #battle-dialog { padding: 16px; }
   .battle-stage { gap: 4px; padding: 14px 8px; grid-template-columns: minmax(0,1fr) 24px minmax(0,1fr); }
@@ -127,4 +219,6 @@
   #battle-dialog [data-type="str"] { --type: #fca5a5; }
   #battle-dialog [data-type="cha"] { --type: #e9b0f0; }
   #battle-dialog [data-type="int"] { --type: #93c5fd; }
+  .skill-vfx svg, .skill-vfx .fx-detail { stroke: var(--fx); }
+  .skill-vfx .fx-solid, .skill-vfx .fx-paper { stroke: var(--fx-ink); }
 }

@@ -917,6 +917,14 @@ long run exceeds that limit. Starting a new run clears that run's record.
 Replays use saved turns and cannot reroll an outcome or Floor Key drop,
 grant more recovery, or resurrect a monster.
 
+All 30 learnable skills have distinct animated vector effects, including
+shields and healing on the caster, a field effect on every fighter, and
+visible misses. Claw Strike, retained legacy skills, and the Slime King's
+Bump have their own effects too. Basics are brief; finishers take about a
+second. Effects use saved results, pause in hidden tabs or behind another
+dialog, and clear between turns and when the battle closes. Reduced-motion
+mode shows static skill artwork and the same result text without pet motion.
+
 **The first solo adventure is free. Later fresh starts cost 40 stamina and
 20 hygiene**, and open a **4-hour cooldown**. This applies whenever the
 player re-enters, including after leaving an unfinished run. Starting is
