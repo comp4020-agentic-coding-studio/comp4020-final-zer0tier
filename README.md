@@ -924,6 +924,9 @@ Bump have their own effects too. Basics are brief; finishers take about a
 second. Effects use saved results, pause in hidden tabs or behind another
 dialog, and clear between turns and when the battle closes. Reduced-motion
 mode shows static skill artwork and the same result text without pet motion.
+Closing or reopening a battle also invalidates its old pending UI requests
+and confirmations. Dismissed encounters are removed from the waiting queue,
+so an obsolete fight cannot open after the replay in front of it closes.
 
 **The first solo adventure is free. Later fresh starts cost 40 stamina and
 20 hygiene**, and open a **4-hour cooldown**. This applies whenever the

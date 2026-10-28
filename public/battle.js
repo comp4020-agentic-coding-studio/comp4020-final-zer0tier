@@ -3,6 +3,9 @@
 let dialog;
 let timer;
 let scene = null;
+// A saved battle key can be reopened after logout or dismissal. Async work
+// belongs to that particular opening, not every future view of the same key.
+let sceneVersion = 0;
 let turn = 0;
 let submitting = false;
 let confirming = false;
@@ -201,10 +204,12 @@ function buildDialog() {
   $('battle-replay').addEventListener('click', () => { if (!scene?.manual && scene?.allowReplay !== false) play(scene); });
   dialog.addEventListener('close', () => {
     if (dialog.open) return;
+    sceneVersion++;
     cancelAdvance(); clearSkillVisuals();
     coveringDialogs.clear();
     motionPaused = false;
     submitting = false;
+    confirming = false;
     const closed = scene;
     scene = null;
     if (closed) document.dispatchEvent(new CustomEvent('battle:closed', { detail: { key: closed.key } }));
@@ -432,44 +437,49 @@ function awaitChoice() {
 async function chooseSkill(ability) {
   if (submitting || !scene?.manual || scene.battle.status !== 'active' || turn < scene.battle.turns.length) return;
   if (scene.battle.fighters[scene.battle.actor]?.id !== scene.viewer) return;
-  const active = scene;
+  const active = scene, version = sceneVersion;
   submitting = true;
   $('battle-error').textContent = '';
   awaitChoice();
   try {
     await active.onChoose(ability, active.battle.revision);
   } catch (error) {
-    if (scene?.key === active.key) $('battle-error').textContent = error.message || 'Could not save your move. Try again.';
+    if (sceneVersion === version && scene?.key === active.key) $('battle-error').textContent = error.message || 'Could not save your move. Try again.';
   } finally {
-    submitting = false;
-    if (scene?.key === active.key && !animating && turn >= scene.battle.turns.length && scene.battle.status === 'active') awaitChoice();
+    if (sceneVersion === version && scene?.key === active.key) {
+      submitting = false;
+      if (!animating && turn >= scene.battle.turns.length && scene.battle.status === 'active') awaitChoice();
+    }
   }
 }
 async function closeBattle() {
   if (!scene?.manual || scene.battle.status !== 'active') return dialog.close();
   if (submitting || confirming) return;
-  const active = scene;
+  const active = scene, version = sceneVersion;
   confirming = true;
   syncBattleMotion();
   $('battle-close').disabled = true;
   const yes = await new Promise(answer => document.dispatchEvent(new CustomEvent('confirm:ask', {
     detail: { title: 'Forfeit this battle?', message: 'Your pet will withdraw. In a team battle, your teammates can keep fighting.', answer },
   })));
+  if (sceneVersion !== version || scene?.key !== active.key) return;
   confirming = false;
   syncBattleMotion();
-  if (scene?.key !== active.key) return;
   if (!yes) { $('battle-close').disabled = false; return; }
   submitting = true;
   try {
     await scene.onForfeit(scene.battle.revision);
   } catch (error) {
-    if (scene?.key === active.key) $('battle-error').textContent = error.message || 'Could not forfeit. Try again.';
+    if (sceneVersion === version && scene?.key === active.key) $('battle-error').textContent = error.message || 'Could not forfeit. Try again.';
   } finally {
-    submitting = false;
-    if (scene?.key === active.key && !animating && turn >= scene.battle.turns.length && scene.battle.status === 'active') awaitChoice();
+    if (sceneVersion === version && scene?.key === active.key) {
+      submitting = false;
+      if (!animating && turn >= scene.battle.turns.length && scene.battle.status === 'active') awaitChoice();
+    }
   }
 }
 function play(next) {
+  sceneVersion++;
   cancelAdvance(); clearSkillVisuals();
   animating = false;
   scene = next;
@@ -477,6 +487,7 @@ function play(next) {
   if (!dialog) buildDialog();
   dialog.querySelectorAll('.battle-effects').forEach(label => label.remove());
   submitting = false;
+  confirming = false;
   $('battle-close').disabled = false;
   $('battle-error').textContent = '';
   $('battle-skills').hidden = true;
@@ -553,6 +564,7 @@ document.addEventListener('battle:show', ({ detail }) => {
   play(detail);
 });
 document.addEventListener('battle:reset', () => {
+  sceneVersion++;
   cancelAdvance(); clearSkillVisuals();
   queue.length = 0;
   seen.clear();
@@ -563,5 +575,8 @@ document.addEventListener('battle:reset', () => {
   if (dialog?.open) dialog.close();
 });
 document.addEventListener('battle:dismiss', ({ detail }) => {
+  for (let i = queue.length - 1; i >= 0; i--) {
+    if (queue[i].key === detail?.key) queue.splice(i, 1);
+  }
   if (scene?.key === detail?.key && dialog?.open) dialog.close();
 });

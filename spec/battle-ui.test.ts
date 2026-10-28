@@ -397,3 +397,79 @@ it('shows dynamic types, acquisition-era skills, costs, restrictions and status 
     expect(scene.$('battle-mp-text-0').textContent).toBe(`${updated.mp[0]} / 12`);
   } finally { scene.close(); }
 });
+
+it.each(['success', 'failure'])('ignores a delayed move %s after the same battle is reopened', async outcome => {
+  const scene = manualScene();
+  try {
+    let settleOld!: () => void, settleNew!: () => void, newRequests = 0;
+    const b = manualBattle();
+    scene.show(b, { onChoose: () => new Promise<void>((resolve, reject) => {
+      settleOld = () => outcome === 'success' ? resolve() : reject(new Error('Old connection failed'));
+    }) });
+    scene.skill('heavy-strike').click();
+    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:reset'));
+    // Signing back in can reopen the same saved battle key before its old
+    // request settles. The new window has its own request in flight.
+    scene.show(b, { onChoose: () => { newRequests++; return new Promise<void>(resolve => { settleNew = resolve; }); } });
+    scene.skill('heavy-strike').click();
+    settleOld(); await microtasks();
+    expect(scene.skill('heavy-strike').disabled).toBe(true);
+    expect(scene.$('battle-skills').getAttribute('aria-busy')).toBe('true');
+    expect(scene.$('battle-error').textContent).toBe('');
+    scene.skill('heavy-strike').click();
+    expect(newRequests).toBe(1);
+    settleNew(); await microtasks();
+    expect(scene.skill('heavy-strike').disabled).toBe(false);
+  } finally { scene.close(); }
+});
+
+it('cannot apply an old forfeit confirmation to a reopened battle', async () => {
+  const scene = manualScene();
+  try {
+    let answerOld!: (yes: boolean) => void, forfeits = 0;
+    scene.window.document.addEventListener('confirm:ask', event => { answerOld = (event as CustomEvent).detail.answer; });
+    const b = manualBattle();
+    scene.show(b, { onForfeit: () => { forfeits++; } });
+    scene.$('battle-close').click();
+    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:reset'));
+    scene.show(b, { onForfeit: () => { forfeits++; } });
+    answerOld(true); await microtasks();
+    expect(forfeits).toBe(0);
+    expect(scene.skill('heavy-strike').disabled).toBe(false);
+    expect((scene.$('battle-close') as HTMLButtonElement).disabled).toBe(false);
+  } finally { scene.close(); }
+});
+
+it('ignores a delayed forfeit response while a reopened battle is submitting a move', async () => {
+  const scene = manualScene();
+  try {
+    let failOld!: (error: Error) => void, settleNew!: () => void;
+    scene.window.document.addEventListener('confirm:ask', event => { (event as CustomEvent).detail.answer(true); });
+    const b = manualBattle();
+    scene.show(b, { onForfeit: () => new Promise<void>((_resolve, reject) => { failOld = reject; }) });
+    scene.$('battle-close').click(); await microtasks();
+    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:reset'));
+    scene.show(b, { onChoose: () => new Promise<void>(resolve => { settleNew = resolve; }) });
+    scene.skill('heavy-strike').click();
+    failOld(new Error('Old forfeit failed')); await microtasks();
+    expect(scene.skill('heavy-strike').disabled).toBe(true);
+    expect(scene.$('battle-error').textContent).toBe('');
+    settleNew(); await microtasks();
+    expect(scene.skill('heavy-strike').disabled).toBe(false);
+  } finally { scene.close(); }
+});
+
+it.each([false, true])('removes a dismissed queued battle and preserves other queued battles (%s)', hasNext => {
+  const scene = manualScene();
+  try {
+    const b = manualBattle();
+    scene.show(b, { key: 'replay:previous', manual: false, replay: true });
+    scene.show(b, { key: 'adventure:obsolete' });
+    if (hasNext) scene.show(b, { key: 'session:next', title: 'Next arena battle' });
+    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:dismiss', { detail: { key: 'adventure:obsolete' } }));
+    scene.$('battle-close').click();
+    expect((scene.$('battle-dialog') as HTMLDialogElement).open).toBe(hasNext);
+    if (hasNext) expect(scene.$('battle-title').textContent).toBe('Next arena battle');
+    expect(scene.timers.size).toBe(0);
+  } finally { scene.close(); }
+});
