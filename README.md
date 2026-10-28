@@ -984,6 +984,9 @@ skill; free skills neither pay nor consume it, preserving a recovery route.
 Mana Barrier absorbs at most the available MP, at one MP per damage.
 
 Timed effects last their listed number of rounds (one action per fighter).
+Knocked-out fighters' skipped turns still advance effect time; an off-turn
+forfeit does not. Accuracy rolls happen when the server accepts a move, and
+the saved outcome is reused on retries and in replays.
 Recasting refreshes duration; for each stat, only the strongest positive and
 strongest negative modifier apply. Stat buffs change maximum resources but
 do not refill them; expiry clamps excess resources. Golden Ratio's all-stat

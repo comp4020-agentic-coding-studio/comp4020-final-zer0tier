@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest';
-import { startBattle, takeBattleTurn, mainAttribute, maxHpFor, maxMpFor, balancedStats, type ActiveBattle, type AbilityId, type PetStats } from '../src/combat.ts';
+import { expect, it, vi } from 'vitest';
+import { startBattle, takeBattleTurn, forfeitBattle, mainAttribute, maxHpFor, maxMpFor, balancedStats, type ActiveBattle, type AbilityId, type PetStats } from '../src/combat.ts';
 import * as legacy from '../src/legacy-combat.ts';
 import { SKILLS } from '../src/skills.ts';
 const all = SKILLS.map(s => s.id);
@@ -165,4 +165,55 @@ it('stale, out-of-turn, unequipped and unaffordable requests are atomic; old bat
     { id: 'b', strength: 5, intelligence: 5, charisma: 5 }, [20, 20]);
   const restored = takeBattleTurn(JSON.parse(JSON.stringify(old)), 'a', 'claw-strike', 0);
   expect(restored).toMatchObject({ revision: 1, hp: [15, 10], mp: [5, 5] });
+});
+
+function teamBattle() {
+  const leader = { ...pet, equippedCoin: 'silver-coin' as const };
+  const ally = { ...pet, id: 'ally', strength: 1, charisma: 1, intelligence: 1 };
+  const monster = { ...rival, id: 'monster', monster: 'slime' as const, charisma: 1, abilities: [] };
+  return startBattle([leader, ally], monster, [power(leader), power(ally), 0], { random: () => 0 });
+}
+it.each(['gym-pump', 'equalizer-field'] as const)('%s expires after three rounds even when a teammate has left', skill => {
+  let b = act(teamBattle(), skill);
+  const quit = forfeitBattle(b, 'ally', b.revision);
+  if ('error' in quit) throw new Error(quit.error);
+  b = JSON.parse(JSON.stringify(quit));
+  for (let i = 0; i < 2; i++) b = act(b, 'coffee-break');
+  expect(b.states!.flatMap(s => s.effects).some(e => e.id === skill)).toBe(true);
+  b = act(b, 'coffee-break');
+  expect(b.states!.flatMap(s => s.effects).some(e => e.id === skill)).toBe(false);
+  if (skill === 'gym-pump') expect(b.fighters[0].stats!.strength).toBe(50);
+  else expect(b.fighters[2].type).toBe('str');
+});
+it('an off-turn forfeit cannot expire a buff before its owner acts', () => {
+  let b = act(teamBattle(), 'service-smile');
+  b = act(b, 'coffee-break'); // ally acts, then the monster; the leader is next
+  expect(b.actor).toBe(0);
+  const quit = forfeitBattle(JSON.parse(JSON.stringify(b)), 'ally', b.revision);
+  if ('error' in quit) throw new Error(quit.error);
+  expect(quit.fighters[0].stats!.charisma).toBeCloseTo(55);
+  expect(quit.actor).toBe(0);
+});
+it('resumes active skill effects from saves that predate the separate effect clock', () => {
+  let b = again(act(start(), 'service-smile'));
+  const old = JSON.parse(JSON.stringify(b));
+  delete old.effectTick;
+  const restored = act(old, 'heavy-breath-slam');
+  b = act(b, 'heavy-breath-slam');
+  expect(restored).toEqual(b);
+  expect(restored.fighters[0].stats!.charisma).toBe(50);
+});
+it('rolls accuracy when a move is accepted instead of exposing predictable future rolls', () => {
+  const b = start();
+  expect(b).not.toHaveProperty('rng');
+  const restored = JSON.parse(JSON.stringify({ ...b, rng: 1 })); // saved before this fix
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.999);
+  try {
+    const result = takeBattleTurn(restored, 'pet', 'humble-pie', restored.revision);
+    if ('error' in result) throw new Error(result.error);
+    expect(result.turns[0].missed).toBe(true);
+    expect(result).not.toHaveProperty('rng');
+    expect(takeBattleTurn(result, 'pet', 'humble-pie', restored.revision)).toMatchObject({ status: 409 });
+    expect(random).toHaveBeenCalledTimes(1);
+  } finally { random.mockRestore(); }
 });

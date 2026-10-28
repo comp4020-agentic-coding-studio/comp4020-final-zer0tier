@@ -166,6 +166,46 @@ const manualRival = { id: 'rival', strength: 4, intelligence: 4, charisma: 14 };
 const manualBattle = () => startBattle([manualPet], manualRival, [36, 26], { mp: [2, 4], random: () => 0 });
 const microtasks = async () => { await Promise.resolve(); await Promise.resolve(); };
 
+it('clears live buff labels when the battle ends or another playback opens', () => {
+  const scene = manualScene();
+  try {
+    const pet = { ...manualPet, equippedAbilities: ['gym-pump'] as const };
+    const battle = startBattle([pet], manualRival, [36, 26], { random: () => 0 });
+    const buffed = takeBattleTurn(battle, 'pet', 'gym-pump', battle.revision);
+    if ('error' in buffed) throw new Error(buffed.error);
+    scene.show(buffed); scene.flush();
+    expect(scene.$('battle-effects-0').textContent).toContain('STR +25%');
+    // A reset can open a different replay using the same fighter cards.
+    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:reset'));
+    scene.show(battle, { key: 'replay:other', manual: false, replay: true });
+    expect(scene.window.document.querySelectorAll('.battle-effects')).toHaveLength(0);
+    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:reset'));
+    scene.show(buffed); scene.flush();
+    const ended = forfeitBattle(buffed, 'pet', buffed.revision);
+    if ('error' in ended) throw new Error(ended.error);
+    scene.show(ended); scene.flush();
+    expect(scene.window.document.querySelectorAll('.battle-effects')).toHaveLength(0);
+  } finally { scene.close(); }
+});
+
+it('uses effect time for team buff countdowns after knocked-out slots are skipped', () => {
+  const scene = manualScene();
+  try {
+    const pet = { ...manualPet, strength: 50, intelligence: 50, charisma: 50, equippedAbilities: ['gym-pump', 'coffee-break'] as const };
+    const ally = { ...manualRival, strength: 1, intelligence: 1, charisma: 1 };
+    const monster = { ...manualRival, id: 'monster', strength: 500, monster: 'slime' as const };
+    let b = startBattle([pet, { ...ally, id: 'ally1' }, { ...ally, id: 'ally2' }], monster, [200, 4, 4, 0],
+      { hp: [160, 0, 0, 1510], random: () => 0 });
+    for (const skill of ['gym-pump', 'coffee-break']) {
+      const next = takeBattleTurn(b, 'pet', skill, b.revision, () => 0);
+      if ('error' in next) throw new Error(next.error);
+      b = next;
+    }
+    scene.show(b); scene.flush();
+    expect(scene.$('battle-effects-0').textContent).toContain('STR +25% (2 turns)');
+  } finally { scene.close(); }
+});
+
 it('opens a live battle with zero attacks, waits indefinitely for a choice, and exposes no live replay, skip or attack log', () => {
   const scene = manualScene();
   try {

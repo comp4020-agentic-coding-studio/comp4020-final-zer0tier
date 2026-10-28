@@ -134,7 +134,7 @@ function describe(step) {
 // a hint: the server's TYPE_CHART (src/combat.ts) decides the saved damage.
 function matchup(attack, battle) {
   if (battle.rulesVersion === 2) {
-    if (!attack.power || battle.fieldUntil > battle.revision) return '';
+    if (!attack.power || battle.fieldUntil > (battle.effectTick ?? battle.revision)) return '';
     const mine = battle.fighters.findIndex(f => f.id === scene.viewer);
     const opponent = battle.monsterIndex ?? (1 - mine);
     const ownType = battle.fighters[mine]?.type, otherType = battle.fighters[opponent]?.type;
@@ -211,6 +211,7 @@ function finish() {
   $('battle-skip').hidden = true;
   $('battle-skills').hidden = true;
   dialog.dataset.waiting = 'false';
+  dialog.querySelectorAll('.battle-effects').forEach(label => label.remove());
   $('battle-close').disabled = false;
   $('battle-close').textContent = scene.returnLabel || 'Close';
   $('battle-close').setAttribute('aria-label', scene.returnLabel || 'Close battle');
@@ -228,9 +229,10 @@ function awaitChoice() {
     const summary = $(`battle-effects-${card}`) ?? document.createElement('p');
     summary.id = `battle-effects-${card}`; summary.className = 'battle-effects';
     const effects = battle.states?.[index]?.effects ?? [];
-    summary.textContent = effects.map(e => `${e.name} (${Math.ceil((e.expires - battle.revision) / battle.order.length)} turns)`).join(' · ')
+    const effectTime = battle.effectTick ?? battle.revision;
+    summary.textContent = effects.map(e => `${e.name} (${Math.ceil((e.expires - effectTime) / battle.order.length)} turns)`).join(' · ')
       + (battle.states?.[index]?.surcharge ? ' · Next paid skill +2 MP' : '')
-      + (battle.fieldUntil > battle.revision ? ' · Type advantages disabled' : '');
+      + (battle.fieldUntil > effectTime ? ' · Type advantages disabled' : '');
     summary.hidden = !summary.textContent;
     $(`battle-fighter-${card}`).append(summary);
   });
@@ -318,6 +320,7 @@ function play(next) {
   scene = next;
   turn = 0;
   if (!dialog) buildDialog();
+  dialog.querySelectorAll('.battle-effects').forEach(label => label.remove());
   submitting = false;
   $('battle-error').textContent = '';
   $('battle-skills').hidden = true;

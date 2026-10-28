@@ -87,9 +87,13 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   battle replays never reroll drops. Preserve unlocked exits within a run.
 - Pet attacks require their owner's explicit skill choice on each turn;
   only monsters and the training bot choose attacks automatically. Keep
-  the existing base damage and coin effects. Monsters have a type and pets
-  don't: Fire, Water, and Grass skills deal ×2 to the monster type they beat
-  and ×½ to the others, so PvP damage stays neutral. In PvP (including
+  the coin effects. New battles derive pet and monster types from their
+  stats: a unique highest stat with at least a 20% lead gives STR, CHA, or
+  INT; otherwise Normal. STR beats CHA, CHA beats INT, and INT beats STR,
+  with +20% damage and 20% mitigation; Normal is neutral. STR scales HP,
+  INT scales MP from a base of 5, and a positive CHA gap grants evasion.
+  Preserve saved battles from before this system under their legacy rules.
+  In PvP (including
   revenge), the pet with the highest Strength + Intelligence + Charisma supplies the coin;
   in cooperative encounters use the strongest participating pet, and in
   solo encounters always use the player's coin. Compare unboosted attributes,

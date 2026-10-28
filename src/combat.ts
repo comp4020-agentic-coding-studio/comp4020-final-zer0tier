@@ -42,7 +42,8 @@ export type BattleAttack = Omit<legacy.BattleAttack, 'id' | 'type'> & {
 export type Effect = { id: string; name: string; expires: number; attribute?: Attribute | 'all'; amount?: number };
 export type FighterState = { effects: Effect[]; lastMissed: boolean; surcharge: boolean };
 export type ActiveBattle = Omit<legacy.ActiveBattle, keyof Battle | 'attacks'> & Battle & {
-  attacks: BattleAttack[][]; rulesVersion?: 2; states?: FighterState[]; fieldUntil?: number; rng?: number;
+  attacks: BattleAttack[][]; rulesVersion?: 2; states?: FighterState[]; fieldUntil?: number; effectTick?: number;
+  rng?: number; // Older saves only; ignored and removed when play resumes.
   restoredHp?: number[]; restoredMp?: number[]; resourceBonus?: { hp: number; mp: number }[];
 };
 export type StartBattleOptions = legacy.StartBattleOptions;
@@ -69,12 +70,15 @@ export function battleTraining(battle: Battle, index: number, random = Math.rand
 }
 const total = (p: Stats) => p.strength + p.charisma + p.intelligence;
 const powerOf = (p: Stats) => total(p) + p.strength;
-const has = (b: ActiveBattle, i: number, id: string) => b.states![i].effects.some(e => e.id === id && e.expires > b.revision);
+// Effect time counts initiative slots, including knocked-out fighters. Request
+// revisions also count off-turn forfeits, which must not consume effect time.
+const effectTime = (b: ActiveBattle) => b.effectTick ?? b.revision;
+const has = (b: ActiveBattle, i: number, id: string) => b.states![i].effects.some(e => e.id === id && e.expires > effectTime(b));
 function effectiveStats(b: ActiveBattle, i: number): Stats {
   const base = b.fighters[i].baseStats!;
   const stats = { ...base };
   for (const key of ['strength', 'charisma', 'intelligence'] as const) {
-    const amounts = b.states![i].effects.filter(e => (e.attribute === key || e.attribute === 'all') && e.expires > b.revision).map(e => e.amount ?? 0);
+    const amounts = b.states![i].effects.filter(e => (e.attribute === key || e.attribute === 'all') && e.expires > effectTime(b)).map(e => e.amount ?? 0);
     // Recasts refresh; different boosts/debuffs use the strongest of each sign.
     stats[key] = Math.max(0, base[key] * (1 + Math.max(0, ...amounts)) * (1 + Math.min(0, ...amounts)));
   }
@@ -89,7 +93,7 @@ function normalBonus(b: ActiveBattle, actor: number) {
   return mainAttribute(b.fighters[actor].stats!) === 'normal' && balancedStats(b.fighters[actor].stats!);
 }
 function typeScale(b: ActiveBattle, actor: number, target: number): number {
-  if ((b.fieldUntil ?? 0) > b.revision) return 1;
+  if ((b.fieldUntil ?? 0) > effectTime(b)) return 1;
   const scale = effectiveness(b.fighters[actor].type ?? 'normal', b.fighters[target].type);
   return scale > 1 ? (has(b, actor, 'peer-review') ? 1.4 : 1.2)
     : scale < 1 ? (has(b, target, 'peer-review') ? 0.6 : 0.8) : 1;
@@ -127,7 +131,7 @@ function unavailable(b: ActiveBattle, actor: number, attack: BattleAttack) {
 }
 function refresh(b: ActiveBattle) {
   b.fighters.forEach((f, i) => {
-    b.states![i].effects = b.states![i].effects.filter(e => e.expires > b.revision);
+    b.states![i].effects = b.states![i].effects.filter(e => e.expires > effectTime(b));
     f.stats = effectiveStats(b, i);
     f.type = has(b, i, 'equalizer-field') ? 'normal' : mainAttribute(f.stats);
     f.maxHp = maxHpFor(f.stats); f.maxMp = maxMpFor(f.stats);
@@ -144,13 +148,7 @@ function refresh(b: ActiveBattle) {
 }
 function addEffect(b: ActiveBattle, i: number, id: string, name: string, turns: number, attribute?: Attribute | 'all', amount?: number) {
   b.states![i].effects = b.states![i].effects.filter(e => e.id !== id);
-  b.states![i].effects.push({ id, name, expires: b.revision + 1 + turns * b.order.length, attribute, amount });
-}
-function roll(b: ActiveBattle) {
-  let seed = b.rng || 1;
-  seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
-  b.rng = seed >>> 0;
-  return b.rng / 0x100000000;
+  b.states![i].effects.push({ id, name, expires: effectTime(b) + 1 + turns * b.order.length, attribute, amount });
 }
 function strike(b: ActiveBattle, actor: number, attack: BattleAttack, random?: () => number) {
   const target = targetOf(b, actor), id = attack.id;
@@ -165,7 +163,9 @@ function strike(b: ActiveBattle, actor: number, attack: BattleAttack, random?: (
     const paidHp = Math.ceil(b.fighters[actor].maxHp * 0.15);
     b.hp[actor] -= paidHp; events.push(`Sacrificed ${paidHp} HP`);
   }
-  const missed = Boolean(attack.power) && (random?.() ?? roll(b)) >= hitChance(b, actor, target, attack);
+  // Only accepted turns roll. Persist their outcome, never a seed that would
+  // let a client predict future hits; stale retries cannot reach this point.
+  const missed = Boolean(attack.power) && (random?.() ?? Math.random()) >= hitChance(b, actor, target, attack);
   b.states![actor].lastMissed = missed;
   const boost = attack.power && b.goldPending && actor === b.coinProvider ? 2 : 1;
   if (attack.power && actor === b.coinProvider) b.goldPending = false;
@@ -226,11 +226,12 @@ function strike(b: ActiveBattle, actor: number, attack: BattleAttack, random?: (
     }
     if (id === 'jack-of-all-trades' && normalBonus(b, actor)) restoreMp(actor, 1);
     if (id === 'equalizer-field') {
-      effect(target, 3, 'Normal type'); b.fieldUntil = b.revision + 1 + 3 * b.order.length;
+      effect(target, 3, 'Normal type'); b.fieldUntil = effectTime(b) + 1 + 3 * b.order.length;
       events.push('All type advantages disabled');
     }
     if (id === 'golden-ratio') { heal(0.2); effect(actor, 3, 'All stats +15%', 'all', 0.15); }
   }
+  b.effectTick = effectTime(b) + 1;
   b.revision++; refresh(b);
   b.turns.push({ actor, target, ability: id, name: attack.name, mpCost: paid, type: attack.type,
     ...(scale !== 1 && attack.power ? { effectiveness: scale } : {}),
@@ -248,7 +249,10 @@ function finished(b: ActiveBattle) {
 }
 function advance(b: ActiveBattle, random?: () => number) {
   while (!finished(b)) {
-    while (b.hp[b.order[b.cursor]] <= 0) b.cursor = (b.cursor + 1) % b.order.length;
+    while (b.hp[b.order[b.cursor]] <= 0) {
+      b.effectTick = effectTime(b) + 1;
+      b.cursor = (b.cursor + 1) % b.order.length;
+    }
     const actor = b.order[b.cursor]; b.actor = actor;
     refresh(b);
     if (actor !== b.monsterIndex && !b.automaticIds.includes(b.fighters[actor].id)) return;
@@ -295,8 +299,7 @@ export function startBattle(pets: PetStats[], opponent: PetStats, rolls: number[
     resourceBonus: fighters.map((f, i) => ({ hp: f.maxHp - maxHpFor(all[i]), mp: f.maxMp - maxMpFor(all[i]) })),
     revision: 0, coinProvider: provider, goldPending: coin.doubleFirstStrike, order, cursor: 0, monsterIndex,
     automaticIds: [...new Set(options.automaticIds ?? [])], forfeited: [], rulesVersion: 2,
-    states: fighters.map(() => ({ effects: [], lastMissed: false, surcharge: false })), fieldUntil: 0,
-    rng: Math.floor((options.random?.() ?? Math.random()) * 0x100000000) || 1,
+    states: fighters.map(() => ({ effects: [], lastMissed: false, surcharge: false })), fieldUntil: 0, effectTick: 0,
     initiative: { toss: coin.toss, coin: coin.coin, provider, providerId: all[provider].id } };
   refresh(b); advance(b, options.random); return b;
 }
@@ -307,7 +310,7 @@ export function takeBattleTurn(battle: ActiveBattle, actorId: string, ability: u
   const actor = battle.actor;
   if (battle.fighters[actor].id !== actorId) return { error: 'Wait for your pet’s turn.', status: 403 };
   if (actor === battle.monsterIndex || battle.automaticIds.includes(actorId)) return { error: 'This fighter’s move is controlled by the game.', status: 403 };
-  const next = structuredClone(battle); refresh(next);
+  const next = structuredClone(battle); delete next.rng; refresh(next);
   const attack = next.attacks[actor].find(a => a.id === ability);
   if (!attack) return { error: 'Choose one of your equipped skills.', status: 400 };
   if (attack.unavailable) return { error: attack.unavailable, status: 409 };
@@ -320,6 +323,8 @@ export function forfeitBattle(battle: ActiveBattle, actorId: string, revision?: 
   if (actor < 0 || actor === battle.monsterIndex || battle.automaticIds.includes(actorId)) return { error: 'You are not a player in this battle.', status: 403 };
   if (battle.status !== 'active') return { error: 'This battle has ended.', status: 409 };
   if (battle.forfeited.includes(actor)) return battle;
-  const next = structuredClone(battle); next.hp[actor] = 0; next.forfeited.push(actor); next.revision++;
+  const next = structuredClone(battle); delete next.rng;
+  next.effectTick = effectTime(next);
+  next.hp[actor] = 0; next.forfeited.push(actor); next.revision++;
   advance(next); return next;
 }
