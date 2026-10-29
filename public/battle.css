@@ -4,6 +4,62 @@
   border-radius: 24px; background: var(--surface); color: var(--fg); box-shadow: var(--shadow);
 }
 #battle-dialog::backdrop { background: rgb(25 15 8 / 65%); backdrop-filter: blur(3px); }
+/* Original handheld-style opening. The fixed overlay stays in the battle's
+   modal layer; its single tile-spiral path needs no extra canvas or assets. */
+#battle-dialog[open][data-opening="true"] { background: transparent; border-color: transparent; box-shadow: none; overflow: visible; }
+#battle-dialog[open][data-opening="true"]::backdrop { background: transparent; backdrop-filter: none; }
+#battle-dialog[data-opening="true"] > :not(#battle-opening) { visibility: hidden; }
+#battle-opening {
+  --opening-ink: #172b20; --opening-paper: #dce6b7; --opening-mid: #80965f;
+  --fg: var(--opening-ink);
+  position: fixed; inset: 0; z-index: 10; overflow: hidden; color: var(--opening-ink);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace; isolation: isolate;
+}
+#battle-opening[hidden] { display: none; }
+.opening-screen {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  padding: max(64px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  background: repeating-linear-gradient(0deg, transparent 0 3px, rgb(23 43 32 / 4%) 3px 4px), var(--opening-paper);
+  box-shadow: inset 0 0 0 8px var(--opening-ink), inset 0 0 0 12px var(--opening-mid);
+  animation: opening-screen-in 1ms 620ms both;
+}
+.opening-content { width: min(880px, 100%); text-align: center; }
+.opening-kind { margin: 0 0 10px; font-size: clamp(.65rem, 1.8vw, .9rem); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+#battle-opening-title { margin: 0; font: 800 clamp(1.2rem, 4vw, 2.4rem)/1.15 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+.opening-fighters { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: clamp(8px, 3vw, 36px); margin: clamp(16px, 4vh, 48px) 0; }
+.opening-fighter { min-width: 0; margin: 0; animation: opening-arrive 420ms 700ms steps(12, end) both; }
+.opening-fighter-0 { --opening-side: -1; }
+.opening-fighter-1 { --opening-side: 1; }
+.opening-portrait {
+  display: block; width: min(28vw, 28dvh, 220px); height: min(28vw, 28dvh, 220px); margin: 0 auto 12px;
+  filter: grayscale(1) sepia(.85) hue-rotate(24deg) saturate(1.5); overflow: visible;
+}
+#battle-opening .battle-monster, #battle-opening .monster-body { animation: none !important; }
+.opening-fighter figcaption { border-top: 3px solid var(--opening-ink); padding-top: 10px; font-size: clamp(.7rem, 2vw, 1.1rem); font-weight: 800; overflow-wrap: anywhere; }
+.opening-versus { padding: 8px; border: 3px double currentColor; font-size: clamp(.8rem, 2.5vw, 1.3rem); font-weight: 900; }
+.opening-ready { margin: 0; padding: 12px; border: 4px double var(--opening-ink); font-size: clamp(.8rem, 2vw, 1rem); font-weight: 700; }
+.opening-wipe { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; pointer-events: none; animation: opening-wipe-out 140ms 660ms both; }
+.opening-wipe path { fill: none; stroke: var(--opening-ink); stroke-width: 8.5; stroke-linecap: square; stroke-linejoin: miter; stroke-dasharray: 1; animation: opening-spiral 640ms steps(40, end) both; }
+#battle-opening-skip {
+  position: absolute; z-index: 2; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right));
+  min-height: 44px; padding: 8px 14px; border: 2px solid var(--opening-ink); border-radius: 6px;
+  color: var(--opening-ink); background: var(--opening-paper); font: 700 .85rem ui-monospace, SFMono-Regular, Consolas, monospace; cursor: pointer;
+}
+#battle-opening-skip:hover { background: #edf3d7; }
+#battle-opening-skip:focus-visible { outline: 3px solid var(--opening-paper); outline-offset: 3px; box-shadow: 0 0 0 7px var(--opening-ink); }
+@keyframes opening-spiral { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes opening-wipe-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes opening-screen-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes opening-arrive { from { transform: translateX(calc(var(--opening-side) * 45vw)); opacity: 0; } 25% { opacity: 1; } to { transform: none; opacity: 1; } }
+@media (max-height: 480px) and (min-width: 560px) {
+  .opening-screen { padding-top: 24px; }
+  .opening-kind { margin-bottom: 4px; }
+  #battle-opening-title { font-size: 1.3rem; }
+  .opening-fighters { margin: 12px 0; }
+  .opening-portrait { margin-bottom: 4px; height: 25dvh; width: 25dvh; }
+  .opening-fighter figcaption { padding-top: 4px; font-size: .75rem; }
+  .opening-ready { padding: 6px; font-size: .75rem; }
+}
 .battle-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
 .battle-heading h2 { font-size: 1.5rem; }
 #battle-mode { margin: 0 0 4px; color: var(--muted); text-transform: uppercase; font-size: .7rem; letter-spacing: .13em; }

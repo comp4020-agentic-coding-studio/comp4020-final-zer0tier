@@ -10,6 +10,10 @@ let turn = 0;
 let submitting = false;
 let confirming = false;
 let animating = false;
+let opening = false;
+let openingInert = [];
+let openingSkipKey = null;
+const OPENING_DURATION = 1500;
 const seen = new Set();
 const queue = [];
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -103,6 +107,57 @@ function syncBattleMotion() {
     if (nextTurnDelay !== null) scheduleAdvance(nextTurnDelay);
   }
 }
+function clearOpening() {
+  const wasOpening = opening;
+  opening = false;
+  openingInert.forEach(node => { node.inert = false; });
+  openingInert = [];
+  if (dialog) {
+    delete dialog.dataset.opening;
+    $('battle-opening').hidden = true;
+    $('battle-opening-fighters').replaceChildren();
+  }
+  return wasOpening;
+}
+function focusBattle() {
+  const choice = !$('battle-skills').hidden && $('battle-skills').querySelector('button:not(:disabled)');
+  (choice || $('battle-close')).focus({ preventScroll: true });
+}
+function skipOpening() {
+  if (!opening) return;
+  cancelAdvance();
+  advance();
+}
+function startOpening() {
+  opening = true;
+  animating = true;
+  dialog.dataset.opening = 'true';
+  const intro = $('battle-opening');
+  openingInert = [...dialog.children].filter(node => node !== intro && !node.inert);
+  openingInert.forEach(node => { node.inert = true; });
+  const enemy = scene.battle.fighters.find(fighter => fighter.monster);
+  $('battle-opening-kind').textContent = enemy ? 'Wild encounter' : 'A challenger approaches';
+  $('battle-opening-title').textContent = scene.title || 'Arena battle';
+  const fighters = $('battle-opening-fighters');
+  [0, 1].forEach(card => {
+    const figure = document.createElement('figure');
+    figure.className = `opening-fighter opening-fighter-${card}`;
+    const portrait = $(`battle-avatar-${card}`).firstElementChild.cloneNode(true);
+    portrait.classList.add('opening-portrait');
+    const name = document.createElement('figcaption');
+    name.textContent = fighterName(scene.battle.fighters[cards[card]]);
+    figure.append(portrait, name);
+    fighters.append(figure);
+    if (!card) {
+      const versus = document.createElement('span');
+      versus.className = 'opening-versus'; versus.textContent = 'VS'; versus.setAttribute('aria-hidden', 'true');
+      fighters.append(versus);
+    }
+  });
+  intro.hidden = false;
+  $('battle-opening-skip').focus({ preventScroll: true });
+  scheduleAdvance(OPENING_DURATION);
+}
 function animatePortrait(card, pose, duration, direction = 1) {
   const node = $(`battle-avatar-${card}`);
   if (reducedMotion.matches || !node?.animate) return;
@@ -163,6 +218,13 @@ function showSkillVisuals(step) {
 document.addEventListener('visibilitychange', syncBattleMotion);
 reducedMotion.addEventListener?.('change', () => {
   if (!reducedMotion.matches) return;
+  if (opening) {
+    clearOpening();
+    cancelAdvance();
+    advance();
+    if (!motionPaused) focusBattle();
+    return;
+  }
   portraitAnimations.forEach(animation => animation.cancel()); portraitAnimations = [];
   dialog?.querySelectorAll('.skill-vfx').forEach(node => node.classList.add('is-still'));
   if (nextTurnDelay !== null) scheduleAdvance(350);
@@ -173,6 +235,13 @@ function buildDialog() {
   dialog.id = 'battle-dialog';
   dialog.setAttribute('aria-labelledby', 'battle-title');
   dialog.setAttribute('aria-describedby', 'battle-mode battle-initiative');
+  // A square spiral fills a 20×18 tile field. It is original vector artwork,
+  // stretched to the viewport so no video or image download delays a fight.
+  let spiral = 'M4 4';
+  for (let left = 4, top = 4, right = 156, bottom = 140; left <= right && top <= bottom;
+    left += 8, top += 8, right -= 8, bottom -= 8) {
+    spiral += `H${right}V${bottom}H${left}V${Math.min(top + 8, bottom)}`;
+  }
   dialog.innerHTML = `
     <header class="battle-heading"><div><p id="battle-mode">Turn-based battle</p><h2 id="battle-title">Claws at the ready</h2></div>
       <button type="button" id="battle-close" class="chip-btn chip-buy" aria-label="Close battle">Close</button></header>
@@ -206,10 +275,38 @@ function buildDialog() {
     <details class="battle-log"><summary>Attack log</summary><ol id="battle-log"></ol></details>
     <footer class="battle-actions"><button type="button" id="battle-sfx-toggle" class="chip-btn chip-buy" aria-pressed="true" hidden>Sound effects: On</button>
       <button type="button" id="battle-skip" class="chip-btn chip-buy">Skip to result</button>
-      <button type="button" id="battle-replay" class="chip-btn chip-buy" hidden>Replay battle</button></footer>`;
+      <button type="button" id="battle-replay" class="chip-btn chip-buy" hidden>Replay battle</button></footer>
+    <section id="battle-opening" aria-label="Battle opening" hidden>
+      <div class="opening-screen">
+        <div class="opening-content">
+          <p id="battle-opening-kind" class="opening-kind"></p>
+          <h2 id="battle-opening-title"></h2>
+          <div id="battle-opening-fighters" class="opening-fighters"></div>
+          <p class="opening-ready" role="status">Get ready to battle!</p>
+        </div>
+      </div>
+      <svg class="opening-wipe" viewBox="0 0 160 144" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <path d="${spiral}" pathLength="1"/>
+      </svg>
+      <button type="button" id="battle-opening-skip">Skip intro <span aria-hidden="true">↵</span></button>
+    </section>`;
   document.body.append(dialog);
+  $('battle-opening-skip').addEventListener('click', skipOpening);
+  dialog.addEventListener('keydown', event => {
+    if (event.repeat && event.key === openingSkipKey) { event.preventDefault(); event.stopPropagation(); return; }
+    if (!opening || !['Enter', ' ', 'Escape'].includes(event.key)) return;
+    openingSkipKey = event.key;
+    event.preventDefault(); event.stopPropagation(); skipOpening();
+  });
+  dialog.addEventListener('keyup', event => {
+    if (event.key !== openingSkipKey) return;
+    // Space releases after focus moves to a skill. Do not activate that skill.
+    event.preventDefault(); event.stopPropagation(); openingSkipKey = null;
+  });
+  window.addEventListener('blur', () => { openingSkipKey = null; });
   $('battle-close').addEventListener('click', closeBattle);
   dialog.addEventListener('cancel', event => {
+    if (opening) { event.preventDefault(); skipOpening(); return; }
     if (!scene?.manual || scene.battle.status !== 'active') return;
     event.preventDefault();
     closeBattle();
@@ -219,7 +316,8 @@ function buildDialog() {
   dialog.addEventListener('close', () => {
     if (dialog.open) return;
     sceneVersion++;
-    cancelAdvance(); clearSkillVisuals();
+    openingSkipKey = null;
+    cancelAdvance(); clearOpening(); clearSkillVisuals();
     coveringDialogs.clear();
     motionPaused = false;
     submitting = false;
@@ -368,9 +466,12 @@ function advance() {
   if (!dialog.open || !scene) return;
   syncBattleMotion();
   if (motionPaused) { scheduleAdvance(0); return; }
+  const entered = clearOpening();
   if (turn === scene.battle.turns.length) {
-    if (scene.manual && scene.battle.status === 'active') return awaitChoice();
-    return finish();
+    if (scene.manual && scene.battle.status === 'active') awaitChoice();
+    else finish();
+    if (entered) focusBattle();
+    return;
   }
   const step = scene.battle.turns[turn++];
   animating = true;
@@ -381,9 +482,10 @@ function advance() {
   $('battle-status').textContent = describe(step);
   cards.forEach((_, card) => $(`battle-fighter-${card}`).classList.remove('taking-turn'));
   scheduleAdvance(showSkillVisuals(step));
+  if (entered) focusBattle();
 }
 function finish() {
-  cancelAdvance(); clearSkillVisuals();
+  cancelAdvance(); clearOpening(); clearSkillVisuals();
   $('battle-intent').hidden = true;
   animating = false;
   if (!scene) return;
@@ -474,7 +576,7 @@ function awaitChoice() {
   if (focused) [...$('battle-skills').children].find(button => button.dataset.skill === focused && !button.disabled)?.focus();
 }
 async function chooseSkill(ability) {
-  if (submitting || !scene?.manual || scene.battle.status !== 'active' || turn < scene.battle.turns.length) return;
+  if (opening || submitting || !scene?.manual || scene.battle.status !== 'active' || turn < scene.battle.turns.length) return;
   if (scene.battle.fighters[scene.battle.actor]?.id !== scene.viewer) return;
   const active = scene, version = sceneVersion;
   submitting = true;
@@ -519,7 +621,8 @@ async function closeBattle() {
 }
 function play(next) {
   sceneVersion++;
-  cancelAdvance(); clearSkillVisuals();
+  openingSkipKey = null;
+  cancelAdvance(); clearOpening(); clearSkillVisuals();
   animating = false;
   scene = next;
   turn = 0;
@@ -576,7 +679,8 @@ function play(next) {
     $('battle-close').focus({ preventScroll: true });
   }
   syncBattleMotion();
-  if (next.manual && !next.battle.turns.length) advance();
+  if (next.manual && !next.replay && next.battle.status === 'active' && !reducedMotion.matches) startOpening();
+  else if (next.manual && !next.battle.turns.length) advance();
   else scheduleAdvance(reducedMotion.matches ? 150 : 400);
 }
 document.addEventListener('battle:show', ({ detail }) => {
@@ -608,7 +712,7 @@ document.addEventListener('battle:show', ({ detail }) => {
 });
 document.addEventListener('battle:reset', () => {
   sceneVersion++;
-  cancelAdvance(); clearSkillVisuals();
+  cancelAdvance(); clearOpening(); clearSkillVisuals();
   queue.length = 0;
   seen.clear();
   scene = null;

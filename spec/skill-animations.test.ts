@@ -32,9 +32,13 @@ function screen(reduce = false) {
   });
   window.eval(readFileSync('public/battle.js', 'utf8'));
   const $ = (selector: string) => window.document.querySelector<HTMLElement>(selector)!;
-  const show = (battle: ActiveBattle, extra = {}) => window.document.dispatchEvent(new window.CustomEvent('battle:show', {
-    detail: { key: 'animations', battle, viewer: 'pet', manual: true, result: '', ...extra },
-  }));
+  const show = (battle: ActiveBattle, extra = {}) => {
+    window.document.dispatchEvent(new window.CustomEvent('battle:show', {
+      detail: { key: 'animations', battle, viewer: 'pet', manual: true, result: '', ...extra },
+    }));
+    // These checks start at the turn visuals; opening lifecycle has its own spec.
+    if (!battle.turns.length && window.document.getElementById('battle-dialog')?.dataset.opening === 'true') window.document.getElementById('battle-opening-skip')!.click();
+  };
   function tick() {
     const entry = timers.entries().next().value;
     if (!entry) return;
