@@ -750,6 +750,7 @@ body.world-playing #home-controls-tip kbd {
 #music-volume-value { font-variant-numeric: tabular-nums; }
 #music-volume { display: block; width: 100%; min-width: 0; height: 44px; margin: 0; padding: 0; accent-color: var(--primary); cursor: pointer; }
 #music-status { font-size: .8rem; }
+#music-credit { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--border); font-size: .8rem; }
 body.world-playing #world-shell[data-scene="town"] #town-activity {
   display: grid;
   gap: 6px;

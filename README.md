@@ -170,13 +170,14 @@ activity finishes or you use an Hourglass. The final minute counts down in
 seconds; “finishing…” means the timer has ended and the server is confirming
 the result. The indicator stays out of the home scene.
 
-An original, gentle instrumental soundtrack plays in the background while you
-are signed in, starting after a click, tap, or key press. Open the game menu
+**“Rainbows” by Kevin MacLeod** plays as the background music at home and on the
+town map, starting after a signed-in click, tap, or key press. Open the game menu
 with **Escape** (or the home menu hotspot on touch screens) for **Background
 music** and its **Volume** slider. These preferences are remembered on this
 browser. Music continues across scenes and windows, pauses when you switch tabs,
 and stops when you sign out. The recording is served locally; it needs no music
-service or extra runtime synthesis.
+service or extra runtime synthesis. The Sound controls include the artist and
+licence credit; full details appear under [Music credits and thanks](#music-credits-and-thanks).
 
 Town uses the same movement and **Space** interaction controls as home.
 Every destination and home object also works with Tab and Enter, and the
@@ -203,6 +204,42 @@ Anyone can look at any pet, but only its owner can study, work, shop, steal,
 or fight with it. The bot's ID, `0`, can't be signed up or signed into. A pet
 from before accounts existed is claimed by the first person to sign up with
 its ID.
+
+### Music credits and thanks
+
+**Thank you, Kevin MacLeod, for creating “Rainbows” and sharing your music
+under a Creative Commons licence. Its bright, refreshing sound brings warmth
+to Sweet Home and the town map.**
+
+The track and its details come from [Kevin MacLeod's Incompetech listing for
+“Rainbows”](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600063).
+
+| Detail | Credit |
+| --- | --- |
+| Title | Rainbows |
+| Composer / artist | Kevin MacLeod ([incompetech.com](https://incompetech.com/)) |
+| Genre | Soundtrack |
+| Album | Light (Lighter Faire) |
+| Length | 3:39 |
+| Tempo | 110 BPM |
+| Feel | Bright, Calming, Grooving |
+| Instruments | Marimba, Ukulele, Cello, Drums, Percussion |
+| ISRC | USUAN1600063 |
+| Uploaded | 2016-10-22 |
+| Licence | [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/) |
+
+Attribution supplied by the artist:
+
+```text
+"Rainbows" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+http://creativecommons.org/licenses/by/4.0/
+```
+
+The supplied MP3 is included unchanged as `public/audio/rainbows.mp3`; it has
+not been edited, trimmed, or re-encoded. The game loops the recording and lets
+players adjust playback volume. The music remains licensed under CC BY 4.0.
+Asset attribution is also included in [public/audio/README.md](public/audio/README.md).
 
 ### Character outfits
 

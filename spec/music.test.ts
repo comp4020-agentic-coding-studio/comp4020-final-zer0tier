@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom';
-import { readFileSync } from 'node:fs';
-import { expect, it, vi } from 'vitest';
+import { readFileSync, statSync } from 'node:fs';
+import { expect, inject, it, vi } from 'vitest';
 
 const preferenceKey = 'virtuepets:music';
 const flush = async () => {
@@ -107,7 +107,8 @@ it('starts one quiet loop after a signed-in gesture and keeps music controls ins
     p.gesture();
     await flush();
     expect(p.play).toHaveBeenCalledTimes(1);
-    expect(p.audio.getAttribute('src')).toBe('/audio/cozy-day.wav');
+    expect(p.audio.getAttribute('src')).toBe('/audio/rainbows.mp3');
+    expect(p.$('music-status').textContent).toBe('Rainbows · Kevin MacLeod');
     expect(p.audio.volume).toBeCloseTo(0.35);
     expect(p.audio.paused).toBe(false);
     p.audio.currentTime = 18;
@@ -120,6 +121,12 @@ it('starts one quiet loop after a signed-in gesture and keeps music controls ins
     p.openMenu();
     expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(true);
     expect(p.$('world-music').closest('[hidden]')).toBeNull();
+    const credit = p.$('music-credit');
+    expect(p.$('world-panel-menu').contains(credit)).toBe(true);
+    expect(credit.textContent).toContain('Thank you, Kevin, for sharing your music.');
+    expect(credit.querySelector('a[href="https://incompetech.com/"]')?.textContent).toBe('Kevin MacLeod');
+    expect(credit.querySelector('a[href*="USUAN1600063"]')?.textContent).toBe('“Rainbows”');
+    expect(credit.querySelector('a[href="https://creativecommons.org/licenses/by/4.0/"]')?.textContent).toBe('CC BY 4.0');
     p.$('world-dialog-close').click();
     // Normal server renders can set hidden=false repeatedly.
     p.$('dashboard').hidden = false;
@@ -136,6 +143,20 @@ it('starts one quiet loop after a signed-in gesture and keeps music controls ins
     expect(p.play).toHaveBeenCalledTimes(1);
     expect(p.audio.paused).toBe(true);
   } finally { p.close(); }
+});
+
+it('serves the Rainbows MP3 with audio headers and byte ranges for browser playback', async () => {
+  const path = 'public/audio/rainbows.mp3';
+  const url = new URL('/audio/rainbows.mp3', inject('baseUrl'));
+  const head = await fetch(url, { method: 'HEAD' });
+  expect(head.status).toBe(200);
+  expect(head.headers.get('content-type')).toMatch(/^audio\/mpeg/);
+  expect(Number(head.headers.get('content-length'))).toBe(statSync(path).size);
+  expect(head.headers.get('accept-ranges')).toBe('bytes');
+  const part = await fetch(url, { headers: { range: 'bytes=0-1023' } });
+  expect(part.status).toBe(206);
+  expect(part.headers.get('content-range')).toBe(`bytes 0-1023/${statSync(path).size}`);
+  expect(Buffer.from(await part.arrayBuffer())).toEqual(readFileSync(path).subarray(0, 1024));
 });
 
 it('preserves playback position while hidden, then resets it and stops on sign-out', async () => {

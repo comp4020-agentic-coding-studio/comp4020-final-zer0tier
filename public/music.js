@@ -25,7 +25,13 @@ musicControls.innerHTML = `
   </button>
   <div class="music-volume-heading"><label for="music-volume">Volume</label><output id="music-volume-value" for="music-volume"></output></div>
   <input id="music-volume" type="range" min="0" max="100" step="1" value="35">
-  <p id="music-status" class="help" role="status"></p>`;
+  <p id="music-status" class="help" role="status"></p>
+  <p id="music-credit" class="help">
+    <a href="https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600063" target="_blank" rel="noopener noreferrer">“Rainbows”</a>
+    by <a href="https://incompetech.com/" target="_blank" rel="noopener noreferrer">Kevin MacLeod</a>.<br>
+    Licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.<br>
+    Thank you, Kevin, for sharing your music.
+  </p>`;
 document.getElementById('world-panel-menu').append(musicControls);
 const musicToggle = document.getElementById('music-toggle');
 const musicVolume = document.getElementById('music-volume');
@@ -58,7 +64,7 @@ function musicRender() {
   const message = !musicSettings.enabled ? 'Music is off.' : musicSettings.volume === 0 ? 'Volume is muted.' :
     musicFailure || (!musicActivated ? 'Click, tap or press a key to start the music.' :
       musicAudio.paused || (musicContext && musicContext.state !== 'running') ? 'Music will resume when you return.' :
-        'A Little Place to Stay · soft piano and warm chords');
+        'Rainbows · Kevin MacLeod');
   if (musicStatus.textContent !== message) musicStatus.textContent = message;
 }
 
@@ -77,7 +83,7 @@ function musicSetVolume() {
 }
 
 function musicPrepare() {
-  if (!musicAudio.getAttribute('src')) musicAudio.src = '/audio/cozy-day.wav';
+  if (!musicAudio.getAttribute('src')) musicAudio.src = '/audio/rainbows.mp3';
   const Context = window.AudioContext || window.webkitAudioContext;
   if (!musicContext && Context) {
     musicContext = new Context();
