@@ -82,6 +82,19 @@ stereo, 44.1 kHz, 320 kbps, 9,749,860 bytes. SHA-256:
 048f03a2118b317bea2b99b31f435866a1263aa6a5d6a3a5f6bff8d084b82f76
 ```
 
+## Battle sound effects — original project audio
+
+`public/battle-audio.js` synthesizes short pet voices and skill effects with
+Web Audio. All eight pet species have distinct voices, with additional monster
+voices, attack reactions, hurt reactions, and faint reactions. Skill cues cover
+swishes, impacts, fire, water, electricity, shields, healing, and magic; misses
+and monster charging turns have their own cues.
+
+These effects were made for VirtuePets from oscillators and filtered noise.
+They use no sampled recordings or third-party sound assets and are separate
+from Kevin MacLeod's music above. Effects have their own saved mute and volume
+controls and follow the battle's saved turn animations, including replays.
+
 ## A Little Place to Stay — original project recording
 
 This earlier recording is retained as a project asset. The game now plays

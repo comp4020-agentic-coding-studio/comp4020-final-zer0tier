@@ -184,6 +184,17 @@ out. Both recordings are served locally; they need no music service or extra
 runtime synthesis. The Sound controls include the artist and
 licence credit; full details appear under [Music credits and thanks](#music-credits-and-thanks).
 
+Battles also have original sound effects: each pet species has a distinct
+cartoon voice, and skills use swishes, impacts, magic, shields, or healing
+chimes to match their animations. Both attacking pets and struck opponents
+react, including monsters. Sounds follow confirmed turns and replays; misses
+use a dodge cue. Open **Escape → Sound** for **Battle sound effects** and
+**Effects volume**, or use **Sound effects: On/Off** inside the battle window.
+These settings are remembered separately from music on this browser. Effects
+start after a signed-in interaction and stop when a battle is skipped, closed,
+covered by another window, or hidden in another tab, and when you sign out.
+The effects are synthesized locally and use no third-party recordings.
+
 Town uses the same movement and **Space** interaction controls as home.
 Every destination and home object also works with Tab and Enter, and the
 camera brings focused objects into view. Close a window with its Close

@@ -52,7 +52,9 @@
 .battle-log { font-size: .8rem; color: var(--muted); }
 .battle-log summary { padding: 8px 0; }
 #battle-log { max-height: 120px; overflow-y: auto; padding-left: 24px; }
-.battle-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+.battle-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+#battle-sfx-toggle { margin-right: auto; min-height: 44px; max-width: 100%; }
+#battle-sfx-toggle[aria-pressed="true"] { color: var(--primary); background: var(--bg-glow); border-color: var(--primary); }
 .battle-skills { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .battle-skills[hidden] { display: none; }
 #battle-dialog[data-manual="true"][data-waiting="true"] .battle-ability { display: none; }

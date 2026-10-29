@@ -67,6 +67,7 @@ let nextTurnAt = 0;
 let motionPaused = false;
 const coveringDialogs = new Set();
 function clearSkillVisuals() {
+  document.dispatchEvent(new CustomEvent('battle:sound-stop'));
   portraitAnimations.forEach(animation => animation.cancel());
   portraitAnimations = [];
   dialog?.querySelectorAll('.skill-vfx, .battle-cue').forEach(node => node.remove());
@@ -89,6 +90,7 @@ function syncBattleMotion() {
   if (paused === motionPaused) return;
   motionPaused = paused;
   if (paused) {
+    document.dispatchEvent(new CustomEvent('battle:sound-stop'));
     if (timer !== undefined) {
       nextTurnDelay = Math.max(0, nextTurnAt - performance.now());
       clearTimeout(timer); timer = undefined;
@@ -150,7 +152,13 @@ function showSkillVisuals(step) {
   if (profile.target === 'enemy' && targetCard !== actorCard && (step.damage > 0 || step.missed)) {
     animatePortrait(targetCard, step.missed ? 'dodge' : 'hit', profile.duration, direction);
   }
-  return reducedMotion.matches ? 350 : profile.duration + 90;
+  const duration = reducedMotion.matches ? 350 : profile.duration + 90;
+  document.dispatchEvent(new CustomEvent('battle:sound', { detail: {
+    step, actor: scene.battle.fighters[step.actor], target: scene.battle.fighters[step.target],
+    motion: profile.motion, targetKind: profile.target, duration,
+    actorPan: actorCard === 1 ? .3 : -.3, targetPan: targetCard === 1 ? .3 : -.3,
+  } }));
+  return duration;
 }
 document.addEventListener('visibilitychange', syncBattleMotion);
 reducedMotion.addEventListener?.('change', () => {
@@ -196,7 +204,8 @@ function buildDialog() {
     <div id="battle-skills" class="battle-skills" role="group" aria-label="Choose your pet's skill" hidden></div>
     <p id="battle-error" class="error" role="alert"></p>
     <details class="battle-log"><summary>Attack log</summary><ol id="battle-log"></ol></details>
-    <footer class="battle-actions"><button type="button" id="battle-skip" class="chip-btn chip-buy">Skip to result</button>
+    <footer class="battle-actions"><button type="button" id="battle-sfx-toggle" class="chip-btn chip-buy" aria-pressed="true" hidden>Sound effects: On</button>
+      <button type="button" id="battle-skip" class="chip-btn chip-buy">Skip to result</button>
       <button type="button" id="battle-replay" class="chip-btn chip-buy" hidden>Replay battle</button></footer>`;
   document.body.append(dialog);
   $('battle-close').addEventListener('click', closeBattle);
