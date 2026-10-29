@@ -174,9 +174,14 @@ the result. The indicator stays out of the home scene.
 town map, starting after a signed-in click, tap, or key press. Open the game menu
 with **Escape** (or the home menu hotspot on touch screens) for **Background
 music** and its **Volume** slider. These preferences are remembered on this
-browser. Music continues across scenes and windows, pauses when you switch tabs,
-and stops when you sign out. The recording is served locally; it needs no music
-service or extra runtime synthesis. The Sound controls include the artist and
+browser. Rainbows continues between home, town, and ordinary windows.
+Opening an Arena, revenge, or Adventure battle (including a replay) switches
+to **“Raving Energy (faster)” by Kevin MacLeod**. Closing the battle window
+resumes Rainbows from where it paused. Saved turn updates never restart the
+battle track. Only one track plays at a time, and both use the same mute and
+volume preferences. Music pauses when you switch tabs and stops when you sign
+out. Both recordings are served locally; they need no music service or extra
+runtime synthesis. The Sound controls include the artist and
 licence credit; full details appear under [Music credits and thanks](#music-credits-and-thanks).
 
 Town uses the same movement and **Space** interaction controls as home.
@@ -207,9 +212,10 @@ its ID.
 
 ### Music credits and thanks
 
-**Thank you, Kevin MacLeod, for creating “Rainbows” and sharing your music
-under a Creative Commons licence. Its bright, refreshing sound brings warmth
-to Sweet Home and the town map.**
+**Thank you, Kevin MacLeod, for creating “Rainbows” and “Raving Energy
+(faster)” and sharing your music under a Creative Commons licence. Rainbows
+brings warmth to Sweet Home and town, while Raving Energy brings momentum to
+the battles.**
 
 The track and its details come from [Kevin MacLeod's Incompetech listing for
 “Rainbows”](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600063).
@@ -240,6 +246,36 @@ The supplied MP3 is included unchanged as `public/audio/rainbows.mp3`; it has
 not been edited, trimmed, or re-encoded. The game loops the recording and lets
 players adjust playback volume. The music remains licensed under CC BY 4.0.
 Asset attribution is also included in [public/audio/README.md](public/audio/README.md).
+
+Battle music comes from [Kevin MacLeod's Incompetech listing for
+“Raving Energy (faster)”](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900012).
+
+| Detail | Credit |
+| --- | --- |
+| Title | Raving Energy (faster) |
+| Composer / artist | Kevin MacLeod ([incompetech.com](https://incompetech.com/)) |
+| Genre | Electronica |
+| Album | Disco and Lounge (Electronic and Rock) |
+| Length | 4:04 |
+| Tempo | 134 BPM |
+| Feel | Bright, Grooving, Driving |
+| Instruments | Synths, Percussion |
+| ISRC | USUAN1900012 |
+| Uploaded | 2019-06-11 |
+| Licence | [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/) |
+
+Attribution supplied by the artist:
+
+```text
+"Raving Energy (faster)" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+http://creativecommons.org/licenses/by/4.0/
+```
+
+The supplied faster version is included unchanged as
+`public/audio/raving-energy-faster.mp3`, with no editing, trimming, speed
+change, or re-encoding. It loops during the battle window. Each new battle
+window starts the track from the beginning; queued battles keep it playing.
 
 ### Character outfits
 

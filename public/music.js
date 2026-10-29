@@ -1,5 +1,5 @@
-// One local recording for the whole game. Audio decoding stays off the movement
-// loop; scene changes and pet broadcasts never recreate or restart the player.
+// Two local recordings share one volume control; only one plays at a time.
+// Keep the world track paused in place while the battle window is open.
 const musicDashboard = document.getElementById('dashboard');
 const musicSettingsKey = 'virtuepets:music';
 function musicPreferences(value) {
@@ -27,8 +27,9 @@ musicControls.innerHTML = `
   <input id="music-volume" type="range" min="0" max="100" step="1" value="35">
   <p id="music-status" class="help" role="status"></p>
   <p id="music-credit" class="help">
-    <a href="https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600063" target="_blank" rel="noopener noreferrer">“Rainbows”</a>
-    by <a href="https://incompetech.com/" target="_blank" rel="noopener noreferrer">Kevin MacLeod</a>.<br>
+    Home &amp; town: <a href="https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600063" target="_blank" rel="noopener noreferrer">“Rainbows”</a>.<br>
+    Battles: <a href="https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900012" target="_blank" rel="noopener noreferrer">“Raving Energy (faster)”</a>.<br>
+    Both by <a href="https://incompetech.com/" target="_blank" rel="noopener noreferrer">Kevin MacLeod</a>.<br>
     Licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.<br>
     Thank you, Kevin, for sharing your music.
   </p>`;
@@ -36,12 +37,20 @@ document.getElementById('world-panel-menu').append(musicControls);
 const musicToggle = document.getElementById('music-toggle');
 const musicVolume = document.getElementById('music-volume');
 const musicStatus = document.getElementById('music-status');
-const musicAudio = document.createElement('audio');
-musicAudio.id = 'background-music';
-musicAudio.loop = true;
-musicAudio.preload = 'none';
-musicAudio.hidden = true;
-document.body.append(musicAudio);
+const musicTracks = {
+  world: { id: 'background-music', title: 'Rainbows', path: '/audio/rainbows.mp3' },
+  battle: { id: 'battle-music', title: 'Raving Energy (faster)', path: '/audio/raving-energy-faster.mp3' },
+};
+for (const track of Object.values(musicTracks)) {
+  track.audio = document.createElement('audio');
+  track.audio.id = track.id;
+  track.audio.loop = true;
+  track.audio.preload = 'none';
+  track.audio.hidden = true;
+  document.body.append(track.audio);
+}
+let musicTrack = musicTracks.world;
+let musicAudio = musicTrack.audio;
 
 let musicActivated = false;
 let musicPending = null;
@@ -64,7 +73,7 @@ function musicRender() {
   const message = !musicSettings.enabled ? 'Music is off.' : musicSettings.volume === 0 ? 'Volume is muted.' :
     musicFailure || (!musicActivated ? 'Click, tap or press a key to start the music.' :
       musicAudio.paused || (musicContext && musicContext.state !== 'running') ? 'Music will resume when you return.' :
-        'Rainbows · Kevin MacLeod');
+        `${musicTrack.title} · Kevin MacLeod`);
   if (musicStatus.textContent !== message) musicStatus.textContent = message;
 }
 
@@ -79,18 +88,22 @@ function musicSetVolume() {
     // Gain also works on mobile browsers that reserve audio.volume for the
     // device buttons. Smooth adjustments prevent clicks while dragging.
     musicGain.gain.setTargetAtTime(level, musicContext.currentTime, 0.08);
-  } else musicAudio.volume = level;
+  } else for (const track of Object.values(musicTracks)) track.audio.volume = level;
 }
 
 function musicPrepare() {
-  if (!musicAudio.getAttribute('src')) musicAudio.src = '/audio/rainbows.mp3';
+  if (!musicAudio.getAttribute('src')) musicAudio.src = musicTrack.path;
+  else if (musicAudio.error) musicAudio.load();
   const Context = window.AudioContext || window.webkitAudioContext;
   if (!musicContext && Context) {
     musicContext = new Context();
     musicGain = musicContext.createGain();
     musicGain.gain.value = musicSettings.volume / 100;
-    musicContext.createMediaElementSource(musicAudio).connect(musicGain);
     musicGain.connect(musicContext.destination);
+  }
+  if (musicContext && !musicTrack.source) {
+    musicTrack.source = musicContext.createMediaElementSource(musicAudio);
+    musicTrack.source.connect(musicGain);
     musicAudio.volume = 1;
   }
   musicSetVolume();
@@ -99,9 +112,11 @@ function musicPrepare() {
 function musicPause() {
   musicGeneration++;
   musicPending = null;
-  musicAudio.pause();
-  if (musicDashboard.hidden) {
-    try { musicAudio.currentTime = 0; } catch { /* No recording loaded yet. */ }
+  for (const { audio } of Object.values(musicTracks)) {
+    audio.pause();
+    if (musicDashboard.hidden) {
+      try { audio.currentTime = 0; } catch { /* No recording loaded yet. */ }
+    }
   }
   if (musicContext?.state === 'running') {
     musicContext.suspend().catch(() => {});
@@ -120,7 +135,24 @@ function musicResume() {
   });
 }
 
+function musicSelectTrack() {
+  const next = !musicDashboard.hidden && document.getElementById('battle-dialog')?.open
+    ? musicTracks.battle : musicTracks.world;
+  if (next === musicTrack) return;
+  musicGeneration++;
+  musicPending = null;
+  musicAudio.pause();
+  musicTrack = next;
+  musicAudio = next.audio;
+  // Each new encounter starts fresh. Returning to the map preserves Rainbows.
+  if (next === musicTracks.battle) {
+    try { musicAudio.currentTime = 0; } catch { /* Load on the next permitted play. */ }
+  }
+  musicFailure = ''; musicNeedsGesture = false; musicFailed = false;
+}
+
 function musicSync() {
+  musicSelectTrack();
   if (!musicWanted()) {
     musicPause();
     musicRender();
@@ -130,14 +162,16 @@ function musicSync() {
   if (musicPending) return;
   if (!musicAudio.paused && (!musicContext || musicContext.state === 'running')) return;
   const generation = ++musicGeneration;
+  const audio = musicAudio;
   try {
     musicPrepare();
     // Both calls happen in the gesture's stack. Awaiting resume before play
     // would lose the media permission in some browsers.
     const resume = musicResume();
-    musicPending = Promise.all([resume, musicAudio.play()]);
+    musicPending = Promise.all([resume, audio.play()]);
     musicPending.then(() => {
       if (generation !== musicGeneration) {
+        if (audio !== musicAudio) audio.pause();
         if (!musicWanted()) musicPause();
         return;
       }
@@ -196,12 +230,26 @@ musicVolume.addEventListener('input', () => {
   musicSync();
   musicRender();
 });
-musicAudio.addEventListener('error', () => {
-  musicFailed = true;
-  musicPause();
-  musicFailure = 'Music could not load. Switch it off and on to retry.';
-  musicRender();
-});
+for (const { audio } of Object.values(musicTracks)) {
+  audio.addEventListener('error', () => {
+    // A delayed error from a paused track must not silence its replacement.
+    if (audio !== musicAudio) return;
+    musicFailed = true;
+    musicPause();
+    musicFailure = 'Music could not load. Switch it off and on to retry.';
+    musicRender();
+  });
+}
+// Observe the result of battle.js handling the event, including its queue.
+// A duplicate turn, ignored replay, or unrelated dismissal never changes tracks.
+let musicBattleSyncPending = false;
+for (const type of ['battle:show', 'battle:closed', 'battle:reset', 'battle:dismiss']) {
+  document.addEventListener(type, () => {
+    if (musicBattleSyncPending) return;
+    musicBattleSyncPending = true;
+    queueMicrotask(() => { musicBattleSyncPending = false; musicSync(); });
+  });
+}
 new MutationObserver(musicSync).observe(musicDashboard, { attributes: true, attributeFilter: ['hidden'] });
 document.addEventListener('visibilitychange', musicSync);
 window.addEventListener('pagehide', () => { musicAway = true; musicSync(); });

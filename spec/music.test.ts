@@ -1,6 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { readFileSync, statSync } from 'node:fs';
 import { expect, inject, it, vi } from 'vitest';
+import { startBattle } from '../src/combat.ts';
 
 const preferenceKey = 'virtuepets:music';
 const flush = async () => {
@@ -28,20 +29,20 @@ function page(options: { signedIn?: boolean; saved?: string; blockedStorage?: bo
     this.open = false;
     this.dispatchEvent(new window.Event('close'));
   };
-  let paused = true;
-  let playback: () => Promise<void> = () => Promise.resolve();
-  Object.defineProperty(window.HTMLMediaElement.prototype, 'paused', { get: () => paused });
+  const paused = new WeakMap<HTMLMediaElement, boolean>();
+  let playback: (audio: HTMLMediaElement) => Promise<void> = () => Promise.resolve();
+  Object.defineProperty(window.HTMLMediaElement.prototype, 'paused', { get() { return paused.get(this) ?? true; } });
   const play = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(function (this: HTMLMediaElement) {
-    paused = false;
-    return playback().then(() => {
-      if (!paused) this.dispatchEvent(new window.Event('playing'));
+    paused.set(this, false);
+    return playback(this).then(() => {
+      if (!this.paused) this.dispatchEvent(new window.Event('playing'));
     }, error => {
-      paused = true;
+      paused.set(this, true);
       throw error;
     });
   });
   const pause = vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(function (this: HTMLMediaElement) {
-    paused = true;
+    paused.set(this, true);
     this.dispatchEvent(new window.Event('pause'));
   });
   const gain = { gain: { value: 1, setTargetAtTime: vi.fn() }, connect: vi.fn() };
@@ -57,14 +58,23 @@ function page(options: { signedIn?: boolean; saved?: string; blockedStorage?: bo
   if (options.webAudio) Object.defineProperty(window, 'AudioContext', { value: AudioContext });
   $('dashboard').hidden = !options.signedIn;
   $('signout').hidden = !options.signedIn;
+  window.eval(readFileSync('public/battle.js', 'utf8'));
   window.eval(readFileSync('public/world.js', 'utf8'));
   window.eval(readFileSync('public/music.js', 'utf8'));
   const audio = $('background-music') as HTMLAudioElement;
+  const battleAudio = $('battle-music') as HTMLAudioElement;
   const toggle = $('music-toggle') as HTMLButtonElement;
   const range = $('music-volume') as HTMLInputElement;
   return {
-    window, $, audio, toggle, range, play, pause, context, gain, source, AudioContext,
-    setPlayback: (callback: () => Promise<void>) => { playback = callback; },
+    window, $, audio, battleAudio, toggle, range, play, pause, context, gain, source, AudioContext,
+    setPlayback: (callback: (audio: HTMLMediaElement) => Promise<void>) => { playback = callback; },
+    showBattle: (key = 'session:1', changes: Record<string, unknown> = {}) => {
+      const pet = { id: 'owner', strength: 5, intelligence: 5, charisma: 5 };
+      const detail = { key, battle: startBattle([pet], { ...pet, id: 'opponent' }, [24, 16]), viewer: pet.id, manual: true, ...changes };
+      window.document.dispatchEvent(new window.CustomEvent('battle:show', { detail }));
+      return detail;
+    },
+    closeBattle: () => ($('battle-dialog') as HTMLDialogElement).close(),
     gesture: () => $('world-stage').dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true })),
     key: (key = 'a', repeat = false) => $('world-stage').dispatchEvent(new window.KeyboardEvent('keydown', { key, repeat, bubbles: true })),
     openMenu: () => $('world-stage').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
@@ -126,6 +136,7 @@ it('starts one quiet loop after a signed-in gesture and keeps music controls ins
     expect(credit.textContent).toContain('Thank you, Kevin, for sharing your music.');
     expect(credit.querySelector('a[href="https://incompetech.com/"]')?.textContent).toBe('Kevin MacLeod');
     expect(credit.querySelector('a[href*="USUAN1600063"]')?.textContent).toBe('“Rainbows”');
+    expect(credit.querySelector('a[href*="USUAN1900012"]')?.textContent).toBe('“Raving Energy (faster)”');
     expect(credit.querySelector('a[href="https://creativecommons.org/licenses/by/4.0/"]')?.textContent).toBe('CC BY 4.0');
     p.$('world-dialog-close').click();
     // Normal server renders can set hidden=false repeatedly.
@@ -134,7 +145,9 @@ it('starts one quiet loop after a signed-in gesture and keeps music controls ins
     expect(p.play).toHaveBeenCalledTimes(1);
     expect(p.pause).toHaveBeenCalledTimes(pauses);
     expect(p.audio.currentTime).toBe(18);
-    expect(p.window.document.querySelectorAll('audio')).toHaveLength(1);
+    expect(p.window.document.querySelectorAll('audio')).toHaveLength(2);
+    expect(p.battleAudio.getAttribute('src')).toBeNull();
+    expect(p.battleAudio.paused).toBe(true);
     p.$('dashboard').hidden = true;
     await flush();
     p.gesture();
@@ -145,9 +158,9 @@ it('starts one quiet loop after a signed-in gesture and keeps music controls ins
   } finally { p.close(); }
 });
 
-it('serves the Rainbows MP3 with audio headers and byte ranges for browser playback', async () => {
-  const path = 'public/audio/rainbows.mp3';
-  const url = new URL('/audio/rainbows.mp3', inject('baseUrl'));
+it.each(['rainbows', 'raving-energy-faster'])('serves %s with audio headers and byte ranges for browser playback', async track => {
+  const path = `public/audio/${track}.mp3`;
+  const url = new URL(`/audio/${track}.mp3`, inject('baseUrl'));
   const head = await fetch(url, { method: 'HEAD' });
   expect(head.status).toBe(200);
   expect(head.headers.get('content-type')).toMatch(/^audio\/mpeg/);
@@ -157,6 +170,122 @@ it('serves the Rainbows MP3 with audio headers and byte ranges for browser playb
   expect(part.status).toBe(206);
   expect(part.headers.get('content-range')).toBe(`bytes 0-1023/${statSync(path).size}`);
   expect(Buffer.from(await part.arrayBuffer())).toEqual(readFileSync(path).subarray(0, 1024));
+});
+
+it.each(['session:arena', 'session:revenge', 'adventure:grass', 'fight:replay'])(
+  'plays battle music for %s without restarting on turns, then resumes Rainbows', async key => {
+    const p = page({ signedIn: true });
+    try {
+      p.gesture();
+      await flush();
+      p.audio.currentTime = 43;
+      const detail = p.showBattle(key, key.includes('replay') ? { manual: false, replay: true } : {});
+      await flush();
+      expect(p.audio.paused).toBe(true);
+      expect(p.battleAudio.paused).toBe(false);
+      expect(p.battleAudio.getAttribute('src')).toBe('/audio/raving-energy-faster.mp3');
+      expect(p.battleAudio.loop).toBe(true);
+      expect(p.battleAudio.volume).toBeCloseTo(0.35);
+      expect(p.$('music-status').textContent).toBe('Raving Energy (faster) · Kevin MacLeod');
+      p.battleAudio.currentTime = 12;
+      const attempts = p.play.mock.calls.length;
+      if (detail.manual) p.window.document.dispatchEvent(new p.window.CustomEvent('battle:show', { detail }));
+      p.window.document.dispatchEvent(new p.window.CustomEvent('battle:dismiss', { detail: { key: 'unrelated' } }));
+      p.gesture();
+      await flush();
+      expect(p.battleAudio.currentTime).toBe(12);
+      expect(p.play).toHaveBeenCalledTimes(attempts);
+      p.closeBattle();
+      await flush();
+      expect(p.battleAudio.paused).toBe(true);
+      expect(p.audio.paused).toBe(false);
+      expect(p.audio.currentTime).toBe(43);
+      expect(p.$('music-status').textContent).toBe('Rainbows · Kevin MacLeod');
+      p.showBattle('session:new');
+      await flush();
+      expect(p.battleAudio.currentTime).toBe(0);
+      expect(p.battleAudio.paused).toBe(false);
+      expect(p.audio.paused).toBe(true);
+    } finally { p.close(); }
+  },
+);
+
+it('keeps battle music continuous across queued windows and ignores a suppressed battle', async () => {
+  const p = page({ signedIn: true });
+  try {
+    p.gesture(); await flush();
+    p.showBattle('session:first'); await flush();
+    p.battleAudio.currentTime = 17;
+    const attempts = p.play.mock.calls.length;
+    p.showBattle('session:queued');
+    p.closeBattle(); await flush();
+    expect((p.$('battle-dialog') as HTMLDialogElement).open).toBe(true);
+    expect(p.battleAudio.currentTime).toBe(17);
+    expect(p.play).toHaveBeenCalledTimes(attempts);
+    expect(p.audio.paused).toBe(true);
+    p.closeBattle(); await flush();
+    p.showBattle('session:first'); await flush();
+    expect((p.$('battle-dialog') as HTMLDialogElement).open).toBe(false);
+    expect(p.audio.paused).toBe(false);
+    expect(p.battleAudio.paused).toBe(true);
+  } finally { p.close(); }
+});
+
+it('shares mute, mobile volume and tab suspension between tracks without leaking audio on sign-out', async () => {
+  const p = page({ signedIn: true, webAudio: true, saved: JSON.stringify({ enabled: false, volume: 19 }) });
+  try {
+    p.gesture();
+    p.showBattle(); await flush();
+    expect(p.play).not.toHaveBeenCalled();
+    expect(p.battleAudio.getAttribute('src')).toBeNull();
+    p.toggle.click(); await flush();
+    expect(p.battleAudio.paused).toBe(false);
+    expect(p.audio.paused).toBe(true);
+    expect(p.gain.gain.value).toBeCloseTo(0.19);
+    p.battleAudio.currentTime = 25;
+    p.volume(8);
+    expect(p.gain.gain.setTargetAtTime.mock.calls.at(-1)?.[0]).toBeCloseTo(0.08);
+    p.setVisible(false); await flush();
+    expect(p.battleAudio.paused).toBe(true);
+    expect(p.context.state).toBe('suspended');
+    p.setVisible(true); await flush();
+    expect(p.battleAudio.currentTime).toBe(25);
+    expect(p.battleAudio.paused).toBe(false);
+    p.closeBattle(); await flush();
+    expect(p.audio.paused).toBe(false);
+    expect(p.AudioContext).toHaveBeenCalledTimes(1);
+    expect(p.context.createGain).toHaveBeenCalledTimes(1);
+    expect(p.context.createMediaElementSource).toHaveBeenCalledTimes(2);
+    p.showBattle('session:next'); await flush();
+    expect(p.context.createMediaElementSource).toHaveBeenCalledTimes(2);
+    p.$('dashboard').hidden = true;
+    p.window.document.dispatchEvent(new p.window.CustomEvent('battle:reset'));
+    await flush();
+    for (const audio of [p.audio, p.battleAudio]) {
+      expect(audio.paused).toBe(true);
+      expect(audio.currentTime).toBe(0);
+    }
+    expect(p.context.state).toBe('suspended');
+  } finally { p.close(); }
+});
+
+it.each(['resolve', 'reject'] as const)('ignores a late battle play %s and old audio errors after returning to the map', async outcome => {
+  const p = page({ signedIn: true });
+  try {
+    p.gesture(); await flush();
+    let resolve!: () => void, reject!: (error: Error) => void;
+    p.setPlayback(audio => audio === p.battleAudio ? new Promise<void>((yes, no) => { resolve = yes; reject = no; }) : Promise.resolve());
+    p.showBattle(); await flush();
+    p.closeBattle(); await flush();
+    expect(p.audio.paused).toBe(false);
+    if (outcome === 'resolve') resolve();
+    else reject(new p.window.DOMException('Playback interrupted', 'AbortError'));
+    p.battleAudio.dispatchEvent(new p.window.Event('error'));
+    await flush();
+    expect(p.battleAudio.paused).toBe(true);
+    expect(p.audio.paused).toBe(false);
+    expect(p.$('music-status').textContent).toBe('Rainbows · Kevin MacLeod');
+  } finally { p.close(); }
 });
 
 it('preserves playback position while hidden, then resets it and stops on sign-out', async () => {
