@@ -17,6 +17,7 @@ import {
   SPOILS, LEADERBOARD_ORDERS, LEADERBOARD_SIZE, fight, isLeaderboardOrder, leaderboard, listPets, recentFights,
   APPEARANCES, isAppearance, setAppearance, STEAL, steal, help, theftsFor, revenge, equipCoin, FREE_SUPPLIES, collectSupplies,
   ADVENTURE_COST, ADVENTURE_COOLDOWN_MINUTES, equipSkills, battleSessionsFor, battleSessionFor, actInBattle, type BattleSessionOutcome, type Outcome,
+  SKILL_LOADOUTS, saveSkillLoadout, equipSkillLoadout,
 } from "./pets.ts";
 import {
   Busy, PASSWORD, type AuthOutcome, clearedCookie, isValidPassword, playerFor, sessionCookie, sessionToken, signIn,
@@ -358,6 +359,7 @@ app.get("/api/rules", (_req, res) => {
       cost: FIGHT_COST, needs: FIGHT_NEEDS, luck: LUCK, powerWeights: POWER_WEIGHTS, spoils: SPOILS,
       cooldownMinutes: FIGHT_COOLDOWN_MINUTES,
       abilities: ABILITIES,
+      skillLoadouts: SKILL_LOADOUTS,
       types: { chart: TYPE_CHART, monsters: MONSTER_TYPES },
     },
     adventure: { cost: ADVENTURE_COST, cooldownMinutes: ADVENTURE_COOLDOWN_MINUTES, skillDropRate: MONSTER_SKILL_DROP_RATE },
@@ -455,8 +457,26 @@ app.post("/api/pets/:id/collect-supplies", (req, res) => {
   respond(res, collectSupplies(req.params.id));
 });
 
+function requireOwnHome(id: string, res: express.Response): boolean {
+  const position = worldPosition(id);
+  if (position.scene === 'home' && position.home === id) return true;
+  res.status(409).json({ error: 'Return to your storage chest at home to change battle skills.' });
+  return false;
+}
+
 app.post('/api/pets/:id/equip-skills', (req, res) => {
+  if (!requireOwnHome(req.params.id, res)) return;
   respond(res, equipSkills(req.params.id, req.body?.abilities));
+});
+
+app.post('/api/pets/:id/skill-loadouts/:slot/save', (req, res) => {
+  if (!requireOwnHome(req.params.id, res)) return;
+  respond(res, saveSkillLoadout(req.params.id, req.params.slot, req.body?.abilities));
+});
+
+app.post('/api/pets/:id/skill-loadouts/:slot/equip', (req, res) => {
+  if (!requireOwnHome(req.params.id, res)) return;
+  respond(res, equipSkillLoadout(req.params.id, req.params.slot));
 });
 
 app.post("/api/pets/:id/equip-coin/:coin", (req, res) => {

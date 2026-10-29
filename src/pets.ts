@@ -17,6 +17,14 @@ export const APPEARANCES = ["cat", "dog", "hedgehog", "lizard", "panda", "bird",
 export type Appearance = (typeof APPEARANCES)[number];
 export const isAppearance = (value: unknown): value is Appearance => APPEARANCES.some((a) => a === value);
 
+export const SKILL_LOADOUTS = [
+  { id: "adventure", name: "Adventure" },
+  { id: "arena", name: "Arena" },
+  { id: "support", name: "Support" },
+] as const;
+type SkillLoadoutId = (typeof SKILL_LOADOUTS)[number]["id"];
+const isSkillLoadoutId = (value: unknown): value is SkillLoadoutId => SKILL_LOADOUTS.some(slot => slot.id === value);
+
 export interface Pet extends ReturnType<typeof inventoryFor> {
   id: string;
   color: string;
@@ -46,6 +54,7 @@ export interface Pet extends ReturnType<typeof inventoryFor> {
   losses: number;
   equippedCoin: CoinId | null; // global to the pet; applies in Adventure, Arena, and revenge
   equippedAbilities: AbilityId[];
+  skillLoadouts: Partial<Record<SkillLoadoutId, AbilityId[]>>;
 }
 
 // Always there to fight, so a new player has someone to test themselves on.
@@ -163,7 +172,7 @@ const select = db.prepare(
   `SELECT id, color, appearance, strength, intelligence, charisma, money, activity, school, credits, stamina, hygiene, food, soap,
           hourglass, construction_rank, office_rank, theatre_rank, task, busy_since, busy_until, reward, wins, losses,
           steal_available_at AS stealAvailableAt, supplies_available_at AS suppliesAvailableAt, equipped_coin AS equippedCoin,
-          equipped_abilities AS equippedAbilities, skill_jobs AS skillJobs
+          equipped_abilities AS equippedAbilities, skill_loadouts AS skillLoadouts, skill_jobs AS skillJobs
      FROM pets WHERE id = ?`,
 );
 // The bot first, then the newest pets, so a player who just joined is easy to
@@ -178,13 +187,14 @@ const save = db.prepare(
   `UPDATE pets SET strength = ?, intelligence = ?, charisma = ?, money = ?, school = ?, credits = ?,
      stamina = ?, hygiene = ?, food = ?, soap = ?, hourglass = ?, construction_rank = ?, office_rank = ?, theatre_rank = ?,
      activity = ?, task = ?, busy_since = ?, busy_until = ?, reward = ?, wins = ?, losses = ?, color = ?, appearance = ?,
-     equipped_coin = ?, equipped_abilities = ?, skill_jobs = ?
+     equipped_coin = ?, equipped_abilities = ?, skill_loadouts = ?, skill_jobs = ?
    WHERE id = ?`,
 );
 
-type Row = Omit<Pet, "jobs" | "skillJobs" | "combat" | "busySince" | "busyUntil" | "reward" | "abilities" | "coins" | "equippedAbilities"> & {
+type Row = Omit<Pet, "jobs" | "skillJobs" | "combat" | "busySince" | "busyUntil" | "reward" | "abilities" | "coins" | "equippedAbilities" | "skillLoadouts"> & {
   skillJobs: string;
   equippedAbilities: string;
+  skillLoadouts: string;
   construction_rank: number;
   office_rank: number;
   theatre_rank: number;
@@ -196,11 +206,12 @@ type Row = Omit<Pet, "jobs" | "skillJobs" | "combat" | "busySince" | "busyUntil"
 export function getPet(id: string): Pet | undefined {
   const row = select.get(id) as Row | undefined;
   if (!row) return undefined;
-  const { construction_rank, office_rank, theatre_rank, busy_since, busy_until, reward, equippedAbilities, skillJobs, ...pet } = row;
+  const { construction_rank, office_rank, theatre_rank, busy_since, busy_until, reward, equippedAbilities, skillLoadouts, skillJobs, ...pet } = row;
   return {
     ...pet,
     ...inventoryFor(id),
     equippedAbilities: JSON.parse(equippedAbilities) as AbilityId[],
+    skillLoadouts: JSON.parse(skillLoadouts),
     skillJobs: JSON.parse(skillJobs),
     combat: { type: mainAttribute(pet), maxHp: maxHpFor(pet), maxMp: maxMpFor(pet), balanced: balancedStats(pet) },
     busySince: busy_since,
@@ -323,7 +334,7 @@ function write(pet: Pet): void {
       pet.stamina, pet.hygiene, pet.food, pet.soap, pet.hourglass,
       pet.jobs.construction, pet.jobs.office, pet.jobs.theatre,
       pet.activity, pet.task, pet.busySince, pet.busyUntil, pet.reward === null ? null : JSON.stringify(pet.reward),
-      pet.wins, pet.losses, pet.color, pet.appearance, pet.equippedCoin, JSON.stringify(pet.equippedAbilities), JSON.stringify(pet.skillJobs), pet.id,
+      pet.wins, pet.losses, pet.color, pet.appearance, pet.equippedCoin, JSON.stringify(pet.equippedAbilities), JSON.stringify(pet.skillLoadouts), JSON.stringify(pet.skillJobs), pet.id,
     );
     for (const skill of SKILLS) {
       if (!pet.abilities.includes(skill.id) && skill.source.channel === 'job' && jobLevel(pet.skillJobs[skill.source.job] ?? 0) >= skill.source.level) {
@@ -403,15 +414,43 @@ export function equipCoin(id: string, coin: unknown): Outcome {
   });
 }
 
+function validateSkills(pet: Pet, abilities: unknown): string | undefined {
+  if (!Array.isArray(abilities) || abilities.length < 1 || abilities.length > 4
+    || new Set(abilities).size !== abilities.length || !abilities.includes("claw-strike")) {
+    return "Equip up to four different skills, including Claw Strike.";
+  }
+  if (abilities.some(ability => !ABILITIES.some(known => known.id === ability)
+    || (ability !== "claw-strike" && !pet.abilities.includes(ability)))) return "You can only equip skills your pet has learned.";
+  return undefined;
+}
+
 export function equipSkills(id: string, abilities: unknown): Outcome {
   return act(id, (pet) => {
-    if (!Array.isArray(abilities) || abilities.length < 1 || abilities.length > 4
-      || new Set(abilities).size !== abilities.length || !abilities.includes("claw-strike")) {
-      return "Equip up to four different skills, including Claw Strike.";
-    }
-    if (abilities.some(ability => !ABILITIES.some(known => known.id === ability)
-      || (ability !== "claw-strike" && !pet.abilities.includes(ability)))) return "You can only equip skills your pet has learned.";
-    pet.equippedAbilities = abilities as AbilityId[];
+    const refusal = validateSkills(pet, abilities);
+    if (refusal) return refusal;
+    pet.equippedAbilities = [...abilities as AbilityId[]];
+    return undefined;
+  });
+}
+
+export function saveSkillLoadout(id: string, slot: unknown, abilities: unknown): Outcome {
+  return act(id, (pet) => {
+    if (!isSkillLoadoutId(slot)) return "Unknown skill loadout.";
+    const refusal = validateSkills(pet, abilities);
+    if (refusal) return refusal;
+    pet.skillLoadouts = { ...pet.skillLoadouts, [slot]: [...abilities as AbilityId[]] };
+    return undefined;
+  });
+}
+
+export function equipSkillLoadout(id: string, slot: unknown): Outcome {
+  return act(id, (pet) => {
+    if (!isSkillLoadoutId(slot)) return "Unknown skill loadout.";
+    const abilities = pet.skillLoadouts[slot];
+    if (!abilities) return "Save some skills in this loadout first.";
+    const refusal = validateSkills(pet, abilities);
+    if (refusal) return refusal;
+    pet.equippedAbilities = [...abilities];
     return undefined;
   });
 }

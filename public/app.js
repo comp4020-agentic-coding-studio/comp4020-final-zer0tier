@@ -11,7 +11,7 @@ const APPEARANCES = ["cat", "dog", "hedgehog", "lizard", "panda", "bird", "drago
 const SVG_NS = "http://www.w3.org/2000/svg";
 let pendingAppearance = null;
 let atHome = true;
-let savingSkills = false;
+let savingSkills = null;
 let activeSocket = null;
 const sessionRefreshSockets = new WeakSet();
 let onlinePlayers = new Set();
@@ -34,16 +34,59 @@ document.addEventListener("world:scene", event => {
 
 const typeLabel = (ability) => ability.type && ability.type !== "normal" ? `${ability.type.toUpperCase()} · ` : "";
 $("home-skill-filter").addEventListener("change", renderSkills);
+function skillNames(abilities) {
+  return abilities.map(id => rules.fight.abilities.find(ability => ability.id === id)?.name || id).join(" · ");
+}
+function renderSkillLoadouts(selected, locked) {
+  for (const slot of rules.fight.skillLoadouts || []) {
+    let row = $("home-loadout-list").querySelector(`[data-loadout="${slot.id}"]`);
+    if (!row) {
+      row = document.createElement("div");
+      row.className = "home-loadout";
+      row.dataset.loadout = slot.id;
+      const title = document.createElement("strong"), preview = document.createElement("p"), actions = document.createElement("div");
+      title.textContent = slot.name;
+      preview.id = `loadout-${slot.id}-skills`;
+      actions.className = "home-loadout-actions";
+      for (const action of ["equip", "save"]) {
+        const button = document.createElement("button");
+        button.type = "button"; button.className = "chip-btn chip-buy";
+        button.dataset.loadoutAction = action;
+        button.setAttribute("aria-describedby", preview.id);
+        button.addEventListener("click", () => changeSkillLoadout(slot, action));
+        actions.append(button);
+      }
+      row.append(title, preview, actions);
+      $("home-loadout-list").append(row);
+    }
+    const saved = current.skillLoadouts?.[slot.id];
+    const matches = Boolean(saved && saved.length === selected.length && saved.every((id, index) => id === selected[index]));
+    row.dataset.equipped = String(matches);
+    row.querySelector("p").textContent = saved ? skillNames(saved) : "No setup saved yet.";
+    const equip = row.querySelector('[data-loadout-action="equip"]'), save = row.querySelector('[data-loadout-action="save"]');
+    equip.textContent = matches ? "Equipped" : "Use";
+    equip.setAttribute("aria-label", matches ? `${slot.name} skills equipped` : `Use ${slot.name} loadout`);
+    equip.disabled = locked || !saved || matches;
+    save.textContent = saved ? "Update from equipped" : "Save current";
+    save.setAttribute("aria-label", saved ? `Update ${slot.name} from equipped skills` : `Save current skills as ${slot.name}`);
+    save.disabled = locked || matches;
+  }
+  $("home-loadout-list").setAttribute("aria-busy", String(Boolean(savingSkills)));
+}
 function renderSkills() {
   if (!current || !rules) return;
   const selected = current.equippedAbilities || ["claw-strike"];
-  $("home-skills-hint").textContent = atHome
+  const inBattle = [...liveBattles.values()].some(session => session.battle.status === "active");
+  const locked = Boolean(savingSkills) || !atHome || inBattle;
+  $("home-skills-hint").textContent = inBattle ? "Finish your battle or forfeit before changing battle skills." : atHome
     ? "Equip up to four skills before heading out. Claw Strike is always ready."
     : "Return to your storage chest at home to change battle skills.";
   const focus = document.activeElement?.dataset.equipSkill;
   const filter = $("home-skill-filter").value;
   const known = current.abilities || ["claw-strike"];
   const combat = current.combat;
+  $("home-equipped-skills").textContent = `Equipped ${selected.length}/4: ${skillNames(selected)}`;
+  renderSkillLoadouts(selected, locked);
   $("home-pet-type").textContent = combat ? `${combat.type.toUpperCase()} type · ${combat.maxHp} Max HP · ${combat.maxMp} Max MP. STR beats CHA, CHA beats INT, INT beats STR: +20% damage and 20% mitigation. Normal is neutral.` : '';
   $("home-skill-list").replaceChildren(...rules.fight.abilities.filter(ability =>
     (ability.source || ability.id === 'claw-strike' || known.includes(ability.id)) &&
@@ -63,24 +106,34 @@ function renderSkills() {
     button.type = "button"; button.className = "chip-btn chip-buy"; button.dataset.equipSkill = ability.id;
     button.textContent = ability.id === "claw-strike" ? "Always ready" : !learned ? "Not learned" : equipped ? "Unequip" : "Equip";
     button.setAttribute("aria-pressed", String(equipped));
-    button.disabled = savingSkills || !atHome || !learned || ability.id === "claw-strike" || (!equipped && selected.length >= 4);
+    button.disabled = locked || !learned || ability.id === "claw-strike" || (!equipped && selected.length >= 4);
     button.addEventListener("click", () => saveSkills(equipped ? selected.filter(id => id !== ability.id) : [...selected, ability.id]));
     row.append(content, button);
     return row;
   }));
-  $("home-skill-list").setAttribute("aria-busy", String(savingSkills));
+  $("home-skill-list").setAttribute("aria-busy", String(Boolean(savingSkills)));
   if (focus) [...$("home-skill-list").querySelectorAll("button")].find(button => button.dataset.equipSkill === focus && !button.disabled)?.focus();
 }
-async function saveSkills(abilities) {
+function saveSkills(abilities) {
+  return requestSkills("equip-skills", { abilities }, "Saving skills…", "Battle skills saved.");
+}
+function changeSkillLoadout(slot, action) {
+  const body = action === "save" ? { abilities: current?.equippedAbilities || ["claw-strike"] } : {};
+  return requestSkills(`skill-loadouts/${slot.id}/${action}`, body,
+    action === "save" ? `Saving ${slot.name} loadout…` : `Equipping ${slot.name} loadout…`,
+    action === "save" ? `${slot.name} loadout saved.` : `${slot.name} loadout equipped.`);
+}
+async function requestSkills(path, body, pending, success) {
   if (!current || savingSkills || !atHome) return;
   const owner = current.id, session = theftSession, before = current;
-  savingSkills = true;
+  const operation = {};
+  savingSkills = operation;
   $("home-skills-error").textContent = "";
-  $("home-skills-status").textContent = "Saving skills…";
+  $("home-skills-status").textContent = pending;
   renderSkills();
   try {
-    const response = await fetch(`/api/pets/${encodeURIComponent(owner)}/equip-skills`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ abilities }),
+    const response = await fetch(`/api/pets/${encodeURIComponent(owner)}/${path}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
     });
     const result = await response.json();
     if (current?.id !== owner || theftSession !== session) return;
@@ -88,15 +141,17 @@ async function saveSkills(abilities) {
     // HTTP is also server-confirmed, so a disconnected socket cannot leave
     // an old loadout on screen after a successful save.
     if (result.id === owner && current === before) render(result);
-    $("home-skills-status").textContent = "Battle skills saved.";
+    $("home-skills-status").textContent = success;
   } catch (error) {
     if (current?.id === owner && theftSession === session) {
       $("home-skills-status").textContent = "";
       $("home-skills-error").textContent = error.message || "Could not save skills. Try again.";
     }
   } finally {
-    savingSkills = false;
-    renderSkills();
+    if (savingSkills === operation) {
+      savingSkills = null;
+      renderSkills();
+    }
   }
 }
 
@@ -932,6 +987,7 @@ function showLiveBattle(session) {
   const prior = liveBattles.get(session.id);
   if (prior && prior.battle.revision > session.battle.revision) return;
   liveBattles.set(session.id, session);
+  renderSkills();
   if (session.battle.status === "active" && battleRefreshTimer === null) {
     battleRefreshTimer = setInterval(() => { if (!document.hidden && current) loadLiveBattles(); }, 1000);
   } else if (![...liveBattles.values()].some(saved => saved.battle.status === "active")) {
@@ -1303,7 +1359,9 @@ function clearThefts() {
   liveBattles.clear();
   clearInterval(battleRefreshTimer);
   battleRefreshTimer = null;
-  savingSkills = false;
+  savingSkills = null;
+  $("home-skills-status").textContent = "";
+  $("home-skills-error").textContent = "";
   if (activeSocket) {
     sessionRefreshSockets.add(activeSocket);
     activeSocket.close?.(4000, 'Session changed');

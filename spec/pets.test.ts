@@ -40,6 +40,7 @@ it("signing up creates a pet with base stats and starts a session", async () => 
     losses: 0,
     equippedCoin: null,
     equippedAbilities: ['claw-strike'],
+    skillLoadouts: {},
   });
   expect(await (await me(sessionFor(id))).json()).toMatchObject({ id });
 });

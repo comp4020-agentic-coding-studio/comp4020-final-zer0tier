@@ -156,7 +156,8 @@ Destinations include **Shops**, **Adventure**, **Arena**, **Part-time Jobs**, an
 or click or tap the building to open its activities. **Sweet Home**
 returns you to your pet. Your **Backpack** holds supplies, learned abilities, and
 Unfair Coins. At home's storage chest, choose **Battle skills** to equip
-learned moves before heading out. The **Journal** keeps recent visitors, activity, fight
+learned moves before heading out. Save **Adventure**, **Arena**, and **Support**
+loadouts there to switch between your favorite skill setups. The **Journal** keeps recent visitors, activity, fight
 history, and saved theft reports with revenge options. Press **Escape** in
 either scene to open the game menu for your pet's details, Backpack,
 Journal, Appearance, help, and Sign out. Pet details open in a compact window;
@@ -555,8 +556,14 @@ and the built-in `node:sqlite` for storage.
   doesn't own, or an unknown coin, returns 409.
   `POST /api/pets/:id/equip-skills` takes `{ "abilities":
   ["claw-strike", "firebolt"] }` and saves up to four different learned
-  skills, including Claw Strike. The home chest exposes these controls;
-  loadout changes are refused during a live battle.
+  skills, including Claw Strike. `POST /api/pets/:id/skill-loadouts/:slot/save`
+  takes the same body to save a setup without equipping it; `:slot` is
+  `adventure`, `arena`, or `support`. `POST /api/pets/:id/skill-loadouts/:slot/equip`
+  equips that saved setup, rejecting empty slots. Pet responses include
+  `skillLoadouts`, initially `{}`, mapping saved slots to skill ID arrays.
+  Saving again replaces only that slot. All three actions require being in
+  your own home, validate learned skills, refuse changes during a live battle,
+  and return and broadcast the saved pet through `pet:updated`.
   Stealing returns `{ thief, victim, amount }`; both pets include
   `stealAvailableAt` (epoch milliseconds, or `null` before any theft). The
   server locks and checks the target before transferring money, saving
@@ -995,6 +1002,17 @@ does not equip it**: at home's storage chest, equip up to four skills,
 including the permanently available Claw Strike. That loadout works in
 Adventure, Arena, and revenge and is fixed for a live battle. Duplicate drops say **already learned**,
 without stacking the ability or rerolling the reward.
+
+**Saved skill loadouts:** in the home chest's **Battle skills**, equip your
+skills and choose **Save current** under Adventure, Arena, or Support. Each
+slot previews its saved skills. **Use** equips a saved setup; **Update from
+equipped** replaces just that slot with your current skills. Individual
+skill changes leave saved setups intact. The slots persist across sign-ins
+and server restarts, and start empty for both new and existing pets.
+These names are labels: the equipped setup applies to every battle until
+you change it at home. Switching activities does not automatically change
+skills. Loadouts only store skills; equipped coins and inventory stay as they
+are. Claw Strike and the four-skill limit still apply.
 
 **30 learnable combat skills** appear in the home skill book with power,
 accuracy, effects, and the exact acquisition source. Claw Strike remains a

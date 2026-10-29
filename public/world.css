@@ -910,6 +910,15 @@ body.world-playing #world-panel-pet #home-care-error:empty {
 .home-skill small { margin-top: 4px; color: var(--muted); line-height: 1.45; }
 .home-skill button { min-height: 44px; flex-shrink: 0; }
 .home-skill[data-equipped="true"] { border-color: var(--primary); }
+.home-equipped-skills { padding: 12px; background: var(--surface); border: 1px solid var(--primary); border-radius: 14px; line-height: 1.5; }
+.home-loadouts { margin: 16px 0; }
+.home-loadouts h5 { margin: 0 0 6px; font-size: 1rem; }
+.home-loadout-list { display: grid; gap: 10px; }
+.home-loadout { padding: 12px; border: 1px solid var(--border); border-radius: 14px; }
+.home-loadout[data-equipped="true"] { border-color: var(--primary); }
+.home-loadout p { margin: 6px 0 10px; color: var(--muted); font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; }
+.home-loadout-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.home-loadout-actions button { min-height: 44px; }
 
 .job-label { display: grid; gap: 6px; font-size: .85rem; }
 .job-select, #home-skill-filter { width: 100%; min-height: 44px; padding: 8px; color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }

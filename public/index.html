@@ -528,14 +528,20 @@
               <h4 id="home-skills-title">Battle skills</h4>
               <p class="help" id="home-skills-hint">Equip skills at your storage chest before heading out. Claw Strike is always ready.</p>
               <p class="help" id="home-pet-type"></p>
+              <p id="home-equipped-skills" class="home-equipped-skills"></p>
+              <section class="home-loadouts" aria-labelledby="home-loadouts-title">
+                <h5 id="home-loadouts-title">Saved loadouts</h5>
+                <p class="help">Save your equipped skills, then use a setup before heading out. Changing skills won’t change your saved setups.</p>
+                <div id="home-loadout-list" class="home-loadout-list"></div>
+              </section>
+              <p id="home-skills-status" class="help" role="status"></p>
+              <p id="home-skills-error" class="error" role="alert"></p>
               <label for="home-skill-filter">Show skills</label>
               <select id="home-skill-filter">
                 <option value="all">All skills</option><option value="learned">Learned</option>
                 <option value="str">Strength</option><option value="cha">Charisma</option><option value="int">Intelligence</option><option value="normal">Normal</option>
               </select>
               <div id="home-skill-list" class="home-skill-list"></div>
-              <p id="home-skills-status" class="help" role="status"></p>
-              <p id="home-skills-error" class="error" role="alert"></p>
             </section>
             <p class="help">Chest items join Care &amp; shop. Equipping a coin applies it in Adventure, Arena, and revenge until you change it.</p>
             <div id="coins" class="items"></div>
