@@ -72,8 +72,8 @@ async function loadoutWindow() {
   const pending: { resolve: (response: Response) => void; reject: (error: Error) => void }[] = [];
   const requests = vi.fn(async (url: string) => {
     if (url === '/api/rules') return Response.json(rules);
-    if (url === '/api/me' || url === '/api/signin') return Response.json(pet);
-    if (url.includes('/skill-loadouts/')) return new Promise<Response>((resolve, reject) => pending.push({ resolve, reject }));
+    if (url === '/api/me' || url === '/api/signin' || url === `/api/pets/${pet.id}`) return Response.json(pet);
+    if (url.includes('/skill-loadouts/') || url.endsWith('/equip-skills')) return new Promise<Response>((resolve, reject) => pending.push({ resolve, reject }));
     return Response.json([]);
   });
   window.fetch = requests as typeof fetch;
@@ -85,7 +85,7 @@ async function loadoutWindow() {
   };
   window.eval(readFileSync('public/app.js', 'utf8'));
   await vi.waitFor(() => expect(button('adventure', 'save')).not.toBeNull());
-  return { window, document, button, preview, requests, pending, update, pet };
+  return { window, document, button, preview, requests, pending, update, pet, setServerPet: (next: any) => { pet = next; } };
 }
 
 it('previews saved loadouts and waits for saved state when saving, updating, and switching', async () => {
@@ -177,4 +177,121 @@ it('ignores a prior login’s late loadout response without unlocking a new save
     await vi.waitFor(() => expect(preview('support')).toBe('Claw Strike · Firebolt'));
     expect(button('adventure', 'save').disabled).toBe(false);
   } finally { window.close(); }
+});
+
+it('shows the saved loadout when an earlier pet update arrives and the save broadcast is lost', async () => {
+  const ui = await loadoutWindow();
+  try {
+    ui.button('arena', 'save').click();
+    // Another action was saved before the loadout, but its event arrived after
+    // this request started. The socket then drops before the loadout event.
+    const earlier = { ...ui.pet, money: 30 };
+    ui.update(earlier);
+    const saved = { ...earlier, skillLoadouts: { arena: ['claw-strike', 'firebolt'] } };
+    ui.setServerPet(saved);
+    ui.pending.shift()!.resolve(Response.json(saved));
+    await vi.waitFor(() => expect(ui.document.getElementById('home-skills-status')!.textContent).toBe('Arena loadout saved.'));
+    expect(ui.preview('arena')).toBe('Claw Strike · Firebolt');
+    expect(ui.document.getElementById('stat-money')!.textContent).toBe('30');
+  } finally { ui.window.close(); }
+});
+
+it.each([401, 403])('recovers the signed-in account when saving loadouts returns %s', async status => {
+  const ui = await loadoutWindow();
+  try {
+    ui.button('arena', 'save').click();
+    const nextPet = { ...ui.pet, id: freshId(), skillLoadouts: {} };
+    ui.setServerPet(nextPet); // another tab signed into a different account
+    ui.pending.shift()!.resolve(Response.json({ error: status === 401 ? 'Sign in first.' : "That's not your pet." }, { status }));
+    if (status === 401) {
+      await vi.waitFor(() => expect(ui.document.getElementById('dashboard')!.hidden).toBe(true));
+      expect(ui.document.getElementById('login-error')!.textContent).toContain('session has ended');
+    } else {
+      await vi.waitFor(() => expect(ui.document.getElementById('pet-name')!.textContent).toBe(nextPet.id));
+      expect(ui.preview('arena')).toBe('No setup saved yet.');
+    }
+  } finally { ui.window.close(); }
+});
+
+it('keeps keyboard focus on the skill after equipping without stealing focus moved elsewhere', async () => {
+  const ui = await loadoutWindow();
+  const skill = () => ui.document.querySelector<HTMLButtonElement>('[data-equip-skill="hardhat-guard"]')!;
+  try {
+    skill().focus();
+    skill().click();
+    const equipped = { ...ui.pet, equippedAbilities: ['claw-strike', 'firebolt', 'hardhat-guard'] };
+    ui.pending.shift()!.resolve(Response.json(equipped));
+    await vi.waitFor(() => expect(skill().getAttribute('aria-pressed')).toBe('true'));
+    expect(ui.document.activeElement === skill()).toBe(true);
+    skill().click();
+    ui.document.getElementById('home-skill-filter')!.focus();
+    ui.pending.shift()!.resolve(Response.json(ui.pet));
+    await vi.waitFor(() => expect(skill().getAttribute('aria-pressed')).toBe('false'));
+    expect(ui.document.activeElement).toBe(ui.document.getElementById('home-skill-filter'));
+  } finally { ui.window.close(); }
+});
+
+it('retries a skill refresh when another saved update overtakes the read', async () => {
+  const ui = await loadoutWindow();
+  const fallback = ui.requests.getMockImplementation()!;
+  const reads: ((response: Response) => void)[] = [];
+  ui.requests.mockImplementation(async url => url === `/api/pets/${ui.pet.id}`
+    ? new Promise<Response>(resolve => reads.push(resolve)) : fallback(url));
+  try {
+    ui.button('arena', 'save').click();
+    ui.update({ ...ui.pet, money: 30 });
+    const saved = { ...ui.pet, money: 30, skillLoadouts: { arena: ['claw-strike', 'firebolt'] } };
+    ui.pending.shift()!.resolve(Response.json(saved));
+    await vi.waitFor(() => expect(reads).toHaveLength(1));
+    const newer = { ...saved, skillLoadouts: { arena: ['claw-strike', 'hardhat-guard'] } };
+    ui.update(newer);
+    reads.shift()!(Response.json(saved));
+    await vi.waitFor(() => expect(reads).toHaveLength(1));
+    expect(ui.preview('arena')).toBe('Claw Strike · Hardhat Guard');
+    reads.shift()!(Response.json(newer));
+    await vi.waitFor(() => expect(ui.document.getElementById('home-skills-status')!.textContent).toBe('Arena loadout saved.'));
+    expect(ui.preview('arena')).toBe('Claw Strike · Hardhat Guard');
+    expect(ui.button('support', 'save').disabled).toBe(false);
+  } finally { ui.window.close(); }
+});
+
+it('distinguishes a completed save from a failed refresh and allows retrying', async () => {
+  const ui = await loadoutWindow();
+  const fallback = ui.requests.getMockImplementation()!;
+  ui.requests.mockImplementation(async url => url === `/api/pets/${ui.pet.id}`
+    ? Response.json({ error: 'Unavailable' }, { status: 503 }) : fallback(url));
+  try {
+    ui.button('arena', 'save').click();
+    ui.update({ ...ui.pet, money: 30 });
+    ui.pending.shift()!.resolve(Response.json({ ...ui.pet, money: 30, skillLoadouts: { arena: ['claw-strike', 'firebolt'] } }));
+    await vi.waitFor(() => expect(ui.document.getElementById('home-skills-error')!.textContent)
+      .toBe('Your change was saved. Could not refresh the saved skills. Try again.'));
+    expect(ui.document.getElementById('home-skills-status')!.textContent).toBe('');
+    expect(ui.button('arena', 'save').disabled).toBe(false);
+  } finally { ui.window.close(); }
+});
+
+it('does not restore an old account when a delayed account refresh follows a new login', async () => {
+  const ui = await loadoutWindow();
+  const fallback = ui.requests.getMockImplementation()!;
+  let finishRefresh: ((response: Response) => void) | undefined;
+  ui.requests.mockImplementation(async url => url === '/api/me'
+    ? new Promise<Response>(resolve => { finishRefresh = resolve; }) : fallback(url));
+  try {
+    ui.button('arena', 'save').click();
+    ui.pending.shift()!.resolve(Response.json({ error: "That's not your pet." }, { status: 403 }));
+    await vi.waitFor(() => expect(finishRefresh).toBeDefined());
+    ui.document.getElementById('signout')!.click();
+    await vi.waitFor(() => expect(ui.document.getElementById('dashboard')!.hidden).toBe(true));
+    const next = { ...ui.pet, id: freshId() };
+    ui.setServerPet(next);
+    (ui.document.getElementById('player-id') as HTMLInputElement).value = next.id;
+    (ui.document.getElementById('password') as HTMLInputElement).value = 'correct horse battery';
+    ui.document.getElementById('login')!.dispatchEvent(new ui.window.Event('submit', { bubbles: true, cancelable: true }));
+    await vi.waitFor(() => expect(ui.document.getElementById('pet-name')!.textContent).toBe(next.id));
+    finishRefresh!(Response.json(ui.pet));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(ui.document.getElementById('pet-name')!.textContent).toBe(next.id);
+    expect(ui.document.getElementById('notice')!.textContent).toBe('');
+  } finally { ui.window.close(); }
 });

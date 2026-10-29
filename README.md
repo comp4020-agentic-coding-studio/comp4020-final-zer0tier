@@ -193,6 +193,7 @@ with the same ID and password to come back to it. Opening or refreshing the
 game page always asks for a fresh login — even in a new tab, since tabs
 share a session. Your pet and progress are saved. After 5 wrong passwords
 for an ID, sign-ins to it from that address wait 15 minutes.
+Delayed account checks cannot undo a later sign-in or sign-out.
 
 The sign-in page keeps the player ID, password, and **Sign in** button together.
 Use **Create account** below the form to register; ID and password requirements
@@ -1013,6 +1014,11 @@ These names are labels: the equipped setup applies to every battle until
 you change it at home. Switching activities does not automatically change
 skills. Loadouts only store skills; equipped coins and inventory stay as they
 are. Claw Strike and the four-skill limit still apply.
+Skill controls keep keyboard focus after a change. If live updates overlap
+a save, the skill book checks the latest saved pet before reporting success;
+if that check fails, it tells you the change was saved but could not be
+refreshed. An expired login returns to sign-in, and a login changed in another
+tab switches the skill book to that account.
 
 **30 learnable combat skills** appear in the home skill book with power,
 accuracy, effects, and the exact acquisition source. Claw Strike remains a

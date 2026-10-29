@@ -39,3 +39,35 @@ it.each([4000, 1001, 1006])('reconnects immediately after sign-in even when the 
     expect(sockets).toHaveLength(before + 1);
   } finally { window.close(); }
 });
+
+it.each(['signin', 'signout'])('ignores the initial account response after an explicit %s', async action => {
+  const pet = await (await signUp(freshId())).json();
+  const rules = await getRules();
+  const dom = new JSDOM(readFileSync('public/index.html', 'utf8'), { runScripts: 'outside-only', url: baseUrl });
+  const { window } = dom;
+  const $ = (id: string) => window.document.getElementById(id)!;
+  window.WebSocket = function () { return new window.EventTarget(); } as unknown as typeof WebSocket;
+  let finishStartup: (response: Response) => void = () => {};
+  window.fetch = (async (url: string) => {
+    if (url === '/api/me') return new Promise<Response>(resolve => { finishStartup = resolve; });
+    if (url === '/api/signin') return Response.json(pet);
+    if (url === '/api/rules') return Response.json(rules);
+    return Response.json([]);
+  }) as typeof fetch;
+  try {
+    window.eval(readFileSync('public/app.js', 'utf8'));
+    ($('player-id') as HTMLInputElement).value = pet.id;
+    ($('password') as HTMLInputElement).value = 'test-password';
+    $('login').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await vi.waitFor(() => expect($('dashboard').hidden).toBe(false));
+    if (action === 'signout') {
+      $('signout').click();
+      await vi.waitFor(() => expect($('dashboard').hidden).toBe(true));
+      finishStartup(Response.json(pet));
+    } else {
+      finishStartup(Response.json({ error: 'Sign in first.' }, { status: 401 }));
+    }
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect($('dashboard').hidden).toBe(action === 'signout');
+  } finally { window.close(); }
+});

@@ -123,10 +123,29 @@ function changeSkillLoadout(slot, action) {
     action === "save" ? `Saving ${slot.name} loadout…` : `Equipping ${slot.name} loadout…`,
     action === "save" ? `${slot.name} loadout saved.` : `${slot.name} loadout equipped.`);
 }
+async function refreshSkillPet(owner, login) {
+  // A pet update received during a save might precede it or follow it. Read
+  // the latest saved pet instead of guessing which response is newer.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (current?.id !== owner || theftSession !== login) return false;
+    const before = current;
+    const response = await fetch(`/api/pets/${encodeURIComponent(owner)}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Could not refresh the saved skills. Try again.");
+    const pet = await response.json();
+    if (current?.id !== owner || theftSession !== login) return false;
+    if (pet.id !== owner) throw new Error("Could not refresh the saved skills. Try again.");
+    if (current === before) { render(pet); return true; }
+    // An update arrived during the read; repeat without replacing it with
+    // an older snapshot. Bound retries if another window keeps making changes.
+  }
+  throw new Error("Your pet kept changing in another window. Try again.");
+}
 async function requestSkills(path, body, pending, success) {
   if (!current || savingSkills || !atHome) return;
   const owner = current.id, session = theftSession, before = current;
+  const focusedSkill = document.activeElement?.dataset.equipSkill;
   const operation = {};
+  let saved = false;
   savingSkills = operation;
   $("home-skills-error").textContent = "";
   $("home-skills-status").textContent = pending;
@@ -135,22 +154,34 @@ async function requestSkills(path, body, pending, success) {
     const response = await fetch(`/api/pets/${encodeURIComponent(owner)}/${path}`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
     });
+    if (current?.id !== owner || theftSession !== session) return;
+    if (response.status === 401) return sessionEnded();
+    if (response.status === 403) return await sessionChanged();
     const result = await response.json();
     if (current?.id !== owner || theftSession !== session) return;
     if (!response.ok) throw new Error(result.error || "Could not equip skills.");
+    saved = true;
     // HTTP is also server-confirmed, so a disconnected socket cannot leave
     // an old loadout on screen after a successful save.
     if (result.id === owner && current === before) render(result);
+    else if (JSON.stringify([current.equippedAbilities, current.skillLoadouts]) !== JSON.stringify([result.equippedAbilities, result.skillLoadouts])) {
+      if (!await refreshSkillPet(owner, session)) return;
+    }
     $("home-skills-status").textContent = success;
   } catch (error) {
     if (current?.id === owner && theftSession === session) {
       $("home-skills-status").textContent = "";
-      $("home-skills-error").textContent = error.message || "Could not save skills. Try again.";
+      $("home-skills-error").textContent = `${saved ? "Your change was saved. " : ""}${error.message || "Could not save skills. Try again."}`;
     }
   } finally {
     if (savingSkills === operation) {
       savingSkills = null;
       renderSkills();
+      if (focusedSkill && document.activeElement === document.body && !$("dashboard").hidden) {
+        const button = [...$("home-skill-list").querySelectorAll("button")].find(button => button.dataset.equipSkill === focusedSkill);
+        const dialog = button?.closest("dialog");
+        if (button && !button.disabled && !button.closest("[hidden]") && (!dialog || dialog.open)) button.focus({ preventScroll: true });
+      }
     }
   }
 }
@@ -1522,14 +1553,17 @@ const sessionEnded = () => showSignIn("Your session has ended. Sign in again to 
 // "Not your pet": this browser's session now belongs to someone else, e.g.
 // another tab signed in to a different account. Follow it, or ask to sign in.
 async function sessionChanged() {
+  const login = theftSession;
   try {
-    const res = await fetch("/api/me");
+    const res = await fetch("/api/me", { cache: "no-store" });
+    if (theftSession !== login) return;
     if (!res.ok) return sessionEnded();
     const pet = await res.json();
+    if (theftSession !== login) return;
     render(pet);
     $("notice").textContent = `This browser is now signed in as ${pet.id} (from another tab), so you're seeing ${pet.id}'s pet.`;
   } catch {
-    sessionEnded();
+    if (theftSession === login) sessionEnded();
   }
 }
 
@@ -1569,11 +1603,12 @@ $("signout").addEventListener("click", async () => {
   }
 });
 
-// A returning player with a live session goes straight to their pet.
-fetch("/api/me")
+// Check the initial account without undoing a later sign-in or sign-out.
+const startupLogin = theftSession;
+fetch("/api/me", { cache: "no-store" })
   .then((res) => (res.ok ? res.json() : null))
-  .then((pet) => (pet ? render(pet) : showSignIn()))
-  .catch(() => showSignIn());
+  .then((pet) => { if (theftSession === startupLogin) pet ? render(pet) : showSignIn(); })
+  .catch(() => { if (theftSession === startupLogin) showSignIn(); });
 
 // Reconnects after a drop (e.g. the Fly machine waking up) and resyncs.
 function connect() {
