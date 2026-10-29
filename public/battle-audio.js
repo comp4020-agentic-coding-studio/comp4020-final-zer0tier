@@ -25,7 +25,7 @@ sfxControls.innerHTML = `
 document.getElementById('music-credit').before(sfxControls);
 const sfxToggle = document.getElementById('sfx-toggle');
 const sfxRange = document.getElementById('sfx-volume');
-let sfxContext = null, sfxOutput = null, sfxNoise = null, sfxPending = null;
+let sfxContext = null, sfxOutput = null, sfxNoise = null, sfxPending = null, sfxSuspending = null;
 let sfxAway = false, sfxFailure = '';
 const sfxVoices = new Set();
 const sfxEnabled = () => SfxContext && sfxSettings.enabled && sfxSettings.volume > 0;
@@ -61,12 +61,20 @@ function sfxStop() {
 }
 function sfxSuspend() {
   sfxStop();
-  if (sfxContext?.state === 'running') sfxContext.suspend().catch(() => {});
+  if (sfxContext?.state !== 'running' || sfxSuspending) return;
+  const pending = sfxContext.suspend();
+  sfxSuspending = pending;
+  pending.catch(() => {}).finally(() => {
+    if (sfxSuspending !== pending) return;
+    sfxSuspending = null;
+    // The player may have unmuted or returned while suspension was queued.
+    if (sfxEnabled() && sfxPresent()) sfxUnlock(true);
+  });
 }
 function sfxSetVolume() {
   sfxOutput?.gain.setTargetAtTime(sfxSettings.volume / 100, sfxContext.currentTime, .02);
 }
-function sfxUnlock() {
+function sfxUnlock(retryPending = false) {
   if (!sfxEnabled() || !sfxPresent()) return;
   try {
     if (!sfxContext) {
@@ -82,14 +90,21 @@ function sfxUnlock() {
         data[i] = seed / 2147483648 - 1;
       }
     }
-    if (sfxContext.state === 'running' || sfxPending) return;
-    sfxPending = sfxContext.resume().then(() => {
+    if (sfxContext.state === 'running' && !sfxSuspending) return;
+    if (sfxPending && !retryPending) return;
+    // A resume started outside a gesture can remain pending until another
+    // resume is called directly inside a tap or key event.
+    const pending = sfxContext.resume();
+    sfxPending = pending;
+    pending.then(() => {
       // Never replay missed turns after a delayed browser permission prompt.
       if (!sfxEnabled() || !sfxPresent()) return sfxSuspend();
       sfxFailure = ''; sfxRender();
     }).catch(() => {
-      sfxFailure = 'Tap a battle control to enable sound effects.'; sfxRender();
-    }).finally(() => { sfxPending = null; });
+      if (sfxPending === pending) {
+        sfxFailure = 'Tap a battle control to enable sound effects.'; sfxRender();
+      }
+    }).finally(() => { if (sfxPending === pending) sfxPending = null; });
   } catch {
     sfxFailure = 'Sound effects could not start. Switch them off and on to retry.'; sfxRender();
   }
@@ -99,20 +114,20 @@ function sfxSave() {
 }
 for (const type of ['pointerdown', 'keydown', 'click']) document.addEventListener(type, event => {
   if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.target.closest?.('#sfx-toggle, #battle-sfx-toggle')) return;
-  sfxUnlock();
+  sfxUnlock(true);
 }, { capture: true });
 document.addEventListener('click', event => {
   if (!event.target.closest?.('#sfx-toggle, #battle-sfx-toggle') || !SfxContext) return;
   sfxSettings.enabled = !sfxSettings.enabled;
   sfxFailure = '';
   sfxSave();
-  if (sfxEnabled()) sfxUnlock(); else sfxSuspend();
+  if (sfxEnabled()) sfxUnlock(true); else sfxSuspend();
   sfxRender();
 });
 sfxRange.addEventListener('input', () => {
   sfxSettings.volume = Number(sfxRange.value);
   sfxSetVolume(); sfxSave();
-  if (sfxEnabled()) sfxUnlock(); else sfxSuspend();
+  if (sfxEnabled()) sfxUnlock(true); else sfxSuspend();
   sfxRender();
 });
 

@@ -227,6 +227,47 @@ it('drops effects when covered, hidden, or signed out, including a delayed audio
   } finally { p.close(); }
 });
 
+it('recovers when effects are re-enabled before a pending suspension completes', async () => {
+  const p = setup();
+  try {
+    p.gesture(); await flush();
+    let finishSuspend!: () => void;
+    p.context.suspend.mockImplementation(() => new Promise<void>(resolve => {
+      finishSuspend = () => { p.context.state = 'suspended'; resolve(); };
+    }));
+    p.$('sfx-toggle').click();
+    p.$('sfx-toggle').click();
+    expect(p.$('sfx-toggle').getAttribute('aria-pressed')).toBe('true');
+    finishSuspend(); await flush();
+    expect(p.context.state).toBe('running');
+    const b = p.battle(); p.show(b); p.turn(b);
+    expect(p.sources.length).toBeGreaterThan(0);
+  } finally { p.close(); }
+});
+
+it('retries a pending autoplay unlock inside the next user gesture', async () => {
+  const p = setup();
+  try {
+    p.gesture(); await flush();
+    p.window.dispatchEvent(new p.window.Event('pagehide')); await flush();
+    let gesture = false;
+    const waiting: (() => void)[] = [];
+    p.context.resume.mockClear();
+    p.context.resume.mockImplementation(() => new Promise<void>(resolve => {
+      waiting.push(resolve);
+      if (gesture) { p.context.state = 'running'; waiting.splice(0).forEach(done => done()); }
+    }));
+    p.window.dispatchEvent(new p.window.Event('pageshow')); await flush();
+    expect(p.context.resume).toHaveBeenCalledTimes(1);
+    gesture = true; p.gesture(); await flush();
+    expect(p.context.resume).toHaveBeenCalledTimes(2);
+    expect(p.context.state).toBe('running');
+    const b = p.battle(); p.show(b); p.turn(b);
+    expect(p.sources.length).toBeGreaterThan(0);
+    expect(p.Context).toHaveBeenCalledTimes(1);
+  } finally { p.close(); }
+});
+
 it.each(['unsupported', 'corrupt storage', 'blocked storage'])('keeps battle controls usable with %s', async mode => {
   const p = setup({ supported: mode !== 'unsupported', saved: '{bad', blockedStorage: mode === 'blocked storage' });
   try {

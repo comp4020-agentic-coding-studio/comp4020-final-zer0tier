@@ -611,6 +611,7 @@ let arrivals = 0;
 let pinned = null; // the pet the player looked up, shown first
 let visiting = null; // the opponent whose pet is open in the visit panel
 let visitLoads = 0;
+let lookupRequest = 0;
 let visitLoading = false;
 let visitReady = false;
 let stealing = false;
@@ -790,7 +791,7 @@ function renderStealControls() {
   $("steal").setAttribute("aria-busy", String(stealing));
 }
 
-async function openVisit(id, focus = true) {
+async function openVisit(id, focus = true, savedPet = null) {
   if (!current || id === current.id) return;
   const owner = current.id;
   const request = ++visitLoads;
@@ -805,9 +806,12 @@ async function openVisit(id, focus = true) {
   if (focus) $("visit-heading").focus();
   const before = rivals.get(id);
   try {
-    const res = await fetch(`/api/pets/${encodeURIComponent(id)}`);
-    if (!res.ok) throw new Error("pet unavailable");
-    const pet = await res.json();
+    let pet = savedPet;
+    if (!pet) {
+      const res = await fetch(`/api/pets/${encodeURIComponent(id)}`);
+      if (!res.ok) throw new Error("pet unavailable");
+      pet = await res.json();
+    }
     if (request !== visitLoads || current?.id !== owner) return;
     // A broadcast received during this fetch already has fresher data.
     if (rivals.get(id) === before) rivals.set(id, pet);
@@ -1302,20 +1306,42 @@ $("attacked-close").addEventListener("click", hideAttacked);
 
 $("lookup").addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (!current) return;
+  const owner = current.id, login = theftSession, visit = visitLoads, request = ++lookupRequest;
   const id = $("lookup-id").value.trim();
   $("arena-error").textContent = "";
-  if (id === current?.id) return void ($("arena-error").textContent = "That's your own pet.");
+  if (id === owner) return void ($("arena-error").textContent = "That's your own pet.");
+  const dialog = $("lookup").closest('dialog');
+  let closed = false;
+  // The native close event may arrive after the same dialog reopens. Watch
+  // removal of its open attribute, scoped to this request, instead.
+  const observeClose = records => { if (records.some(record => record.oldValue !== null)) closed = true; };
+  const closing = dialog ? new MutationObserver(observeClose) : null;
+  closing?.observe(dialog, { attributes: true, attributeFilter: ['open'], attributeOldValue: true });
+  // A search belongs to this login and navigation choice, including its
+  // response body and error. Older requests must never redirect a later visit.
+  const active = () => {
+    if (closing) observeClose(closing.takeRecords());
+    return !closed && (!dialog || dialog.open) && current?.id === owner && theftSession === login && visitLoads === visit && lookupRequest === request;
+  };
+  const before = rivals.get(id);
   try {
     const res = await fetch(`/api/pets/${encodeURIComponent(id)}`);
+    if (!active()) return;
     if (!res.ok) return void ($("arena-error").textContent = `There's no pet called ${id}.`);
     const pet = await res.json();
+    if (!active()) return;
     pinned = pet.id;
     if (!arrival.has(pet.id)) arrival.set(pet.id, ++arrivals);
-    rivals.set(pet.id, pet);
+    if (rivals.get(id) === before) rivals.set(pet.id, pet);
     renderRivals();
-    openVisit(pet.id);
+    // The lookup already fetched this pet. Reusing that confirmed snapshot
+    // avoids a second request that could outlive the player's next search.
+    openVisit(pet.id, true, rivals.get(pet.id));
   } catch {
-    $("arena-error").textContent = "Couldn't reach the server. Try again.";
+    if (active()) $("arena-error").textContent = "Couldn't reach the server. Try again.";
+  } finally {
+    closing?.disconnect();
   }
 });
 

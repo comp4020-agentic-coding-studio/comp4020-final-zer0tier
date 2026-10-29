@@ -193,6 +193,9 @@ use a dodge cue. Open **Escape → Sound** for **Battle sound effects** and
 These settings are remembered separately from music on this browser. Effects
 start after a signed-in interaction and stop when a battle is skipped, closed,
 covered by another window, or hidden in another tab, and when you sign out.
+Quickly switching effects off and on keeps the latest setting. If the browser
+needs another interaction after a tab return, the next click, tap, or key press
+unlocks the effects without replaying missed turns.
 The effects are synthesized locally and use no third-party recordings.
 
 Town uses the same movement and **Space** interaction controls as home.
@@ -201,6 +204,10 @@ camera brings focused objects into view. Close a window with its Close
 button or Escape to return to the scene. Movement keys work immediately when
 focus returns to a building or home object. Walking around home and town costs
 nothing; lessons, work, battles, and adventures keep their usual rules.
+
+Pet searches follow your latest lookup or visit. A delayed result from an older
+search or login cannot send you to a different home or show an outdated error.
+Closing the Arena window cancels its pending search.
 
 **Create an account** with a player ID (letters, digits, `-` or `_`, up to
 32 characters) and a password of at least 8 characters. Each ID has one
