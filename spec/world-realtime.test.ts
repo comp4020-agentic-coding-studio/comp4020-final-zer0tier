@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { WebSocket } from 'ws';
-import { baseUrl, connectPlayer, disconnectPlayer, freshId, getPet, post, sessionFor, signUp } from './helpers.ts';
+import { baseUrl, connectPlayer, disconnectPlayer, freshId, getPet, post, sessionFor, signIn, signUp } from './helpers.ts';
 
 async function snapshot(id: string): Promise<any> {
   return (await fetch(new URL('/api/world', baseUrl), { headers: { cookie: sessionFor(id)! } })).json();
@@ -69,6 +69,46 @@ it('world:updated delivers saved visitor movement and facing to owner and anothe
   const stopped = windows.map(ws => next(ws, 'world:updated', e => e.player.id === visitor && !e.player.moving));
   await move(visitor, { moving: false });
   await Promise.all(stopped);
+});
+
+it('world:updated delivers saved outfit colours to the owner and a visitor within 1s', async () => {
+  const owner = await player(), visitor = await player();
+  await move(visitor, { home: owner });
+  const windows = [await connectPlayer(owner), await connectPlayer(visitor)];
+  const before = (await snapshot(owner)).players.find((p: any) => p.id === owner);
+  const changes = windows.map(ws => next(ws, 'world:updated', e => e.player.id === owner && e.player.outfit === 'ocean'));
+  const response = await post('/api/world/outfit', { outfit: 'ocean', id: visitor, x: 800 }, owner);
+  expect(response.status).toBe(200);
+  const saved = await response.json();
+  expect(saved).toEqual({ ...before, outfit: 'ocean', revision: before.revision + 1 });
+  for (const event of await Promise.all(changes)) expect(event.player).toEqual(saved);
+  expect((await snapshot(visitor)).players.find((p: any) => p.id === owner)).toEqual(saved);
+  expect((await snapshot(visitor)).players.find((p: any) => p.id === visitor).outfit).toBe('amber');
+  const stale = await post('/api/world', { ...before, x: 530, outfit: 'rose' }, owner);
+  expect(stale.status).toBe(409);
+  expect((await stale.json()).player).toEqual(saved);
+  expect(await (await move(owner, { scene: 'town', home: null, outfit: 'rose' })).json()).toMatchObject({ outfit: 'ocean' });
+  await post('/api/signout', undefined, owner);
+  await signIn(owner);
+  expect((await snapshot(owner)).players.find((p: any) => p.id === owner).outfit).toBe('ocean');
+});
+
+it('rejects unauthenticated and invalid outfit changes without altering a character or pet', async () => {
+  const owner = await player();
+  const before = (await snapshot(owner)).players.find((p: any) => p.id === owner);
+  const pet = await getPet(owner);
+  expect((await post('/api/world/outfit', { outfit: 'forest' }, null)).status).toBe(401);
+  for (const outfit of [null, undefined, '', 'unknown', 'Ocean', '__proto__', 4, {}, ['ocean']]) {
+    expect((await post('/api/world/outfit', { outfit }, owner)).status).toBe(400);
+  }
+  expect((await post('/api/world/outfit', undefined, owner)).status).toBe(400);
+  expect((await snapshot(owner)).players.find((p: any) => p.id === owner)).toEqual(before);
+  for (const outfit of ['amber', 'forest', 'ocean', 'berry', 'lavender', 'rose', 'slate', 'cream']) {
+    const response = await post('/api/world/outfit', { outfit }, owner);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ id: owner, outfit });
+  }
+  expect(await getPet(owner)).toEqual(pet);
 });
 
 it('allows home visits and movement when the owner is elsewhere or offline, and isolates rooms', async () => {

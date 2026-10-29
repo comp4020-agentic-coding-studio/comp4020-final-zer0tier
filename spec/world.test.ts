@@ -82,7 +82,7 @@ function page() {
 
 async function networkPage(whileConnecting?: (p: ReturnType<typeof page>) => void) {
   const p = page();
-  const initial: WorldPosition = { id: 'owner', scene: 'home', home: 'owner', x: 480, y: 475, facing: 'down', moving: false, revision: 0 };
+  const initial: WorldPosition = { outfit: 'amber', id: 'owner', scene: 'home', home: 'owner', x: 480, y: 475, facing: 'down', moving: false, revision: 0 };
   const moves: { state: typeof initial; reply: (response: Response) => void }[] = [];
   let initialized = false;
   p.window.fetch = (async (_url: string, options?: RequestInit) => {
@@ -100,7 +100,7 @@ async function networkPage(whileConnecting?: (p: ReturnType<typeof page>) => voi
 
 function pendingNetworkPage(saved: Partial<WorldPosition> = {}) {
   const p = page();
-  const initial: WorldPosition = { id: 'owner', scene: 'home', home: 'owner', x: 760, y: 475, facing: 'left', moving: false, revision: 7, ...saved };
+  const initial: WorldPosition = { outfit: 'amber', id: 'owner', scene: 'home', home: 'owner', x: 760, y: 475, facing: 'left', moving: false, revision: 7, ...saved };
   const snapshots: { reply: (response: Response) => void }[] = [];
   const moves: { state: WorldPosition; reply: (response: Response) => void }[] = [];
   p.window.fetch = (async (_url: string, options?: RequestInit) => {
@@ -113,6 +113,112 @@ function pendingNetworkPage(saved: Partial<WorldPosition> = {}) {
   p.window.document.dispatchEvent(new p.window.CustomEvent('adventure:pet', { detail: { id: initial.id } }));
   return { ...p, initial, snapshots, moves, send, snapshot };
 }
+
+function chooseOutfit(p: ReturnType<typeof page>, outfit: string) {
+  const radio = p.window.document.querySelector<HTMLInputElement>(`#outfit-choices input[value="${outfit}"]`)!;
+  radio.checked = true;
+  radio.dispatchEvent(new p.window.Event('change', { bubbles: true }));
+}
+
+it('previews all outfit colours independently and only dresses the character after a confirmed save', async () => {
+  const p = await networkPage();
+  const originalFetch = p.window.fetch;
+  const requests: { body: unknown; reply: (response: Response) => void }[] = [];
+  p.window.fetch = (async (url: string, options?: RequestInit) => url === '/api/world/outfit'
+    ? new Promise<Response>(reply => requests.push({ body: JSON.parse(String(options?.body)), reply }))
+    : originalFetch(url, options)) as typeof fetch;
+  try {
+    p.destination('appearance');
+    expect(p.$('outfit-settings').closest('[hidden]')).toBeNull();
+    expect(p.$('appearance-settings').closest('[hidden]')).toBeNull();
+    expect([...p.$('outfit-choices').querySelectorAll('input')].map(input => input.value)).toEqual([
+      'amber', 'forest', 'ocean', 'berry', 'lavender', 'rose', 'slate', 'cream',
+    ]);
+    chooseOutfit(p, 'ocean');
+    expect(p.$('outfit-preview').dataset.outfit).toBe('ocean');
+    expect(p.$('world-avatar').dataset.outfit).toBe('amber');
+    for (const facing of ['right', 'up', 'left', 'down']) {
+      p.$('outfit-turn').click();
+      expect(p.$('outfit-preview').dataset.facing).toBe(facing);
+    }
+    p.send({ revision: 2 }); // A movement event must not discard a colour being tried on.
+    expect(p.$('outfit-preview').dataset.outfit).toBe('ocean');
+    p.$('outfit-save').click();
+    p.$('outfit-settings').dispatchEvent(new p.window.Event('submit', { cancelable: true }));
+    expect(requests).toHaveLength(1);
+    expect(requests[0].body).toEqual({ outfit: 'ocean' });
+    expect(p.$('world-avatar').dataset.outfit).toBe('amber');
+    expect((p.$('outfit-choices') as HTMLFieldSetElement).disabled).toBe(true);
+    const result = { id: 'owner', scene: 'home', home: 'owner', x: 480, y: 475, facing: 'down', moving: false, outfit: 'ocean', revision: 3 };
+    requests[0].reply(Response.json(result));
+    await vi.waitFor(() => expect(p.$('outfit-status').textContent).toBe('Ocean outfit saved.'));
+    expect(p.$('world-avatar').dataset.outfit).toBe('ocean');
+    expect((p.$('outfit-save') as HTMLButtonElement).disabled).toBe(true);
+  } finally { p.window.close(); }
+});
+
+it('keeps each peer and preview gradient private and refuses stale outfit replies', async () => {
+  const p = await networkPage();
+  const originalFetch = p.window.fetch;
+  let reply!: (response: Response) => void;
+  p.window.fetch = (async (url: string, options?: RequestInit) => url === '/api/world/outfit'
+    ? new Promise<Response>(resolve => { reply = resolve; }) : originalFetch(url, options)) as typeof fetch;
+  try {
+    p.window.document.dispatchEvent(new p.window.CustomEvent('presence:updated', { detail: ['owner', 'guest'] }));
+    p.send({ id: 'guest', outfit: 'berry', revision: 2 });
+    const peer = p.window.document.querySelector<HTMLElement>('[data-player="guest"]')!;
+    expect(peer.dataset.outfit).toBe('berry');
+    const ids = new Set();
+    for (const character of [peer, p.$('world-avatar'), p.$('outfit-preview')]) {
+      const svg = character.querySelector('svg')!;
+      for (const element of svg.querySelectorAll('[id]')) {
+        expect(ids.has(element.id)).toBe(false);
+        ids.add(element.id);
+      }
+      for (const element of svg.querySelectorAll('[fill^="url(#"]')) {
+        const id = element.getAttribute('fill')!.slice(5, -1);
+        expect(svg.querySelector(`[id="${id}"]`)).not.toBeNull();
+      }
+    }
+    p.destination('appearance');
+    chooseOutfit(p, 'ocean');
+    p.$('outfit-save').click();
+    p.send({ outfit: 'ocean', revision: 3 });
+    p.send({ outfit: 'forest', revision: 4 });
+    reply(Response.json({ id: 'owner', scene: 'home', home: 'owner', x: 480, y: 475, facing: 'down', moving: false, outfit: 'ocean', revision: 3 }));
+    await vi.waitFor(() => expect(p.$('outfit-status').textContent).toContain('changed in another window'));
+    expect(p.$('world-avatar').dataset.outfit).toBe('forest');
+    expect(peer.dataset.outfit).toBe('berry');
+    expect(p.$('outfit-preview').dataset.outfit).toBe('forest');
+  } finally { p.window.close(); }
+});
+
+it('retains the outfit draft after a failed save and discards a delayed reply after sign-out', async () => {
+  const p = await networkPage();
+  const originalFetch = p.window.fetch;
+  let reply!: (response: Response) => void;
+  p.window.fetch = (async (url: string, options?: RequestInit) => url === '/api/world/outfit'
+    ? new Promise<Response>(resolve => { reply = resolve; }) : originalFetch(url, options)) as typeof fetch;
+  try {
+    p.destination('appearance');
+    chooseOutfit(p, 'rose');
+    p.$('outfit-save').click();
+    reply(Response.json({ error: 'Please try again.' }, { status: 503 }));
+    await vi.waitFor(() => expect(p.$('outfit-error').textContent).toBe('Please try again.'));
+    expect(p.$('world-avatar').dataset.outfit).toBe('amber');
+    expect(p.$('outfit-preview').dataset.outfit).toBe('rose');
+    expect((p.$('outfit-save') as HTMLButtonElement).disabled).toBe(false);
+    p.$('outfit-save').click();
+    p.$('dashboard').hidden = true;
+    await vi.waitFor(() => expect(p.$('outfit-preview').dataset.outfit).toBe('amber'));
+    reply(Response.json({ id: 'owner', outfit: 'rose', revision: 4 }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(p.$('world-avatar').dataset.outfit).toBe('amber');
+    expect(p.$('outfit-status').textContent).toBe('');
+    expect(p.$('outfit-error').textContent).toBe('');
+    expect((p.$('outfit-save') as HTMLButtonElement).disabled).toBe(true);
+  } finally { p.window.close(); }
+});
 
 it.each([
   { place: 'own home', saved: { x: 760 } },

@@ -391,6 +391,62 @@ body.world-playing .world-panel .item { padding: 16px; }
 body.world-playing .world-panel .item-free { margin: 14px 0 18px; }
 body.world-playing .world-panel .appearance-settings { margin: 0; padding: 18px; }
 body.world-playing .world-panel .appearance-fields { gap: 16px; }
+body.world-playing #outfit-settings { margin-bottom: 18px; }
+body.world-playing .outfit-layout { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 20px; align-items: center; margin: 18px 0; }
+body.world-playing .outfit-preview-card { display: grid; justify-items: center; gap: 8px; margin: 0; padding: 16px 8px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); }
+body.world-playing .outfit-preview-card figcaption { font-size: .8rem; color: var(--muted); }
+body.world-playing .outfit-preview { width: 80px; }
+body.world-playing .outfit-preview > svg { display: block; width: 100%; height: auto; overflow: visible; }
+body.world-playing .outfit-preview .walker-direction { transform-box: view-box; transform-origin: center; }
+body.world-playing .outfit-preview[data-facing="left"] .walker-direction { transform: scaleX(-1); }
+body.world-playing .outfit-preview .walker-view { display: none; }
+body.world-playing .outfit-preview[data-facing="down"] .walker-front,
+body.world-playing .outfit-preview[data-facing="up"] .walker-back,
+body.world-playing .outfit-preview:is([data-facing="left"], [data-facing="right"]) .walker-side { display: inline; }
+body.world-playing #outfit-choices { min-width: 0; margin: 0; padding: 0; border: 0; }
+body.world-playing #outfit-choices legend { margin-bottom: 10px; font-size: .875rem; font-weight: 700; }
+body.world-playing .outfit-swatches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+body.world-playing .outfit-option { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px; border: 2px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-size: .85rem; cursor: var(--cursor-pointer); }
+body.world-playing .outfit-option:has(input:checked) { border-color: var(--primary); background: var(--bg-glow); }
+body.world-playing .outfit-option:has(input:focus-visible) { outline: 3px solid var(--primary); outline-offset: 3px; }
+body.world-playing .outfit-option input { appearance: auto; flex: none; width: 16px; height: 16px; min-height: 0; margin: 0; accent-color: var(--primary); }
+body.world-playing #outfit-choices:disabled .outfit-option { opacity: .7; cursor: default; }
+body.world-playing .outfit-swatch { flex: none; width: 22px; height: 28px; border: 1px solid color-mix(in srgb, var(--outfit-coat), #222 35%); border-radius: 6px; background: linear-gradient(var(--outfit-cap) 0 30%, var(--outfit-coat) 30% 75%, var(--outfit-trousers) 75%); }
+body.world-playing #outfit-save, body.world-playing #outfit-turn { min-height: 44px; }
+body.world-playing [data-outfit] { --outfit-coat: #d18455; --outfit-cap: #8ba06f; --outfit-trousers: #6f8172; }
+body.world-playing [data-outfit="forest"] { --outfit-coat: #648765; --outfit-cap: #c6a46c; --outfit-trousers: #676e58; }
+body.world-playing [data-outfit="ocean"] { --outfit-coat: #518ba8; --outfit-cap: #92b5ba; --outfit-trousers: #536a84; }
+body.world-playing [data-outfit="berry"] { --outfit-coat: #a25870; --outfit-cap: #947898; --outfit-trousers: #67596c; }
+body.world-playing [data-outfit="lavender"] { --outfit-coat: #9983b5; --outfit-cap: #c0abc9; --outfit-trousers: #69758c; }
+body.world-playing [data-outfit="rose"] { --outfit-coat: #cf8890; --outfit-cap: #b3b18c; --outfit-trousers: #8b7776; }
+body.world-playing [data-outfit="slate"] { --outfit-coat: #637685; --outfit-cap: #8b9aab; --outfit-trousers: #505664; }
+body.world-playing [data-outfit="cream"] { --outfit-coat: #d4c5a1; --outfit-cap: #b49a76; --outfit-trousers: #8e856d; }
+/* Amber retains the original artwork's exact shading; the other palettes share its lighting. */
+body.world-playing [data-outfit]:not([data-outfit="amber"]) {
+  --outfit-coat-light: color-mix(in srgb, var(--outfit-coat), #fff3d6 30%);
+  --outfit-coat-dark: color-mix(in srgb, var(--outfit-coat), #33282b 26%);
+  --outfit-coat-edge: color-mix(in srgb, var(--outfit-coat), #33282b 38%);
+  --outfit-coat-highlight: color-mix(in srgb, var(--outfit-coat), #fff3d6 45%);
+  --outfit-coat-pocket: color-mix(in srgb, var(--outfit-coat), #33282b 18%);
+  --outfit-cap-light: color-mix(in srgb, var(--outfit-cap), #fff3d6 28%);
+  --outfit-cap-dark: color-mix(in srgb, var(--outfit-cap), #293b35 30%);
+  --outfit-cap-brim: color-mix(in srgb, var(--outfit-cap), #fff3d6 8%);
+  --outfit-cap-edge: color-mix(in srgb, var(--outfit-cap), #293b35 42%);
+  --outfit-cap-highlight: color-mix(in srgb, var(--outfit-cap), #fff3d6 45%);
+  --outfit-trousers-dark: color-mix(in srgb, var(--outfit-trousers), #26352f 35%);
+  --outfit-trousers-edge: color-mix(in srgb, var(--outfit-trousers), #26352f 40%);
+  --outfit-trousers-highlight: color-mix(in srgb, var(--outfit-trousers), #fff3d6 30%);
+}
+@media (max-width: 600px) {
+  body.world-playing .outfit-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  body.world-playing .outfit-preview-card { grid-template-columns: 64px minmax(0, 1fr); gap: 8px 16px; padding: 10px 16px; }
+  body.world-playing .outfit-preview { width: 64px; grid-row: span 2; }
+  body.world-playing .outfit-preview-card figcaption { align-self: end; }
+  body.world-playing #outfit-turn { align-self: start; }
+}
+@media (max-width: 370px) {
+  body.world-playing .outfit-swatches { grid-template-columns: minmax(0, 1fr); }
+}
 body.world-playing .world-panel .theft-notifications { padding: 18px; border-width: 1px; box-shadow: none; animation: none; }
 body.world-playing .world-panel .theft-notifications h2 { font-size: 1.25rem; }
 body.world-playing .world-panel .theft-notifications p { font-size: 0.9rem; }

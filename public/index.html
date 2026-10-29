@@ -344,6 +344,25 @@
           <p id="visitors-empty" class="help">Nobody has dropped by yet. Other players can visit from the Arena.</p>
         </section>
 
+        <form id="outfit-settings" class="appearance-settings" aria-labelledby="outfit-heading">
+          <h3 id="outfit-heading" class="section-label">Character outfit</h3>
+          <p class="help">A little colour for your walks around home and town.</p>
+          <div class="outfit-layout">
+            <figure class="outfit-preview-card">
+              <div id="outfit-preview" class="outfit-preview" data-outfit="amber" data-facing="down" aria-hidden="true"></div>
+              <figcaption id="outfit-preview-label">Amber preview</figcaption>
+              <button id="outfit-turn" class="world-button" type="button">Turn preview</button>
+            </figure>
+            <fieldset id="outfit-choices">
+              <legend>Choose a colour</legend>
+              <div id="outfit-swatches" class="outfit-swatches"></div>
+            </fieldset>
+          </div>
+          <button id="outfit-save" class="chip-btn chip-buy" type="submit" disabled>Save outfit</button>
+          <p id="outfit-status" class="help" role="status"></p>
+          <p id="outfit-error" class="error" role="alert"></p>
+        </form>
+
         <form id="appearance-settings" class="appearance-settings" aria-labelledby="appearance-heading">
           <h3 id="appearance-heading" class="section-label">Pet appearance</h3>
           <div class="appearance-fields">

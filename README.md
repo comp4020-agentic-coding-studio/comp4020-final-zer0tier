@@ -204,6 +204,20 @@ or fight with it. The bot's ID, `0`, can't be signed up or signed into. A pet
 from before accounts existed is claimed by the first person to sign up with
 its ID.
 
+### Character outfits
+
+Open **Appearance** from the Escape menu or the pet house at home. Under
+**Character outfit**, choose **Amber, Forest, Ocean, Berry, Lavender, Rose,
+Slate, or Cream**. The preview shows the matching jacket, cap, and trousers;
+**Turn preview** lets you see every side. Press **Save outfit** to wear it.
+Trying colours only changes the preview until your save succeeds.
+
+Outfits are free and saved to your account across sign-outs and server
+restarts. Your walking character wears them at home, while visiting, and in
+town, and other players see saved changes live. New and existing characters
+start with the original Amber outfit. Pet colour and species have their own
+controls and save button below.
+
 ### Pet appearance
 
 Open **Appearance**, or select the pet house at home, to pick a color and species:
@@ -616,12 +630,18 @@ and the built-in `node:sqlite` for storage.
   entries in SQLite. A private `battle:updated` event sends saved
   Arena/revenge session changes only to its participants.
   `presence:updated` lists authenticated players with open connections;
-  `world:updated` carries a saved home/town position. `GET /api/world`
+  `world:updated` carries a saved home/town position and character `outfit`. `GET /api/world`
   resyncs online players and positions. Authenticated `POST /api/world`
   accepts `{ scene, home, x, y, facing, moving, revision }` for the caller
   only; positions are saved in SQLite before broadcasting, and stale
   revisions are refused. Movement is coalesced to at most one request per
   50 ms, with short confirmed steps drawn at walking speed to reduce input lag.
+  Authenticated `POST /api/world/outfit` accepts `{ "outfit": "ocean" }`
+  for the caller only. Valid IDs are `amber`, `forest`, `ocean`, `berry`,
+  `lavender`, `rose`, `slate`, and `cream`. It saves with full disk sync,
+  increments the world revision, then returns and broadcasts the saved row.
+  Movement cannot change outfits; malformed colours are refused with 400,
+  and unauthenticated saves with 401.
   Positions use their own SQLite connection with `synchronous = NORMAL`, so
   a step doesn't wait for the disk; everything else keeps the default full
   sync. `scripts/load-test.ts` walks a crowd around town and times each

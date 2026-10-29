@@ -1,6 +1,8 @@
 import { db, worldDb } from './db.ts';
 import { getPet, isValidId } from './pets.ts';
 
+export const OUTFITS = ['amber', 'forest', 'ocean', 'berry', 'lavender', 'rose', 'slate', 'cream'] as const;
+
 export interface WorldPosition {
   id: string;
   scene: 'home' | 'town';
@@ -9,6 +11,7 @@ export interface WorldPosition {
   y: number;
   facing: 'up' | 'down' | 'left' | 'right';
   moving: boolean;
+  outfit: typeof OUTFITS[number];
   revision: number;
 }
 
@@ -20,19 +23,34 @@ db.exec(`CREATE TABLE IF NOT EXISTS world_positions (
   y REAL NOT NULL,
   facing TEXT NOT NULL,
   moving INTEGER NOT NULL DEFAULT 0,
+  outfit TEXT NOT NULL DEFAULT 'amber',
   revision INTEGER NOT NULL DEFAULT 0
 )`);
+if (!db.prepare("SELECT name FROM pragma_table_info('world_positions') WHERE name = ?").get('outfit')) {
+  db.exec("ALTER TABLE world_positions ADD COLUMN outfit TEXT NOT NULL DEFAULT 'amber'");
+}
 // Positions go through worldDb, which doesn't wait for the disk (see db.ts).
 const initial = worldDb.prepare("INSERT OR IGNORE INTO world_positions (player_id, scene, home, x, y, facing) VALUES (?, 'home', ?, 480, 475, 'down')");
-const read = worldDb.prepare('SELECT player_id AS id, scene, home, x, y, facing, moving, revision FROM world_positions WHERE player_id = ?');
+const read = worldDb.prepare('SELECT player_id AS id, scene, home, x, y, facing, moving, outfit, revision FROM world_positions WHERE player_id = ?');
 const write = worldDb.prepare('UPDATE world_positions SET scene = ?, home = ?, x = ?, y = ?, facing = ?, moving = ?, revision = revision + 1 WHERE player_id = ? AND revision = ?');
 const stop = worldDb.prepare('UPDATE world_positions SET moving = 0, revision = revision + 1 WHERE player_id = ? AND moving != 0');
+// Appearance is a durable preference, so use the fully synchronous connection.
+const dress = db.prepare('UPDATE world_positions SET outfit = ?, revision = revision + 1 WHERE player_id = ?');
 export function stopWorld(id: string): WorldPosition { stop.run(id); return worldPosition(id); }
 
 export function worldPosition(id: string): WorldPosition {
   initial.run(id, id);
   const row = read.get(id) as unknown as WorldPosition;
   return { ...row, moving: Boolean(row.moving) };
+}
+
+export function setWorldOutfit(id: string, outfit: unknown): WorldPosition | { status: number; error: string } {
+  if (typeof outfit !== 'string' || !OUTFITS.includes(outfit as WorldPosition['outfit'])) {
+    return { status: 400, error: 'Choose an available outfit colour.' };
+  }
+  worldPosition(id);
+  dress.run(outfit, id);
+  return worldPosition(id);
 }
 
 export function moveWorld(id: string, input: unknown): WorldPosition | { status: number; error: string; player?: WorldPosition } {

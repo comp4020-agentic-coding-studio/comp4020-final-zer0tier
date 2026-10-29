@@ -143,17 +143,17 @@ worldShell.innerHTML = `
           <button type="button" class="town-stop" data-place="arena" data-town-action="arena" style="--x:78.33%;--y:55.31%;--w:19.38%;--h:22.19%"><span class="stop-name">Arena</span><span class="stop-detail">Meet, visit &amp; battle</span></button>
           <button type="button" id="town-home" class="town-stop" data-town-action="home" style="--x:50.21%;--y:76.33%;--w:16.88%;--h:21.09%"><span class="stop-name">Sweet Home</span><span class="stop-detail">Your cozy corner</span></button>
         </div>
-        <div id="world-avatar" class="world-avatar" aria-hidden="true" data-facing="down">
+        <div id="world-avatar" class="world-avatar" aria-hidden="true" data-facing="down" data-outfit="amber">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 88" aria-hidden="true">
             <defs>
               <linearGradient id="walker-skin" x1=".15" y1="0" x2=".85" y2="1"><stop stop-color="#ffe1ac"/><stop offset=".6" stop-color="#f4c58e"/><stop offset="1" stop-color="#d99a6b"/></linearGradient>
               <linearGradient id="walker-hair" x1=".15" y1="0" x2=".85" y2="1"><stop stop-color="#9a6845"/><stop offset=".5" stop-color="#785039"/><stop offset="1" stop-color="#513c2d"/></linearGradient>
-              <linearGradient id="walker-cap" x1=".15" y1="0" x2=".8" y2="1"><stop stop-color="#afbc83"/><stop offset=".45" stop-color="#8ba06f"/><stop offset="1" stop-color="#5f7958"/></linearGradient>
-              <linearGradient id="walker-cap-brim" x1="0" y1="0" x2=".5" y2="1"><stop stop-color="#91a776"/><stop offset="1" stop-color="#4e6950"/></linearGradient>
-              <linearGradient id="walker-jacket" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e8ac72"/><stop offset=".48" stop-color="#d18455"/><stop offset="1" stop-color="#a65c42"/></linearGradient>
-              <linearGradient id="walker-sleeve" x1="0" y1="0" x2="1" y2=".7"><stop stop-color="#db9c63"/><stop offset="1" stop-color="#b86c48"/></linearGradient>
+              <linearGradient id="walker-cap" x1=".15" y1="0" x2=".8" y2="1"><stop stop-color="var(--outfit-cap-light, #afbc83)"/><stop offset=".45" stop-color="var(--outfit-cap, #8ba06f)"/><stop offset="1" stop-color="var(--outfit-cap-dark, #5f7958)"/></linearGradient>
+              <linearGradient id="walker-cap-brim" x1="0" y1="0" x2=".5" y2="1"><stop stop-color="var(--outfit-cap-brim, #91a776)"/><stop offset="1" stop-color="var(--outfit-cap-dark, #4e6950)"/></linearGradient>
+              <linearGradient id="walker-jacket" x1="0" y1="0" x2="1" y2="1"><stop stop-color="var(--outfit-coat-light, #e8ac72)"/><stop offset=".48" stop-color="var(--outfit-coat, #d18455)"/><stop offset="1" stop-color="var(--outfit-coat-dark, #a65c42)"/></linearGradient>
+              <linearGradient id="walker-sleeve" x1="0" y1="0" x2="1" y2=".7"><stop stop-color="var(--outfit-coat-light, #db9c63)"/><stop offset="1" stop-color="var(--outfit-coat-dark, #b86c48)"/></linearGradient>
               <linearGradient id="walker-scarf" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#fff2ce"/><stop offset="1" stop-color="#d9bc8a"/></linearGradient>
-              <linearGradient id="walker-trousers" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6f8172"/><stop offset="1" stop-color="#435b54"/></linearGradient>
+              <linearGradient id="walker-trousers" x1="0" y1="0" x2="1" y2="1"><stop stop-color="var(--outfit-trousers, #6f8172)"/><stop offset="1" stop-color="var(--outfit-trousers-dark, #435b54)"/></linearGradient>
               <linearGradient id="walker-boots" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#94704e"/><stop offset=".4" stop-color="#79583e"/><stop offset="1" stop-color="#4b3c30"/></linearGradient>
               <linearGradient id="walker-pack" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d9bc81"/><stop offset=".45" stop-color="#bc965f"/><stop offset="1" stop-color="#937044"/></linearGradient>
             </defs>
@@ -161,15 +161,15 @@ worldShell.innerHTML = `
             <g class="walker-direction" stroke-linecap="round" stroke-linejoin="round">
               <g class="walker-view walker-front">
                 <g class="walker-leg walker-leg--far">
-                  <path d="M22 61h10l-1.5 17-9-.3Z" fill="url(#walker-trousers)" stroke="#46594e" stroke-width="1"/>
-                  <path d="m24 65-.4 9" fill="none" stroke="#9baa89" stroke-width="1.1"/>
+                  <path d="M22 61h10l-1.5 17-9-.3Z" fill="url(#walker-trousers)" stroke="var(--outfit-trousers-edge, #46594e)" stroke-width="1"/>
+                  <path d="m24 65-.4 9" fill="none" stroke="var(--outfit-trousers-highlight, #9baa89)" stroke-width="1.1"/>
                   <path d="M21.7 75.2q4.2 2 8.7.2l.3 5.5q-.2 2.1-3 2.2h-8.1q-2.1-.2-1.4-2.6l1.3-2.7Z" fill="url(#walker-boots)" stroke="#4d3d2f" stroke-width="1.1"/>
                   <path d="M19 81.5q5 1.2 10.7 0" fill="none" stroke="#b38c5d" stroke-width="1"/>
                   <path d="m22.7 77.5 4 .3" stroke="#d2ab76" stroke-width="1.1"/>
                 </g>
                 <g class="walker-leg walker-leg--near">
-                  <path d="M33 61h10l-.5 16.7-9 .4Z" fill="url(#walker-trousers)" stroke="#46594e" stroke-width="1"/>
-                  <path d="m36.2 65 .1 9" fill="none" stroke="#9baa89" stroke-width="1.1"/>
+                  <path d="M33 61h10l-.5 16.7-9 .4Z" fill="url(#walker-trousers)" stroke="var(--outfit-trousers-edge, #46594e)" stroke-width="1"/>
+                  <path d="m36.2 65 .1 9" fill="none" stroke="var(--outfit-trousers-highlight, #9baa89)" stroke-width="1.1"/>
                   <path d="M33.7 75.5q4.2 1.8 8.7-.3l2.3 3.8q1.6 3.3-1.1 3.9h-8.1q-2.5-.2-2.2-2.3Z" fill="url(#walker-boots)" stroke="#4d3d2f" stroke-width="1.1"/>
                   <path d="M34.2 81.5q4.8 1.2 9.6-.1" fill="none" stroke="#b38c5d" stroke-width="1"/>
                   <path d="m36.4 77.8 4-.3" stroke="#d2ab76" stroke-width="1.1"/>
@@ -177,24 +177,24 @@ worldShell.innerHTML = `
                 <g class="walker-upper">
                   <path d="M15 47q0-5 5-5h23q5 0 5 5v15q0 3-4 3H19q-4 0-4-3Z" fill="url(#walker-pack)" stroke="#84623f" stroke-width="1"/>
                   <g class="walker-arm walker-arm--far">
-                    <path d="M19.8 44.8q-5.2 1-6 5.1l-2.2 10q3.7 2.8 7.7 1.7l3.4-12Z" fill="url(#walker-sleeve)" stroke="#9d6042" stroke-width="1.1"/>
+                    <path d="M19.8 44.8q-5.2 1-6 5.1l-2.2 10q3.7 2.8 7.7 1.7l3.4-12Z" fill="url(#walker-sleeve)" stroke="var(--outfit-coat-edge, #9d6042)" stroke-width="1.1"/>
                     <path d="m13.2 58.5 6.3 1.6-.8 3-6.3-1.5Z" fill="#ecd2a2" stroke="#b38759" stroke-width=".7"/>
                     <path d="m12.4 61.1-.8 3.5q-.5 3.7 2.4 4.2 3.5.5 4.1-2.5l.6-3.7Z" fill="url(#walker-skin)" stroke="#ad7955" stroke-width="1"/>
                     <path d="m15.6 64.2-.5 1.9" stroke="#d59970" stroke-width=".8"/>
                   </g>
-                  <path d="M22 43q10-3 20 0l3.2 21.3q-12.7 5.5-26.4 0Z" fill="url(#walker-jacket)" stroke="#985d40" stroke-width="1.2"/>
-                  <path d="M24.5 44.8q2.2 7.5 1.8 18.6" fill="none" stroke="#efbd84" stroke-width="1.2" opacity=".8"/>
-                  <path d="M32 48v18" fill="none" stroke="#ad6a46" stroke-width="1"/>
-                  <path d="M20.4 62.8q11.8 4.2 23.3 0" fill="none" stroke="#efb884" stroke-width="1"/>
-                  <path d="m22.5 55.4 5.2.7-.5 4.1-5.1-.7Zm14 .7 5.1-.7.5 4.1-5.1.7Z" fill="#bb714b" stroke="#ab6645" stroke-width=".7"/>
-                  <path d="m22.5 55.4 5.2.7m8.8 0 5.1-.7" stroke="#efb782" stroke-width=".9"/>
+                  <path d="M22 43q10-3 20 0l3.2 21.3q-12.7 5.5-26.4 0Z" fill="url(#walker-jacket)" stroke="var(--outfit-coat-edge, #985d40)" stroke-width="1.2"/>
+                  <path d="M24.5 44.8q2.2 7.5 1.8 18.6" fill="none" stroke="var(--outfit-coat-highlight, #efbd84)" stroke-width="1.2" opacity=".8"/>
+                  <path d="M32 48v18" fill="none" stroke="var(--outfit-coat-edge, #ad6a46)" stroke-width="1"/>
+                  <path d="M20.4 62.8q11.8 4.2 23.3 0" fill="none" stroke="var(--outfit-coat-highlight, #efb884)" stroke-width="1"/>
+                  <path d="m22.5 55.4 5.2.7-.5 4.1-5.1-.7Zm14 .7 5.1-.7.5 4.1-5.1.7Z" fill="var(--outfit-coat-pocket, #bb714b)" stroke="var(--outfit-coat-edge, #ab6645)" stroke-width=".7"/>
+                  <path d="m22.5 55.4 5.2.7m8.8 0 5.1-.7" stroke="var(--outfit-coat-highlight, #efb782)" stroke-width=".9"/>
                   <circle cx="32" cy="55" r="1" fill="#f4d49a"/><circle cx="32" cy="61" r="1" fill="#f4d49a"/>
                   <path d="M23 43.3q8.9 4.5 18 0l-3.8 7.2-5.4-2.8-4.9 2.8Z" fill="url(#walker-scarf)" stroke="#c4a574" stroke-width=".9"/>
                   <path d="m32 46.7 3 4.7-2 6-3-5.9Z" fill="#f5dfb0" stroke="#c6a574" stroke-width=".7"/>
                   <path d="M21.3 43.4 18.7 55m24-11.6 2 11.3" fill="none" stroke="#916c45" stroke-width="2.7"/>
                   <path d="M21.1 44.3 19 53m23.7-8.7 1.5 8.5" fill="none" stroke="#e3bf83" stroke-width="1"/>
                   <g class="walker-arm walker-arm--near">
-                    <path d="M43.2 44.8q5.4 1 6.3 5.1l2.1 10q-3.7 2.8-7.7 1.7l-3.1-12Z" fill="url(#walker-sleeve)" stroke="#9d6042" stroke-width="1.1"/>
+                    <path d="M43.2 44.8q5.4 1 6.3 5.1l2.1 10q-3.7 2.8-7.7 1.7l-3.1-12Z" fill="url(#walker-sleeve)" stroke="var(--outfit-coat-edge, #9d6042)" stroke-width="1.1"/>
                     <path d="m44.1 60.1 6.3-1.6.9 3.1-6.4 1.5Z" fill="#ecd2a2" stroke="#b38759" stroke-width=".7"/>
                     <path d="m45 63.1.5 3.7q.5 3 4 2.5 3-.5 2.5-4.2l-.8-3.5Z" fill="url(#walker-skin)" stroke="#ad7955" stroke-width="1"/>
                     <path d="m48 64.2.5 1.9" stroke="#d59970" stroke-width=".8"/>
@@ -215,35 +215,35 @@ worldShell.innerHTML = `
                     <path d="M28.6 37q3.7 3 7.2-.2" fill="none" stroke="#8c5741" stroke-width="1.2"/>
                     <path d="M16 21.7q1-11 15-11.7 14.5-.5 17.6 11.3l-6.3-.6-1.6-4q-2.7 6.9-8.6 8.1l.7-6.2q-5.5 6.1-13.6 7.2l.3-5Z" fill="url(#walker-hair)" stroke="#654532" stroke-width="1"/>
                     <path d="M22.5 19q4.4-1.6 7.1-5m7.2 1.8-1.6 4.6" fill="none" stroke="#b47e4e" stroke-width="1.1" opacity=".7"/>
-                    <path d="M14.2 17.4Q14.9 4.9 30 3.6 46.9 2.7 49 17.3q-17.3 6-34.8.1Z" fill="url(#walker-cap)" stroke="#536b4b" stroke-width="1.1"/>
-                    <path d="M18.9 11.7q4-5.7 12.8-5.4m3.1.2q5.5 3.2 5.9 9.8" fill="none" stroke="#c8ce98" stroke-width="1.1" opacity=".8"/>
-                    <path d="M11.6 17.4q20.4-5.1 40.5.1 3.2 1.1.2 3.2-18.9 5.4-40.7-.2-3-1.3 0-3.1Z" fill="url(#walker-cap-brim)" stroke="#50654a" stroke-width="1"/>
-                    <path d="M16 17.5q14.9-2.8 30.7-.3" fill="none" stroke="#c1ca93" stroke-width="1.1"/>
+                    <path d="M14.2 17.4Q14.9 4.9 30 3.6 46.9 2.7 49 17.3q-17.3 6-34.8.1Z" fill="url(#walker-cap)" stroke="var(--outfit-cap-edge, #536b4b)" stroke-width="1.1"/>
+                    <path d="M18.9 11.7q4-5.7 12.8-5.4m3.1.2q5.5 3.2 5.9 9.8" fill="none" stroke="var(--outfit-cap-highlight, #c8ce98)" stroke-width="1.1" opacity=".8"/>
+                    <path d="M11.6 17.4q20.4-5.1 40.5.1 3.2 1.1.2 3.2-18.9 5.4-40.7-.2-3-1.3 0-3.1Z" fill="url(#walker-cap-brim)" stroke="var(--outfit-cap-edge, #50654a)" stroke-width="1"/>
+                    <path d="M16 17.5q14.9-2.8 30.7-.3" fill="none" stroke="var(--outfit-cap-highlight, #c1ca93)" stroke-width="1.1"/>
                     <path d="M43.6 10.1q-5.8 0-4 5.1 4.4.1 4-5.1Z" fill="#d9ce93"/><path d="m40 14.4 2.1-2.6" stroke="#809268" stroke-width=".65"/>
                   </g>
                 </g>
               </g>
               <g class="walker-view walker-back">
                 <g class="walker-leg walker-leg--far">
-                  <path d="M22 61h10l-1.5 17-9-.3Z" fill="url(#walker-trousers)" stroke="#46594e" stroke-width="1"/>
-                  <path d="m25 66-.2 9" fill="none" stroke="#8b9b80" stroke-width="1"/>
+                  <path d="M22 61h10l-1.5 17-9-.3Z" fill="url(#walker-trousers)" stroke="var(--outfit-trousers-edge, #46594e)" stroke-width="1"/>
+                  <path d="m25 66-.2 9" fill="none" stroke="var(--outfit-trousers-highlight, #8b9b80)" stroke-width="1"/>
                   <path d="M21.7 75.2q4.2 2 8.7.2l.5 6q-.3 1.6-2.5 1.7h-7q-2.3-.3-1.8-2.7Z" fill="url(#walker-boots)" stroke="#4d3d2f" stroke-width="1.1"/>
                   <path d="m21 81.2 8.3.1m-4.1-4.4-.2 3" stroke="#b38c5d" stroke-width="1"/>
                 </g>
                 <g class="walker-leg walker-leg--near">
-                  <path d="M33 61h10l-.5 16.7-9 .4Z" fill="url(#walker-trousers)" stroke="#46594e" stroke-width="1"/>
-                  <path d="m37 66 .2 9" fill="none" stroke="#8b9b80" stroke-width="1"/>
+                  <path d="M33 61h10l-.5 16.7-9 .4Z" fill="url(#walker-trousers)" stroke="var(--outfit-trousers-edge, #46594e)" stroke-width="1"/>
+                  <path d="m37 66 .2 9" fill="none" stroke="var(--outfit-trousers-highlight, #8b9b80)" stroke-width="1"/>
                   <path d="M33.7 75.5q4.2 1.8 8.7-.3l1.9 5.5q.5 2.1-1.9 2.4h-7q-2.2-.1-2.4-1.7Z" fill="url(#walker-boots)" stroke="#4d3d2f" stroke-width="1.1"/>
                   <path d="m34.9 81.3 8.1-.1m-4.3-4.3.2 3" stroke="#b38c5d" stroke-width="1"/>
                 </g>
                 <g class="walker-upper">
                   <g class="walker-arm walker-arm--far">
-                    <path d="M19.8 44.8q-5.2 1-6 5.1l-2.2 10q3.7 2.8 7.7 1.7l3.4-12Z" fill="url(#walker-sleeve)" stroke="#9d6042" stroke-width="1.1"/>
+                    <path d="M19.8 44.8q-5.2 1-6 5.1l-2.2 10q3.7 2.8 7.7 1.7l3.4-12Z" fill="url(#walker-sleeve)" stroke="var(--outfit-coat-edge, #9d6042)" stroke-width="1.1"/>
                     <path d="m13.2 58.5 6.3 1.6-.8 3-6.3-1.5Z" fill="#ecd2a2" stroke="#b38759" stroke-width=".7"/>
                     <path d="m12.4 61.1-.8 3.5q-.5 3.7 2.4 4.2 3.5.5 4.1-2.5l.6-3.7Z" fill="url(#walker-skin)" stroke="#ad7955" stroke-width="1"/>
                   </g>
-                  <path d="M22 43q10-3 20 0l3.2 21.3q-12.7 5.5-26.4 0Z" fill="url(#walker-jacket)" stroke="#985d40" stroke-width="1.2"/>
-                  <path d="M20.4 62.8q11.8 4.2 23.3 0" fill="none" stroke="#efb884" stroke-width="1"/>
+                  <path d="M22 43q10-3 20 0l3.2 21.3q-12.7 5.5-26.4 0Z" fill="url(#walker-jacket)" stroke="var(--outfit-coat-edge, #985d40)" stroke-width="1.2"/>
+                  <path d="M20.4 62.8q11.8 4.2 23.3 0" fill="none" stroke="var(--outfit-coat-highlight, #efb884)" stroke-width="1"/>
                   <path d="M23.8 42.4q8 3.9 16.2 0l.3 5.2q-8.3 3-16.7 0Z" fill="url(#walker-scarf)" stroke="#c4a574" stroke-width=".9"/>
                   <path d="M22 44q-4 5-2.7 16m22.5-16q4 5 2.5 16" fill="none" stroke="#8d6a43" stroke-width="3.1"/>
                   <path d="M22 45q-2.8 5-1.7 14m21.5-14q2.8 5 1.5 14" fill="none" stroke="#e0bc7f" stroke-width="1.1"/>
@@ -255,7 +255,7 @@ worldShell.innerHTML = `
                   <path d="M27.5 60h9" stroke="#edca90" stroke-width="1"/>
                   <path d="M30.2 51.9h3.7v7h-3.7Z" fill="#90683e"/><rect x="30.5" y="54.1" width="3.1" height="2.4" rx=".5" fill="#ebcf8c"/>
                   <g class="walker-arm walker-arm--near">
-                    <path d="M43.2 44.8q5.4 1 6.3 5.1l2.1 10q-3.7 2.8-7.7 1.7l-3.1-12Z" fill="url(#walker-sleeve)" stroke="#9d6042" stroke-width="1.1"/>
+                    <path d="M43.2 44.8q5.4 1 6.3 5.1l2.1 10q-3.7 2.8-7.7 1.7l-3.1-12Z" fill="url(#walker-sleeve)" stroke="var(--outfit-coat-edge, #9d6042)" stroke-width="1.1"/>
                     <path d="m44.1 60.1 6.3-1.6.9 3.1-6.4 1.5Z" fill="#ecd2a2" stroke="#b38759" stroke-width=".7"/>
                     <path d="m45 63.1.5 3.7q.5 3 4 2.5 3-.5 2.5-4.2l-.8-3.5Z" fill="url(#walker-skin)" stroke="#ad7955" stroke-width="1"/>
                   </g>
@@ -264,35 +264,35 @@ worldShell.innerHTML = `
                     <ellipse cx="47.7" cy="29.6" rx="3.9" ry="5.2" fill="url(#walker-skin)" stroke="#bb8058" stroke-width=".9"/>
                     <path d="M16.1 16.9q16.7-12 32 1l.6 14.2 2.4 4.2-4.5 1.1.3 4.7-5.3-2q-3.6 4.3-9.7 4.8-5.2-.2-9.7-4.2l-5.6 1.3.6-4-3.8-2.1 2.3-4Z" fill="url(#walker-hair)" stroke="#654532" stroke-width="1"/>
                     <path d="M21.9 24q-2 8.6 2.9 13m6.4-11q-2.5 10.6 2.5 14m7.1-15q3.4 7.6.7 12" fill="none" stroke="#ac794d" stroke-width="1.4" opacity=".55"/>
-                    <path d="M14.2 19.4Q14.2 4.9 30 3.6 47.6 2.7 49 19.3q-16.9 9.7-34.8.1Z" fill="url(#walker-cap)" stroke="#536b4b" stroke-width="1.1"/>
-                    <path d="M18.9 11.7q4-5.7 12.8-5.4m2.8.2q4.6 6.3 3.7 14.5" fill="none" stroke="#c8ce98" stroke-width="1.1" opacity=".8"/>
-                    <path d="M15.1 19q16.5 8.1 33 .1l-.6 4q-15.7 7.6-31.7-.2Z" fill="url(#walker-cap-brim)" stroke="#50654a" stroke-width=".9"/>
-                    <path d="M27 23.2q4.8 1 9.7 0v3.1q-4.8 1.1-9.7-.1Z" fill="#c6bd87" stroke="#687956" stroke-width=".7"/>
-                    <circle cx="31.9" cy="24.7" r=".75" fill="#6f805a"/>
+                    <path d="M14.2 19.4Q14.2 4.9 30 3.6 47.6 2.7 49 19.3q-16.9 9.7-34.8.1Z" fill="url(#walker-cap)" stroke="var(--outfit-cap-edge, #536b4b)" stroke-width="1.1"/>
+                    <path d="M18.9 11.7q4-5.7 12.8-5.4m2.8.2q4.6 6.3 3.7 14.5" fill="none" stroke="var(--outfit-cap-highlight, #c8ce98)" stroke-width="1.1" opacity=".8"/>
+                    <path d="M15.1 19q16.5 8.1 33 .1l-.6 4q-15.7 7.6-31.7-.2Z" fill="url(#walker-cap-brim)" stroke="var(--outfit-cap-edge, #50654a)" stroke-width=".9"/>
+                    <path d="M27 23.2q4.8 1 9.7 0v3.1q-4.8 1.1-9.7-.1Z" fill="#c6bd87" stroke="var(--outfit-cap-edge, #687956)" stroke-width=".7"/>
+                    <circle cx="31.9" cy="24.7" r=".75" fill="var(--outfit-cap-dark, #6f805a)"/>
                   </g>
                 </g>
               </g>
               <g class="walker-view walker-side">
                 <g class="walker-leg walker-leg--far">
-                  <path d="M25.3 61.2h9.2l1.3 16-8.6.3Z" fill="#4c635a" stroke="#41554c" stroke-width="1"/>
+                  <path d="M25.3 61.2h9.2l1.3 16-8.6.3Z" fill="var(--outfit-trousers-dark, #4c635a)" stroke="var(--outfit-trousers-edge, #41554c)" stroke-width="1"/>
                   <path d="M27 75.7q4.4 1.5 8.3-.4l1.6 2.7 5.9 1q2.9 1.2 1.1 3.5H26.4q-1.4-.6-.6-2.4Z" fill="url(#walker-boots)" stroke="#4d3d2f" stroke-width="1.1"/>
                   <path d="M27 81.2h14.9" stroke="#a7845b" stroke-width="1"/>
                 </g>
                 <g class="walker-leg walker-leg--near">
-                  <path d="M30.2 61h10l-.7 16.3-9 .7Z" fill="url(#walker-trousers)" stroke="#46594e" stroke-width="1"/>
-                  <path d="m33.5 65 .3 9" stroke="#9baa89" stroke-width="1"/>
+                  <path d="M30.2 61h10l-.7 16.3-9 .7Z" fill="url(#walker-trousers)" stroke="var(--outfit-trousers-edge, #46594e)" stroke-width="1"/>
+                  <path d="m33.5 65 .3 9" stroke="var(--outfit-trousers-highlight, #9baa89)" stroke-width="1"/>
                   <path d="M30.7 75.6q4.2 1.8 8.6-.2l2 3 5.2 1q2.5 1 1.8 3.1-.3 1.1-2.6 1.1H30.4q-1.9-.5-1-3.1Z" fill="url(#walker-boots)" stroke="#4d3d2f" stroke-width="1.1"/>
                   <path d="M30.6 82h15.7m-7.4-3.4 2.8 1" fill="none" stroke="#bc9767" stroke-width="1"/>
                 </g>
                 <g class="walker-upper">
                   <g class="walker-arm walker-arm--far">
-                    <path d="M36.5 44.5q5.3-.2 6.8 6.5l2.9 9.1-6.9 2-5.2-14Z" fill="#b87950" stroke="#9d6042" stroke-width="1"/>
+                    <path d="M36.5 44.5q5.3-.2 6.8 6.5l2.9 9.1-6.9 2-5.2-14Z" fill="var(--outfit-coat-dark, #b87950)" stroke="var(--outfit-coat-edge, #9d6042)" stroke-width="1"/>
                     <path d="m39.7 60 6.2-1.5 1 3.2-6.2 1.4Z" fill="#ddc18e"/>
                     <path d="m40.7 62.3 1.3 3.7q1.2 3.3 4.2 2 2.5-1.2 1.1-4.3l-.8-2.2Z" fill="url(#walker-skin)" stroke="#ad7955" stroke-width="1"/>
                   </g>
-                  <path d="M25.2 43.3q8.8-2.3 15.3 1.2 3.3 9.9 1.8 20.4-9.6 3.9-19.1-1Z" fill="url(#walker-jacket)" stroke="#985d40" stroke-width="1.2"/>
-                  <path d="M38.3 49q2.2 8 1.3 13.7" fill="none" stroke="#efb884" stroke-width="1.2"/>
-                  <path d="M24.7 63.1q8 3 16.4.4" fill="none" stroke="#efb884" stroke-width="1"/>
+                  <path d="M25.2 43.3q8.8-2.3 15.3 1.2 3.3 9.9 1.8 20.4-9.6 3.9-19.1-1Z" fill="url(#walker-jacket)" stroke="var(--outfit-coat-edge, #985d40)" stroke-width="1.2"/>
+                  <path d="M38.3 49q2.2 8 1.3 13.7" fill="none" stroke="var(--outfit-coat-highlight, #efb884)" stroke-width="1.2"/>
+                  <path d="M24.7 63.1q8 3 16.4.4" fill="none" stroke="var(--outfit-coat-highlight, #efb884)" stroke-width="1"/>
                   <path d="M28.1 42.8q7.6 2.6 13.2.5l-1.8 7.2-5.8-2.8-5.8 1.5Z" fill="url(#walker-scarf)" stroke="#c4a574" stroke-width=".8"/>
                   <path d="m38 47.3 3.1 3.5-1.1 6.5-3.3-5.6Z" fill="#f5dfb0" stroke="#c6a574" stroke-width=".7"/>
                   <path d="M28 43.7q-4.8 2.1-3.3 14.9" fill="none" stroke="#8c6842" stroke-width="3"/>
@@ -302,11 +302,11 @@ worldShell.innerHTML = `
                   <path d="M17.2 57.1q2.9-1.1 5.8 0l.1 5q-3.1 1.1-5.9-.6Z" fill="#c6a16a" stroke="#9b7648" stroke-width=".7"/>
                   <path d="m20 51 .1 4.1" stroke="#8d6740" stroke-width="2"/>
                   <g class="walker-arm walker-arm--near">
-                    <path d="M31 45.6q5.6-1.1 7 3.8l.5 11.7q-3.8 2.1-7.2.3l-3.1-10.9q-1-3.7 2.8-4.9Z" fill="url(#walker-sleeve)" stroke="#9d6042" stroke-width="1.1"/>
+                    <path d="M31 45.6q5.6-1.1 7 3.8l.5 11.7q-3.8 2.1-7.2.3l-3.1-10.9q-1-3.7 2.8-4.9Z" fill="url(#walker-sleeve)" stroke="var(--outfit-coat-edge, #9d6042)" stroke-width="1.1"/>
                     <path d="m30.7 59.1 7.9.1-.1 3.6-6.7.1Z" fill="#ecd2a2" stroke="#b38759" stroke-width=".7"/>
                     <path d="M31.9 62.7v4q.3 3.6 3.7 3.4 3.1-.3 2.8-4l-.3-3.5Z" fill="url(#walker-skin)" stroke="#ad7955" stroke-width="1"/>
                     <path d="m34.8 65.7.1 1.8" stroke="#d59970" stroke-width=".8"/>
-                    <path d="m30.6 49 1.4 6" stroke="#edb47b" stroke-width="1.2"/>
+                    <path d="m30.6 49 1.4 6" stroke="var(--outfit-coat-highlight, #edb47b)" stroke-width="1.2"/>
                   </g>
                   <g class="walker-head">
                     <path d="M17.1 15.9q8.4-9.5 21.1-3.9L46 29.9l-3.1 8.8-7.9 3.6-6.8-1.4-5.9 2-1.8-4-4.5-1.6 2-3.9-3.2-5.6Z" fill="url(#walker-hair)" stroke="#654532" stroke-width="1"/>
@@ -319,10 +319,10 @@ worldShell.innerHTML = `
                     <path d="M22 24q-1 7.4 3 10m6.1-15.9-2 5.5" fill="none" stroke="#b37c4d" stroke-width="1.2" opacity=".7"/>
                     <ellipse cx="31" cy="31.1" rx="4.2" ry="5.2" fill="url(#walker-skin)" stroke="#b57d56" stroke-width=".9"/>
                     <path d="M29.7 30.1q2.4-1.7 2.6 1.4l-1.4 1.2" fill="none" stroke="#c18a61" stroke-width=".9"/>
-                    <path d="M15 17.7Q14.7 4.2 29.6 3.6 44.7 2.9 47.2 18q-15.1 6.4-32.2-.3Z" fill="url(#walker-cap)" stroke="#536b4b" stroke-width="1.1"/>
-                    <path d="M19.4 11.4q3.8-5.3 11.6-5.1m3 .4q4.8 4.3 5.7 10.2" fill="none" stroke="#c8ce98" stroke-width="1.1" opacity=".8"/>
-                    <path d="M16.1 18q17.9 3.2 29.1-2.1l10.3 3.6q2.4 1.8-.7 3.6-10.9 4.3-24-1.7-7.3 2.4-14.6-.3Z" fill="url(#walker-cap-brim)" stroke="#50654a" stroke-width="1"/>
-                    <path d="m42.1 17.7 10.8 2.8" fill="none" stroke="#c1ca93" stroke-width="1"/>
+                    <path d="M15 17.7Q14.7 4.2 29.6 3.6 44.7 2.9 47.2 18q-15.1 6.4-32.2-.3Z" fill="url(#walker-cap)" stroke="var(--outfit-cap-edge, #536b4b)" stroke-width="1.1"/>
+                    <path d="M19.4 11.4q3.8-5.3 11.6-5.1m3 .4q4.8 4.3 5.7 10.2" fill="none" stroke="var(--outfit-cap-highlight, #c8ce98)" stroke-width="1.1" opacity=".8"/>
+                    <path d="M16.1 18q17.9 3.2 29.1-2.1l10.3 3.6q2.4 1.8-.7 3.6-10.9 4.3-24-1.7-7.3 2.4-14.6-.3Z" fill="url(#walker-cap-brim)" stroke="var(--outfit-cap-edge, #50654a)" stroke-width="1"/>
+                    <path d="m42.1 17.7 10.8 2.8" fill="none" stroke="var(--outfit-cap-highlight, #c1ca93)" stroke-width="1"/>
                     <path d="M34.9 11.3q-5.8 0-4 5.1 4.4.1 4-5.1Z" fill="#d9ce93"/><path d="m31.3 15.6 2.1-2.6" stroke="#809268" stroke-width=".65"/>
                   </g>
                 </g>
@@ -389,7 +389,7 @@ worldPanels.work.append(original.work);
 worldPanels.shop.append(original.supplies, original.adventure);
 worldPanels.arena.append(original.arena);
 worldPanels.visit.append(worldById('visit'));
-worldPanels.appearance.append(worldById('appearance-settings'));
+worldPanels.appearance.append(worldById('outfit-settings'), worldById('appearance-settings'));
 worldPanels.pet.classList.add('world-companion');
 worldPanels.menu.innerHTML = '<p class="help">Take your time. Your pet and progress are saved.</p><p><a href="/readme/" target="_blank" rel="noopener">How to play</a></p><button type="button" class="world-button" id="world-pet-details" data-place="pet">Pet details</button> <button type="button" class="world-button" data-place="backpack">Backpack</button> <button type="button" class="world-button" data-place="journal">Town journal</button> <button type="button" class="world-button" data-place="appearance">Appearance</button>';
 for (const selector of ['#world-pet-summary', '#home-interaction-label', '.home-care', '#home-care-hint', '#home-care-error', '#world-play', '#town-care-hint', '.companion-footer']) {
@@ -425,7 +425,7 @@ const worldPlaces = {
   work: ['Part-time jobs', 'Find a shift that suits your pet. Build skills, earn money, and work your way up.'],
   arena: ['The town arena', 'Meet your neighbours, visit their pets, or challenge someone to a friendly rivalry.'],
   journal: ['Your town journal', 'Recent visitors, battles, town news, and any theft reports that need your attention.'],
-  appearance: ["Your pet's little nook", 'Make your companion feel like yours. Choose a shape and colour, then save your appearance.'],
+  appearance: ['A style of your own', 'Dress for your next stroll, or give your companion a new look.'],
   pet: ['Your companion', 'A little affection goes a long way. Play, care, or see how your pet is doing.'],
   menu: ['Make yourself at home', ''],
   visit: ['Visiting a neighbour', ''],
@@ -473,6 +473,101 @@ let worldPresenceChanges = 0;
 const worldPeers = new Map();
 const worldNetworked = () => Boolean(worldPlayerId && typeof fetch === 'function');
 const worldVisiting = () => worldScene === 'home' && worldHome && worldHome !== worldPlayerId;
+let worldAvatarCopies = 0;
+function worldCloneCharacter() {
+  const svg = worldAvatar.querySelector('svg').cloneNode(true);
+  const prefix = `walker-copy-${++worldAvatarCopies}-`;
+  const ids = new Map();
+  // Each character owns its gradients so neighbouring outfits cannot recolour it.
+  for (const element of svg.querySelectorAll('[id]')) {
+    ids.set(element.id, prefix + element.id);
+    element.id = prefix + element.id;
+  }
+  for (const element of svg.querySelectorAll('[fill], [stroke]')) {
+    for (const attribute of ['fill', 'stroke']) {
+      const value = element.getAttribute(attribute);
+      if (value?.startsWith('url(#')) element.setAttribute(attribute, value.replace(/url\(#([^)]+)\)/g, (match, id) => ids.has(id) ? `url(#${ids.get(id)})` : match));
+    }
+  }
+  return svg;
+}
+
+const worldOutfits = ['amber', 'forest', 'ocean', 'berry', 'lavender', 'rose', 'slate', 'cream'];
+const worldOutfitName = outfit => outfit[0].toUpperCase() + outfit.slice(1);
+const worldOutfit = outfit => worldOutfits.includes(outfit) ? outfit : 'amber';
+const outfitForm = worldById('outfit-settings');
+const outfitChoices = worldById('outfit-choices');
+const outfitPreview = worldById('outfit-preview');
+const outfitSave = worldById('outfit-save');
+const outfitStatus = worldById('outfit-status');
+const outfitError = worldById('outfit-error');
+worldById('outfit-swatches').innerHTML = worldOutfits.map(outfit => `<label class="outfit-option"><input type="radio" name="outfit" value="${outfit}"><span class="outfit-swatch" data-outfit="${outfit}" aria-hidden="true"></span><span>${worldOutfitName(outfit)}</span></label>`).join('');
+outfitPreview.append(worldCloneCharacter());
+let worldOutfitSaved = null;
+let worldOutfitDraft = 'amber';
+let worldOutfitSaving = false;
+let worldOutfitRequest = 0;
+function worldRenderOutfit() {
+  outfitPreview.dataset.outfit = worldOutfitDraft;
+  worldById('outfit-preview-label').textContent = `${worldOutfitName(worldOutfitDraft)} preview`;
+  for (const radio of outfitChoices.querySelectorAll('input')) radio.checked = radio.value === worldOutfitDraft;
+  outfitChoices.disabled = !worldOutfitSaved || worldOutfitSaving;
+  outfitSave.disabled = !worldOutfitSaved || worldOutfitSaving || worldOutfitDraft === worldOutfitSaved;
+  outfitSave.textContent = worldOutfitSaving ? 'Saving…' : 'Save outfit';
+  outfitForm.setAttribute('aria-busy', String(worldOutfitSaving));
+}
+function worldResetOutfit() {
+  worldOutfitRequest++;
+  worldOutfitSaved = null; worldOutfitDraft = 'amber'; worldOutfitSaving = false;
+  worldAvatar.dataset.outfit = 'amber'; outfitPreview.dataset.facing = 'down';
+  outfitStatus.textContent = ''; outfitError.textContent = '';
+  worldRenderOutfit();
+}
+function worldReceiveOutfit(player) {
+  const outfit = worldOutfit(player.outfit);
+  worldAvatar.dataset.outfit = outfit;
+  if (worldOutfitSaved === outfit) return;
+  if (worldOutfitSaved === null || worldOutfitDraft === worldOutfitSaved) worldOutfitDraft = outfit;
+  worldOutfitSaved = outfit;
+  outfitStatus.textContent = '';
+  worldRenderOutfit();
+}
+outfitChoices.addEventListener('change', event => {
+  if (!event.target.matches('input[name="outfit"]') || worldOutfitSaving) return;
+  worldOutfitDraft = worldOutfit(event.target.value);
+  outfitStatus.textContent = ''; outfitError.textContent = '';
+  worldRenderOutfit();
+});
+worldById('outfit-turn').addEventListener('click', () => {
+  const facings = ['down', 'right', 'up', 'left'];
+  outfitPreview.dataset.facing = facings[(facings.indexOf(outfitPreview.dataset.facing) + 1) % facings.length];
+});
+outfitForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!worldNetworked() || !worldOutfitSaved || worldOutfitSaving || worldOutfitDraft === worldOutfitSaved) return;
+  const generation = worldGeneration, request = ++worldOutfitRequest, outfit = worldOutfitDraft;
+  worldOutfitSaving = true;
+  outfitStatus.textContent = ''; outfitError.textContent = '';
+  worldRenderOutfit();
+  try {
+    const response = await fetch('/api/world/outfit', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ outfit }),
+    });
+    const result = await response.json();
+    if (generation !== worldGeneration || request !== worldOutfitRequest) return;
+    if (!response.ok) throw new Error(result.error || 'Could not save your outfit. Try again.');
+    worldReceive(result);
+    outfitStatus.textContent = worldOutfitSaved === outfit ? `${worldOutfitName(outfit)} outfit saved.` : 'Your outfit changed in another window. Choose a colour to save again.';
+  } catch (error) {
+    if (generation === worldGeneration && request === worldOutfitRequest) outfitError.textContent = error.message || 'Could not save your outfit. Try again.';
+  } finally {
+    if (generation === worldGeneration && request === worldOutfitRequest) {
+      worldOutfitSaving = false;
+      worldRenderOutfit();
+    }
+  }
+});
+worldResetOutfit();
 const visitPet = document.createElement('button');
 visitPet.type = 'button'; visitPet.id = 'world-visit-pet'; visitPet.className = 'pet-touch home-pet'; visitPet.hidden = true;
 worldById('home-scene').append(visitPet);
@@ -514,11 +609,9 @@ function worldRenderPeers() {
     visible.add(player.id);
     let avatar = worldPeers.get(player.id);
     if (!avatar) {
-      avatar = worldAvatar.cloneNode(true);
-      avatar.removeAttribute('id');
-      // Reuse the original SVG's definitions without duplicate document IDs.
-      avatar.querySelector('defs')?.remove();
-      avatar.classList.add('world-peer');
+      avatar = document.createElement('div');
+      avatar.className = 'world-avatar world-peer';
+      avatar.append(worldCloneCharacter());
       avatar.dataset.player = player.id;
       avatar.removeAttribute('aria-hidden');
       const label = document.createElement('span');
@@ -528,6 +621,7 @@ function worldRenderPeers() {
     }
     avatar.style.transform = `translate3d(${player.x * worldView.width / 960}px, ${player.y * worldView.height / 640}px, 0) translate(-50%, -100%)`;
     avatar.dataset.facing = player.facing;
+    avatar.dataset.outfit = worldOutfit(player.outfit);
     avatar.dataset.walking = String(player.moving);
     avatar.dataset.paused = String(document.hidden);
   }
@@ -579,6 +673,7 @@ function worldReceive(player) {
   worldPlayers.set(player.id, player);
   if (player.id === worldPlayerId && (!worldSaved || player.revision >= worldSaved.revision)) {
     worldSaved = player;
+    worldReceiveOutfit(player);
     // Login always starts at home. Keep earlier socket/snapshot rows for
     // revision checks, but never animate from the previous session's position.
     if (!worldPlaced && (worldSpawnRevision === null || player.revision <= worldSpawnRevision ||
@@ -687,6 +782,7 @@ document.addEventListener('adventure:pet', event => {
   if (worldPlayerId === event.detail.id) return;
   worldGeneration++; worldPlayerId = event.detail.id; worldHome = worldPlayerId;
   worldSaved = null; worldQueued = null; worldSending = false; worldConnected = false;
+  worldResetOutfit();
   worldPlaced = false; worldSpawnRevision = null;
   worldPlayers.clear(); worldIntent = { x: 480, y: 475 };
   worldResync();
@@ -1236,6 +1332,7 @@ function worldSyncSession() {
   const visible = !worldDashboard.hidden;
   if (!visible && worldPlayerId) {
     worldGeneration++; worldPlayerId = null; worldSaved = null; worldQueued = null; worldSending = false;
+    worldResetOutfit();
     worldPlayers.clear(); worldOnline.clear(); worldRenderPeers();
   }
   document.body.classList.toggle('world-playing', visible);
