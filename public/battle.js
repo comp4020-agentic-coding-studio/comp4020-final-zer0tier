@@ -230,24 +230,26 @@ reducedMotion.addEventListener?.('change', () => {
   if (nextTurnDelay !== null) scheduleAdvance(350);
 });
 
+// One bar per fighter card, built as a labelled div rather than <meter> so a
+// Pokémon-style green/yellow/red HP threshold can be painted without relying
+// on inconsistent ::-webkit-meter-* / ::-moz-meter-* pseudo-elements.
+const bar = (card, kind, label) => `<div class="battle-bar battle-bar-${kind}">
+  <span class="battle-bar-label">${kind.toUpperCase()}</span>
+  <div class="battle-bar-track" id="battle-${kind}-${card}" role="meter" aria-label="${label}" aria-valuemin="0">
+    <div class="battle-bar-fill"></div></div>
+  <span id="battle-${kind}-text-${card}" class="battle-bar-value"></span></div>`;
 function buildDialog() {
   dialog = document.createElement('dialog');
   dialog.id = 'battle-dialog';
   dialog.setAttribute('aria-labelledby', 'battle-title');
   dialog.setAttribute('aria-describedby', 'battle-mode battle-initiative');
-  // A square spiral fills a 20×18 tile field. It is original vector artwork,
-  // stretched to the viewport so no video or image download delays a fight.
-  let spiral = 'M4 4';
-  for (let left = 4, top = 4, right = 156, bottom = 140; left <= right && top <= bottom;
-    left += 8, top += 8, right -= 8, bottom -= 8) {
-    spiral += `H${right}V${bottom}H${left}V${Math.min(top + 8, bottom)}`;
-  }
   dialog.innerHTML = `
     <header class="battle-heading"><div><p id="battle-mode">Turn-based battle</p><h2 id="battle-title">Claws at the ready</h2></div>
       <button type="button" id="battle-close" class="chip-btn chip-buy" aria-label="Close battle">Close</button></header>
     <p id="battle-initiative" class="battle-initiative" hidden></p>
     <p id="battle-strategy" class="battle-strategy" hidden></p>
     <div class="battle-stage">
+      <div class="battle-sky" aria-hidden="true"></div>
       <div class="battle-woodland-art" aria-hidden="true"><svg viewBox="0 0 600 220" preserveAspectRatio="xMidYMax slice">
         <use href="/scenes/adventure-atlas.svg#tree" x="-38" y="-14" width="190" height="190"/>
         <use href="/scenes/adventure-atlas.svg#tree" x="450" y="-18" width="200" height="200"/>
@@ -255,18 +257,24 @@ function buildDialog() {
         <use href="/scenes/adventure-atlas.svg#grass" x="8" y="160" width="100" height="70"/>
         <use href="/scenes/adventure-atlas.svg#grass" x="500" y="160" width="100" height="70"/>
       </svg></div>
-      <article class="battle-fighter" id="battle-fighter-0"><h3 id="battle-name-0"></h3><div class="battle-avatar" id="battle-avatar-0"></div>
-        <label for="battle-hp-0">HP <span id="battle-hp-text-0"></span></label><meter id="battle-hp-0" min="0" aria-label="Attacker HP"></meter>
-        <label for="battle-mp-0">MP <span id="battle-mp-text-0"></span></label><meter id="battle-mp-0" min="0" aria-label="Attacker MP"></meter></article>
+      <article class="battle-fighter" id="battle-fighter-0">
+        <div class="battle-platform" aria-hidden="true"></div>
+        <div class="battle-avatar" id="battle-avatar-0"></div>
+        <div class="battle-nameplate"><h3 id="battle-name-0"></h3>
+          ${bar(0, 'hp', 'Attacker HP')}${bar(0, 'mp', 'Attacker MP')}</div>
+      </article>
       <span class="battle-versus" aria-hidden="true">VS</span>
-      <article class="battle-fighter" id="battle-fighter-1"><h3 id="battle-name-1"></h3><div class="battle-avatar" id="battle-avatar-1"></div>
-        <label for="battle-hp-1">HP <span id="battle-hp-text-1"></span></label><meter id="battle-hp-1" min="0" aria-label="Defender HP"></meter>
-        <label for="battle-mp-1">MP <span id="battle-mp-text-1"></span></label><meter id="battle-mp-1" min="0" aria-label="Defender MP"></meter></article>
+      <article class="battle-fighter" id="battle-fighter-1">
+        <div class="battle-platform" aria-hidden="true"></div>
+        <div class="battle-avatar" id="battle-avatar-1"></div>
+        <div class="battle-nameplate"><h3 id="battle-name-1"></h3>
+          ${bar(1, 'hp', 'Defender HP')}${bar(1, 'mp', 'Defender MP')}</div>
+      </article>
     </div>
     <section class="battle-allies" id="battle-allies" aria-label="Teammates in this battle" hidden></section>
     <div class="battle-ability"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 4-5 24M18 4l-5 24M27 4l-5 24"/></svg>
       <div><strong id="battle-ability-name">Choose a skill</strong><span id="battle-ability-cost">Your pet is ready</span></div></div>
-    <div role="status" aria-live="polite" aria-atomic="true">
+    <div id="battle-textbox" role="status" aria-live="polite" aria-atomic="true">
       <p id="battle-status"></p>
       <p id="battle-intent" class="battle-intent" hidden></p>
     </div>
@@ -285,9 +293,6 @@ function buildDialog() {
           <p class="opening-ready" role="status">Get ready to battle!</p>
         </div>
       </div>
-      <svg class="opening-wipe" viewBox="0 0 160 144" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <path d="${spiral}" pathLength="1"/>
-      </svg>
       <button type="button" id="battle-opening-skip">Skip intro <span aria-hidden="true">↵</span></button>
     </section>`;
   document.body.append(dialog);
@@ -376,12 +381,17 @@ function avatar(fighter, index) {
   }
   $(`battle-avatar-${index}`).replaceChildren(svg);
 }
+// A Pokémon-style HP bar turns yellow below half and red below a fifth.
+const hpTone = ratio => ratio <= .2 ? 'low' : ratio <= .5 ? 'mid' : 'high';
 function meters(hp, mp, snapshot) {
   cards.forEach((fighterIndex, card) => {
     const fighter = scene.battle.fighters[fighterIndex];
     for (const [kind, value, max] of [['hp', hp[fighterIndex], snapshot?.maxHp?.[fighterIndex] ?? fighter.maxHp], ['mp', mp[fighterIndex], snapshot?.maxMp?.[fighterIndex] ?? fighter.maxMp]]) {
-      $(`battle-${kind}-${card}`).max = Math.max(1, max);
-      $(`battle-${kind}-${card}`).value = value;
+      const bounded = Math.max(1, max), track = $(`battle-${kind}-${card}`);
+      track.setAttribute('aria-valuemax', String(bounded));
+      track.setAttribute('aria-valuenow', String(value));
+      track.style.setProperty('--fill', String(Math.max(0, Math.min(1, value / bounded))));
+      if (kind === 'hp') track.dataset.tone = hpTone(value / bounded);
       $(`battle-${kind}-text-${card}`).textContent = `${value} / ${max}`;
     }
     const tag = $(`battle-type-${card}`), type = snapshot?.types?.[fighterIndex] ?? fighter.type;
@@ -398,9 +408,8 @@ function allyCards(battle) {
     const article = document.createElement('article');
     article.className = 'battle-fighter battle-ally';
     article.id = `battle-fighter-${card}`;
-    article.innerHTML = `<h3 id="battle-name-${card}"></h3><div class="battle-avatar" id="battle-avatar-${card}"></div>
-      <label for="battle-hp-${card}">HP <span id="battle-hp-text-${card}"></span></label><meter id="battle-hp-${card}" min="0"></meter>
-      <label for="battle-mp-${card}">MP <span id="battle-mp-text-${card}"></span></label><meter id="battle-mp-${card}" min="0"></meter>`;
+    article.innerHTML = `<div class="battle-avatar" id="battle-avatar-${card}"></div>
+      <div class="battle-nameplate"><h3 id="battle-name-${card}"></h3>${bar(card, 'hp', '')}${bar(card, 'mp', '')}</div>`;
     allies.append(article);
     const name = fighterName(battle.fighters[fighterIndex]);
     $(`battle-hp-${card}`).setAttribute('aria-label', `${name} HP`);

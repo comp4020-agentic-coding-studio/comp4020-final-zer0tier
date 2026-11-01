@@ -184,15 +184,21 @@ out. Both recordings are served locally; they need no music service or extra
 runtime synthesis. The Sound controls include the artist and
 licence credit; full details appear under [Music credits and thanks](#music-credits-and-thanks).
 
-New live battles open with a 1.2-second retro transition: a chunky spiral wipe,
-a green handheld-style screen, and the two pets sliding in from opposite
-sides. This original CSS/SVG sequence takes inspiration from early Game Boy
-[battle transitions](https://github.com/pret/pokered/blob/master/engine/battle/battle_transitions.asm)
-and uses VirtuePets' own pet and monster artwork. Choose **Skip intro**, or
-press **Enter**, **Space**, or **Escape**, to go straight to battle without
-choosing a skill or forfeiting. Reduced-motion settings bypass the opening.
-It pauses while hidden or covered, and saved turn updates never restart it.
-Replays open directly so you can review their turns immediately.
+New live battles open with a 1.2-second transition inspired by the mainline
+Pokémon games: a bright screen flash, a diagonal light sweep, and the two
+pets sliding onto the field from opposite sides over a sky-to-grass backdrop.
+This original CSS sequence uses VirtuePets' own pet and monster artwork.
+Choose **Skip intro**, or press **Enter**, **Space**, or **Escape**, to go
+straight to battle without choosing a skill or forfeiting. Reduced-motion
+settings bypass the opening. It pauses while hidden or covered, and saved
+turn updates never restart it. Replays open directly so you can review
+their turns immediately.
+
+The battle screen itself echoes the same style: fighters stand on shadowed
+platforms over a sky-and-grass stage, each with a rounded nameplate showing
+its name, type, and green/yellow/red HP and blue MP bars that recolour as
+health drops. A tall-grass encounter tints the stage and adds woodland
+scenery behind the platforms.
 
 Battles also have original sound effects: each pet species has a distinct
 cartoon voice, and skills use swishes, impacts, magic, shields, or healing
