@@ -53,7 +53,7 @@ it('opens with the saved pet artwork and a focused skip control, then offers ski
     expect(p.$('battle-close').parentElement!.inert).toBe(true);
     expect([...p.$('battle-opening-fighters').querySelectorAll('use')].map(node => node.getAttribute('href'))).toEqual(['#pet-cat', '#pet-dog']);
     expect(p.$('battle-opening-fighters').textContent).toBe('ownerVSrival');
-    p.advance(1499);
+    p.advance(1199);
     expect(p.$('battle-dialog').dataset.opening).toBe('true');
     expect(p.cues).not.toHaveBeenCalled();
     p.advance(1);
@@ -90,7 +90,7 @@ it('keeps the original opening deadline and queues saved turns received during i
     const saved = takeBattleTurn(p.battle, 'owner', 'claw-strike', p.battle.revision, () => 0);
     if ('error' in saved) throw new Error(saved.error);
     p.show(saved); p.show(saved);
-    p.advance(899);
+    p.advance(599);
     expect(p.cues).not.toHaveBeenCalled();
     expect(p.$('battle-opening').hidden).toBe(false);
     p.advance(1);
@@ -131,7 +131,7 @@ it.each(['tab', 'dialog'])('pauses the opening while covered by a %s and resumes
     p.advance(10000);
     expect(p.$('battle-opening').hidden).toBe(false);
     if (cover === 'tab') p.visible(true); else other.close();
-    await flush(); p.advance(1099);
+    await flush(); p.advance(799);
     expect(p.$('battle-opening').hidden).toBe(false);
     p.advance(1);
     expect(p.$('battle-opening').hidden).toBe(true);
@@ -163,7 +163,7 @@ it.each(['battle:reset', 'battle:dismiss'])('clears the opening on %s and keeps 
     expect(p.$('battle-opening').hidden).toBe(true);
     expect(p.timers.size).toBe(0);
     expect(p.$('battle-skills').inert).toBe(false);
-    p.show(p.battle, { key: 'opening:2' }); p.advance(1499);
+    p.show(p.battle, { key: 'opening:2' }); p.advance(1199);
     expect(p.$('battle-opening').hidden).toBe(false);
     p.advance(1); expect(p.$('battle-skills').hidden).toBe(false);
   } finally { p.close(); }

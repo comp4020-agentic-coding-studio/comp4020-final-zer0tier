@@ -184,7 +184,7 @@ out. Both recordings are served locally; they need no music service or extra
 runtime synthesis. The Sound controls include the artist and
 licence credit; full details appear under [Music credits and thanks](#music-credits-and-thanks).
 
-New live battles open with a 1.5-second retro transition: a chunky spiral wipe,
+New live battles open with a 1.2-second retro transition: a chunky spiral wipe,
 a green handheld-style screen, and the two pets sliding in from opposite
 sides. This original CSS/SVG sequence takes inspiration from early Game Boy
 [battle transitions](https://github.com/pret/pokered/blob/master/engine/battle/battle_transitions.asm)
