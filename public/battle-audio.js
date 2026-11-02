@@ -192,7 +192,7 @@ function sfxPet(fighter, at, scale, pan, reaction = 'attack') {
 const sfxFamilies = {
   slash: ['claw', 'maul', 'sweep', 'riposte', 'dart', 'vine', 'review'],
   impact: ['breath', 'pie', 'bloodlust', 'titan', 'hammer', 'bump', 'heckle'],
-  fire: ['flame'], water: ['wave'], electric: ['synapse', 'crown', 'beam'],
+  fire: ['flame'], water: ['wave'], electric: ['synapse', 'crown', 'laser'],
   shield: ['hardhat', 'barrier'], heal: ['coffee', 'ovation', 'smile'],
   sparkle: ['siren', 'velvet', 'makeover', 'perfume', 'pump', 'roar'],
   arcane: ['gravity', 'mind', 'grimoire'], balance: ['jack', 'equalizer', 'golden'],

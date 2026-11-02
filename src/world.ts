@@ -48,6 +48,7 @@ export function setWorldOutfit(id: string, outfit: unknown): WorldPosition | { s
   if (typeof outfit !== 'string' || !OUTFITS.includes(outfit as WorldPosition['outfit'])) {
     return { status: 400, error: 'Choose an available outfit colour.' };
   }
+  if (!isValidId(id) || !getPet(id)) return { status: 404, error: 'No such pet.' };
   worldPosition(id);
   dress.run(outfit, id);
   return worldPosition(id);

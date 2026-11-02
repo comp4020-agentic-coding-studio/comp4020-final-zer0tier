@@ -135,13 +135,13 @@
 /* Like the mainline games: your own pet stands close to the camera, bigger
    and lower in the frame; the opponent stands further back, smaller and
    higher, for the same sense of depth without redrawing any artwork. */
-.battle-fighter-1 { align-self: start; margin-top: 6px; }
-.battle-fighter-0 { align-self: end; margin-bottom: -4px; }
+#battle-fighter-1 { align-self: start; margin-top: 6px; }
+#battle-fighter-0 { align-self: end; margin-bottom: -4px; }
 .battle-platform {
   width: 82%; max-width: 160px; height: 18px; margin: 0 auto -8px; border-radius: 50%;
   background: radial-gradient(ellipse at center, rgb(0 0 0 / 22%), transparent 72%);
 }
-.battle-fighter-1 .battle-platform { width: 68%; max-width: 120px; height: 14px; }
+#battle-fighter-1 .battle-platform { width: 68%; max-width: 120px; height: 14px; }
 .battle-fighter h3 { font-size: 1rem; text-align: center; margin: 0; overflow-wrap: anywhere; }
 /* Monster types and typed skills share one colour each, with text beside it. */
 #battle-dialog { --type-fire: #c2410c; --type-water: #0e7490; --type-grass: #3f7d3a; --type-earth: #8a5a2b; }

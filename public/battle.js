@@ -717,7 +717,7 @@ function play(next) {
     $('battle-close').focus({ preventScroll: true });
   }
   syncBattleMotion();
-  if (next.manual && !next.replay && next.battle.status === 'active' && !reducedMotion.matches) startOpening();
+  if (next.manual && !next.replay && !next.battle.turns.length && next.battle.status === 'active' && !reducedMotion.matches) startOpening();
   else if (next.manual && !next.battle.turns.length) advance();
   else scheduleAdvance(reducedMotion.matches ? 150 : 400);
 }
