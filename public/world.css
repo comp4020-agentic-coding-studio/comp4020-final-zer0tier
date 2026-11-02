@@ -365,15 +365,16 @@ body.world-playing .world-nav button.has-alerts:hover { background: var(--bg); }
 body.world-playing #world-message { margin: 0; color: var(--fg); font-size: 0.82rem; font-weight: 600; }
 body.world-playing #world-message:empty { display: none; }
 
-/* Furniture and town buildings open the existing forms when needed. */
-body.world-playing #world-dialog, body.world-playing #battle-dialog, body.world-playing #confirm-dialog, body.world-playing #team-dialog, body.world-playing #adventure-guide {
+/* Furniture and town buildings open the existing forms when needed. Battle
+   and Adventure fill the screen instead, so they keep their own chrome. */
+body.world-playing #world-dialog, body.world-playing #confirm-dialog, body.world-playing #team-dialog, body.world-playing #adventure-guide {
   color: var(--fg);
   background: var(--surface);
   border: 2px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
-body.world-playing #world-dialog::backdrop, body.world-playing #battle-dialog::backdrop, body.world-playing #confirm-dialog::backdrop, body.world-playing #team-dialog::backdrop, body.world-playing #adventure-guide::backdrop { background: rgb(28 20 16 / 58%); backdrop-filter: blur(3px); }
+body.world-playing #world-dialog::backdrop, body.world-playing #confirm-dialog::backdrop, body.world-playing #team-dialog::backdrop, body.world-playing #adventure-guide::backdrop { background: rgb(28 20 16 / 58%); backdrop-filter: blur(3px); }
 body.world-playing #world-dialog { width: min(850px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); padding: 0; overflow-y: auto; overscroll-behavior: contain; }
 body.world-playing .place-heading { position: sticky; z-index: 8; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 26px 18px; border-bottom: 1px solid var(--border); background: var(--bg-glow); }
 body.world-playing .place-heading h2 { margin: 0; font-size: 1.8rem; }
@@ -454,8 +455,6 @@ body.world-playing .world-panel .arena-tabs { grid-template-columns: repeat(2, m
 body.world-playing .world-panel .arena-tabs button { padding: 8px 6px; font-size: 0.82rem; }
 body.world-playing #world-dialog[data-place="backpack"] .item-actions .chip-buy { display: none; }
 body.world-playing #world-dialog[data-place="backpack"] .item-actions { grid-template-columns: minmax(0, 1fr); }
-body.world-playing #battle-dialog .battle-stage { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-glow); }
-body.world-playing #battle-dialog .battle-stage :is(h3, label, .battle-versus) { color: var(--fg); }
 body.world-playing #adventure-dialog { background: var(--bg); }
 body.world-playing .adventure-top { padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 body.world-playing #adventure-grid { border-color: var(--border); background: var(--bg-glow); }

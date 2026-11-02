@@ -246,41 +246,43 @@ function buildDialog() {
   dialog.innerHTML = `
     <header class="battle-heading"><div><p id="battle-mode">Turn-based battle</p><h2 id="battle-title">Claws at the ready</h2></div>
       <button type="button" id="battle-close" class="chip-btn chip-buy" aria-label="Close battle">Close</button></header>
-    <p id="battle-initiative" class="battle-initiative" hidden></p>
-    <p id="battle-strategy" class="battle-strategy" hidden></p>
-    <div class="battle-stage">
-      <div class="battle-sky" aria-hidden="true"></div>
-      <div class="battle-woodland-art" aria-hidden="true"><svg viewBox="0 0 600 220" preserveAspectRatio="xMidYMax slice">
-        <use href="/scenes/adventure-atlas.svg#tree" x="-38" y="-14" width="190" height="190"/>
-        <use href="/scenes/adventure-atlas.svg#tree" x="450" y="-18" width="200" height="200"/>
-        <use href="/scenes/adventure-atlas.svg#fern" x="230" y="140" width="90" height="90"/>
-        <use href="/scenes/adventure-atlas.svg#grass" x="8" y="160" width="100" height="70"/>
-        <use href="/scenes/adventure-atlas.svg#grass" x="500" y="160" width="100" height="70"/>
-      </svg></div>
-      <article class="battle-fighter" id="battle-fighter-0">
-        <div class="battle-platform" aria-hidden="true"></div>
-        <div class="battle-avatar" id="battle-avatar-0"></div>
-        <div class="battle-nameplate"><h3 id="battle-name-0"></h3>
-          ${bar(0, 'hp', 'Attacker HP')}${bar(0, 'mp', 'Attacker MP')}</div>
-      </article>
-      <span class="battle-versus" aria-hidden="true">VS</span>
-      <article class="battle-fighter" id="battle-fighter-1">
-        <div class="battle-platform" aria-hidden="true"></div>
-        <div class="battle-avatar" id="battle-avatar-1"></div>
-        <div class="battle-nameplate"><h3 id="battle-name-1"></h3>
-          ${bar(1, 'hp', 'Defender HP')}${bar(1, 'mp', 'Defender MP')}</div>
-      </article>
+    <div class="battle-body">
+      <p id="battle-initiative" class="battle-initiative" hidden></p>
+      <p id="battle-strategy" class="battle-strategy" hidden></p>
+      <div class="battle-stage">
+        <div class="battle-sky" aria-hidden="true"></div>
+        <div class="battle-woodland-art" aria-hidden="true"><svg viewBox="0 0 600 220" preserveAspectRatio="xMidYMax slice">
+          <use href="/scenes/adventure-atlas.svg#tree" x="-38" y="-14" width="190" height="190"/>
+          <use href="/scenes/adventure-atlas.svg#tree" x="450" y="-18" width="200" height="200"/>
+          <use href="/scenes/adventure-atlas.svg#fern" x="230" y="140" width="90" height="90"/>
+          <use href="/scenes/adventure-atlas.svg#grass" x="8" y="160" width="100" height="70"/>
+          <use href="/scenes/adventure-atlas.svg#grass" x="500" y="160" width="100" height="70"/>
+        </svg></div>
+        <article class="battle-fighter" id="battle-fighter-0">
+          <div class="battle-platform" aria-hidden="true"></div>
+          <div class="battle-avatar" id="battle-avatar-0"></div>
+          <div class="battle-nameplate"><h3 id="battle-name-0"></h3>
+            ${bar(0, 'hp', 'Attacker HP')}${bar(0, 'mp', 'Attacker MP')}</div>
+        </article>
+        <span class="battle-versus" aria-hidden="true">VS</span>
+        <article class="battle-fighter" id="battle-fighter-1">
+          <div class="battle-platform" aria-hidden="true"></div>
+          <div class="battle-avatar" id="battle-avatar-1"></div>
+          <div class="battle-nameplate"><h3 id="battle-name-1"></h3>
+            ${bar(1, 'hp', 'Defender HP')}${bar(1, 'mp', 'Defender MP')}</div>
+        </article>
+      </div>
+      <section class="battle-allies" id="battle-allies" aria-label="Teammates in this battle" hidden></section>
+      <div class="battle-ability"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 4-5 24M18 4l-5 24M27 4l-5 24"/></svg>
+        <div><strong id="battle-ability-name">Choose a skill</strong><span id="battle-ability-cost">Your pet is ready</span></div></div>
+      <div id="battle-textbox" role="status" aria-live="polite" aria-atomic="true">
+        <p id="battle-status"></p>
+        <p id="battle-intent" class="battle-intent" hidden></p>
+      </div>
+      <div id="battle-skills" class="battle-skills" role="group" aria-label="Choose your pet's skill" hidden></div>
+      <p id="battle-error" class="error" role="alert"></p>
+      <details class="battle-log"><summary>Attack log</summary><ol id="battle-log"></ol></details>
     </div>
-    <section class="battle-allies" id="battle-allies" aria-label="Teammates in this battle" hidden></section>
-    <div class="battle-ability"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 4-5 24M18 4l-5 24M27 4l-5 24"/></svg>
-      <div><strong id="battle-ability-name">Choose a skill</strong><span id="battle-ability-cost">Your pet is ready</span></div></div>
-    <div id="battle-textbox" role="status" aria-live="polite" aria-atomic="true">
-      <p id="battle-status"></p>
-      <p id="battle-intent" class="battle-intent" hidden></p>
-    </div>
-    <div id="battle-skills" class="battle-skills" role="group" aria-label="Choose your pet's skill" hidden></div>
-    <p id="battle-error" class="error" role="alert"></p>
-    <details class="battle-log"><summary>Attack log</summary><ol id="battle-log"></ol></details>
     <footer class="battle-actions"><button type="button" id="battle-sfx-toggle" class="chip-btn chip-buy" aria-pressed="true" hidden>Sound effects: On</button>
       <button type="button" id="battle-skip" class="chip-btn chip-buy">Skip to result</button>
       <button type="button" id="battle-replay" class="chip-btn chip-buy" hidden>Replay battle</button></footer>

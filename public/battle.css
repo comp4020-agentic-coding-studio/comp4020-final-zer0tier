@@ -1,14 +1,18 @@
+/* The battle fills the screen like Adventure and the world scenes: a slim
+   header, a scrollable body with the stage and controls, and a footer. */
 #battle-dialog {
-  width: min(620px, calc(100vw - 24px)); max-height: calc(100dvh - 32px);
-  overflow-y: auto; padding: 24px; border: 2px solid var(--border);
-  border-radius: 24px; background: var(--surface); color: var(--fg); box-shadow: var(--shadow);
+  width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0;
+  box-sizing: border-box; padding: 16px 20px; border: 0; border-radius: 0;
+  background: var(--surface); color: var(--fg);
 }
-#battle-dialog::backdrop { background: rgb(25 15 8 / 65%); backdrop-filter: blur(3px); }
+#battle-dialog[open] { display: flex; flex-direction: column; gap: 8px; }
+#battle-dialog::backdrop { background: var(--surface); }
+.battle-body { flex: 1; min-height: 0; overflow-y: auto; }
 /* Original sky-to-grass opening, echoing the mainline games' pre-battle
    flash and slide-in. The fixed overlay stays in the battle's modal layer;
    two gradients and a diagonal sweep need no extra canvas or assets. */
-#battle-dialog[open][data-opening="true"] { background: transparent; border-color: transparent; box-shadow: none; overflow: visible; }
-#battle-dialog[open][data-opening="true"]::backdrop { background: transparent; backdrop-filter: none; }
+#battle-dialog[open][data-opening="true"] { background: transparent; }
+#battle-dialog[open][data-opening="true"]::backdrop { background: transparent; }
 #battle-dialog[data-opening="true"] > :not(#battle-opening) { visibility: hidden; }
 #battle-opening {
   --opening-ink: #2a3b1e;
@@ -86,9 +90,12 @@
   .opening-fighter figcaption { padding: 2px 14px; font-size: .75rem; }
   .opening-ready { padding: 5px 14px; font-size: .75rem; }
 }
-.battle-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.battle-heading { flex: none; display: flex; justify-content: space-between; align-items: start; gap: 16px; }
 .battle-heading h2 { font-size: 1.5rem; }
 #battle-mode { margin: 0 0 4px; color: var(--muted); text-transform: uppercase; font-size: .7rem; letter-spacing: .13em; }
+/* The body centres a readable column so the full-screen stage and controls
+   do not stretch edge-to-edge on wide desktop windows. */
+.battle-body { width: min(720px, 100%); margin: 0 auto; }
 .battle-initiative { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 0; font-weight: 700; font-size: .9rem; overflow-wrap: anywhere; }
 .battle-initiative::before { content: ''; flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; background: var(--stamina); /* gold in both themes */ box-shadow: inset 0 0 0 3px rgb(0 0 0 / 18%); }
 /* Modern-Pokémon stage: a sky-to-grass backdrop, a diagonal platform under
@@ -96,7 +103,7 @@
 .battle-stage {
   position: relative; isolation: isolate; overflow: hidden;
   display: grid; grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr); align-items: end; gap: 12px;
-  margin: 24px 0; padding: 22px 14px 16px; border-radius: 18px;
+  margin: 24px 0; padding: 22px 14px 16px; border-radius: 18px; min-height: min(46dvh, 380px);
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 6%);
 }
 .battle-sky { position: absolute; inset: 0; z-index: -1; background: linear-gradient(#bfe3f3 0%, #d9ecd0 62%, #a9cf86 100%); }
@@ -165,7 +172,7 @@
 .battle-log { font-size: .8rem; color: var(--muted); }
 .battle-log summary { padding: 8px 0; }
 #battle-log { max-height: 120px; overflow-y: auto; padding-left: 24px; }
-.battle-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.battle-actions { flex: none; width: min(720px, 100%); margin: 8px auto 0; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 #battle-sfx-toggle { margin-right: auto; min-height: 44px; max-width: 100%; }
 #battle-sfx-toggle[aria-pressed="true"] { color: var(--primary); background: var(--bg-glow); border-color: var(--primary); }
 .battle-skills { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
@@ -306,8 +313,8 @@
 @keyframes fx-bump { from { transform: scale(.2); } 40% { transform: scale(1.1, .85); } 70% { transform: scale(.9, 1.06); } to { transform: scale(1.12); } }
 @keyframes fx-charge { from { transform: translateY(6px) scale(.65); } 55% { transform: translateY(2px) scale(1.05, .9); } to { transform: translateY(-3px) scale(1.08); } }
 @media (max-width: 480px) {
-  #battle-dialog { padding: 16px; }
-  .battle-stage { gap: 4px; padding: 16px 8px 12px; grid-template-columns: minmax(0,1fr) 24px minmax(0,1fr); }
+  #battle-dialog { padding: 10px 12px; }
+  .battle-stage { gap: 4px; padding: 16px 8px 12px; min-height: min(38dvh, 300px); grid-template-columns: minmax(0,1fr) 24px minmax(0,1fr); }
   .battle-fighter h3 { font-size: .85rem; }
   .battle-avatar { width: 90px; }
   .battle-nameplate { padding: 6px 8px 8px; }

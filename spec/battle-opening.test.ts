@@ -49,7 +49,7 @@ it('opens with the saved pet artwork and a focused skip control, then offers ski
     expect(p.$('battle-dialog').dataset.opening).toBe('true');
     expect(p.$('battle-opening').hidden).toBe(false);
     expect(p.window.document.activeElement).toBe(p.$('battle-opening-skip'));
-    expect(p.$('battle-skills').inert).toBe(true);
+    expect(p.$('battle-skills').closest<HTMLElement>('.battle-body')!.inert).toBe(true);
     expect(p.$('battle-close').parentElement!.inert).toBe(true);
     expect([...p.$('battle-opening-fighters').querySelectorAll('use')].map(node => node.getAttribute('href'))).toEqual(['#pet-cat', '#pet-dog']);
     expect(p.$('battle-opening-fighters').textContent).toBe('ownerVSrival');
@@ -59,7 +59,7 @@ it('opens with the saved pet artwork and a focused skip control, then offers ski
     p.advance(1);
     expect(p.$('battle-opening').hidden).toBe(true);
     expect(p.$('battle-opening-fighters').children).toHaveLength(0);
-    expect(p.$('battle-skills').inert).toBe(false);
+    expect(p.$('battle-skills').closest<HTMLElement>('.battle-body')!.inert).toBe(false);
     expect(p.$('battle-mode').textContent).toContain('Your move');
     expect((p.window.document.activeElement as HTMLElement).dataset.skill).toBe('claw-strike');
     expect(p.choose).not.toHaveBeenCalled(); expect(p.forfeit).not.toHaveBeenCalled();
@@ -147,7 +147,7 @@ it('bypasses the opening for reduced motion and cancels it when that preference 
       if (!reduced) { p.advance(300); p.reduced(); }
       expect(p.$('battle-opening').hidden).toBe(true);
       expect(p.$('battle-skills').hidden).toBe(false);
-      expect(p.$('battle-skills').inert).not.toBe(true);
+      expect(p.$('battle-skills').closest<HTMLElement>('.battle-body')!.inert).not.toBe(true);
       p.advance(3000);
       expect(p.cues).not.toHaveBeenCalled();
     } finally { p.close(); }
@@ -162,7 +162,7 @@ it.each(['battle:reset', 'battle:dismiss'])('clears the opening on %s and keeps 
     expect((p.$('battle-dialog') as HTMLDialogElement).open).toBe(false);
     expect(p.$('battle-opening').hidden).toBe(true);
     expect(p.timers.size).toBe(0);
-    expect(p.$('battle-skills').inert).toBe(false);
+    expect(p.$('battle-skills').closest<HTMLElement>('.battle-body')!.inert).toBe(false);
     p.show(p.battle, { key: 'opening:2' }); p.advance(1199);
     expect(p.$('battle-opening').hidden).toBe(false);
     p.advance(1); expect(p.$('battle-skills').hidden).toBe(false);

@@ -194,7 +194,8 @@ settings bypass the opening. It pauses while hidden or covered, and saved
 turn updates never restart it. Replays open directly so you can review
 their turns immediately.
 
-The battle screen itself echoes the same style: fighters stand on shadowed
+The battle screen itself echoes the same style and fills the whole screen,
+like Sweet Home, the town map, and Adventure. Fighters stand on shadowed
 platforms over a sky-and-grass stage, each with a rounded nameplate showing
 its name, type, and green/yellow/red HP and blue MP bars that recolour as
 health drops. A tall-grass encounter tints the stage and adds woodland
