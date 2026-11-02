@@ -109,11 +109,16 @@
 .battle-sky { position: absolute; inset: 0; z-index: -1; background: linear-gradient(#bfe3f3 0%, #d9ecd0 62%, #a9cf86 100%); }
 @media (prefers-color-scheme: dark) { .battle-sky { background: linear-gradient(#1c2a3a 0%, #223324 62%, #2b3f23 100%); } }
 .battle-fighter { min-width: 0; position: relative; display: flex; flex-direction: column; align-items: center; }
-.battle-fighter-1 { align-self: start; }
+/* Like the mainline games: your own pet stands close to the camera, bigger
+   and lower in the frame; the opponent stands further back, smaller and
+   higher, for the same sense of depth without redrawing any artwork. */
+.battle-fighter-1 { align-self: start; margin-top: 6px; }
+.battle-fighter-0 { align-self: end; margin-bottom: -4px; }
 .battle-platform {
   width: 82%; max-width: 160px; height: 18px; margin: 0 auto -8px; border-radius: 50%;
   background: radial-gradient(ellipse at center, rgb(0 0 0 / 22%), transparent 72%);
 }
+.battle-fighter-1 .battle-platform { width: 68%; max-width: 120px; height: 14px; }
 .battle-fighter h3 { font-size: 1rem; text-align: center; margin: 0; overflow-wrap: anywhere; }
 /* Monster types and typed skills share one colour each, with text beside it. */
 #battle-dialog { --type-fire: #c2410c; --type-water: #0e7490; --type-grass: #3f7d3a; --type-earth: #8a5a2b; }
@@ -128,6 +133,8 @@
 .battle-type[hidden] { display: none; }
 .battle-avatar { width: 116px; max-width: 100%; margin: 0 auto; position: relative; z-index: 1; }
 .battle-avatar svg { width: 100%; display: block; }
+#battle-fighter-0 .battle-avatar { width: 144px; }
+#battle-fighter-1 .battle-avatar { width: 92px; }
 .battle-monster { fill: none; stroke: var(--fg); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
 .monster-gear { fill: currentColor; stroke: var(--fg); stroke-width: 2; paint-order: stroke fill; }
 #battle-close { min-height: 44px; }
@@ -316,7 +323,8 @@
   #battle-dialog { padding: 10px 12px; }
   .battle-stage { gap: 4px; padding: 16px 8px 12px; min-height: min(38dvh, 300px); grid-template-columns: minmax(0,1fr) 24px minmax(0,1fr); }
   .battle-fighter h3 { font-size: .85rem; }
-  .battle-avatar { width: 90px; }
+  #battle-fighter-0 .battle-avatar { width: 108px; }
+  #battle-fighter-1 .battle-avatar { width: 70px; }
   .battle-nameplate { padding: 6px 8px 8px; }
 }
 @media (prefers-reduced-motion: reduce) { #battle-dialog *, #battle-dialog *::after { animation: none !important; transition: none !important; } }

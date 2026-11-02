@@ -203,7 +203,10 @@ like Sweet Home, the town map, and Adventure. Fighters stand on shadowed
 platforms over a sky-and-grass stage, each with a rounded nameplate showing
 its name, type, and green/yellow/red HP and blue MP bars that recolour as
 health drops. A tall-grass encounter tints the stage and adds woodland
-scenery behind the platforms.
+scenery behind the platforms. As in the mainline games, your own pet stands
+closer to the camera, bigger and lower in the frame, while the opponent
+stands further back, smaller and higher — the same artwork, just given a
+sense of depth.
 
 Battles also have original sound effects: each pet species has a distinct
 cartoon voice, and skills use swishes, impacts, magic, shields, or healing
