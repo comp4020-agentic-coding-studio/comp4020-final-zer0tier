@@ -208,6 +208,13 @@ closer to the camera, bigger and lower in the frame, while the opponent
 stands further back, smaller and higher — the same artwork, just given a
 sense of depth.
 
+When the battle ends, its Victory or Defeat message pops out in its own
+themed card over the dimmed stage instead of sitting inline with the log,
+with **Replay battle** (when allowed) and a **Leave** button inside it. The
+log and fighters stay visible but dimmed behind the overlay. Adventure keeps
+its own specific labels in this same spot — **Return to map** mid-run, or
+**Back to records** after reviewing a finished run's replays.
+
 Battles also have original sound effects: each pet species has a distinct
 cartoon voice, and skills use swishes, impacts, magic, shields, or healing
 chimes to match their animations. Both attacking pets and struck opponents

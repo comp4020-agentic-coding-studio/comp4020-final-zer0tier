@@ -372,7 +372,7 @@ it('keeps the newest saved state when a live battle is queued behind another bat
     expect(scene.$('battle-status').textContent).toBe('Victory! Your opponent withdrew.');
     expect(scene.$('battle-hp-text-1').textContent).toBe('0 / 22');
     expect(scene.$('battle-skills').hidden).toBe(true);
-    expect(scene.$('battle-close').textContent).toBe('Close');
+    expect(scene.$('battle-close').textContent).toBe('Leave');
   } finally { scene.close(); }
 });
 

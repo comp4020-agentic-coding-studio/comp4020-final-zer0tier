@@ -244,8 +244,8 @@ function buildDialog() {
   dialog.setAttribute('aria-labelledby', 'battle-title');
   dialog.setAttribute('aria-describedby', 'battle-mode battle-initiative');
   dialog.innerHTML = `
-    <header class="battle-heading"><div><p id="battle-mode">Turn-based battle</p><h2 id="battle-title">Claws at the ready</h2></div>
-      <button type="button" id="battle-close" class="chip-btn chip-buy" aria-label="Close battle">Close</button></header>
+    <header class="battle-heading" id="battle-heading"><div><p id="battle-mode">Turn-based battle</p><h2 id="battle-title">Claws at the ready</h2></div>
+      <button type="button" id="battle-close" class="chip-btn chip-buy" aria-label="Leave battle">Leave</button></header>
     <div class="battle-body">
       <p id="battle-initiative" class="battle-initiative" hidden></p>
       <p id="battle-strategy" class="battle-strategy" hidden></p>
@@ -283,9 +283,16 @@ function buildDialog() {
       <p id="battle-error" class="error" role="alert"></p>
       <details class="battle-log"><summary>Attack log</summary><ol id="battle-log"></ol></details>
     </div>
-    <footer class="battle-actions"><button type="button" id="battle-sfx-toggle" class="chip-btn chip-buy" aria-pressed="true" hidden>Sound effects: On</button>
+    <footer class="battle-actions" id="battle-actions"><button type="button" id="battle-sfx-toggle" class="chip-btn chip-buy" aria-pressed="true" hidden>Sound effects: On</button>
       <button type="button" id="battle-skip" class="chip-btn chip-buy">Skip to result</button>
       <button type="button" id="battle-replay" class="chip-btn chip-buy" hidden>Replay battle</button></footer>
+    <section id="battle-result" aria-label="Battle result" hidden>
+      <div class="result-card">
+        <p id="battle-result-kind" class="result-kind"></p>
+        <p id="battle-result-text"></p>
+        <div class="result-actions" id="battle-result-actions"></div>
+      </div>
+    </section>
     <section id="battle-opening" aria-label="Battle opening" hidden>
       <div class="opening-screen">
         <div class="opening-content">
@@ -506,18 +513,37 @@ function finish() {
   abilityLabel(last);
   meters(scene.resultResources?.hp ?? scene.battle.hp ?? last?.hp ?? scene.battle.initialHp,
     scene.resultResources?.mp ?? scene.battle.mp ?? last?.mp ?? scene.battle.initialMp);
-  $('battle-status').textContent = `${scene.won ?? scene.battle.winner === scene.viewer ? 'Victory!' : 'Defeat.'} ${scene.result}`;
+  const won = scene.won ?? scene.battle.winner === scene.viewer;
+  $('battle-status').textContent = `${won ? 'Victory!' : 'Defeat.'} ${scene.result}`;
   const skipped = document.activeElement === $('battle-skip');
   $('battle-skip').hidden = true;
   $('battle-skills').hidden = true;
   dialog.dataset.waiting = 'false';
   dialog.querySelectorAll('.battle-effects').forEach(label => label.remove());
   $('battle-close').disabled = false;
-  $('battle-close').textContent = scene.returnLabel || 'Close';
-  $('battle-close').setAttribute('aria-label', scene.returnLabel || 'Close battle');
+  $('battle-close').textContent = scene.returnLabel || 'Leave';
+  $('battle-close').setAttribute('aria-label', scene.returnLabel || 'Leave battle');
   $('battle-replay').hidden = scene.manual || scene.allowReplay === false;
-  if (skipped) $(scene.allowReplay === false ? 'battle-close' : 'battle-replay').focus();
   cards.forEach((_, card) => $(`battle-fighter-${card}`).classList.remove('striking', 'hit', 'taking-turn'));
+  showResult(won, skipped);
+}
+// The finished battle's outcome pops out over the scene, its Leave and
+// Replay controls moved into the overlay rather than duplicated.
+function showResult(won, focusDefault) {
+  dialog.dataset.result = won ? 'won' : 'lost';
+  $('battle-result-kind').textContent = won ? 'Victory!' : 'Defeat.';
+  $('battle-result-text').textContent = scene.result || '';
+  $('battle-result-actions').append($('battle-replay'), $('battle-close'));
+  $('battle-result').hidden = false;
+  if (focusDefault) $(scene.allowReplay === false || scene.manual ? 'battle-close' : 'battle-replay').focus();
+}
+function hideResult() {
+  delete dialog.dataset.result;
+  $('battle-result').hidden = true;
+  $('battle-result-kind').textContent = '';
+  $('battle-result-text').textContent = '';
+  $('battle-heading').append($('battle-close'));
+  $('battle-actions').prepend($('battle-replay'));
 }
 function awaitChoice() {
   cancelAdvance(); clearSkillVisuals();
@@ -638,6 +664,7 @@ function play(next) {
   scene = next;
   turn = 0;
   if (!dialog) buildDialog();
+  else hideResult();
   dialog.querySelectorAll('.battle-effects').forEach(label => label.remove());
   submitting = false;
   confirming = false;
@@ -651,8 +678,8 @@ function play(next) {
   dialog.dataset.encounter = next.encounter || '';
   dialog.dataset.manual = String(Boolean(next.manual));
   $('battle-title').textContent = next.title || 'Arena battle';
-  $('battle-close').textContent = next.returnLabel || 'Close';
-  $('battle-close').setAttribute('aria-label', next.returnLabel || 'Close battle');
+  $('battle-close').textContent = next.returnLabel || 'Leave';
+  $('battle-close').setAttribute('aria-label', next.returnLabel || 'Leave battle');
   $('battle-log').replaceChildren();
   $('battle-log').parentElement.hidden = next.manual || next.showLog === false;
   $('battle-log').parentElement.open = false;

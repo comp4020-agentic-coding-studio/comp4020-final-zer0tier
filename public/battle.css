@@ -8,6 +8,29 @@
 #battle-dialog[open] { display: flex; flex-direction: column; gap: 8px; }
 #battle-dialog::backdrop { background: var(--surface); }
 .battle-body { flex: 1; min-height: 0; overflow-y: auto; }
+/* The finished battle's outcome pops out over the dimmed stage, echoing the
+   opening transition's full-screen overlay pattern and the game's own
+   themed window frame rather than a plain inline message. */
+#battle-result {
+  position: fixed; inset: 0; z-index: 11; display: grid; place-items: center;
+  padding: 20px; background: rgb(0 0 0 / 45%); animation: result-veil 200ms both;
+}
+#battle-result[hidden] { display: none; }
+.result-card {
+  width: min(420px, 100%); padding: 24px 28px; text-align: center;
+  color: var(--fg); background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow), 0 0 0 5px var(--pet), 0 0 0 7px var(--surface);
+  animation: result-pop 280ms 40ms cubic-bezier(.34,1.56,.64,1) both;
+}
+.result-kind {
+  margin: 0 0 6px; font: 800 1.6rem/1.2 "Varela Round", "Nunito Sans", system-ui, sans-serif;
+  color: var(--primary);
+}
+#battle-dialog[data-result="lost"] .result-kind { color: var(--muted); }
+#battle-result-text { margin: 0 0 18px; }
+.result-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+@keyframes result-veil { from { opacity: 0; } to { opacity: 1; } }
+@keyframes result-pop { from { opacity: 0; transform: scale(.9) translateY(8px); } to { opacity: 1; transform: none; } }
 /* Original sky-to-grass opening, echoing the mainline games' pre-battle
    flash and slide-in. The fixed overlay stays in the battle's modal layer;
    two gradients and a diagonal sweep need no extra canvas or assets. */
