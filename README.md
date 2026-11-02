@@ -117,7 +117,11 @@ or you are typing. Keys held before sign-in or during a pause must be released
 and pressed again to start walking. Delayed movement updates play at normal
 walking speed without a catch-up sprint. Home and town work on desktop and phones. Menus, windows,
 and controls share the sign-in screen's warm orange and cream palette,
-rounded shapes, typefaces, and light or dark appearance.
+rounded shapes, typefaces, and light or dark appearance. Every window that
+pops up over a scene — the game menu, pet details, shops, the Yes/No
+confirmation, and the team-up window — stands out with a warm double-ring
+frame in the pet's orange and the sign-in screen's primary colour, so a
+prompt is never easy to miss against the scene behind it.
 
 Your character shares the town's illustrated style and turns to face the
 direction you walk, with a steady facing direction during diagonal steps.

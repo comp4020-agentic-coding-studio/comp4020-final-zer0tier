@@ -366,13 +366,15 @@ body.world-playing #world-message { margin: 0; color: var(--fg); font-size: 0.82
 body.world-playing #world-message:empty { display: none; }
 
 /* Furniture and town buildings open the existing forms when needed. Battle
-   and Adventure fill the screen instead, so they keep their own chrome. */
+   and Adventure fill the screen instead, so they keep their own chrome.
+   A warm double-ring frame (a pet-coloured outer band around the usual
+   border) makes every popped-up window read clearly over the scene. */
 body.world-playing #world-dialog, body.world-playing #confirm-dialog, body.world-playing #team-dialog, body.world-playing #adventure-guide {
   color: var(--fg);
   background: var(--surface);
   border: 2px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), 0 0 0 5px var(--pet), 0 0 0 7px var(--surface), 0 0 0 9px var(--primary);
 }
 body.world-playing #world-dialog::backdrop, body.world-playing #confirm-dialog::backdrop, body.world-playing #team-dialog::backdrop, body.world-playing #adventure-guide::backdrop { background: rgb(28 20 16 / 58%); backdrop-filter: blur(3px); }
 body.world-playing #world-dialog { width: min(850px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); padding: 0; overflow-y: auto; overscroll-behavior: contain; }
