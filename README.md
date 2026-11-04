@@ -700,6 +700,14 @@ and the built-in `node:sqlite` for storage.
   signs the browser out and picks up a new deploy. Scripts, styles, and scene
   art are reused for five minutes, then revalidated by ETag in the
   background. Music is kept for a week. API responses are unchanged by this.
+- **Saved history:** so the single `/data` volume can't fill up, older
+  history is trimmed whenever new history is saved. Each pet keeps its newest
+  50 fights with replays (the journal shows 10), and a fight stays while
+  either fighter still keeps it. Each victim keeps every unresolved theft,
+  for revenge, and its newest 20 resolved ones. Each player keeps its newest
+  20 finished Arena and revenge battles; battles still being played are never
+  trimmed. Wins and losses are totals on the pet, so trimming never changes
+  a record. Older saved history is trimmed the next time each pet fights.
 
 - **Accounts:** `POST /api/signup`, `/api/signin`, and `/api/signout`, and
   `GET /api/me`. Passwords are hashed with scrypt. A session is a random

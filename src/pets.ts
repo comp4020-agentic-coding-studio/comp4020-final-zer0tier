@@ -628,6 +628,13 @@ export const spoilsFrom = (loser: Pet): number => Math.min(SPOILS.max, Math.floo
 // defender can hit back straight away, and the bot never makes anyone wait.
 export const FIGHT_COOLDOWN_MINUTES = 60;
 
+// Saved history is trimmed as new history lands, so the one small /data volume
+// can't fill up over a term. Each limit sits well above what the game reads:
+// the journal shows a pet's 10 newest fights, the rematch wait reads the
+// newest one, and revenge reads only unresolved thefts. Wins and losses are
+// totals on the pet, so trimming never changes a record.
+export const HISTORY_KEPT = { fights: 50, resolvedThefts: 20, finishedBattles: 20 } as const;
+
 // Starting a fresh adventure (after winning, failing, or abandoning one in
 // progress) costs this outright, with no extra buffer: an adventure doesn't
 // keep running after you leave, unlike a lesson or shift.
@@ -662,6 +669,15 @@ const fightsFor = db.prepare(
 const lastAttack = db.prepare(
   "SELECT fought_at AS foughtAt FROM fights WHERE attacker = ? AND defender = ? ORDER BY id DESC LIMIT 1",
 );
+// A pet's newest few fights, by id. A fight is kept while it is among either
+// fighter's newest few, so trimming one pet never empties the other's journal.
+const newestFightIds = db.prepare(
+  "SELECT id FROM fights WHERE attacker = ?1 OR defender = ?1 ORDER BY id DESC LIMIT ?2",
+);
+const olderFights = db.prepare(
+  "SELECT id, attacker, defender FROM fights WHERE (attacker = ?1 OR defender = ?1) AND id < ?2",
+);
+const deleteFight = db.prepare("DELETE FROM fights WHERE id = ?");
 const begin = db.prepare("BEGIN IMMEDIATE");
 const commit = db.prepare("COMMIT");
 const rollback = db.prepare("ROLLBACK");
@@ -681,6 +697,22 @@ const tenths = (n: number): number => Math.round(n * 10) / 10;
 export type FightOutcome =
   | { session: BattleSession; fight?: Fight; attacker: Pet; defender: Pet }
   | { status: 400 | 404 | 409 | 429; error: string };
+
+// Trims each fighter's fights beyond its newest few, run inside the
+// transaction that saves a new fight. Each fighter has at most one more fight
+// than the limit, so this usually removes at most a row or two.
+function pruneFightsFor(...pets: string[]): void {
+  const newest = new Map<string, Set<number>>();
+  const keep = (pet: string) => newest.get(pet) ?? newest.set(pet, new Set(
+    (newestFightIds.all(pet, HISTORY_KEPT.fights) as { id: number }[]).map(row => row.id))).get(pet)!;
+  for (const pet of pets) {
+    const own = keep(pet);
+    if (own.size < HISTORY_KEPT.fights) continue;
+    for (const row of olderFights.all(pet, Math.min(...own)) as { id: number; attacker: string; defender: string }[]) {
+      if (!keep(row.attacker === pet ? row.defender : row.attacker).has(row.id)) deleteFight.run(row.id);
+    }
+  }
+}
 
 // Why the attacker can't attack this defender again yet, if it can't.
 function cooldown(attacker: Pet, defender: Pet, now: number): string | undefined {
@@ -822,6 +854,11 @@ const theftColumns = "id, thief, victim, amount, stolen_at AS stolenAt, result";
 const selectTheft = db.prepare(`SELECT ${theftColumns} FROM thefts WHERE id = ? AND victim = ?`);
 const pendingThefts = db.prepare(`SELECT ${theftColumns} FROM thefts WHERE victim = ? AND result IS NULL ORDER BY id DESC`);
 const resolveTheft = db.prepare("UPDATE thefts SET result = ?, resolved_at = ?, battle_json = ? WHERE id = ?");
+// Unresolved thefts stay for revenge; only a victim's older resolved ones go.
+const pruneThefts = db.prepare(
+  `DELETE FROM thefts WHERE victim = ?1 AND result IS NOT NULL
+     AND id NOT IN (SELECT id FROM thefts WHERE victim = ?1 AND result IS NOT NULL ORDER BY id DESC LIMIT ?2)`,
+);
 export const theftsFor = (id: string): Theft[] => pendingThefts.all(id) as unknown as Theft[];
 
 export type RevengeOutcome =
@@ -866,6 +903,14 @@ interface SessionRow {
 }
 const selectSession = db.prepare('SELECT * FROM manual_battles WHERE id = ? AND (player_a = ? OR player_b = ?)');
 const selectActiveSessions = db.prepare("SELECT * FROM manual_battles WHERE status = 'active' AND (player_a = ? OR player_b = ?)");
+// Live battles are never touched. Of a player's finished battles, the newest
+// few stay, along with the one just finished, which is read back to announce
+// its final turn. The id is random, so rowid gives the saved order.
+const pruneSessions = db.prepare(
+  `DELETE FROM manual_battles WHERE status = 'finished' AND (player_a = ?1 OR player_b = ?1) AND id != ?3
+     AND rowid NOT IN (SELECT rowid FROM manual_battles WHERE status = 'finished' AND (player_a = ?1 OR player_b = ?1)
+       ORDER BY rowid DESC LIMIT ?2)`,
+);
 function sessionFrom(row: SessionRow): BattleSession {
   return { id: row.id, kind: row.kind, attacker: row.player_a, defender: row.player_b, sourceId: row.source_id,
     battle: JSON.parse(row.state_json) as ActiveBattle, ...(row.result_json ? { result: JSON.parse(row.result_json) } : {}) };
@@ -945,6 +990,7 @@ export function actInBattle(id: string, battleId: string, action: 'turn' | 'forf
         const { lastInsertRowid } = insertFight.run(attacker.id, defender.id, winner.id,
           metadata.attackerPower, metadata.defenderPower, metadata.attackerRoll, metadata.defenderRoll, spoils, JSON.stringify(battle));
         result.fight = readFight(selectFight.get(lastInsertRowid));
+        pruneFightsFor(attacker.id, defender.id);
         record({ kind: 'fight', pet: attacker.id, other: defender.id, winner: winner.id, spoils });
       } else {
         const theft = selectTheft.get(session.sourceId, attacker.id) as unknown as Theft;
@@ -952,12 +998,16 @@ export function actInBattle(id: string, battleId: string, action: 'turn' | 'forf
         if (won) { defender.money -= reward; attacker.money += reward; attacker.strength++; attacker.intelligence++; attacker.charisma++; }
         write(attacker); write(defender);
         resolveTheft.run(won ? 'won' : 'lost', new Date().toISOString(), JSON.stringify(battle), theft.id);
+        pruneThefts.run(attacker.id, HISTORY_KEPT.resolvedThefts);
         result.theft = { ...theft, result: won ? 'won' : 'lost' }; result.won = won; result.reward = reward;
         record({ kind: 'revenge', pet: attacker.id, other: defender.id, won, amount: reward });
       }
     }
     db.prepare('UPDATE manual_battles SET status = ?, state_json = ?, result_json = ? WHERE id = ?')
       .run(battle.status, JSON.stringify(battle), battle.status === 'finished' ? JSON.stringify(result) : null, session.id);
+    if (battle.status === 'finished') {
+      for (const player of [session.attacker, session.defender]) pruneSessions.run(player, HISTORY_KEPT.finishedBattles, session.id);
+    }
     return sessionOutcome(battleSessionFor(id, session.id)!);
   });
 }
