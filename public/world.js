@@ -1069,7 +1069,10 @@ const worldObstacles = {
     [428, 300, 104, 128],
   ],
   town: [
-    [401, 421, 162, 135], [112, 237, 184, 126], [162, 51, 176, 126], [399, 71, 166, 145], [659, 291, 186, 134], [428, 287, 88, 60], [714, 97, 13, 80], [777, 97, 13, 80],
+    [401, 421, 162, 135], [162, 51, 176, 126], [399, 71, 166, 145], [659, 291, 186, 134], [428, 287, 88, 60], [714, 97, 13, 80], [777, 97, 13, 80],
+    // The shop's gabled roof steps in toward its peak, following its outline,
+    // so the open corner beside it stays walkable onto the Part-time Jobs lane.
+    [176, 240, 52, 15], [148, 255, 108, 15], [122, 270, 164, 16], [112, 286, 184, 77],
     // Garden rails are solid, with the front gate and soil left walkable.
     [150, 488, 178, 22], [150, 582, 61, 22], [270, 582, 58, 22],
   ],

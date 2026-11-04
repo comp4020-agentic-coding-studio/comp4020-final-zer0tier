@@ -989,6 +989,37 @@ it('uses the same movement and Space interaction controls at home and in town', 
   } finally { p.dom.window.close(); }
 });
 
+it('walks from the main road past the shop roof onto the Part-time Jobs lane, while the shop stays solid', () => {
+  const p = page();
+  try {
+    p.$('home-door').click();
+    expect(p.$('world-stage').dataset.scene).toBe('town');
+    const stage = p.$('world-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new p.window.DOMRect(0, 0, 960, 640));
+    const route = (x: number, y: number) => {
+      stage.dispatchEvent(new p.window.MouseEvent('click', { clientX: x, clientY: y, bubbles: true }));
+      p.advance(600);
+    };
+    // The open grass beside the shop's sloping roof joins the main road to the
+    // lane. These spots used to sit inside the shop's rectangular collision.
+    for (const [x, y] of [[300, 280], [280, 260], [260, 240]]) {
+      route(x, y);
+      expect(p.$('world-message').textContent, `${x},${y} is open`).not.toContain('occupied');
+      expect(p.position()).toEqual({ x, y });
+    }
+    // Walking north up the lane reaches the job board's door and its Space prompt.
+    for (let step = 0; step < 8; step++) p.walk('w');
+    expect(p.position().y).toBeLessThan(215);
+    expect(p.$('world-interact').textContent).toContain('Browse part-time jobs');
+    // The shop itself is still solid: its roof and walls refuse a floor route.
+    for (const [x, y] of [[200, 250], [205, 300], [130, 330]]) {
+      p.$('world-message').textContent = '';
+      route(x, y);
+      expect(p.$('world-message').textContent, `${x},${y} is inside the shop`).toContain('occupied');
+    }
+  } finally { p.dom.window.close(); }
+});
+
 it('highlights the reachable home object that Space will open and clears it outside interaction range', async () => {
   const p = page();
   try {

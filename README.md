@@ -155,6 +155,8 @@ the front door to visit town.
 The town shares home's warm illustrated style, with tiled roofs, timber
 shopfronts, leafy gardens, a stone fountain, and a riverside footbridge.
 The garden fences block movement; use the front opening or walk around the rails.
+Buildings block movement along their drawn outline, so the shop's sloping
+roof leaves the lane corner open between the main road and Part-time Jobs.
 Destinations include **Shops**, **Adventure**, **Arena**, **Part-time Jobs**, and
 **School**. Walk near a building to see its outline, then press **Space**,
 or click or tap the building to open its activities. **Sweet Home**
