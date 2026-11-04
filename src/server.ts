@@ -582,7 +582,24 @@ app.get(["/", "/index.html"], (req, res, next) => {
   next();
 });
 
-app.use(express.static("public"));
+// Browser caching for the static files. Fly's proxy already compresses
+// responses, so the app only decides how long a browser may reuse a file.
+// HTML pages stay no-store, so each visit runs the sign-out above and a
+// deploy reaches players on their next visit. Scripts, styles, and scene art
+// keep their plain names: reuse them for five minutes, then serve the cached
+// copy while checking the ETag in the background, so a deploy shows up within
+// minutes. Music is large and rarely changes, so keep it for a week.
+const STATIC_CACHE = {
+  page: "no-store",
+  assets: "public, max-age=300, stale-while-revalidate=86400",
+  audio: "public, max-age=604800",
+} as const;
+app.use(express.static("public", {
+  setHeaders(res, path) {
+    res.setHeader("Cache-Control", path.endsWith(".html") ? STATIC_CACHE.page
+      : /[/\\]audio[/\\]/.test(path) ? STATIC_CACHE.audio : STATIC_CACHE.assets);
+  },
+}));
 
 const server = createServer(app);
 attachRealtime(server);

@@ -693,6 +693,12 @@ volume).
 Node 24 running TypeScript directly, Express for HTTP, `ws` for WebSockets,
 and the built-in `node:sqlite` for storage.
 
+- **Caching:** Fly's proxy compresses responses, so the app only sets how
+  long browsers may reuse files. The game page is `no-store`, so every visit
+  signs the browser out and picks up a new deploy. Scripts, styles, and scene
+  art are reused for five minutes, then revalidated by ETag in the
+  background. Music is kept for a week. API responses are unchanged by this.
+
 - **Accounts:** `POST /api/signup`, `/api/signin`, and `/api/signout`, and
   `GET /api/me`. Passwords are hashed with scrypt. A session is a random
   token in an HttpOnly cookie, stored only as a hash.
