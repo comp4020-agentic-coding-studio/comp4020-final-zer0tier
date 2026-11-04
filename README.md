@@ -308,9 +308,10 @@ Licensed under Creative Commons: By Attribution 4.0 License
 http://creativecommons.org/licenses/by/4.0/
 ```
 
-The supplied MP3 is included unchanged as `public/audio/rainbows.mp3`; it has
-not been edited, trimmed, or re-encoded. The game loops the recording and lets
-players adjust playback volume. The music remains licensed under CC BY 4.0.
+The supplied MP3 is included as `public/audio/rainbows.mp3`, re-encoded from
+256 kbps to 128 kbps so it downloads faster; it has not been edited or
+trimmed. The game loops the recording and lets players adjust playback
+volume. The music remains licensed under CC BY 4.0.
 Asset attribution is also included in [public/audio/README.md](public/audio/README.md).
 
 Battle music comes from [Kevin MacLeod's Incompetech listing for
@@ -338,9 +339,10 @@ Licensed under Creative Commons: By Attribution 4.0 License
 http://creativecommons.org/licenses/by/4.0/
 ```
 
-The supplied faster version is included unchanged as
-`public/audio/raving-energy-faster.mp3`, with no editing, trimming, speed
-change, or re-encoding. It loops during the battle window. Each new battle
+The supplied faster version is included as
+`public/audio/raving-energy-faster.mp3`, re-encoded from 320 kbps to 128 kbps
+so it downloads faster, with no editing, trimming, or speed change. It loops
+during the battle window. Each new battle
 window starts the track from the beginning; queued battles keep it playing.
 
 ### Character outfits

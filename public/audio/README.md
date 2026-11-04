@@ -32,13 +32,22 @@ http://creativecommons.org/licenses/by/4.0/
 
 Licence: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
 
-The supplied MP3 is copied unchanged, with its metadata intact. No editing,
-trimming, or re-encoding was performed. The player loops the recording and
-adjusts playback volume. The file is MPEG Layer III, stereo, 44.1 kHz,
-256 kbps, 7,021,434 bytes. SHA-256:
+The supplied MP3 was re-encoded to a smaller file so it downloads faster on
+phones; its metadata is kept. Nothing was edited, trimmed, or otherwise
+changed. The player loops the recording and adjusts playback volume.
+
+The supplied file was MPEG Layer III, stereo, 44.1 kHz, 256 kbps, 7,021,434
+bytes, SHA-256:
 
 ```text
 71bd8b3f78187c44cc8da14783f7ebb14a6f122307e6622c3f449bdc03eae4b6
+```
+
+The game's copy was re-encoded with LAME 3.100 (`--mp3input --cbr -b 128 -q 0`)
+to MPEG Layer III, joint stereo, 44.1 kHz, 128 kbps, 3,512,665 bytes, SHA-256:
+
+```text
+e52ca27a0ac5f9c15149471f31e136053d5ee622381b62ab37ceb22883ce7ff5
 ```
 
 ## Raving Energy (faster) — Kevin MacLeod
@@ -73,13 +82,23 @@ http://creativecommons.org/licenses/by/4.0/
 
 Licence: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
 
-The supplied faster version is copied unchanged, with its metadata intact.
-No editing, trimming, speed change, or re-encoding was performed. The player
-loops the recording and adjusts playback volume. The file is MPEG Layer III,
-stereo, 44.1 kHz, 320 kbps, 9,749,860 bytes. SHA-256:
+The supplied faster version was re-encoded to a smaller file so it downloads
+faster on phones; its metadata is kept. Nothing was edited, trimmed,
+sped up, or otherwise changed. The player loops the recording and adjusts
+playback volume.
+
+The supplied file was MPEG Layer III, stereo, 44.1 kHz, 320 kbps, 9,749,860
+bytes, SHA-256:
 
 ```text
 048f03a2118b317bea2b99b31f435866a1263aa6a5d6a3a5f6bff8d084b82f76
+```
+
+The game's copy was re-encoded with LAME 3.100 (`--mp3input --cbr -b 128 -q 0`)
+to MPEG Layer III, joint stereo, 44.1 kHz, 128 kbps, 3,903,236 bytes, SHA-256:
+
+```text
+2e2f4905ef40a1e2035894a02165e111570ac8320fe8bdc94b52d96035dbd54b
 ```
 
 ## Battle sound effects — original project audio

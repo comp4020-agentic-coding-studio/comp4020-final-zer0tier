@@ -543,3 +543,20 @@ it.each(['corrupt', 'unavailable'] as const)('keeps the music controls usable wh
     expect(p.audio.volume).toBeCloseTo(0.2);
   } finally { p.close(); }
 });
+
+// Music is the largest download in the game, so keep it phone-friendly: each
+// track stays a credited 128 kbps MP3 of the full recording, well under 5 MB.
+it.each([
+  ['rainbows', 'Rainbows', 219],
+  ['raving-energy-faster', 'Raving Energy (faster)', 243],
+])('keeps %s small, complete, and credited to Kevin MacLeod', (track, title, seconds) => {
+  const bytes = readFileSync(`public/audio/${track}.mp3`);
+  expect(bytes.length).toBeLessThan(5_000_000);
+  const tags = bytes.subarray(0, 2048).toString('latin1');
+  expect(tags).toContain(title);
+  expect(tags).toContain('Kevin MacLeod');
+  // A 128 kbps constant-bitrate file of the full length (16,000 bytes a second).
+  const audio = bytes.length - ((bytes[6] << 21) | (bytes[7] << 14) | (bytes[8] << 7) | bytes[9]) - 10;
+  expect(audio / 16_000).toBeGreaterThan(seconds - 1);
+  expect(audio / 16_000).toBeLessThan(seconds + 2);
+});
