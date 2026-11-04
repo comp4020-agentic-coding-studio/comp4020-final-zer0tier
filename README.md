@@ -775,7 +775,10 @@ and the built-in `node:sqlite` for storage.
   sets off, and a `pet:touched` event, carrying the saved touch, whenever a
   visitor plays with someone else's pet. The feed keeps its newest 500
   entries in SQLite. A private `battle:updated` event sends saved
-  Arena/revenge session changes only to its participants.
+  Arena/revenge session changes only to its participants, and each fighter's
+  screen shows the turn from that event. The browser re-reads a live battle
+  only on reconnecting, after a refused move, on returning to its tab, or
+  every 10 seconds as a backstop.
   `presence:updated` lists authenticated players with open connections;
   `world:updated` carries a saved home/town position and character `outfit`. `GET /api/world`
   resyncs online players and positions. Authenticated `POST /api/world`

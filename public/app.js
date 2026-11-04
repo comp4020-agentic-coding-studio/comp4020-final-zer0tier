@@ -1027,6 +1027,16 @@ function showFightScene(fight, replay = false) {
 const liveBattles = new Map();
 let refreshingBattles = false;
 let battleRefreshTimer = null;
+// Each saved turn reaches both fighters as a battle:updated broadcast, and a
+// reconnect reloads every live battle. This slow check is only a backstop for
+// a broadcast lost without a reconnect, so it no longer runs every second.
+const BATTLE_BACKSTOP_MS = 10000;
+const battleActive = () => [...liveBattles.values()].some(saved => saved.battle.status === "active");
+// The backstop skips hidden tabs, and browsers may also drop a hidden tab's
+// connection, so catch up as soon as the player returns to an active battle.
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && current && battleActive()) loadLiveBattles();
+});
 function showLiveBattle(session) {
   if (!current || !session?.battle?.fighters.some(fighter => fighter.id === current.id)) return;
   const prior = liveBattles.get(session.id);
@@ -1034,8 +1044,8 @@ function showLiveBattle(session) {
   liveBattles.set(session.id, session);
   renderSkills();
   if (session.battle.status === "active" && battleRefreshTimer === null) {
-    battleRefreshTimer = setInterval(() => { if (!document.hidden && current) loadLiveBattles(); }, 1000);
-  } else if (![...liveBattles.values()].some(saved => saved.battle.status === "active")) {
+    battleRefreshTimer = setInterval(() => { if (!document.hidden && current) loadLiveBattles(); }, BATTLE_BACKSTOP_MS);
+  } else if (!battleActive()) {
     clearInterval(battleRefreshTimer);
     battleRefreshTimer = null;
   }
