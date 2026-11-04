@@ -269,14 +269,12 @@ function buildDialog() {
           <use href="/scenes/adventure-atlas.svg#grass" x="500" y="160" width="100" height="70"/>
         </svg></div>
         <article class="battle-fighter" id="battle-fighter-0">
-          <div class="battle-platform" aria-hidden="true"></div>
           <div class="battle-avatar" id="battle-avatar-0"></div>
           <div class="battle-nameplate"><h3 id="battle-name-0"></h3>
             ${bar(0, 'hp', 'Attacker HP')}${bar(0, 'mp', 'Attacker MP')}</div>
         </article>
         <span class="battle-versus" aria-hidden="true">VS</span>
         <article class="battle-fighter" id="battle-fighter-1">
-          <div class="battle-platform" aria-hidden="true"></div>
           <div class="battle-avatar" id="battle-avatar-1"></div>
           <div class="battle-nameplate"><h3 id="battle-name-1"></h3>
             ${bar(1, 'hp', 'Defender HP')}${bar(1, 'mp', 'Defender MP')}</div>
