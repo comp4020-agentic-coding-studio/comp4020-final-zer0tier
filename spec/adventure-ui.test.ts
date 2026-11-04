@@ -25,8 +25,11 @@ function map(floor = 1) {
   };
 }
 
-function page({ automaticEntry = true } = {}) {
-  const dom = new JSDOM(readFileSync('public/index.html', 'utf8'), { url: baseUrl, runScripts: 'outside-only', pretendToBeVisual: true });
+// Most tests count every request, so their page stays hidden (jsdom's default)
+// and the Adventure's visible-only map refresh never interleaves. Tests of the
+// shared countdown clock, which also rests while hidden, ask for a visible page.
+function page({ automaticEntry = true, visible = false } = {}) {
+  const dom = new JSDOM(readFileSync('public/index.html', 'utf8'), { url: baseUrl, runScripts: 'outside-only', pretendToBeVisual: visible });
   const { window } = dom;
   window.matchMedia = (() => ({ matches: true })) as unknown as typeof window.matchMedia;
   window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
@@ -616,7 +619,7 @@ it('keeps active cooldown progress in the menu, follows its saved deadline, and 
 });
 
 it('counts down the final cooldown seconds and unlocks a new run without replacing map tiles or moving keyboard focus', async () => {
-  const { dom, window, $ } = page();
+  const { dom, window, $ } = page({ visible: true });
   let now = 1_800_000_000_000;
   const clock = vi.spyOn(window.Date, 'now').mockImplementation(() => now);
   let tick: () => void = () => { throw new Error('The cooldown clock was not registered.'); };
