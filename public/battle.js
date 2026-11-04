@@ -261,13 +261,8 @@ function buildDialog() {
       <p id="battle-strategy" class="battle-strategy" hidden></p>
       <div class="battle-stage">
         <div class="battle-sky" aria-hidden="true"></div>
-        <div class="battle-woodland-art" aria-hidden="true"><svg viewBox="0 0 600 220" preserveAspectRatio="xMidYMax slice">
-          <use href="/scenes/adventure-atlas.svg#tree" x="-38" y="-14" width="190" height="190"/>
-          <use href="/scenes/adventure-atlas.svg#tree" x="450" y="-18" width="200" height="200"/>
-          <use href="/scenes/adventure-atlas.svg#fern" x="230" y="140" width="90" height="90"/>
-          <use href="/scenes/adventure-atlas.svg#grass" x="8" y="160" width="100" height="70"/>
-          <use href="/scenes/adventure-atlas.svg#grass" x="500" y="160" width="100" height="70"/>
-        </svg></div>
+        <div class="battle-backdrop" aria-hidden="true"><svg id="battle-backdrop-art" preserveAspectRatio="xMidYMax slice">
+          <use href="/scenes/battle-backdrops.svg#arena" width="100%" height="100%"/></svg></div>
         <article class="battle-fighter" id="battle-fighter-0">
           <div class="battle-avatar" id="battle-avatar-0"></div>
           <div class="battle-nameplate"><h3 id="battle-name-0"></h3>
@@ -685,6 +680,11 @@ function play(next) {
   $('battle-strategy').textContent = enemy ? `${fighterName(enemy)}: ${enemy.strategy}` : '';
   $('battle-strategy').hidden = !enemy;
   dialog.dataset.encounter = next.encounter || '';
+  // The stage matches where the fight happens: monsters live in the woodland,
+  // and pet-against-pet fights (Arena, revenge, the training bot) use the arena.
+  dialog.dataset.backdrop = next.encounter === 'grass' || next.encounter === 'woodland'
+    || next.battle.fighters.some(fighter => fighter.monster) ? 'woodland' : 'arena';
+  $('battle-backdrop-art').firstElementChild.setAttribute('href', `/scenes/battle-backdrops.svg#${dialog.dataset.backdrop}`);
   dialog.dataset.manual = String(Boolean(next.manual));
   $('battle-title').textContent = next.title || 'Arena battle';
   $('battle-close').textContent = next.returnLabel || 'Leave';

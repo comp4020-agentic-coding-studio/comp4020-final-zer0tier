@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { coinEffect, forfeitBattle, simulateBattle, startBattle, takeBattleTurn, type ActiveBattle } from '../src/combat.ts';
+import { baseUrl } from './helpers.ts';
 
 it.each(['hedgehog', 'lizard', 'panda'])('keeps the saved %s model and coat color in battle playback', (appearance) => {
   const dom = new JSDOM(readFileSync('public/index.html', 'utf8'), { runScripts: 'outside-only' });
@@ -144,7 +145,7 @@ function manualScene() {
   window.clearTimeout = (id: number | undefined) => { if (id !== undefined) timers.delete(id); };
   window.eval(readFileSync('public/battle.js', 'utf8'));
   const $ = (id: string) => window.document.getElementById(id)!;
-  const show = (battle: ActiveBattle, extra: Record<string, unknown> = {}) => window.document.dispatchEvent(new window.CustomEvent('battle:show', {
+  const show = (battle: ActiveBattle | ReturnType<typeof simulateBattle>, extra: Record<string, unknown> = {}) => window.document.dispatchEvent(new window.CustomEvent('battle:show', {
     detail: { key: 'manual:test', battle, viewer: 'pet', manual: true, result: '', ...extra },
   }));
   function flush() {
@@ -472,4 +473,37 @@ it.each([false, true])('removes a dismissed queued battle and preserves other qu
     if (hasNext) expect(scene.$('battle-title').textContent).toBe('Next arena battle');
     expect(scene.timers.size).toBe(0);
   } finally { scene.close(); }
+});
+
+it('stages pet-against-pet fights in the arena and monster fights in the Adventure woodland', async () => {
+  const scene = manualScene();
+  const backdrop = () => ({
+    kind: scene.$('battle-dialog').dataset.backdrop,
+    href: scene.$('battle-backdrop-art').querySelector('use')!.getAttribute('href'),
+  });
+  try {
+    // Arena and revenge sessions are pets on both sides.
+    scene.show(manualBattle(), { key: 'session:arena', title: 'Arena battle' });
+    expect(backdrop()).toEqual({ kind: 'arena', href: '/scenes/battle-backdrops.svg#arena' });
+    expect(scene.$('battle-backdrop-art').closest('[aria-hidden="true"]')).not.toBeNull();
+    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:reset'));
+    // A saved Arena replay uses the same arena.
+    const replay = simulateBattle({ id: 'pet', strength: 5, intelligence: 5, charisma: 5 }, { id: 'rival', strength: 5, intelligence: 5, charisma: 5 }, [24, 16]);
+    scene.show(replay, { key: 'fight:replay', manual: false, replay: true });
+    expect(backdrop().kind).toBe('arena');
+    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:reset'));
+    // Any battle with a monster is in the woodland, tagged or not.
+    const monster = { id: 'monster:slime', name: 'Slime', monster: 'slime' as const, strength: 4, intelligence: 4, charisma: 4 };
+    const wild = startBattle([manualPet], monster, [36, 12], { random: () => 0 });
+    scene.show(wild, { key: 'adventure:wild', encounter: 'grass' });
+    expect(backdrop()).toEqual({ kind: 'woodland', href: '/scenes/battle-backdrops.svg#woodland' });
+    scene.window.document.dispatchEvent(new scene.window.CustomEvent('battle:reset'));
+    scene.show(wild, { key: 'adventure:untagged' });
+    expect(backdrop().kind).toBe('woodland');
+  } finally { scene.close(); }
+  const art = readFileSync('public/scenes/battle-backdrops.svg', 'utf8');
+  for (const id of ['arena', 'woodland']) expect(art).toContain(`<symbol id="${id}"`);
+  const response = await fetch(`${baseUrl}/scenes/battle-backdrops.svg`);
+  expect(response.status).toBe(200);
+  expect(response.headers.get('content-type')).toContain('image/svg+xml');
 });

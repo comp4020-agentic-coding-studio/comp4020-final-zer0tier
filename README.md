@@ -200,6 +200,13 @@ settings bypass the opening. It pauses while hidden or covered, and saved
 turn updates never restart it. Replays open directly so you can review
 their turns immediately.
 
+The battle stage matches where the fight happens. Arena fights, revenge, and
+the training bot take place in the town's sandstone arena, with a cheering
+crowd, terracotta and sage pennants, and a raked sand floor. Any fight with a
+monster takes place in a sunlit woodland clearing that matches the Adventure.
+Both backdrops dim to an evening light in dark mode. They come from one local
+file, `public/scenes/battle-backdrops.svg`.
+
 The battle screen itself echoes the same style and fills the whole screen,
 like Sweet Home, the town map, and Adventure. Fighters stand on shadowed
 platforms over a sky-and-grass stage, each with a rounded nameplate showing

@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <title>VirtuePets battle backdrops</title>
+  <desc>Original illustrated battle stages: the town's sandstone arena, and a sunlit woodland clearing that matches the Adventure.</desc>
+  <defs>
+    <!-- Arena: the town arena's sandstone and sage palette. -->
+    <linearGradient id="bb-arena-sky" x2="0" y2="1">
+      <stop stop-color="#bfe0ee"/><stop offset=".6" stop-color="#e3eedb"/><stop offset="1" stop-color="#f3ead0"/>
+    </linearGradient>
+    <linearGradient id="bb-stone" x2=".15" y2="1">
+      <stop stop-color="#eee2bd"/><stop offset=".55" stop-color="#cdbb98"/><stop offset="1" stop-color="#a18d6d"/>
+    </linearGradient>
+    <linearGradient id="bb-stand" x2="0" y2="1">
+      <stop stop-color="#d9c8a1"/><stop offset="1" stop-color="#b7a37f"/>
+    </linearGradient>
+    <linearGradient id="bb-sand" x2="0" y2="1">
+      <stop stop-color="#e6d6a6"/><stop offset=".5" stop-color="#dcc791"/><stop offset="1" stop-color="#cdb57c"/>
+    </linearGradient>
+    <linearGradient id="bb-gate" x2="0" y2="1">
+      <stop stop-color="#596449"/><stop offset="1" stop-color="#6f7c5c"/>
+    </linearGradient>
+    <pattern id="bb-brick" width="32" height="18" patternUnits="userSpaceOnUse">
+      <path d="M0 9h32M16 0v9M0 9v9M32 9v9" fill="none" stroke="#8d7b60" stroke-width=".8" opacity=".38"/>
+      <path d="M1 10h30M17 1h14" fill="none" stroke="#f3e5c3" stroke-width=".8" opacity=".55"/>
+    </pattern>
+    <!-- Woodland: the Adventure atlas greens, a glade lit from above. -->
+    <radialGradient id="bb-glade" cx=".5" cy="0" r="1.05">
+      <stop stop-color="#f3edbf"/><stop offset=".42" stop-color="#cbd6a0"/><stop offset="1" stop-color="#8fa873"/>
+    </radialGradient>
+    <linearGradient id="bb-canopy" x2="0" y2="1">
+      <stop stop-color="#6f8f5c"/><stop offset="1" stop-color="#55764f"/>
+    </linearGradient>
+    <linearGradient id="bb-canopy-far" x2="0" y2="1">
+      <stop stop-color="#a3b98a"/><stop offset="1" stop-color="#8aa476"/>
+    </linearGradient>
+    <linearGradient id="bb-meadow" x2="0" y2="1">
+      <stop stop-color="#b9cb8a"/><stop offset=".55" stop-color="#9fb874"/><stop offset="1" stop-color="#86a263"/>
+    </linearGradient>
+    <linearGradient id="bb-trail" x2="0" y2="1">
+      <stop stop-color="#eddeb5"/><stop offset="1" stop-color="#d9c493"/>
+    </linearGradient>
+    <linearGradient id="bb-bark" x2="1">
+      <stop stop-color="#8d6949"/><stop offset=".45" stop-color="#b78c5c"/><stop offset="1" stop-color="#71533b"/>
+    </linearGradient>
+    <linearGradient id="bb-sunbeam" x2="0" y2="1">
+      <stop stop-color="#fff6cf" stop-opacity=".55"/><stop offset="1" stop-color="#fff6cf" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Drawn in a 600 × 300 frame. The fighters stand on the lower third, so
+       detail stays at the edges and the middle stays calm behind them. -->
+  <symbol id="arena" viewBox="0 0 600 300" preserveAspectRatio="xMidYMax slice">
+    <rect width="600" height="300" fill="url(#bb-arena-sky)"/>
+    <!-- Soft clouds over the far rim. -->
+    <g fill="#fff" opacity=".75">
+      <path d="M58 46q4-14 20-11 8-12 24-4 16-2 16 12 12 3 6 12H52q-8-6 6-9Z"/>
+      <path d="M452 30q5-12 19-9 9-10 22-2 14 0 13 11 10 4 4 10h-62q-6-5 4-10Z"/>
+    </g>
+    <!-- Far wall of the bowl with its tiered stands. -->
+    <path d="M-10 150Q300 60 610 150V196H-10Z" fill="url(#bb-stone)" stroke="#8d7d5c" stroke-width="1.6"/>
+    <path d="M-10 150Q300 60 610 150V196H-10Z" fill="url(#bb-brick)"/>
+    <path d="M-10 148Q300 58 610 148" fill="none" stroke="#f4e9c9" stroke-width="3"/>
+    <g fill="none" stroke-linecap="round">
+      <path d="M-10 166Q300 88 610 166" stroke="#a89474" stroke-width="2"/>
+      <path d="M-10 168Q300 90 610 168" stroke="#efe3c1" stroke-width="1"/>
+      <path d="M-10 182Q300 110 610 182" stroke="#a89474" stroke-width="2"/>
+      <path d="M-10 184Q300 112 610 184" stroke="#efe3c1" stroke-width="1"/>
+    </g>
+    <!-- A cheering crowd: little rounded heads in the town's soft colours. -->
+    <g stroke="#7c6a4c" stroke-width=".8">
+      <circle cx="24" cy="146" r="5" fill="#e48d64"/> <circle cx="46" cy="141" r="5" fill="#8ccbe2"/> <circle cx="68" cy="136" r="5" fill="#f2c35f"/> <circle cx="90" cy="132" r="5" fill="#e6a0c9"/> <circle cx="112" cy="129" r="5" fill="#86ab62"/> <circle cx="134" cy="125" r="5" fill="#e48d64"/> <circle cx="156" cy="123" r="5" fill="#8ccbe2"/> <circle cx="178" cy="120" r="5" fill="#f2c35f"/>
+      <circle cx="200" cy="118" r="5" fill="#e6a0c9"/> <circle cx="222" cy="117" r="5" fill="#86ab62"/> <circle cx="244" cy="115" r="5" fill="#e48d64"/> <circle cx="354" cy="115" r="5" fill="#8ccbe2"/> <circle cx="376" cy="116" r="5" fill="#f2c35f"/> <circle cx="398" cy="118" r="5" fill="#e6a0c9"/> <circle cx="420" cy="120" r="5" fill="#86ab62"/> <circle cx="442" cy="122" r="5" fill="#e48d64"/>
+      <circle cx="464" cy="125" r="5" fill="#8ccbe2"/> <circle cx="486" cy="128" r="5" fill="#f2c35f"/> <circle cx="508" cy="132" r="5" fill="#e6a0c9"/> <circle cx="530" cy="136" r="5" fill="#86ab62"/> <circle cx="552" cy="140" r="5" fill="#e48d64"/> <circle cx="574" cy="145" r="5" fill="#8ccbe2"/> <circle cx="35" cy="160" r="5" fill="#f2c35f"/> <circle cx="57" cy="156" r="5" fill="#e6a0c9"/>
+      <circle cx="79" cy="152" r="5" fill="#86ab62"/> <circle cx="101" cy="148" r="5" fill="#e48d64"/> <circle cx="123" cy="145" r="5" fill="#8ccbe2"/> <circle cx="145" cy="142" r="5" fill="#f2c35f"/> <circle cx="167" cy="140" r="5" fill="#e6a0c9"/> <circle cx="189" cy="138" r="5" fill="#86ab62"/> <circle cx="211" cy="136" r="5" fill="#e48d64"/> <circle cx="233" cy="135" r="5" fill="#8ccbe2"/>
+      <circle cx="365" cy="135" r="5" fill="#f2c35f"/> <circle cx="387" cy="136" r="5" fill="#e6a0c9"/> <circle cx="409" cy="138" r="5" fill="#86ab62"/> <circle cx="431" cy="140" r="5" fill="#e48d64"/> <circle cx="453" cy="142" r="5" fill="#8ccbe2"/> <circle cx="475" cy="145" r="5" fill="#f2c35f"/> <circle cx="497" cy="148" r="5" fill="#e6a0c9"/> <circle cx="519" cy="151" r="5" fill="#86ab62"/>
+      <circle cx="541" cy="155" r="5" fill="#e48d64"/> <circle cx="563" cy="160" r="5" fill="#8ccbe2"/> <circle cx="585" cy="164" r="5" fill="#f2c35f"/>
+    </g>
+    <!-- The arched gate, centred behind the fighters. -->
+    <path d="M268 196v-38q0-32 32-32t32 32v38Z" fill="url(#bb-gate)" stroke="#9d8a65" stroke-width="8"/>
+    <path d="M271 196v-37q0-29 29-29t29 29v37" fill="none" stroke="#e8d6aa" stroke-width="4"/>
+    <path d="M284 196v-36m16-12v48m16-36v36" stroke="#4d5942" stroke-width="3"/>
+    <path d="M262 196h76v6h-76Z" fill="#e1d0a8" stroke="#a89474" stroke-width="1"/>
+    <!-- Pennant poles at the ends of the wall: terracotta and sage, as on the town arena. -->
+    <g stroke-linejoin="round">
+      <path d="M30 150V84m540 66V84" stroke="#795f40" stroke-width="3"/>
+      <path d="M32 86q18-8 36 0v28q-18-9-36 0Z" fill="#bd7b58" stroke="#8a5a3c" stroke-width="1.2"/>
+      <path d="M568 86q-18-8-36 0v28q18-9 36 0Z" fill="#7c9a80" stroke="#55705a" stroke-width="1.2"/>
+      <path d="m50 94 5 6-5 8-5-8Zm500 0 5 6-5 8-5-8Z" fill="#f2d7a0"/>
+      <circle cx="30" cy="82" r="3" fill="#d9bb78"/><circle cx="570" cy="82" r="3" fill="#d9bb78"/>
+    </g>
+    <!-- A low parapet ringing the sand. -->
+    <path d="M-10 196H610V214H-10Z" fill="url(#bb-stone)" stroke="#8d7d5c" stroke-width="1.4"/>
+    <path d="M-10 196H610V214H-10Z" fill="url(#bb-brick)"/>
+    <path d="M-10 198H610" stroke="#f4e9c9" stroke-width="1.6"/>
+    <!-- The sand floor, raked in gentle arcs. -->
+    <path d="M-10 214H610V310H-10Z" fill="url(#bb-sand)"/>
+    <g fill="none" stroke="#c4ab72" stroke-width="1.4" stroke-linecap="round" opacity=".55">
+      <path d="M40 240q260-22 520 0"/><path d="M10 266q290-26 580 0"/><path d="M-10 292q310-28 620 0"/>
+    </g>
+    <g fill="none" stroke="#f3e6bf" stroke-width="1" stroke-linecap="round" opacity=".7">
+      <path d="M40 242q260-22 520 0"/><path d="M10 268q290-26 580 0"/>
+    </g>
+    <!-- The duelling circle where both fighters stand. -->
+    <ellipse cx="300" cy="262" rx="250" ry="34" fill="none" stroke="#f6ecd0" stroke-width="3" opacity=".75"/>
+    <ellipse cx="300" cy="262" rx="250" ry="34" fill="none" stroke="#b39a64" stroke-width="1" opacity=".5" stroke-dasharray="10 8"/>
+    <g fill="#b9a06c" opacity=".45"><circle cx="70" cy="282" r="2"/><circle cx="520" cy="230" r="1.6"/><circle cx="560" cy="276" r="2.2"/><circle cx="30" cy="232" r="1.5"/></g>
+  </symbol>
+
+  <symbol id="woodland" viewBox="0 0 600 300" preserveAspectRatio="xMidYMax slice">
+    <rect width="600" height="300" fill="url(#bb-glade)"/>
+    <!-- Far treeline, pale with distance. -->
+    <path d="M-10 160c20-30 44-34 60-18 12-30 44-36 62-12 16-24 48-26 62-4 14-20 42-22 58 0 16-26 52-28 68-4 14-22 44-22 58 0 16-24 48-24 62 0 14-22 46-26 64-2 14-18 40-18 52 4 14-20 40-22 52 2 12-16 30-16 40 4V200H-10Z" fill="url(#bb-canopy-far)"/>
+    <!-- Sunbeams through the canopy. -->
+    <g fill="url(#bb-sunbeam)">
+      <path d="M210 0h34L300 230h-34Z"/><path d="M300 0h22L372 230h-26Z"/><path d="M366 0h16L414 200h-18Z"/>
+    </g>
+    <!-- Meadow floor with a winding trail between the fighters. -->
+    <path d="M-10 186Q160 172 300 180T610 184V310H-10Z" fill="url(#bb-meadow)"/>
+    <path d="M270 182q-12 28 22 44 50 24 30 84h70q18-58-34-84-36-18-26-44Z" fill="url(#bb-trail)" stroke="#c9b17c" stroke-width="1"/>
+    <path d="M280 186q-6 24 22 38 48 24 34 86" fill="none" stroke="#fff3d2" stroke-width="2" opacity=".55"/>
+    <!-- Big framing trees at each edge. -->
+    <g stroke-linejoin="round">
+      <path d="M44 300q10-70 2-150l26-2q-4 92 12 152Z" fill="url(#bb-bark)" stroke="#6b533b" stroke-width="1.6"/>
+      <path d="M58 290v-120m4 60-14-16m16 6 14-16" fill="none" stroke="#d7b47d" stroke-width="2" opacity=".6" stroke-linecap="round"/>
+      <path d="M-40 150C-56 110-30 80 0 86 6 44 50 30 80 52c26-26 72-14 78 22 30 6 38 44 14 62-6 32-48 40-70 22-22 22-62 18-76-6-30 12-66-12-66-46Z" fill="url(#bb-canopy)" stroke="#4e714b" stroke-width="1.6"/>
+      <path d="M-10 108c-6-22 18-34 36-28 6-24 44-32 60-6 26-12 52 10 42 34-14 14-40 14-56 6-22 18-52 14-62 0-8 4-14 2-20-6Z" fill="#8caa6e" opacity=".9"/>
+      <path d="M548 300q-12-72-2-150l-26-2q4 92-14 152Z" fill="url(#bb-bark)" stroke="#6b533b" stroke-width="1.6"/>
+      <path d="M534 290v-120m-4 60 14-16m-16 6-14-16" fill="none" stroke="#d7b47d" stroke-width="2" opacity=".6" stroke-linecap="round"/>
+      <path d="M640 150C656 110 630 80 600 86 594 44 550 30 520 52c-26-26-72-14-78 22-30 6-38 44-14 62 6 32 48 40 70 22 22 22 62 18 76-6 30 12 66-12 66-46Z" fill="url(#bb-canopy)" stroke="#4e714b" stroke-width="1.6"/>
+      <path d="M610 108c6-22-18-34-36-28-6-24-44-32-60-6-26-12-52 10-42 34 14 14 40 14 56 6 22 18 52 14 62 0 8 4 14 2 20-6Z" fill="#8caa6e" opacity=".9"/>
+    </g>
+    <!-- Leaf highlights. -->
+    <g fill="none" stroke="#d0dca1" stroke-width="2.4" stroke-linecap="round" opacity=".6">
+      <path d="M8 78q8-8 20-4m40-10q14-4 22 6m-66 44q-2 10 8 14"/><path d="M592 78q-8-8-20-4m-40-10q-14-4-22 6m66 44q2 10-8 14"/>
+    </g>
+    <!-- Ferns, flowers, and tall grass along the edges, clear of the middle. -->
+    <g stroke="#52764e" stroke-width="1.2" stroke-linejoin="round">
+      <path d="M100 300c-4-24 6-44 22-56-6 22-6 38 0 56Zm14 0c2-22 16-38 34-44-12 18-16 30-14 44Zm-26 0c-6-18-2-34 8-44 0 16 2 28 6 44Z" fill="#7e9c5d"/>
+      <path d="M500 300c4-24-6-44-22-56 6 22 6 38 0 56Zm-14 0c-2-22-16-38-34-44 12 18 16 30 14 44Zm26 0c6-18 2-34-8-44 0 16-2 28-6 44Z" fill="#7e9c5d"/>
+      <path d="M150 286c-6-14 0-26 10-32-2 12 0 22 4 32Zm300 0c6-14 0-26-10-32 2 12 0 22-4 32Z" fill="#9db678"/>
+    </g>
+    <g stroke="#8a6a48" stroke-width=".8">
+      <circle cx="168" cy="250" r="4" fill="#f3b7d4"/><circle cx="178" cy="258" r="3.4" fill="#fff3d2"/><circle cx="160" cy="262" r="3" fill="#f2c35f"/>
+      <circle cx="432" cy="250" r="4" fill="#fff3d2"/><circle cx="442" cy="260" r="3.4" fill="#f3b7d4"/><circle cx="424" cy="262" r="3" fill="#8ccbe2"/>
+    </g>
+    <g fill="#f8e7a8" opacity=".85"><circle cx="210" cy="120" r="1.6"/><circle cx="388" cy="96" r="1.4"/><circle cx="246" cy="76" r="1.2"/><circle cx="352" cy="140" r="1.6"/></g>
+    <g fill="#c8b98a" stroke="#8e7f5e" stroke-width="1"><ellipse cx="226" cy="292" rx="14" ry="6"/><ellipse cx="420" cy="294" rx="10" ry="5"/></g>
+  </symbol>
+</svg>
