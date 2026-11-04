@@ -9,7 +9,7 @@ async function page() {
   const opponent = { ...pet, id: "neighbour", money: 75, appearance: "cat", color: "#123456" };
   const poor = { ...opponent, id: "poor", money: 9 };
   const bot = { ...opponent, id: rules.botId };
-  const dom = new JSDOM(readFileSync("public/index.html", "utf8"), { url: baseUrl, runScripts: "outside-only" });
+  const dom = new JSDOM(readFileSync("public/index.html", "utf8"), { url: baseUrl, runScripts: "outside-only", pretendToBeVisual: true });
   const { window } = dom;
   const socket = new window.EventTarget();
   window.WebSocket = function () { return socket; } as unknown as typeof window.WebSocket;

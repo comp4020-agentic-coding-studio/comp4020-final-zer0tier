@@ -1,3 +1,18 @@
+// One shared once-a-second clock for on-screen countdowns. app.js and
+// adventure.js each carry this helper, so either works alone; whichever loads
+// first starts the single timer, and the other joins it. It rests while the
+// tab is hidden and catches up as soon as the player returns, since every
+// countdown is recalculated from the clock rather than counted down.
+const everySecond = (render) => {
+  const clock = globalThis.virtuePetsClock ??= (() => {
+    const subscribers = new Set();
+    const tick = () => { for (const render of subscribers) render(); };
+    setInterval(() => { if (!document.hidden) tick(); }, 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+    return subscribers;
+  })();
+  clock.add(render);
+};
 const adventure = document.createElement('dialog');
 adventure.id = 'adventure-dialog';
 adventure.setAttribute('aria-labelledby', 'adventure-title');
@@ -335,7 +350,7 @@ function renderCooldown() {
   adventure.querySelector('#adventure-close').textContent = ended ? 'Return to town' : 'End adventure';
   syncControls();
 }
-setInterval(() => { if (adventure.open) renderCooldown(); }, 1000);
+everySecond(() => { if (adventure.open) renderCooldown(); });
 
 function renderMap() {
   if (!state) return;

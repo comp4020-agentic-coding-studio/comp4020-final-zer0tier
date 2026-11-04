@@ -44,7 +44,7 @@ it("shows the free supplies button, posts once, and renders only what the broadc
   const id = freshId();
   const pet = await (await signUp(id)).json();
   const rules = await getRules();
-  const dom = new JSDOM(readFileSync("public/index.html", "utf8"), { url: baseUrl, runScripts: "outside-only" });
+  const dom = new JSDOM(readFileSync("public/index.html", "utf8"), { url: baseUrl, runScripts: "outside-only", pretendToBeVisual: true });
   const { window } = dom;
   const $ = (name: string) => window.document.getElementById(name)!;
   const sockets: EventTarget[] = [];

@@ -26,7 +26,7 @@ function map(floor = 1) {
 }
 
 function page({ automaticEntry = true } = {}) {
-  const dom = new JSDOM(readFileSync('public/index.html', 'utf8'), { url: baseUrl, runScripts: 'outside-only' });
+  const dom = new JSDOM(readFileSync('public/index.html', 'utf8'), { url: baseUrl, runScripts: 'outside-only', pretendToBeVisual: true });
   const { window } = dom;
   window.matchMedia = (() => ({ matches: true })) as unknown as typeof window.matchMedia;
   window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };

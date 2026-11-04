@@ -700,6 +700,10 @@ and the built-in `node:sqlite` for storage.
   signs the browser out and picks up a new deploy. Scripts, styles, and scene
   art are reused for five minutes, then revalidated by ETag in the
   background. Music is kept for a week. API responses are unchanged by this.
+- **Countdowns:** activity, supplies, theft protection, and Adventure cooldown
+  timers share one once-a-second clock. It rests while the tab is hidden and
+  catches up the moment the player returns, so a background tab doesn't wake
+  the phone every second.
 - **Saved history:** so the single `/data` volume can't fill up, older
   history is trimmed whenever new history is saved. Each pet keeps its newest
   50 fights with replays (the journal shows 10), and a fight stays while

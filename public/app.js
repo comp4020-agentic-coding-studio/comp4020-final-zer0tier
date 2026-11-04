@@ -1,4 +1,19 @@
 const $ = (id) => document.getElementById(id);
+// One shared once-a-second clock for on-screen countdowns. app.js and
+// adventure.js each carry this helper, so either works alone; whichever loads
+// first starts the single timer, and the other joins it. It rests while the
+// tab is hidden and catches up as soon as the player returns, since every
+// countdown is recalculated from the clock rather than counted down.
+const everySecond = (render) => {
+  const clock = globalThis.virtuePetsClock ??= (() => {
+    const subscribers = new Set();
+    const tick = () => { for (const render of subscribers) render(); };
+    setInterval(() => { if (!document.hidden) tick(); }, 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+    return subscribers;
+  })();
+  clock.add(render);
+};
 let current = null; // the pet this window is showing
 let broadcasts = 0; // pet:updated events rendered; a resync older than one is stale
 let rules = null; // schools, courses, items and costs, as the server publishes them
@@ -533,11 +548,11 @@ function renderSupplies(pet) {
 }
 
 // The clock ticks locally; the finish itself arrives as a broadcast.
-setInterval(() => {
+everySecond(() => {
   if (rules && current?.busyUntil) renderBusyClock(current);
   if (rules && current?.suppliesAvailableAt) renderSupplies(current);
   if (rules && current && visiting) renderStealControls();
-}, 1000);
+});
 
 function renderControls(pet) {
   $("appearance-save").disabled = busy.has($("appearance-save"));
