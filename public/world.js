@@ -331,7 +331,10 @@ worldShell.innerHTML = `
           </svg>
         </div>
       </div>
-      <p id="home-controls-tip"><span><kbd>W/A/S/D</kbd> move</span><span><kbd>Space bar</kbd> interact</span></p>
+      <p id="home-controls-tip"><span><kbd>W/A/S/D</kbd> move</span><span><kbd>Space bar</kbd> interact</span><span><kbd>1–4</kbd> emote</span></p>
+      <div id="world-emotes" class="world-emotes" role="group" aria-label="Show an emote to everyone here">
+        <button type="button" data-emote="wave" aria-label="Wave (1)" title="Wave (1)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="#3b2314" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14V7.5a1.5 1.5 0 0 1 3 0V12m0-5.5V5a1.5 1.5 0 0 1 3 0v6.5m0-5a1.5 1.5 0 0 1 3 0V12m0-3.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-4.6-2.2L4.2 15.5a1.5 1.5 0 0 1 2.3-1.9L7 14" fill="#f6c58e"/><path d="M3 6q1-2 3-3M20 3q1.5 1 2 3" fill="none"/></svg></button><button type="button" data-emote="heart" aria-label="Heart (2)" title="Heart (2)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="#3b2314" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5C5 16 3 12.2 3 9.2 3 6.6 5 4.5 7.5 4.5c1.9 0 3.5 1.1 4.5 2.7 1-1.6 2.6-2.7 4.5-2.7C19 4.5 21 6.6 21 9.2c0 3-2 6.8-9 11.3Z" fill="#ef8aa7"/><path d="M7 8q.7-1.5 2.2-1.6" fill="none" stroke="#fff" stroke-width="1.4"/></svg></button><button type="button" data-emote="laugh" aria-label="Laugh (3)" title="Laugh (3)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="#3b2314" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" fill="#f6d26b"/><path d="M8 9.5q1-1.5 2 0m4 0q1-1.5 2 0" fill="none"/><path d="M7.5 13h9a4.5 4.5 0 0 1-9 0Z" fill="#8a3b33"/></svg></button><button type="button" data-emote="question" aria-label="Question (4)" title="Question (4)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="#3b2314" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" fill="#9ccbe0"/><path d="M9.5 9.5a2.6 2.6 0 1 1 3.6 2.4c-.8.4-1.1.9-1.1 1.8" fill="none" stroke-width="2"/><circle cx="12" cy="16.8" r="1.2" fill="#3b2314" stroke="none"/></svg></button>
+      </div>
       <p id="home-feedback" role="status" aria-live="polite" hidden></p>
       <div class="scene-caption"><p id="world-message" role="status">Welcome home. Your pet is happy to see you.</p><button type="button" id="world-interact" class="world-button" disabled>Move closer to interact</button></div>
       <div class="world-controls">
@@ -770,6 +773,45 @@ async function worldResync() {
   } catch { /* The socket's next reconnect retries the snapshot. */ }
 }
 document.addEventListener('world:updated', event => worldReceive(event.detail));
+// Emotes: a quick bubble over a character, seen by everyone in the same room.
+// The server saves each one first; every bubble, including your own, comes
+// from its world:emoted broadcast rather than from the key press.
+// The bubble reuses each button's drawn icon, so emotes look the same on every device.
+const WORLD_EMOTES = Object.fromEntries([...worldShell.querySelectorAll('[data-emote]')].map(button => [button.dataset.emote, button.querySelector('svg')]));
+const WORLD_EMOTE_KEYS = { 1: 'wave', 2: 'heart', 3: 'laugh', 4: 'question' };
+const WORLD_EMOTE_MS = 2500;
+let worldEmoting = false;
+async function worldSendEmote(emote) {
+  if (!worldPlayerId || worldEmoting || worldIsPaused()) return;
+  worldEmoting = true;
+  try {
+    const response = await fetch('/api/world/emote', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ emote }),
+    });
+    if (!response.ok && response.status !== 429) worldMessage((await response.json().catch(() => ({}))).error || 'Could not show that emote.');
+  } catch {
+    worldMessage('Could not show that emote. Check your connection.');
+  } finally { worldEmoting = false; }
+}
+function worldShowEmote(detail) {
+  if (!detail || !WORLD_EMOTES[detail.emote] || detail.scene !== worldScene) return;
+  if (worldScene === 'home' && detail.home !== worldHome) return;
+  const avatar = detail.id === worldPlayerId ? worldAvatar : worldPeers.get(detail.id);
+  if (!avatar) return;
+  avatar.querySelector('.world-emote')?.remove();
+  const bubble = document.createElement('span');
+  bubble.className = 'world-emote';
+  bubble.dataset.emote = detail.emote;
+  bubble.append(WORLD_EMOTES[detail.emote].cloneNode(true));
+  bubble.setAttribute('role', 'img');
+  bubble.setAttribute('aria-label', `${detail.id === worldPlayerId ? 'You' : detail.id}: ${detail.emote}`);
+  avatar.append(bubble);
+  setTimeout(() => bubble.remove(), WORLD_EMOTE_MS);
+}
+document.addEventListener('world:emoted', event => worldShowEmote(event.detail));
+for (const button of worldShell.querySelectorAll('[data-emote]')) {
+  button.addEventListener('click', () => { worldSendEmote(button.dataset.emote); worldStage.focus({ preventScroll: true }); });
+}
 document.addEventListener('presence:updated', event => {
   worldPresenceChanges++;
   worldOnline = new Set(event.detail);
@@ -949,6 +991,8 @@ function worldChangeScene(scene, focus = true, home = worldPlayerId, confirmed =
   if (worldDialog.open) worldDialog.close();
   worldScene = scene;
   worldHome = scene === 'home' ? home : null;
+  // A bubble belongs to the room it was shown in.
+  worldStage.querySelectorAll('.world-emote').forEach(bubble => bubble.remove());
   worldStage.dataset.scene = scene;
   worldShell.dataset.scene = scene;
   worldById('home-scene').hidden = scene !== 'home';
@@ -1239,6 +1283,7 @@ document.addEventListener('keydown', (event) => {
   if (event.target !== worldStage) return;
   if (worldDirections[key]) { event.preventDefault(); worldStartWalk(key); }
   if (['e', 'Enter', ' '].includes(key)) { event.preventDefault(); if (!event.repeat) worldById('world-interact').click(); }
+  if (WORLD_EMOTE_KEYS[key] && !event.repeat) { event.preventDefault(); worldSendEmote(WORLD_EMOTE_KEYS[key]); }
 });
 document.addEventListener('keyup', (event) => {
   worldKeys.delete(event.key.length === 1 ? event.key.toLowerCase() : event.key);

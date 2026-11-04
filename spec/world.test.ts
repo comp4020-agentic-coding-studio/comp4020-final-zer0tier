@@ -1621,3 +1621,41 @@ it('surfaces saved theft reports and clears the open world view when the account
     expect(p.$('world-stage').dataset.scene).toBe('home');
   } finally { p.dom.window.close(); }
 });
+
+it('sends keys 1–4 as emotes and shows each bubble only from its broadcast, in the same room', async () => {
+  const p = await networkPage();
+  const emotes: string[] = [];
+  const network = p.window.fetch;
+  p.window.fetch = (async (url: string, options?: RequestInit) => {
+    if (url === '/api/world/emote') { emotes.push(JSON.parse(String(options!.body)).emote); return Response.json({}); }
+    return network(url, options);
+  }) as typeof fetch;
+  try {
+    const stage = p.$('world-stage'), avatar = p.$('world-avatar');
+    stage.focus();
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: '2', bubbles: true }));
+    await vi.waitFor(() => expect(emotes).toEqual(['heart']));
+    // Pressing the key never shows a bubble by itself: it waits for the broadcast.
+    expect(avatar.querySelector('.world-emote')).toBeNull();
+    const emoted = (detail: Record<string, unknown>) => p.window.document.dispatchEvent(new p.window.CustomEvent('world:emoted', { detail }));
+    emoted({ id: 'owner', emote: 'heart', scene: 'home', home: 'owner', at: 1 });
+    const bubble = avatar.querySelector<HTMLElement>('.world-emote')!;
+    expect(bubble.dataset.emote).toBe('heart');
+    expect(bubble.getAttribute('aria-label')).toBe('You: heart');
+    // A bubble from another room, or an unknown emote, is ignored.
+    emoted({ id: 'owner', emote: 'wave', scene: 'town', home: null, at: 2 });
+    emoted({ id: 'owner', emote: 'dance', scene: 'home', home: 'owner', at: 3 });
+    expect(avatar.querySelectorAll('.world-emote')).toHaveLength(1);
+    expect(avatar.querySelector<HTMLElement>('.world-emote')!.dataset.emote).toBe('heart');
+    // While a window is open, keys don't send emotes.
+    p.openMenu();
+    stage.dispatchEvent(new p.window.KeyboardEvent('keydown', { key: '1', bubbles: true }));
+    expect(emotes).toEqual(['heart']);
+    p.$('world-dialog-close').click();
+    // The world resumes a moment after its window closes.
+    await vi.waitFor(() => expect(p.$('world-shell').dataset.paused).toBe('false'));
+    // The touch buttons send the same request.
+    p.$('world-emotes').querySelector<HTMLButtonElement>('[data-emote="question"]')!.click();
+    await vi.waitFor(() => expect(emotes).toEqual(['heart', 'question']));
+  } finally { p.dom.window.close(); }
+});

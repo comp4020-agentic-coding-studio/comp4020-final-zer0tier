@@ -164,3 +164,19 @@ it('stops saved walking on disconnect and resumes from the same saved position',
   const state = (await snapshot(id)).players.find((p: any) => p.id === id);
   expect(state).toMatchObject({ x: 520, y: 475, moving: false, facing: 'right' });
 });
+
+it('world:emoted delivers a saved emote to everyone in the same home within 1s, and refuses spam and bad emotes', async () => {
+  const owner = await player(), visitor = await player();
+  await move(visitor, { scene: 'home', home: owner });
+  const windows = [await connectPlayer(owner), await connectPlayer(visitor)];
+  const shown = windows.map(ws => next(ws, 'world:emoted', e => e.emote.id === visitor && e.emote.emote === 'heart'));
+  const response = await post('/api/world/emote', { emote: 'heart' }, visitor);
+  expect(response.status).toBe(200);
+  const saved = await response.json();
+  expect(saved).toMatchObject({ id: visitor, emote: 'heart', scene: 'home', home: owner });
+  for (const event of await Promise.all(shown)) expect(event.emote).toEqual(saved);
+  // Straight away again is too soon; an unknown emote or no session is refused.
+  expect((await post('/api/world/emote', { emote: 'wave' }, visitor)).status).toBe(429);
+  expect((await post('/api/world/emote', { emote: 'dance' }, owner)).status).toBe(400);
+  expect((await post('/api/world/emote', { emote: 'wave' }, null)).status).toBe(401);
+});

@@ -7,12 +7,14 @@ import type { FeedEntry } from "./feed.ts";
 import type { BattleSession, Fight, Pet } from "./pets.ts";
 import type { Team } from "./teams.ts";
 import type { Touch } from "./touches.ts";
-import { stopWorld, type WorldPosition } from './world.ts';
+import { stopWorld, type WorldEmote, type WorldPosition } from './world.ts';
 
 // Server -> client events. Clients act over HTTP; the socket only carries news.
 export type ServerEvent =
   | { type: 'presence:updated'; players: string[] }
   | { type: 'world:updated'; player: WorldPosition }
+  // A player showed a quick emote where they stand, for everyone in that room.
+  | { type: 'world:emoted'; emote: WorldEmote }
   | { type: "pet:updated"; pet: Pet }
   // Sent after both fighters' pet:updated, so clients can tell the story.
   | { type: "fight:finished"; fight: Fight }

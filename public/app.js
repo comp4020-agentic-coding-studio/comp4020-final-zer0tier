@@ -1704,6 +1704,7 @@ function connect() {
     const event = JSON.parse(msg.data);
     if (event.type === 'presence:updated') document.dispatchEvent(new CustomEvent('presence:updated', { detail: event.players }));
     if (event.type === 'world:updated') document.dispatchEvent(new CustomEvent('world:updated', { detail: event.player }));
+    if (event.type === 'world:emoted') document.dispatchEvent(new CustomEvent('world:emoted', { detail: event.emote }));
     if (event.type === "pet:updated") {
       broadcasts++;
       if (feedPets.has(event.pet.id)) feedPets.set(event.pet.id, event.pet);

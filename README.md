@@ -114,7 +114,14 @@ click or tap an empty spot to walk there, or select an object directly. Clicked 
 continue smoothly around furniture and your pet, and walking keeps the same
 speed across display refresh rates. Movement pauses while a window is open
 or you are typing. Keys held before sign-in or during a pause must be released
-and pressed again to start walking. Delayed movement updates play at normal
+and pressed again to start walking.
+
+Press **1–4** to show an emote above your character: a **wave**, a **heart**,
+a **laugh**, or a **question** mark. On a touch screen, tap the four small
+round buttons in the lower corner instead. Everyone in the same home or town
+sees the bubble for a couple of seconds, including you. Emotes are saved
+before anyone sees them, wait about a second and a half between each, and
+pause along with movement while a window is open or you are typing. Delayed movement updates play at normal
 walking speed without a catch-up sprint. Home and town work on desktop and phones. Menus, windows,
 and controls share the sign-in screen's warm orange and cream palette,
 rounded shapes, typefaces, and light or dark appearance. Every window that
@@ -804,6 +811,13 @@ and the built-in `node:sqlite` for storage.
   increments the world revision, then returns and broadcasts the saved row.
   Movement cannot change outfits; malformed colours are refused with 400,
   and unauthenticated saves with 401.
+  Authenticated `POST /api/world/emote` accepts `{ "emote": "wave" }` (or
+  `heart`, `laugh`, `question`) for the caller only. It saves the emote with
+  the caller's current scene and home, then returns and broadcasts the saved
+  row as a `world:emoted` event; clients show the bubble only from that event,
+  and only to players in the same room. A second emote within 1.5 seconds is
+  refused with 429, an unknown emote with 400, and an unauthenticated one
+  with 401.
   Positions use their own SQLite connection with `synchronous = NORMAL`, so
   a step doesn't wait for the disk; everything else keeps the default full
   sync. `scripts/load-test.ts` walks a crowd around town and times each

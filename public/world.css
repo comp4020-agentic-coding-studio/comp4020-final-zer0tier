@@ -250,11 +250,53 @@ body.world-playing #world-stage[data-scene="town"] .world-avatar { z-index: 2; }
 body.world-playing .world-avatar > svg { display: block; width: 100%; height: auto; overflow: visible; }
 body.world-playing .world-peer { transition: transform 50ms linear; }
 body.world-playing .world-player-name { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding: 2px 6px; border-radius: 6px; background: var(--surface); color: var(--fg); font-size: 12px; font-weight: 700; white-space: nowrap; }
+/* Emotes: a rounded speech bubble above the character (and above another
+   player's name), in the game's own colours, that pops in and floats. */
+body.world-playing .world-emote {
+  position: absolute; left: 50%; bottom: calc(100% + 4px); z-index: 1;
+  display: grid; place-items: center; width: 34px; height: 34px;
+  border: 2px solid var(--border); border-radius: 50%; background: var(--surface);
+  box-shadow: var(--shadow);
+  transform: translateX(-50%); animation: world-emote 2.5s var(--ease) both;
+}
+body.world-playing .world-emote svg { width: 22px; height: 22px; }
+body.world-playing .world-emote::after {
+  content: ''; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px;
+  border-right: 2px solid var(--border); border-bottom: 2px solid var(--border);
+  background: var(--surface); transform: translateX(-50%) rotate(45deg);
+}
+body.world-playing .world-peer .world-emote { bottom: calc(100% + 26px); }
+@keyframes world-emote {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(.4); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1.08); }
+  20% { transform: translate(-50%, 0) scale(1); }
+  85% { opacity: 1; transform: translate(-50%, -4px); }
+  100% { opacity: 0; transform: translate(-50%, -8px); }
+}
+body.world-playing #world-shell[data-paused="true"] .world-emote { animation-play-state: paused; }
+/* Touch: four compact emote buttons in the lower corner; keys 1–4 work too. */
+body.world-playing .world-emotes {
+  position: fixed; z-index: 10; left: max(18px, env(safe-area-inset-left)); bottom: max(18px, env(safe-area-inset-bottom));
+  display: flex; gap: 6px;
+}
+body.world-playing .world-emotes button {
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
+  border: 2px solid var(--border); border-radius: 50%; background: var(--surface);
+  box-shadow: var(--shadow); cursor: var(--cursor-pointer);
+}
+body.world-playing .world-emotes svg { width: 24px; height: 24px; }
+body.world-playing .world-emotes button:hover { border-color: var(--primary); background: var(--bg-glow); }
+body.world-playing .world-emotes button:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+body:not(.world-playing) .world-emotes { display: none; }
+/* Phones put the visit bar along the bottom, so stack the emotes on the right, above it. */
+@media (max-width: 600px) {
+  body.world-playing .world-emotes { left: auto; right: max(12px, env(safe-area-inset-right)); bottom: max(76px, calc(env(safe-area-inset-bottom) + 76px)); flex-direction: column; }
+}
 body.world-playing #world-visit-pet { position: absolute; z-index: 5; left: 50%; top: 55%; transform: translate(-50%, -70%); width: 12%; max-width: 120px; min-width: 44px; padding: 0; border: 0; background: transparent; cursor: var(--cursor-pointer); }
 body.world-playing #world-visit-bar { position: fixed; z-index: 12; right: 12px; top: 12px; display: flex; align-items: center; gap: 8px; max-width: calc(100vw - 24px); padding: 6px 10px; border-radius: var(--radius-sm); background: var(--surface); box-shadow: var(--shadow); }
 body.world-playing #world-visit-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 600px) { body.world-playing #world-visit-bar { top: auto; bottom: 12px; } }
-@media (prefers-reduced-motion: reduce) { body.world-playing .world-peer { transition: none; } }
+@media (prefers-reduced-motion: reduce) { body.world-playing .world-peer { transition: none; } body.world-playing .world-emote { animation: none; } }
 /* Direction changes never replace the artwork or animate the ground anchor.
    Only the visible pose's small body parts move; walking keeps its existing rAF. */
 body.world-playing .world-avatar .walker-direction { transform-box: view-box; transform-origin: center; }

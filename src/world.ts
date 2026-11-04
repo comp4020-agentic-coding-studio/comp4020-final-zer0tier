@@ -2,6 +2,12 @@ import { db, worldDb } from './db.ts';
 import { getPet, isValidId } from './pets.ts';
 
 export const OUTFITS = ['amber', 'forest', 'ocean', 'berry', 'lavender', 'rose', 'slate', 'cream'] as const;
+// Quick reactions a player can show above their character to everyone in the
+// same home or town. Keys 1–4 pick them in this order.
+export const EMOTES = ['wave', 'heart', 'laugh', 'question'] as const;
+export type Emote = typeof EMOTES[number];
+// Real milliseconds between one player's emotes, so nobody can flood a room.
+export const EMOTE_COOLDOWN_MS = 1500;
 
 export interface WorldPosition {
   id: string;
@@ -29,6 +35,15 @@ db.exec(`CREATE TABLE IF NOT EXISTS world_positions (
 if (!db.prepare("SELECT name FROM pragma_table_info('world_positions') WHERE name = ?").get('outfit')) {
   db.exec("ALTER TABLE world_positions ADD COLUMN outfit TEXT NOT NULL DEFAULT 'amber'");
 }
+// Each player's latest emote: what it was, where they stood, and when. Saved
+// before it is broadcast, and it sets the cooldown for the next one.
+db.exec(`CREATE TABLE IF NOT EXISTS world_emotes (
+  player_id TEXT PRIMARY KEY REFERENCES pets(id),
+  emote TEXT NOT NULL,
+  scene TEXT NOT NULL,
+  home TEXT,
+  at INTEGER NOT NULL
+)`);
 // Positions go through worldDb, which doesn't wait for the disk (see db.ts).
 const initial = worldDb.prepare("INSERT OR IGNORE INTO world_positions (player_id, scene, home, x, y, facing) VALUES (?, 'home', ?, 480, 475, 'down')");
 const read = worldDb.prepare('SELECT player_id AS id, scene, home, x, y, facing, moving, outfit, revision FROM world_positions WHERE player_id = ?');
@@ -37,6 +52,23 @@ const stop = worldDb.prepare('UPDATE world_positions SET moving = 0, revision = 
 // Appearance is a durable preference, so use the fully synchronous connection.
 const dress = db.prepare('UPDATE world_positions SET outfit = ?, revision = revision + 1 WHERE player_id = ?');
 export function stopWorld(id: string): WorldPosition { stop.run(id); return worldPosition(id); }
+const saveEmote = db.prepare(`INSERT INTO world_emotes (player_id, emote, scene, home, at) VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT (player_id) DO UPDATE SET emote = excluded.emote, scene = excluded.scene, home = excluded.home, at = excluded.at`);
+const readEmote = db.prepare('SELECT player_id AS id, emote, scene, home, at FROM world_emotes WHERE player_id = ?');
+
+export interface WorldEmote { id: string; emote: Emote; scene: WorldPosition['scene']; home: string | null; at: number }
+
+// Shows an emote where the player currently stands, unless they sent one too recently.
+export function emoteWorld(id: string, emote: unknown, now = Date.now()): WorldEmote | { status: number; error: string } {
+  if (typeof emote !== 'string' || !EMOTES.includes(emote as Emote)) return { status: 400, error: 'Choose an available emote.' };
+  if (!isValidId(id) || !getPet(id)) return { status: 404, error: 'No such pet.' };
+  const last = readEmote.get(id) as WorldEmote | undefined;
+  // Capped, so a wall clock that jumped backwards can't stretch the wait.
+  if (last && now - last.at < EMOTE_COOLDOWN_MS && now >= last.at) return { status: 429, error: 'Give it a moment before the next emote.' };
+  const { scene, home } = worldPosition(id);
+  saveEmote.run(id, emote, scene, home, now);
+  return readEmote.get(id) as unknown as WorldEmote;
+}
 
 export function worldPosition(id: string): WorldPosition {
   initial.run(id, id);
