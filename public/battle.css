@@ -187,7 +187,7 @@
 .battle-ally h3 { font-size: .85rem; }
 .battle-ally .battle-avatar { width: 56px; margin: 6px auto; }
 .battle-ability { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; }
-.battle-ability svg { width: 30px; height: 30px; flex-shrink: 0; stroke: var(--primary); stroke-width: 3; fill: none; stroke-linecap: round; }
+.battle-ability .skill-icon { width: 40px; height: 40px; }
 .battle-ability span { display: block; color: var(--muted); font-size: .8rem; }
 /* The "What will your pet do?" textbox: a rounded panel with a double inset
    border, matching the mainline games' dialogue box. */
@@ -217,6 +217,10 @@
   transition: transform 120ms var(--ease), box-shadow 120ms var(--ease);
 }
 .battle-skill strong, .battle-skill span { display: block; overflow-wrap: anywhere; }
+/* The badge sits in its own column; name, cost, and detail stack beside it. */
+.battle-skill { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; align-content: start; }
+.battle-skill > .skill-icon { grid-row: 1 / span 3; width: 40px; height: 40px; }
+.battle-skill:disabled > .skill-icon { filter: grayscale(.6); }
 .battle-skill strong { font-size: .95rem; }
 .battle-skill span { margin-top: 4px; color: var(--muted); font-size: .78rem; }
 .battle-skill:hover:not(:disabled) { box-shadow: 0 2px 0 rgb(0 0 0 / 10%), inset 0 0 0 2px var(--primary); }
@@ -349,6 +353,8 @@
   #battle-fighter-0 .battle-avatar { width: 108px; }
   #battle-fighter-1 .battle-avatar { width: 70px; }
   .battle-nameplate { padding: 6px 8px 8px; }
+  .battle-skill { padding: 10px 12px; column-gap: 8px; }
+  .battle-skill > .skill-icon { width: 30px; height: 30px; }
 }
 @media (prefers-reduced-motion: reduce) { #battle-dialog *, #battle-dialog *::after { animation: none !important; transition: none !important; } }
 .battle-woodland-art { display: none; }

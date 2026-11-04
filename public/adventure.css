@@ -75,6 +75,8 @@
 .adventure-backpack .help { margin: 0 0 10px; }
 #adventure-items li, #adventure-coins li { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 #adventure-items button, #adventure-coins button { min-height: 44px; }
+#adventure-abilities li { display: flex; align-items: flex-start; gap: 8px; }
+#adventure-abilities .skill-icon { width: 28px; height: 28px; }
 
 /* Bottom bar: HP/MP rings on the left, tile actions, arrow pad on the right.
    Registering --gauge lets the ring sweep smoothly when HP or MP changes. */

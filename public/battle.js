@@ -65,6 +65,16 @@ const skillVisuals = {
   'bump': visual('str', 'bump', '<g class="fx-core">'+burst+'</g><g class="fx-detail"><circle cx="50" cy="50" r="16"/></g>', { pose: 'slam', duration: 580 }),
 };
 const bossChargeVisual = visual('str', 'charge', '<g class="fx-core"><path class="fx-solid" d="m24 40-5-22 20 9 11-17 11 17 20-9-5 22Z"/><ellipse cx="50" cy="65" rx="28" ry="17"/></g><g class="fx-detail">'+rings+'</g>', { target: 'self', cue: 'Charging', pose: 'brace', duration: 780 });
+// Each skill's own illustrated badge from the shared sheet, decorative beside its name.
+const SKILL_ICONS = '/scenes/skill-icons.svg';
+const skillIcon = id => {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'), use = document.createElementNS(svg.namespaceURI, 'use');
+  svg.setAttribute('class', 'skill-icon'); svg.setAttribute('viewBox', '0 0 48 48'); svg.setAttribute('aria-hidden', 'true');
+  use.setAttribute('href', `${SKILL_ICONS}#skill-${id}`);
+  svg.append(use);
+  return svg;
+};
+const showAbilityIcon = id => $('battle-ability-icon').firstElementChild.setAttribute('href', `${SKILL_ICONS}#skill-${id}`);
 let portraitAnimations = [];
 let nextTurnDelay = null;
 let nextTurnAt = 0;
@@ -273,7 +283,7 @@ function buildDialog() {
         </article>
       </div>
       <section class="battle-allies" id="battle-allies" aria-label="Teammates in this battle" hidden></section>
-      <div class="battle-ability"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 4-5 24M18 4l-5 24M27 4l-5 24"/></svg>
+      <div class="battle-ability"><svg class="skill-icon" id="battle-ability-icon" viewBox="0 0 48 48" aria-hidden="true"><use href="/scenes/skill-icons.svg#skill-claw-strike"/></svg>
         <div><strong id="battle-ability-name">Choose a skill</strong><span id="battle-ability-cost">Your pet is ready</span></div></div>
       <div id="battle-textbox" role="status" aria-live="polite" aria-atomic="true">
         <p id="battle-status"></p>
@@ -455,6 +465,7 @@ function abilityLabel(step) {
   $('battle-ability-name').textContent = `${step.telegraph ? 'Charging ' : ''}${step.name || 'Claw Strike'}`;
   $('battle-ability-cost').textContent = step.telegraph ? 'No MP spent · Lands on the next boss turn' : `${step.mpCost || 0} MP · ${step.damage} damage`;
   dialog.dataset.ability = step.ability || 'claw-strike';
+  showAbilityIcon(dialog.dataset.ability);
 }
 const fighterName = fighter => fighter.name || fighter.id;
 // The saved pre-battle coin toss, or the acting pet's coin that replaced it.
@@ -601,7 +612,7 @@ function awaitChoice() {
     cost.textContent = `${attack.type ? `${typeName(attack.type)} · ` : ''}${mpCost} MP${matchup(attack, battle)}${reason ? ` · ${reason}` : ''}`;
     const detail = document.createElement('span'); detail.className = 'battle-skill-detail';
     detail.textContent = `${attack.power !== undefined ? `Power ${attack.power} · ${attack.accuracy === 'sure-hit' ? 'Sure-hit' : `${Math.round((attack.hitChance ?? (attack.accuracy ?? 100) / 100) * 100)}% hit chance`}. ` : ''}${attack.description ?? ''}`;
-    button.append(name, cost, detail);
+    button.append(skillIcon(attack.id), name, cost, detail);
     button.disabled = submitting || !myTurn || Boolean(reason) || battle.hp[mine] <= 0;
     button.addEventListener('click', () => chooseSkill(attack.id));
     return button;
@@ -692,6 +703,7 @@ function play(next) {
   $('battle-mode').textContent = next.manual ? 'Turn-based battle' : 'Battle replay';
   $('battle-ability-name').textContent = next.manual ? 'Choose a skill' : 'Battle replay';
   $('battle-ability-cost').textContent = next.manual ? 'Your pet waits for your choice.' : 'Playing the saved battle.';
+  showAbilityIcon('claw-strike');
   // A team battle (pets, then the monster last) shows the viewer's pet against
   // the monster, with its teammates beside them.
   const fighters = next.battle.fighters, last = fighters.length - 1;

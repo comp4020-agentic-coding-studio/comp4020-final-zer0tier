@@ -970,7 +970,9 @@ body.world-playing #world-panel-pet #home-care-error:empty {
 }
 .home-skill-list { display: grid; gap: 10px; }
 .home-skill { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; }
-.home-skill > div { min-width: 0; }
+.home-skill > div { min-width: 0; flex: 1; }
+.home-skill > .skill-icon { align-self: flex-start; }
+.home-skill[data-learned="false"] > .skill-icon { filter: grayscale(.75); opacity: .6; }
 .home-skill strong, .home-skill small { display: block; }
 .home-skill small { margin-top: 4px; color: var(--muted); line-height: 1.45; }
 .home-skill button { min-height: 44px; flex-shrink: 0; }
@@ -991,5 +993,7 @@ body.world-playing #world-panel-pet #home-care-error:empty {
 #home-skill-filter { margin-bottom: 12px; }
 @media (max-width: 480px) {
   .home-skill { align-items: flex-start; flex-wrap: wrap; }
-  .home-skill > div { flex: 1 1 200px; }
+  .home-skill > div { flex: 1 1 160px; }
+  .home-skill > .skill-icon { width: 2.25rem; height: 2.25rem; }
+  .home-skill button { margin-left: auto; }
 }

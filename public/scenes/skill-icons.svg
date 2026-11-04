@@ -1,0 +1,418 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <title>VirtuePets battle skill icons</title>
+  <desc>Original illustrated badges, one per battle skill, coloured by STR, CHA, INT, or Normal type.</desc>
+  <defs>
+    <linearGradient id="si-str" x2=".2" y2="1"><stop stop-color="#f7c39c"/><stop offset="1" stop-color="#e48d64"/></linearGradient>
+    <linearGradient id="si-cha" x2=".2" y2="1"><stop stop-color="#f8cfe4"/><stop offset="1" stop-color="#e6a0c9"/></linearGradient>
+    <linearGradient id="si-int" x2=".2" y2="1"><stop stop-color="#c9ecf5"/><stop offset="1" stop-color="#8ccbe2"/></linearGradient>
+    <linearGradient id="si-normal" x2=".2" y2="1"><stop stop-color="#f5e2aa"/><stop offset="1" stop-color="#dfc07a"/></linearGradient>
+  </defs>
+  <symbol id="skill-heavy-breath-slam" viewBox="0 0 48 48">
+    <desc>Mover’s box and a huffing breath cloud</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-str)" stroke="#b25a3c" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#b25a3c" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M10 25h20v14H10Z" fill="#d9a566"/><path d="M10 25l3-4h14l3 4" fill="#e9bd80"/><path d="M18 25v5h4v-5" fill="#fff6e3"/>
+      <path d="M25 19c-4 0-5-5-1-6 0-4 5-5 7-2 2-3 7-2 7 2 4 0 4 6 0 6Z" fill="#fff6e3"/><path d="M29 15q2 1 4 0" stroke-width="1.2"/>
+      <path d="M6 40h3m24 0h3m-2-6 3-1" stroke-width="1.4"/>
+    </g>
+  </symbol>
+  <symbol id="skill-lumberjack-sweep" viewBox="0 0 48 48">
+    <desc>Woodcutter’s axe mid-swing</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-str)" stroke="#b25a3c" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#b25a3c" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M9 31Q9 15 23 9" stroke="#fff6e3" stroke-width="2.4" stroke-opacity=".9"/><path d="M8 37Q6 22 15 13" stroke="#fff6e3" stroke-width="1.6" stroke-opacity=".7"/>
+      <path d="M16 39 31 15" stroke-width="5.6"/><path d="M16 39 31 15" stroke="#cf9257" stroke-width="3"/>
+      <path d="M27 11l5-4q8 4 7 15l-6 1-2-4Z" fill="#e8e1d4"/><path d="M34 9q4 4 4 11" stroke="#fff" stroke-width="1.2"/>
+    </g>
+  </symbol>
+  <symbol id="skill-humble-pie" viewBox="0 0 48 48">
+    <desc>A lattice pie flying at the target</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-str)" stroke="#b25a3c" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#b25a3c" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M5 20h6M6 25h4" stroke-width="1.4"/>
+      <path d="M11 28h28l-3 9H14Z" fill="#c98a4f"/><ellipse cx="25" cy="27.5" rx="14" ry="5" fill="#f0c27e"/>
+      <path d="M17 24l7 7m1-8 8 7m-17 0 7-6m2 7 7-6" stroke-width="1.2"/><circle cx="21" cy="27" r="1.2" fill="#e0574a" stroke="none"/><circle cx="29" cy="27" r="1.2" fill="#e0574a" stroke="none"/>
+    </g>
+  </symbol>
+  <symbol id="skill-feral-maul" viewBox="0 0 48 48">
+    <desc>Wild fanged jaws snapping shut</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-str)" stroke="#b25a3c" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#b25a3c" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M8 16q16-9 32 0v4q-16-6-32 0Z" fill="#d9636a"/>
+      <path d="M12 18.5l2 7 3-7.5m5-1 2 9 2-9m5 1 3 7.5 2-7" fill="#fff6e3"/>
+      <path d="M8 34q16 7 32 0v-4q-16 5-32 0Z" fill="#d9636a"/>
+      <path d="M14 31.5l2-5 2 6m5 1 1-6 2 6m5-1 2-5 2 4.5" fill="#fff6e3"/>
+    </g>
+  </symbol>
+  <symbol id="skill-bloodlust-crash" viewBox="0 0 48 48">
+    <desc>A cracked heart bursting with fury</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-str)" stroke="#b25a3c" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#b25a3c" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M24 7v3M11 12l2 2m24-2-2 2M6 25h3m30 0h3M11 37l2-2m24 2-2-2" stroke-width="1.6"/>
+      <path d="M24 38C11 30 10 19 16 15c3-2 7-1 8 3 1-4 5-5 8-3 6 4 5 15-8 23Z" fill="#e0574a"/>
+      <path d="M24 18l-2 5 3 3-2 5" stroke="#fff6e3" stroke-width="1.6"/><path d="M17 19q1-2 3-2" stroke="#fff" stroke-width="1.4"/>
+    </g>
+  </symbol>
+  <symbol id="skill-titans-relic-press" viewBox="0 0 48 48">
+    <desc>An ancient stone pillar pressing down</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-str)" stroke="#b25a3c" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#b25a3c" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M12 9h24v3H12Z" fill="#e6dcba"/><path d="M14 12h20v19H14Z" fill="#d6cba5"/><path d="M12 31h24v3H12Z" fill="#e6dcba"/>
+      <path d="M24 16l4 5-4 5-4-5Z" fill="#f2c35f"/><path d="M18 14v15m12-15v15" stroke-width="1" stroke-opacity=".5"/>
+      <path d="M8 39h32M17 39l-2 3m9-3v3m7-3 2 3" stroke-width="1.4"/><path d="M8 14v5m32-5v5" stroke-width="1.4"/>
+    </g>
+  </symbol>
+  <symbol id="skill-gym-pump" viewBox="0 0 48 48">
+    <desc>A dumbbell with a rising arrow</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-str)" stroke="#b25a3c" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#b25a3c" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M14 30h20" stroke-width="5.2"/><path d="M14 30h20" stroke="#efe7dc" stroke-width="2.6"/>
+      <rect x="8" y="23" width="6" height="14" rx="2" fill="#8c5a3a"/><rect x="34" y="23" width="6" height="14" rx="2" fill="#8c5a3a"/>
+      <rect x="14" y="25" width="3.5" height="10" rx="1.5" fill="#b57a4f"/><rect x="30.5" y="25" width="3.5" height="10" rx="1.5" fill="#b57a4f"/>
+      <path d="M24 21V8m-5 5 5-5 5 5" stroke="#fff6e3" stroke-width="4.6"/><path d="M24 21V8m-5 5 5-5 5 5" stroke-width="1.8"/>
+    </g>
+  </symbol>
+  <symbol id="skill-apex-roar" viewBox="0 0 48 48">
+    <desc>A roaring lion cub</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-str)" stroke="#b25a3c" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#b25a3c" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M6 19q-2 6 0 12m36-12q2 6 0 12" stroke-width="1.6"/>
+      <path d="M24 9l3 3 4-1 1 4 4 1-1 4 3 3-3 3 1 4-4 1-1 4-4-1-3 3-3-3-4 1-1-4-4-1 1-4-3-3 3-3-1-4 4-1 1-4 4 1Z" fill="#c87a3f"/>
+      <circle cx="24" cy="25" r="9" fill="#f3c27c"/>
+      <path d="M19.5 22l2.5 1m6.5-1-2.5 1" stroke-width="1.4"/><path d="M22.5 25.5h3l-1.5 1.5Z" fill="#4f3222" stroke-width="1"/>
+      <ellipse cx="24" cy="30" rx="3.4" ry="2.8" fill="#8a3b33" stroke-width="1.2"/>
+    </g>
+  </symbol>
+  <symbol id="skill-hardhat-guard" viewBox="0 0 48 48">
+    <desc>A sturdy yellow hard hat</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-str)" stroke="#b25a3c" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#b25a3c" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M12 30a12 12 0 0 1 24 0Z" fill="#f2c35f"/><path d="M21.5 18.4h5V30h-5Z" fill="#f8d98d"/>
+      <path d="M8 30h32a2 2 0 0 1 0 4H8a2 2 0 0 1 0-4Z" fill="#e0a93e"/><path d="M15 25q1-4 4-6" stroke="#fff" stroke-width="1.4"/>
+      <path d="M9 40h30" stroke-width="1.2" stroke-opacity=".5"/>
+    </g>
+  </symbol>
+  <symbol id="skill-service-smile" viewBox="0 0 48 48">
+    <desc>A smiling silver cloche on a tray</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-cha)" stroke="#a05489" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a05489" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M11 33a13 12 0 0 1 26 0Z" fill="#f3ece2"/><circle cx="24" cy="19" r="2" fill="#f2c35f"/>
+      <path d="M7 34h34a2 2 0 0 1-2 3H9a2 2 0 0 1-2-3Z" fill="#e2d6c4"/>
+      <circle cx="20" cy="26" r="1" fill="#4f3222" stroke="none"/><circle cx="28" cy="26" r="1" fill="#4f3222" stroke="none"/><path d="M20 29q4 3 8 0" stroke-width="1.4"/>
+      <path d="M15 27q0-3 2-5" stroke="#fff" stroke-width="1.4"/><path d="M38 8Q38 12 42 12Q38 12 38 16Q38 12 34 12Q38 12 38 8Z" fill="#fff6e3" stroke-width="1"/>
+    </g>
+  </symbol>
+  <symbol id="skill-hecklers-jab" viewBox="0 0 48 48">
+    <desc>A cheeky shouting speech bubble</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-cha)" stroke="#a05489" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a05489" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M11 9h26a4 4 0 0 1 4 4v13a4 4 0 0 1-4 4H23l-8 7 1-7h-5a4 4 0 0 1-4-4V13a4 4 0 0 1 4-4Z" fill="#fff6e3"/>
+      <path d="M19 14v6" stroke-width="2.4"/><circle cx="19" cy="24.5" r="1.4" fill="#4f3222" stroke="none"/>
+      <path d="M25 16q0-3 3.5-3t3.5 3q0 2.5-3.5 3.5V21" stroke-width="2.2"/><circle cx="28.5" cy="24.5" r="1.4" fill="#4f3222" stroke="none"/>
+      <path d="M38 34l3 3m-7-1 1 4" stroke-width="1.4"/>
+    </g>
+  </symbol>
+  <symbol id="skill-dazzling-riposte" viewBox="0 0 48 48">
+    <desc>A sparkling fencing rapier</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-cha)" stroke="#a05489" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a05489" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M18 30 37 11" stroke-width="4.4"/><path d="M18 30 37 11" stroke="#efe7dc" stroke-width="1.8"/>
+      <path d="M11 28q7-2 9 9l-3 1q-1-6-6-7Z" fill="#f2c35f"/><path d="M10 38l5-5" stroke-width="5"/><path d="M10 38l5-5" stroke="#9a5a7e" stroke-width="2.4"/>
+      <path d="M38 5Q38 10 43 10Q38 10 38 15Q38 10 33 10Q38 10 38 5Z" fill="#fff6e3" stroke-width="1"/><path d="M29 6.5Q29 9 31.5 9Q29 9 29 11.5Q29 9 26.5 9Q29 9 29 6.5Z" fill="#fff6e3" stroke-width="1"/>
+    </g>
+  </symbol>
+  <symbol id="skill-sirens-lure" viewBox="0 0 48 48">
+    <desc>A heart-shaped lure and a siren’s song</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-cha)" stroke="#a05489" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a05489" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M30 5v9" stroke-width="1.2"/>
+      <path d="M30 26c-6-4-7-8-5-10 1.5-1.5 4-1 5 1 1-2 3.5-2.5 5-1 2 2 1 6-5 10Z" fill="#e86f9a"/>
+      <path d="M30 26v6a5 5 0 0 1-10 0l-1-3 3 1" stroke-width="1.8"/>
+      <path d="M12 30V15l7-2v13" stroke-width="1.6"/><ellipse cx="10" cy="30.5" rx="3" ry="2.2" fill="#4f3222" stroke="none"/><ellipse cx="17" cy="26.5" rx="3" ry="2.2" fill="#4f3222" stroke="none"/>
+    </g>
+  </symbol>
+  <symbol id="skill-vip-velvet-rope" viewBox="0 0 48 48">
+    <desc>Brass stanchions and a velvet rope</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-cha)" stroke="#a05489" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a05489" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M12 16v20M36 16v20" stroke-width="5"/><path d="M12 16v20M36 16v20" stroke="#f2c35f" stroke-width="2.4"/>
+      <ellipse cx="12" cy="37.5" rx="4.5" ry="1.8" fill="#e0a93e"/><ellipse cx="36" cy="37.5" rx="4.5" ry="1.8" fill="#e0a93e"/>
+      <circle cx="12" cy="13" r="3" fill="#f2c35f"/><circle cx="36" cy="13" r="3" fill="#f2c35f"/>
+      <path d="M12 19q12 14 24 0" stroke-width="5.6"/><path d="M12 19q12 14 24 0" stroke="#c0394d" stroke-width="3"/><path d="M18 24q4 3 8 3" stroke="#f28ba0" stroke-width="1"/>
+    </g>
+  </symbol>
+  <symbol id="skill-crown-jewel-beam" viewBox="0 0 48 48">
+    <desc>A jewelled crown sending out a beam</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-cha)" stroke="#a05489" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a05489" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M24 4v5m-9-2 2.5 3.5M33 7l-2.5 3.5" stroke="#fff6e3" stroke-width="3.6"/><path d="M24 4v5m-9-2 2.5 3.5M33 7l-2.5 3.5" stroke-width="1.4"/>
+      <path d="M11 31l-2-15 8 6 7-9 7 9 8-6-2 15Z" fill="#f2c35f"/><path d="M11 31h26v5H11Z" fill="#e0a93e"/>
+      <path d="M24 20l3.5 3.5L24 27l-3.5-3.5Z" fill="#e86f9a"/><circle cx="16" cy="33.5" r="1.2" fill="#8ccbe2"/><circle cx="32" cy="33.5" r="1.2" fill="#8ccbe2"/>
+    </g>
+  </symbol>
+  <symbol id="skill-makeover-glow" viewBox="0 0 48 48">
+    <desc>A pretty hand mirror with sparkles</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-cha)" stroke="#a05489" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a05489" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M21 31v9" stroke-width="5.6"/><path d="M21 31v9" stroke="#e8a0c4" stroke-width="3"/>
+      <ellipse cx="21" cy="19" rx="10" ry="12" fill="#e8a0c4"/><ellipse cx="21" cy="19" rx="7" ry="9" fill="#e4f5f8"/>
+      <path d="M17 15q2-4 5-4m-6 9 7-8" stroke="#fff" stroke-width="1.6"/><path d="M37 8.5Q37 13 41.5 13Q37 13 37 17.5Q37 13 32.5 13Q37 13 37 8.5Z" fill="#fff6e3" stroke-width="1"/><path d="M37 25.2Q37 28 39.8 28Q37 28 37 30.8Q37 28 34.2 28Q37 28 37 25.2Z" fill="#fff6e3" stroke-width="1"/>
+    </g>
+  </symbol>
+  <symbol id="skill-phantom-perfume" viewBox="0 0 48 48">
+    <desc>A perfume bottle misting the air</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-cha)" stroke="#a05489" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a05489" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <circle cx="36" cy="13" r="3.4" fill="#fff6e3" stroke-opacity=".6"/><circle cx="31" cy="8.5" r="2.4" fill="#fff6e3" stroke-opacity=".6"/><circle cx="40" cy="20" r="2.2" fill="#fff6e3" stroke-opacity=".6"/>
+      <path d="M24 20h4" stroke-width="1.6"/><circle cx="31" cy="20" r="3" fill="#c0394d"/>
+      <path d="M18 18h6v5h-6Z" fill="#f2c35f"/>
+      <path d="M13 23h16a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3V26a3 3 0 0 1 3-3Z" fill="#f3b7d4"/><path d="M14 27v7" stroke="#fff" stroke-width="1.6"/>
+    </g>
+  </symbol>
+  <symbol id="skill-standing-ovation" viewBox="0 0 48 48">
+    <desc>A bouquet of roses tossed to the stage</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-cha)" stroke="#a05489" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a05489" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M14 22q-6-2-7 3 5 1 7-3Zm20 0q6-2 7 3-5 1-7-3Z" fill="#86ab62"/>
+      <path d="M24 42 13 24h22Z" fill="#fff6e3"/><path d="M20 30h8" stroke="#e86f9a" stroke-width="1.6"/>
+      <circle cx="17.5" cy="20" r="5" fill="#e0574a"/><circle cx="30.5" cy="20" r="5" fill="#e0574a"/><circle cx="24" cy="15" r="5.5" fill="#ef6f62"/>
+      <path d="M24 13a2 2 0 1 1-2 2.5M17.5 18.5a1.5 1.5 0 1 1-1.5 2m14.5-2a1.5 1.5 0 1 1-1.5 2" stroke-width="1.1"/>
+    </g>
+  </symbol>
+  <symbol id="skill-paperplane-dart" viewBox="0 0 48 48">
+    <desc>A folded paper aeroplane</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-int)" stroke="#4c88ab" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#4c88ab" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M5 33h6m-3 5h5" stroke-width="1.4"/>
+      <path d="M8 24 41 10 31 38 23 29Z" fill="#fff6e3"/><path d="M41 10 23 29v8l4-4.5" fill="#e3dccd"/>
+    </g>
+  </symbol>
+  <symbol id="skill-synapse-shock" viewBox="0 0 48 48">
+    <desc>A lightning bolt jumping between neurons</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-int)" stroke="#4c88ab" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#4c88ab" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M10 14l8 6m20 12-7-4M10 36l7-5" stroke-width="1.4"/>
+      <circle cx="10" cy="14" r="3" fill="#e98ab0"/><circle cx="38" cy="32" r="3" fill="#e98ab0"/><circle cx="10" cy="36" r="3" fill="#e98ab0"/>
+      <path d="M28 7 16 26h8l-3 15 13-20h-8Z" fill="#f2c35f"/><path d="M25 12l-4 7" stroke="#fff" stroke-width="1.2"/>
+    </g>
+  </symbol>
+  <symbol id="skill-gravity-formula" viewBox="0 0 48 48">
+    <desc>Newton’s apple in an orbit</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-int)" stroke="#4c88ab" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#4c88ab" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <ellipse cx="24" cy="29" rx="19" ry="5.5" stroke-width="1.4"/>
+      <path d="M24 18c-3-2-11-2-11 7 0 7 5 13 8 13 1 0 2-1 3-1s2 1 3 1c3 0 8-6 8-13 0-9-8-9-11-7Z" fill="#e0574a"/>
+      <path d="M24 18q0-4 2-6" stroke-width="1.6"/><path d="M25 14q4-4 8-1-4 3-8 1Z" fill="#86ab62"/><path d="M17 23q1-2 3-2" stroke="#fff" stroke-width="1.4"/>
+      <path d="M5 29a19 5.5 0 0 0 38 0" stroke-width="1.4"/><circle cx="40" cy="31.5" r="2" fill="#f2c35f"/>
+    </g>
+  </symbol>
+  <symbol id="skill-laser-trajectory" viewBox="0 0 48 48">
+    <desc>A laser beam locked onto a target</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-int)" stroke="#4c88ab" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#4c88ab" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M6 39 29 22" stroke="#fff" stroke-width="5" stroke-opacity=".7"/><path d="M6 39 29 22" stroke="#e86f9a" stroke-width="2.4"/>
+      <circle cx="30" cy="21" r="10" fill="#fff6e3" fill-opacity=".85"/><circle cx="30" cy="21" r="5" stroke-width="1.4"/>
+      <path d="M30 7v6m0 16v6M16 21h6m16 0h6" stroke-width="1.8"/><circle cx="30" cy="21" r="1.6" fill="#e86f9a"/>
+    </g>
+  </symbol>
+  <symbol id="skill-mind-gap" viewBox="0 0 48 48">
+    <desc>A thinking brain split by a measured gap</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-int)" stroke="#4c88ab" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#4c88ab" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M22.5 11c-3-2-7-1-7.5 2-4 0-6 4-4 7-3 2-2 7 1.5 8 0 4 5 5.5 7.5 3.5 1 1 2 1 2.5 1Z" fill="#f4a7bf"/>
+      <path d="M25.5 11c3-2 7-1 7.5 2 4 0 6 4 4 7 3 2 2 7-1.5 8 0 4-5 5.5-7.5 3.5-1 1-2 1-2.5 1Z" fill="#f4a7bf"/>
+      <path d="M15 17q3 0 4 3m-5 4q3-1 5 1m15-8q-3 0-4 3m5 4q-3-1-5 1" stroke-width="1.1"/>
+      <path d="M16 39h16m-3-3 3 3-3 3m-10-6-3 3 3 3" stroke-width="1.6"/>
+    </g>
+  </symbol>
+  <symbol id="skill-forbidden-grimoire" viewBox="0 0 48 48">
+    <desc>A sealed spellbook with a glowing sigil</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-int)" stroke="#4c88ab" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#4c88ab" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M14 39h21v3H14Z" fill="#fff6e3"/>
+      <path d="M12 8h22a2 2 0 0 1 2 2v27a2 2 0 0 1-2 2H12Z" fill="#7c4a8a"/><path d="M15 8v31" stroke-width="1.2"/>
+      <path d="M36 20h-4v7h4" fill="#f2c35f"/>
+      <path d="M24 15l1.8 4.2 4.5.4-3.4 3 1 4.4-3.9-2.3-3.9 2.3 1-4.4-3.4-3 4.5-.4Z" fill="#f2c35f" stroke-width="1"/>
+      <path d="M41 6Q41 9 44 9Q41 9 41 12Q41 9 38 9Q41 9 41 6Z" fill="#fff6e3" stroke-width="1"/>
+    </g>
+  </symbol>
+  <symbol id="skill-peer-review" viewBox="0 0 48 48">
+    <desc>A checklist under a magnifying glass</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-int)" stroke="#4c88ab" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#4c88ab" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M11 7h18l6 6v27H11Z" fill="#fff6e3"/><path d="M29 7v6h6" fill="#e3dccd"/>
+      <path d="M15 15l2 2 3-3m3 1.5h7M15 23l2 2 3-3m3 1.5h5" stroke-width="1.4"/>
+      <path d="M35.5 35.5 41 41" stroke-width="5.2"/><path d="M35.5 35.5 41 41" stroke="#cf9257" stroke-width="2.6"/><circle cx="31" cy="31" r="6" fill="#dff3f7"/><path d="M28 29q1-2 3-2" stroke="#fff" stroke-width="1.4"/>
+    </g>
+  </symbol>
+  <symbol id="skill-mana-barrier" viewBox="0 0 48 48">
+    <desc>A crystal hexagon shield</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-int)" stroke="#4c88ab" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#4c88ab" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M24 6 39 15v18L24 42 9 33V15Z" fill="#bfe4f2"/><path d="M24 12 34 18v12L24 36 14 30V18Z" fill="#dff3f7" stroke-width="1.1"/>
+      <path d="M24 17l5 7-5 7-5-7Z" fill="#6fb6d9"/><path d="M22.5 21l1.5-2" stroke="#fff" stroke-width="1.2"/>
+    </g>
+  </symbol>
+  <symbol id="skill-coffee-break" viewBox="0 0 48 48">
+    <desc>A steaming mug of coffee</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-int)" stroke="#4c88ab" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#4c88ab" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M18 14q-2-3 0-5t0-5m6 10q-2-3 0-5t0-5m6 10q-2-3 0-5t0-5" stroke-width="1.4" stroke-opacity=".8"/>
+      <path d="M32 21h3a5 5 0 0 1 0 10h-3" stroke-width="2.4"/>
+      <path d="M12 18h20v15a6 6 0 0 1-6 6h-8a6 6 0 0 1-6-6Z" fill="#e8a36b"/><ellipse cx="22" cy="18" rx="10" ry="2.4" fill="#7a4a2c"/>
+      <path d="M15 23v9" stroke="#fff" stroke-width="1.6" stroke-opacity=".8"/>
+    </g>
+  </symbol>
+  <symbol id="skill-jack-of-all-trades" viewBox="0 0 48 48">
+    <desc>A fanned hand of three cards led by a jack</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-normal)" stroke="#a7843f" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a7843f" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <rect x="9" y="12" width="17" height="25" rx="2.5" fill="#e48d64" transform="rotate(-16 17.5 24.5)"/>
+      <rect x="22" y="12" width="17" height="25" rx="2.5" fill="#8ccbe2" transform="rotate(16 30.5 24.5)"/>
+      <rect x="15.5" y="9" width="17" height="27" rx="2.5" fill="#fff6e3"/>
+      <path d="M27 15v10a3.5 3.5 0 0 1-7 0" stroke-width="2.2"/><path d="M19 12l1.6 2-1.6 2-1.6-2Z" fill="#e86f9a" stroke-width=".8"/>
+    </g>
+  </symbol>
+  <symbol id="skill-equalizer-field" viewBox="0 0 48 48">
+    <desc>A perfectly balanced scale</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-normal)" stroke="#a7843f" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a7843f" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M24 11v26M17 38h14M10 16h28" stroke-width="2"/><circle cx="24" cy="10" r="2" fill="#f2c35f"/>
+      <path d="M12 16l-4 10m4-10 4 10m20-10-4 10m4-10 4 10" stroke-width="1.1"/>
+      <path d="M7 26h10a5 3 0 0 1-10 0Zm24 0h10a5 3 0 0 1-10 0Z" fill="#f2c35f"/>
+    </g>
+  </symbol>
+  <symbol id="skill-golden-ratio" viewBox="0 0 48 48">
+    <desc>A golden spiral shell</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-normal)" stroke="#a7843f" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a7843f" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M40 27a16 14 0 0 1-31 3c-2-9 4-17 13-18 9-1 16 5 16 12Z" fill="#f6dfae"/>
+      <path d="M24 25a1.5 1.5 0 0 1 1.5 1.5 1.5 1.5 0 0 1-1.5 1.5 3 3 0 0 1-3-3 4.5 4.5 0 0 1 4.5-4.5 7.5 7.5 0 0 1 7.5 7.5 12 12 0 0 1-12 12" stroke="#b9781f" stroke-width="2"/>
+      <path d="M17 19l-3-3m8-1-1-4m9 4 2-3m3 10 4-1" stroke="#d09a52" stroke-width="1.4"/><path d="M40 8.5Q40 12 43.5 12Q40 12 40 15.5Q40 12 36.5 12Q40 12 40 8.5Z" fill="#fff6e3" stroke-width="1"/>
+    </g>
+  </symbol>
+  <symbol id="skill-claw-strike" viewBox="0 0 48 48">
+    <desc>Three swift claw marks</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-normal)" stroke="#a7843f" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a7843f" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M15 11q4 12-3 26M24 9q5 14-3 30M33 11q4 12-3 26" stroke-width="6"/>
+      <path d="M15 11q4 12-3 26M24 9q5 14-3 30M33 11q4 12-3 26" stroke="#fff6e3" stroke-width="3"/>
+    </g>
+  </symbol>
+  <symbol id="skill-heavy-strike" viewBox="0 0 48 48">
+    <desc>A big wooden mallet</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-normal)" stroke="#a7843f" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a7843f" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M25 19 34 40" stroke-width="5.6"/><path d="M25 19 34 40" stroke="#b57a4f" stroke-width="3"/>
+      <rect x="10" y="9" width="24" height="12" rx="3" fill="#cf9257" transform="rotate(-20 22 15)"/>
+      <path d="M14 14l2 7m14-12 2 7" stroke-width="1.2" transform="rotate(-20 22 15)"/><path d="M7 30l4 1m-3 5 4-2" stroke-width="1.4"/>
+    </g>
+  </symbol>
+  <symbol id="skill-firebolt" viewBox="0 0 48 48">
+    <desc>A bright bolt of fire</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-int)" stroke="#4c88ab" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#4c88ab" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M24 6c3 8 12 11 12 21a12 12 0 0 1-24 0c0-6 4-9 5-14 2 3 2 6 4 7 1-5 1-9 3-14Z" fill="#f08a3c"/>
+      <path d="M24 24c2 4 6 5 6 10a6 6 0 0 1-12 0c0-4 3-5 3-8 1 1 2 2 3 2Z" fill="#f9d36b" stroke-width="1.2"/>
+    </g>
+  </symbol>
+  <symbol id="skill-tide-crash" viewBox="0 0 48 48">
+    <desc>A curling, crashing wave</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-str)" stroke="#b25a3c" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#b25a3c" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M7 38c7 0 8-5 10-11 3-9 10-14 19-12 6 1.5 7 7.5 3 10-2-4-7-4-8 0-1 5 4 9 10 10v3Z" fill="#6fb6d9"/>
+      <path d="M29 17q6-1 8 4" stroke="#fff6e3" stroke-width="2"/><path d="M5 41h38" stroke-width="1.4"/>
+    </g>
+  </symbol>
+  <symbol id="skill-vine-lash" viewBox="0 0 48 48">
+    <desc>A curling vine whip</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-cha)" stroke="#a05489" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a05489" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M10 39c4-12 22-8 22-20 0-6-6-8-9-4" stroke-width="5.4"/><path d="M10 39c4-12 22-8 22-20 0-6-6-8-9-4" stroke="#86ab62" stroke-width="2.8"/>
+      <path d="M18 30q-8 0-7-7 7 0 7 7Zm12-6q7 3 10-3-6-4-10 3Zm-6-14q-2-6 3-8 3 6-3 8Z" fill="#86ab62"/>
+    </g>
+  </symbol>
+  <symbol id="skill-bump" viewBox="0 0 48 48">
+    <desc>The Slime King’s bouncing bump</desc>
+    <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#si-normal)" stroke="#a7843f" stroke-width="1.5"/>
+    <path d="M8 15q0-7 7-7h17" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="24" cy="41" rx="14" ry="2.6" fill="#a7843f" stroke="none" opacity=".22"/>
+    <g fill="none" stroke="#4f3222" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" >
+      <path d="M24 5v4m-11 0 2.5 3M35 9l-2.5 3" stroke-width="1.6"/>
+      <path d="M10 38c0-10 6-19 14-19s14 9 14 19Z" fill="#8db6a0"/><path d="M8 38h32" stroke-width="1.6"/>
+      <path d="M18 19l1-6 3 3 2-4 2 4 3-3 1 6Z" fill="#f2c35f" stroke-width="1.2"/>
+      <circle cx="20" cy="29" r="1.4" fill="#4f3222" stroke="none"/><circle cx="28" cy="29" r="1.4" fill="#4f3222" stroke="none"/>
+      <path d="M22 33q2 1.5 4 0" stroke-width="1.2"/><path d="M14 30q0-4 3-6" stroke="#fff" stroke-width="1.4"/>
+    </g>
+  </symbol>
+</svg>

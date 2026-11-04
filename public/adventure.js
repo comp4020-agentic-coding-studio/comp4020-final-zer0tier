@@ -182,6 +182,14 @@ const icons = {
   goblin: '<use href="#monster-goblin"/>',
   'slime-king': '<use href="#monster-slime-king"/>',
 };
+// Each skill's own illustrated badge from the shared sheet, decorative beside its name.
+const skillIcon = id => {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'), use = document.createElementNS(svg.namespaceURI, 'use');
+  svg.setAttribute('class', 'skill-icon'); svg.setAttribute('viewBox', '0 0 48 48'); svg.setAttribute('aria-hidden', 'true');
+  use.setAttribute('href', `/scenes/skill-icons.svg#skill-${id}`);
+  svg.append(use);
+  return svg;
+};
 const mapIcon = kind => `<svg viewBox="0 0 ${icons[kind] ? '24 24' : '96 96'}" aria-hidden="true" class="adventure-icon">${icons[kind] || `<use href="/scenes/adventure-atlas.svg#${kind}"/>`}</svg>`;
 const legend = guide.querySelector('.adventure-legend');
 for (const [kind, label] of [['grass', 'Tall grass'], ['slime', 'Wild slime'], ['goblin', 'Wild goblin'], ['slime-king', 'Slime King'], ['chest', 'Chest'], ['up', 'Stairs up'], ['down', 'Stairs down'], ['lock', 'Locked exit'], ['key', 'Floor Key']]) {
@@ -621,9 +629,10 @@ function renderInventory() {
   const abilities = adventure.querySelector('#adventure-abilities');
   abilities.replaceChildren();
   for (const ability of inventory.abilities.filter(a => a.learned)) {
-    const row = document.createElement('li');
+    const row = document.createElement('li'), text = document.createElement('span');
     const type = ability.type && ability.type !== 'normal' ? `${typeName(ability.type)} · ` : '';
-    row.textContent = `${ability.name} · ${type}${ability.mpCost} MP${ability.equipped ? ' · Equipped' : ''}. ${ability.description}`;
+    text.textContent = `${ability.name} · ${type}${ability.mpCost} MP${ability.equipped ? ' · Equipped' : ''}. ${ability.description}`;
+    row.append(skillIcon(ability.id), text);
     abilities.append(row);
   }
   const coins = adventure.querySelector('#adventure-coins');

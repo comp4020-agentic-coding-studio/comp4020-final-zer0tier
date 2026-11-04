@@ -215,6 +215,14 @@ log and fighters stay visible but dimmed behind the overlay. Adventure keeps
 its own specific labels in this same spot — **Return to map** mid-run, or
 **Back to records** after reviewing a finished run's replays.
 
+Every battle skill, including Claw Strike, legacy moves, and the Slime
+King's Bump, has its own small illustrated badge, tinted by its type (STR,
+CHA, INT, or Normal). It appears beside the skill's name in the home skill
+book, equipped summary, and saved loadouts, on each battle choice, on the
+battle banner for the skill being used, and in the Adventure backpack.
+Unlearned skills show a faded badge. The badges are decorative; skill names
+stay in text. They come from one local sheet, `public/scenes/skill-icons.svg`.
+
 Battles also have original sound effects: each pet species has a distinct
 cartoon voice, and skills use swishes, impacts, magic, shields, or healing
 chimes to match their animations. Both attacking pets and struck opponents

@@ -34,9 +34,18 @@ document.addEventListener("world:scene", event => {
 
 const typeLabel = (ability) => ability.type && ability.type !== "normal" ? `${ability.type.toUpperCase()} · ` : "";
 $("home-skill-filter").addEventListener("change", renderSkills);
-function skillNames(abilities) {
-  return abilities.map(id => rules.fight.abilities.find(ability => ability.id === id)?.name || id).join(" · ");
-}
+// Each skill's own illustrated badge from the shared sheet, decorative beside its name.
+const skillIcon = (id, inline = false) => {
+  const svg = document.createElementNS(SVG_NS, "svg"), use = document.createElementNS(SVG_NS, "use");
+  svg.setAttribute("class", inline ? "skill-icon is-inline" : "skill-icon");
+  svg.setAttribute("viewBox", "0 0 48 48"); svg.setAttribute("aria-hidden", "true");
+  use.setAttribute("href", `/scenes/skill-icons.svg#skill-${id}`);
+  svg.append(use);
+  return svg;
+};
+// Icon-and-name pairs separated by " · ", so the text reads as a plain list.
+const skillChips = (abilities, label = id => rules.fight.abilities.find(ability => ability.id === id)?.name || id) =>
+  abilities.flatMap((id, index) => [...(index ? [" · "] : []), skillIcon(id, true), label(id)]);
 function renderSkillLoadouts(selected, locked) {
   for (const slot of rules.fight.skillLoadouts || []) {
     let row = $("home-loadout-list").querySelector(`[data-loadout="${slot.id}"]`);
@@ -62,7 +71,7 @@ function renderSkillLoadouts(selected, locked) {
     const saved = current.skillLoadouts?.[slot.id];
     const matches = Boolean(saved && saved.length === selected.length && saved.every((id, index) => id === selected[index]));
     row.dataset.equipped = String(matches);
-    row.querySelector("p").textContent = saved ? skillNames(saved) : "No setup saved yet.";
+    row.querySelector("p").replaceChildren(...(saved ? skillChips(saved) : ["No setup saved yet."]));
     const equip = row.querySelector('[data-loadout-action="equip"]'), save = row.querySelector('[data-loadout-action="save"]');
     equip.textContent = matches ? "Equipped" : "Use";
     equip.setAttribute("aria-label", matches ? `${slot.name} skills equipped` : `Use ${slot.name} loadout`);
@@ -85,7 +94,7 @@ function renderSkills() {
   const filter = $("home-skill-filter").value;
   const known = current.abilities || ["claw-strike"];
   const combat = current.combat;
-  $("home-equipped-skills").textContent = `Equipped ${selected.length}/4: ${skillNames(selected)}`;
+  $("home-equipped-skills").replaceChildren(`Equipped ${selected.length}/4: `, ...skillChips(selected));
   renderSkillLoadouts(selected, locked);
   $("home-pet-type").textContent = combat ? `${combat.type.toUpperCase()} type · ${combat.maxHp} Max HP · ${combat.maxMp} Max MP. STR beats CHA, CHA beats INT, INT beats STR: +20% damage and 20% mitigation. Normal is neutral.` : '';
   $("home-skill-list").replaceChildren(...rules.fight.abilities.filter(ability =>
@@ -96,6 +105,7 @@ function renderSkills() {
     const row = document.createElement("div"), content = document.createElement("div");
     row.className = "home-skill";
     row.dataset.equipped = String(equipped);
+    row.dataset.learned = String(learned);
     const title = document.createElement("strong"), hint = document.createElement("small");
     title.textContent = `${ability.name} · ${typeLabel(ability)}${ability.mpCost} MP`;
     const stats = ability.category ? `${ability.category} · Power ${ability.power} · ${ability.accuracy === 'sure-hit' ? 'Sure-hit' : `${ability.accuracy}% accuracy`}. ` : '';
@@ -108,7 +118,7 @@ function renderSkills() {
     button.setAttribute("aria-pressed", String(equipped));
     button.disabled = locked || !learned || ability.id === "claw-strike" || (!equipped && selected.length >= 4);
     button.addEventListener("click", () => saveSkills(equipped ? selected.filter(id => id !== ability.id) : [...selected, ability.id]));
-    row.append(content, button);
+    row.append(skillIcon(ability.id), content, button);
     return row;
   }));
   $("home-skill-list").setAttribute("aria-busy", String(Boolean(savingSkills)));
@@ -1383,8 +1393,11 @@ function render(pet) {
   }
   renderMeters(pet);
   if (rules) {
-    $("learned-abilities").textContent = rules.fight.abilities.filter(a => (pet.abilities || ['claw-strike']).includes(a.id))
-      .map(a => `${a.name} (${typeLabel(a)}${a.mpCost} MP)`).join(' · ');
+    const learned = rules.fight.abilities.filter(a => (pet.abilities || ['claw-strike']).includes(a.id));
+    $("learned-abilities").replaceChildren(...skillChips(learned.map(a => a.id), id => {
+      const a = learned.find(ability => ability.id === id);
+      return `${a.name} (${typeLabel(a)}${a.mpCost} MP)`;
+    }));
     renderSkills();
     renderBusy(pet);
     renderSchool(pet, previous);
