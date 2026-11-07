@@ -400,7 +400,7 @@ for (const selector of ['#world-pet-summary', '#home-interaction-label', '.home-
 }
 const signoutAnchor = document.createComment('sign out position');
 worldById('signout').before(signoutAnchor);
-for (const node of [worldById('visitors-heading'), worldById('visitors'), worldById('visitors-empty'), worldById('theft-notifications'), worldById('fight-log').previousElementSibling, worldById('fight-log'), worldById('feed-heading'), worldById('feed')]) worldPanels.journal.append(node);
+for (const node of [worldById('visitors-heading'), worldById('visitors'), worldById('visitors-empty'), worldById('guestbook'), worldById('theft-notifications'), worldById('fight-log').previousElementSibling, worldById('fight-log'), worldById('feed-heading'), worldById('feed')]) worldPanels.journal.append(node);
 const journalEmpty = document.createElement('p');
 journalEmpty.className = 'help';
 journalEmpty.id = 'world-reports-empty';
@@ -427,7 +427,7 @@ const worldPlaces = {
   school: ['A little learning', 'Every lesson brings your pet a little further. Choose a course and watch them grow.'],
   work: ['Part-time jobs', 'Find a shift that suits your pet. Build skills, earn money, and work your way up.'],
   arena: ['The town arena', 'Meet your neighbours, visit their pets, or challenge someone to a friendly rivalry.'],
-  journal: ['Your town journal', 'Recent visitors, battles, town news, and any theft reports that need your attention.'],
+  journal: ['Your town journal', 'Recent visitors, their notes, battles, town news, and any theft reports that need your attention.'],
   appearance: ['A style of your own', 'Dress for your next stroll, or give your companion a new look.'],
   pet: ['Your companion', 'A little affection goes a long way. Play, care, or see how your pet is doing.'],
   menu: ['Make yourself at home', ''],

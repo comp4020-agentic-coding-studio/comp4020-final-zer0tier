@@ -7,6 +7,7 @@ import type { FeedEntry } from "./feed.ts";
 import type { BattleSession, Fight, Pet } from "./pets.ts";
 import type { Team } from "./teams.ts";
 import type { Touch } from "./touches.ts";
+import type { Note } from "./notes.ts";
 import { stopWorld, type WorldEmote, type WorldPosition } from './world.ts';
 import { audienceOf, unwatch, type WatcherCount } from './watch.ts';
 
@@ -31,7 +32,11 @@ export type ServerEvent =
   | { type: "team:updated"; team: Team }
   // A visitor touched someone else's pet. It reacts in every window showing
   // it, and its owner's visitors list gains the touch.
-  | { type: "pet:touched"; touch: Touch };
+  | { type: "pet:touched"; touch: Touch }
+  // A visitor left a guestbook note. Only the pet's owner and that visitor hear it.
+  | { type: "pet:noted"; note: Note }
+  // An owner cleared their guestbook. Only the owner's own windows hear it.
+  | { type: "notes:cleared"; pet: string };
 
 let wss: WebSocketServer | undefined;
 const credentials = new WeakMap<WebSocket, string | undefined>();
@@ -144,9 +149,13 @@ export function attachRealtime(server: Server): void {
 export function broadcast(event: ServerEvent): void {
   if (!wss) return;
   const message = JSON.stringify(event);
-  // A live fight's turns reach its two fighters and its saved audience.
+  // A live fight's turns reach its two fighters and its saved audience; a
+  // guestbook note, only the owner and the visitor who wrote it.
   const audience = event.type === "battle:updated"
-    ? new Set([event.session.attacker, event.session.defender, ...audienceOf(event.session.id)]) : null;
+    ? new Set([event.session.attacker, event.session.defender, ...audienceOf(event.session.id)])
+    : event.type === "pet:noted" ? new Set([event.note.pet, event.note.visitor])
+    : event.type === "notes:cleared" ? new Set([event.pet])
+    : null;
   let recipients = 0;
   for (const client of wss.clients) {
     if (client.readyState === WebSocket.OPEN) {

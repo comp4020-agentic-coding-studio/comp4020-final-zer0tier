@@ -34,6 +34,7 @@ import { logEvent, ROOM } from "./logging.ts";
 import { logRequest } from "./request-logging.ts";
 import { schedule, scheduleAll } from "./scheduler.ts";
 import { TOUCH_KINDS, isTouchKind, touch, touchesOn } from "./touches.ts";
+import { NOTE_COOLDOWN_MS, NOTES_KEPT, PHRASES, clearNotes, isPhraseId, leaveNote, notesFor } from "./notes.ts";
 
 const app = express();
 app.use((req, res, next) => {
@@ -431,6 +432,7 @@ app.get("/api/rules", (_req, res) => {
     botId: BOT_ID,
     steal: STEAL,
     leaderboardSize: LEADERBOARD_SIZE,
+    guestbook: { phrases: PHRASES, kept: NOTES_KEPT, cooldownMs: NOTE_COOLDOWN_MS },
   });
 });
 
@@ -617,6 +619,37 @@ app.post("/api/pets/:id/gift/:pet", (req, res) => {
   broadcast({ type: "pet:updated", pet: outcome.pet });
   followUp();
   res.json(outcome);
+});
+
+// The guestbook. Leaving a note goes as your own pet (the owner check above);
+// it's saved, logged, then sent to the owner and the visitor. Only the owner
+// can read or clear their guestbook.
+app.get("/api/pets/:id/notes", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (!isValidId(req.params.id) || !getPet(req.params.id)) return notFound(res, "pet");
+  const player = playerFor(req.headers.cookie);
+  if (!player) return void res.status(401).json({ error: "Sign in first." });
+  if (player !== req.params.id) return void res.status(403).json({ error: "Only its owner can read a guestbook." });
+  res.json(notesFor(req.params.id));
+});
+app.post("/api/pets/:id/note/:pet", (req, res) => {
+  if (!isValidId(req.params.id) || !isValidId(req.params.pet)) return notFound(res, "pet");
+  const phrase = req.body?.phrase;
+  if (!isPhraseId(phrase)) return void res.status(400).json({ error: `phrase must be one of ${PHRASES.map((p) => p.id).join(", ")}` });
+  const outcome = leaveNote(req.params.id, req.params.pet, phrase);
+  if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
+  logEvent("action_result", {
+    user: outcome.note.visitor, room: ROOM, client_in_room: clientsInRoom(),
+    action: "note", pet: outcome.note.pet, phrase: outcome.note.phrase,
+  });
+  broadcast({ type: "pet:noted", note: outcome.note });
+  res.json(outcome.note);
+});
+app.post("/api/pets/:id/notes/clear", (req, res) => {
+  const cleared = clearNotes(req.params.id);
+  logEvent("action_result", { user: req.params.id, room: ROOM, client_in_room: clientsInRoom(), action: "clear_notes", cleared });
+  broadcast({ type: "notes:cleared", pet: req.params.id });
+  res.json({ cleared });
 });
 
 // Playing with someone else's pet, as your own: saved, logged, then broadcast

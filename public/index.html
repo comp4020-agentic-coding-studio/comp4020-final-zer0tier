@@ -344,6 +344,15 @@
           <h4 id="visitors-heading" class="visitors-heading">Recent visitors</h4>
           <ul id="visitors" class="visitors" aria-labelledby="visitors-heading"></ul>
           <p id="visitors-empty" class="help">Nobody has dropped by yet. Other players can visit from the Arena.</p>
+          <section id="guestbook" class="guestbook" aria-labelledby="guestbook-heading">
+            <div class="guestbook-head">
+              <h4 id="guestbook-heading" class="visitors-heading">Guestbook</h4>
+              <button type="button" id="guestbook-clear" class="chip-btn" hidden>Clear</button>
+            </div>
+            <ul id="guestbook-notes" class="visitors" aria-labelledby="guestbook-heading"></ul>
+            <p id="guestbook-empty" class="help">No notes yet. Visitors can leave you one from your home.</p>
+            <p id="guestbook-error" class="error" role="alert"></p>
+          </section>
         </section>
 
         <form id="outfit-settings" class="appearance-settings" aria-labelledby="outfit-heading">
@@ -513,6 +522,13 @@
                 <p id="help-news" class="hint" role="status"></p>
                 <p id="help-error" class="error" role="alert"></p>
               </section>
+              <section id="visit-note" class="visit-help" aria-labelledby="visit-note-heading">
+                <h5 id="visit-note-heading" class="visit-help-heading">Leave a note</h5>
+                <div id="note-phrases" class="note-phrases" role="group" aria-labelledby="visit-note-heading"></div>
+                <p id="note-hint" class="hint"></p>
+                <p id="note-news" class="hint" role="status"></p>
+                <p id="note-error" class="error" role="alert"></p>
+              </section>
               <section id="visit-gift" class="visit-help" aria-labelledby="visit-gift-heading">
                 <h5 id="visit-gift-heading" class="visit-help-heading"><svg class="icon" aria-hidden="true"><use href="#i-gift" /></svg> Give a gift</h5>
                 <div id="gift-buttons" class="help-buttons"></div>
@@ -602,6 +618,7 @@
     <script type="module" src="/adventure.js"></script>
     <script type="module" src="/confirm.js"></script>
     <script type="module" src="/interact.js"></script>
+    <script type="module" src="/notes.js"></script>
     <script type="module" src="/world.js"></script>
     <script type="module" src="/music.js"></script>
     <script type="module" src="/battle-audio.js"></script>

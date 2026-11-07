@@ -144,6 +144,17 @@ db.exec(`
     at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
   CREATE INDEX IF NOT EXISTS touches_by_pet ON touches (pet, id);
+  -- Guestbook notes: a visitor's fixed phrase left for a pet's owner. Only each
+  -- pet's newest few are kept, for its owner's Journal.
+  CREATE TABLE IF NOT EXISTS notes (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    visitor TEXT NOT NULL REFERENCES pets (id),
+    pet     TEXT NOT NULL REFERENCES pets (id),
+    phrase  TEXT NOT NULL,
+    at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+  CREATE INDEX IF NOT EXISTS notes_by_pet ON notes (pet, id);
+  CREATE INDEX IF NOT EXISTS notes_by_visitor ON notes (pet, visitor, id);
   CREATE TABLE IF NOT EXISTS accounts (
     id            TEXT PRIMARY KEY REFERENCES pets (id),
     password_hash TEXT NOT NULL,

@@ -425,6 +425,13 @@ played with your pet, each with their latest touch and when it happened,
 newest first. When someone touches your pet while you're signed in, it
 reacts at home and says who did it.
 
+Below it, your **Guestbook** keeps the 10 newest notes visitors left you
+(see **Leave a note** under **Visit, play and steal**), each with who wrote
+it and when, newest first. A new note appears there live, with a notice
+saying who left it. Only you can read your guestbook. **Clear** removes
+every note after you confirm in the Yes/No window; every window you have
+open empties together.
+
 ### School
 
 Visit **School** on the town map to take lessons. Every pet starts at
@@ -673,6 +680,16 @@ reacts only once that news arrives — in your window, in its owner's (whose
 player can touch a given pet once a second. Touching costs nothing, works
 while either pet is busy, and changes no money, stats, stamina, or hygiene.
 
+**Leave a note** for its owner by choosing one of eight fixed phrases:
+*Your pet is adorable!*, *Thanks for the food!*, *Thanks for the gift!*,
+*Rematch?*, *Good fight!*, *Come visit me!*, *Want to team up?*, or
+*Sorry about that…*. There's no free text, so there's nothing to moderate.
+The note is saved as from your pet and lands in the owner's **Guestbook**;
+your window confirms it once it's saved. You can leave a given pet one note
+every 10 seconds. Notes cost nothing, work while either pet is busy, and
+can't be left for yourself or the bot. Only you and the owner hear about a
+note: it isn't announced to anyone else.
+
 **Help out** by feeding or cleaning it. The visit shows its stamina and
 hygiene; **Feed** and **Clean** give it one Food or Soap **from your own
 cupboard** (bought at the shop or collected as free daily supplies),
@@ -775,7 +792,9 @@ and the built-in `node:sqlite` for storage.
   `steal/:opponent`, `help/:pet` (with `{"item": "food"}` or `"soap"`),
   `gift/:pet` (with `{"item": "food"}`, `"soap"`, `"hourglass"`, or a coin ID;
   409 when you have none spare, 400 for yourself or the bot),
-  `touch/:pet` (with `{"kind": "pat"}`), and `equip-coin/:coin` (`:coin` is
+  `touch/:pet` (with `{"kind": "pat"}`), `note/:pet` (with `{"phrase":
+  "rematch"}`, a phrase ID from `/api/rules`; 429 within 10 seconds of your
+  last note to that pet), `notes/clear`, and `equip-coin/:coin` (`:coin` is
   `copper-coin`, `silver-coin`, `gold-coin`, or `none` to unequip).
   `collect-supplies` adds the free daily Food and Soap, and sets the pet's
   `suppliesAvailableAt` (epoch milliseconds of the next UTC midnight, or
@@ -840,7 +859,10 @@ and the built-in `node:sqlite` for storage.
   entry in Happening now (sent after the change it describes), a
   `team:updated` event whenever a team in the **Team up** window changes or
   sets off, and a `pet:touched` event, carrying the saved touch, whenever a
-  visitor plays with someone else's pet. The feed keeps its newest 500
+  visitor plays with someone else's pet. `pet:noted` carries a saved
+  guestbook note to that pet's owner and the visitor only, and `notes:cleared`
+  reaches only the owner's windows; `GET /api/pets/:id/notes` is the owner's
+  guestbook, newest 10, for the owner alone. The feed keeps its newest 500
   entries in SQLite. A `battle:updated` event sends saved Arena/revenge
   session changes to its two participants and the players watching it, and
   each screen shows the turn from that event. The browser re-reads a live

@@ -291,6 +291,15 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .visit-play { margin-bottom: 1rem; }
 .visit-help { margin-bottom: 1rem; }
 .visit-help-heading { margin: 0 0 0.25rem; font-size: 0.875rem; }
+/* Leaving a guestbook note: fixed phrases, as buttons that wrap. */
+.note-phrases { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+.note-phrases .chip-btn { min-height: 40px; padding-inline: 0.8rem; }
+/* The owner's guestbook, under Recent visitors in the Journal. */
+.guestbook { margin-top: 1rem; }
+.guestbook-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.guestbook-head h4 { margin: 0; }
+.guestbook-head .chip-btn[hidden] { display: none; }
+.guestbook q { font-style: italic; }
 #visit-gift-heading { display: flex; align-items: center; gap: 0.35rem; }
 #visit-gift-heading .icon { color: var(--pet); }
 .visit-help .meters { margin-top: 0.25rem; }
