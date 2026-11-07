@@ -18,18 +18,19 @@ the point of the game, not boxes to tick:
   owner can act for it, so a stranger can't train, shop, or fight with your
   pet. A player who joins while you're playing shows up in your Arena right
   away. Visiting is how players reach each other's pets: you can play with
-  (touch), feed, clean, or steal from a pet you visit, but always *as your
-  own pet*. The server checks your session owns the acting pet, and records
-  who did it. A touch changes nothing, so anyone may do it to any pet.
-  Feeding and cleaning spend only *your* food or soap, and can only raise the
-  other pet's stamina or hygiene. A visitor can help, but never use up or
-  harm what someone else owns. Owners see who came by, and the server logs
-  each touch and help by player.
+  (touch), feed, clean, give gifts to, or steal from a pet you visit, but
+  always *as your own pet*. The server checks your session owns the acting
+  pet, and records who did it. A touch changes nothing, so anyone may do it
+  to any pet. Feeding, cleaning, and gifts spend only *your* food, soap,
+  hourglasses, or spare coins, and can only add to the other pet. A visitor
+  can help, but never use up or harm what someone else owns. Owners see who
+  came by, and the server logs each touch, help, and gift by player.
   *Enforced:* `spec/pets.test.ts` (one pet per ID, owner-only actions,
   401/403), `spec/touch.test.ts` (touching only as your own pet, never your
-  own pet, and changing nothing else), `spec/help.test.ts` (helping only as
-  your own pet, from your own cupboard, exactly once), `spec/fight.test.ts`
-  (new pets listed after the bot).
+  own pet, and changing nothing else), `spec/help.test.ts` and
+  `spec/gift.test.ts` (helping and giving only as your own pet, from your own
+  cupboard, exactly once), `spec/gift-state.test.ts` (only spare coins, never
+  the one you wear), `spec/fight.test.ts` (new pets listed after the bot).
 - **You see each other act (real-time).** Every change to a pet, and every
   fight, reaches every open window within a second — no reload needed. Your
   rival's shift ending, their level-up, the fight they just started against
@@ -76,11 +77,12 @@ Some of "good" can only be judged by playing, not by `spec/`: whether waiting
 $150 hourglass) make choices interesting, and whether the Arena is more fun
 with a room full of people — the capstone showcase this is built for.
 
-**What I chose not to build (yet):** chat, trading, or giving items to other
-players outright. You can feed or clean their pet with your own food or
-soap, but not hand it over. Recruiting other players' pets is also still to
-come. Each would add interaction, but the first version proves the core loop
-— train, work, fight, see others do the same — before widening it.
+**What I chose not to build (yet):** chat and trading. You can give another
+player your own items and spare coins (see **Visit, play and steal**), but
+nothing comes back in exchange, so a gift can never be a lopsided trade.
+Recruiting other players' pets is also still to come. Each would add
+interaction, but the first version proves the core loop — train, work,
+fight, see others do the same — before widening it.
 
 **What I read or looked at:**
 
@@ -654,6 +656,19 @@ none to give, when that need is already full, or the bot. Helping works
 while either pet is busy. Both pets update live in every window, its owner
 gets a notice saying who helped, and it appears in **Happening now**.
 
+**Give a gift** from your own cupboard. The visit lists a button for each
+thing you can hand over, with how many you have: **Food**, **Soap**, an
+**Hourglass**, or a **Copper, Silver, or Gold Coin**. Each press gives
+**one** of it, straight into that pet's backpack; press again to give
+another. Your equipped coin stays with you: you can give a coin only if
+you own a spare copy, or after you unequip it at your backpack. A gift
+costs you only the item and changes no money, stats, stamina, or hygiene.
+You can't give to yourself or the bot. Giving works while either pet is
+busy, and a lesson or shift keeps running. Both cupboards update live in
+every window, the owner gets a notice saying who gave what, and the gift
+appears in **Happening now** and so in the owner's Journal. If two gifts
+of your last item race, only one goes through.
+
 **Steal $10–$30** takes a random whole dollar amount from that pet and adds
 it to yours. The amount never exceeds its balance; a pet with less than $10
 can't be robbed. Visiting and stealing are instant, cost no stamina or
@@ -679,7 +694,7 @@ train, and your own pet is highlighted when it makes the board.
 
 Below your fights, the Arena shows the 15 newest things that happened
 anywhere in the game, live: a player joining, every theft, every time
-someone feeds or cleans another player's pet, every fight (who won, and any
+someone feeds, cleans, or gives a gift to another player's pet, every fight (who won, and any
 money taken), a pet moving up a school, a pet getting promoted at work, and
 a pet or team clearing the woodland. Ordinary lessons and shifts stay out of
 it, so it isn't flooded. Entries about your pet, including a clear you shared,
@@ -730,6 +745,8 @@ and the built-in `node:sqlite` for storage.
   `work/:location` (with `{"minutes": 60}`), `upgrade/:location`,
   `buy/:item`, `use/:item`, `collect-supplies`, `fight/:opponent`,
   `steal/:opponent`, `help/:pet` (with `{"item": "food"}` or `"soap"`),
+  `gift/:pet` (with `{"item": "food"}`, `"soap"`, `"hourglass"`, or a coin ID;
+  409 when you have none spare, 400 for yourself or the bot),
   `touch/:pet` (with `{"kind": "pat"}`), and `equip-coin/:coin` (`:coin` is
   `copper-coin`, `silver-coin`, `gold-coin`, or `none` to unequip).
   `collect-supplies` adds the free daily Food and Soap, and sets the pet's

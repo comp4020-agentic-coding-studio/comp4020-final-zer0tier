@@ -653,6 +653,7 @@ let visitLoading = false;
 let visitReady = false;
 let stealing = false;
 let helping = null; // "food" or "soap" while a help request is in flight
+let gifting = null; // the item or coin ID while a gift request is in flight
 let fighting = false; // a fight request is in flight
 let arenaBlock = ""; // why this pet can't fight right now, or ""
 let avenging = null; // the pet that last attacked this one, for the Revenge button
@@ -778,6 +779,7 @@ function renderVisit() {
   }
   renderStealControls();
   renderHelpControls();
+  renderGiftControls();
   document.dispatchEvent(new CustomEvent('visit:pet', { detail: pet }));
 }
 
@@ -813,6 +815,86 @@ function renderHelpControls() {
     : hint || `Uses your own food or soap. You have ${current.food} food and ${current.soap} soap.`;
 }
 
+// Every item and Unfair Coin you could give, in shop then backpack order.
+const giftChoices = () => [...rules.items, ...(rules.treasure?.coins ?? [])];
+// How many you can hand over: your equipped coin's own copy stays with you.
+const giftable = (pet, choice) =>
+  pet.coins && choice.id in pet.coins ? pet.coins[choice.id] - Number(pet.equippedCoin === choice.id) : pet[choice.id] ?? 0;
+
+// Giving the visited pet one of your own items or spare coins. One button
+// per choice you can give; the server's broadcasts decide what's left.
+function renderGiftControls() {
+  const pet = rivals.get(visiting);
+  if (!pet || !rules || !current) return;
+  const loading = visitLoading || !visitReady;
+  const bot = pet.id === rules.botId;
+  const choices = giftChoices().filter((choice) => giftable(current, choice) > 0 || gifting === choice.id);
+  const container = $("gift-buttons");
+  // Keep keyboard focus on the same gift across rebuilds; if it's all given
+  // away, the section heading takes it so focus never drops to the page.
+  const focused = container.contains(document.activeElement) ? document.activeElement.dataset.gift : null;
+  container.replaceChildren(...choices.map((choice) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "chip-btn chip-buy";
+    button.dataset.gift = choice.id;
+    const count = giftable(current, choice);
+    button.textContent = gifting === choice.id ? "Giving…" : `${choice.name} (${count})`;
+    button.setAttribute("aria-label", `Give 1 ${choice.name} to ${pet.id}. You can give ${count}.`);
+    button.setAttribute("aria-busy", String(gifting === choice.id));
+    // The pressed button stays focusable while its gift is in flight.
+    button.disabled = bot || loading || (gifting !== null && gifting !== choice.id);
+    button.setAttribute("aria-disabled", String(gifting === choice.id));
+    button.addEventListener("click", () => giveGift(choice));
+    return button;
+  }));
+  if (focused) {
+    const again = container.querySelector(`[data-gift="${focused}"]:not(:disabled)`);
+    if (again) again.focus({ preventScroll: true });
+    else {
+      $("visit-gift-heading").tabIndex = -1;
+      $("visit-gift-heading").focus({ preventScroll: true });
+    }
+  }
+  const wearing = current.equippedCoin && current.coins?.[current.equippedCoin] === 1
+    ? ` Your equipped ${rules.treasure.coins.find((c) => c.id === current.equippedCoin)?.name ?? "coin"} stays with you.` : "";
+  $("gift-hint").textContent = loading ? ""
+    : bot ? "The bot doesn't need presents."
+    : choices.length ? `Give one at a time from your own cupboard.${wearing}`
+    : `You have nothing spare to give. Buy supplies at the shop, or collect your free daily supplies.${wearing}`;
+}
+
+async function giveGift(choice) {
+  if (!current || !visiting || gifting) return;
+  const owner = current.id;
+  const target = visiting;
+  const visit = visitLoads;
+  gifting = choice.id;
+  $("gift-error").textContent = "";
+  $("gift-news").textContent = "";
+  renderGiftControls();
+  try {
+    const res = await fetch(`/api/pets/${encodeURIComponent(owner)}/gift/${encodeURIComponent(target)}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ item: choice.id }),
+    });
+    if (current?.id !== owner) return;
+    if (res.status === 401) return sessionEnded();
+    if (res.status === 403) return sessionChanged();
+    const body = await res.json();
+    if (visit !== visitLoads) return;
+    if (!res.ok) $("gift-error").textContent = body.error ?? "Couldn't give that. Try again.";
+    else $("gift-news").textContent = `You gave ${target} 1 ${choice.name}.`;
+    // Both cupboards' new counts arrive through pet:updated in every window.
+  } catch {
+    if (current?.id === owner && visit === visitLoads) {
+      $("gift-error").textContent = "Couldn't confirm the gift. Check your backpack before trying again.";
+    }
+  } finally {
+    gifting = null;
+    renderGiftControls();
+  }
+}
+
 function renderStealControls() {
   const pet = rivals.get(visiting);
   if (!pet || !rules) return;
@@ -840,6 +922,8 @@ async function openVisit(id, focus = true, savedPet = null) {
   $("steal-error").textContent = "";
   $("help-news").textContent = "";
   $("help-error").textContent = "";
+  $("gift-news").textContent = "";
+  $("gift-error").textContent = "";
   renderVisit();
   if (focus) $("visit-heading").focus();
   const before = rivals.get(id);
@@ -877,6 +961,8 @@ function closeVisit() {
   $("steal-error").textContent = "";
   $("help-news").textContent = "";
   $("help-error").textContent = "";
+  $("gift-news").textContent = "";
+  $("gift-error").textContent = "";
 }
 
 $("visit-close").addEventListener("click", () => {
@@ -1153,6 +1239,13 @@ function onFight(fight) {
 // "Happening now": what everyone's pets have been up to, newest first.
 const FEED_SIZE = 15;
 
+// "a Gold Coin", "an Hourglass", "some Food": how a gift reads in a sentence.
+function giftLabel(id) {
+  const name = giftChoices().find((choice) => choice.id === id)?.name ?? "a gift";
+  if (id === "food" || id === "soap") return `some ${name}`;
+  return /^[AEIOU]/.test(name) || id === "hourglass" ? `an ${name}` : `a ${name}`;
+}
+
 function feedText(entry) {
   switch (entry.kind) {
     case "joined":
@@ -1163,6 +1256,8 @@ function feedText(entry) {
       return [entry.pet, ` stole $${entry.amount} from `, entry.other, "."];
     case "helped":
       return [entry.pet, entry.item === "food" ? " fed " : " cleaned ", entry.other, "."];
+    case "gifted":
+      return [entry.pet, ` gave `, entry.other, ` ${giftLabel(entry.item)}.`];
     case "fight": {
       const loser = entry.winner === entry.pet ? entry.other : entry.pet;
       return [entry.winner, " beat ", loser, entry.spoils ? ` and took $${entry.spoils}.` : "."];
@@ -1449,7 +1544,10 @@ function render(pet) {
     renderBusy(pet);
     renderSchool(pet, previous);
     renderControls(pet);
-    if (visiting) renderHelpControls(); // your own food and soap decide what you can give
+    if (visiting) {
+      renderHelpControls(); // your own food and soap decide what you can give
+      renderGiftControls(); // and your cupboard and spare coins what you can hand over
+    }
     if (previous?.id !== pet.id) {
       closeVisit();
       pinned = null;
@@ -1757,6 +1855,9 @@ function connect() {
         $("notice").textContent = event.entry.item === "food"
           ? `${event.entry.pet} fed your pet with their own food.`
           : `${event.entry.pet} cleaned your pet with their own soap.`;
+      }
+      if (event.entry.kind === "gifted" && event.entry.other === current.id) {
+        $("notice").textContent = `${event.entry.pet} gave you ${giftLabel(event.entry.item)}. It's in your backpack.`;
       }
       if (event.entry.kind === "stole" && event.entry.other === current.id) {
         loadThefts();

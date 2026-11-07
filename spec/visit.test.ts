@@ -182,3 +182,71 @@ it("tells the owner when someone feeds or cleans their pet", async () => {
     p.dom.window.close();
   }
 });
+
+it("gives the visited pet one of your own items or spare coins, and shows only what the broadcasts say", async () => {
+  const p = await page();
+  const { $, pet, opponent } = p;
+  const buttons = () => [...$("gift-buttons").querySelectorAll("button")] as HTMLButtonElement[];
+  try {
+    await p.visit(opponent.id);
+    // A new pet has nothing to give.
+    expect(buttons()).toHaveLength(0);
+    expect($("gift-hint").textContent).toBe("You have nothing spare to give. Buy supplies at the shop, or collect your free daily supplies.");
+    // Your cupboard fills; your only Gold Coin is equipped, so it stays with you.
+    const stocked = { ...pet, food: 2, soap: 0, hourglass: 1, coins: { "copper-coin": 0, "silver-coin": 2, "gold-coin": 1 }, equippedCoin: "gold-coin" };
+    p.send({ type: "pet:updated", pet: stocked });
+    expect(buttons().map((b) => b.textContent)).toEqual(["Food (2)", "Hourglass (1)", "Silver Coin (2)"]);
+    expect($("gift-hint").textContent).toBe("Give one at a time from your own cupboard. Your equipped Gold Coin stays with you.");
+    expect(buttons()[2].getAttribute("aria-label")).toBe("Give 1 Silver Coin to neighbour. You can give 2.");
+    // One press sends one gift; more presses while it's in flight send nothing.
+    // The pressed button keeps keyboard focus, marked busy rather than disabled.
+    buttons()[2].focus();
+    buttons()[2].click();
+    buttons()[2].click();
+    buttons()[0].click();
+    expect(buttons()[2].textContent).toBe("Giving…");
+    expect(buttons()[2].getAttribute("aria-disabled")).toBe("true");
+    expect(p.window.document.activeElement).toBe(buttons()[2]);
+    expect(buttons().filter((b) => b !== buttons()[2]).every((b) => b.disabled)).toBe(true);
+    const posts = p.requests.mock.calls.filter(([, options]) => options?.method === "POST");
+    expect(posts).toEqual([[`/api/pets/${pet.id}/gift/${opponent.id}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ item: "silver-coin" }),
+    }]]);
+    // Counts change only when your pet's broadcast arrives.
+    expect(buttons()[2].textContent).toBe("Giving…");
+    p.send({ type: "pet:updated", pet: { ...stocked, coins: { ...stocked.coins, "silver-coin": 1 } } });
+    p.finish(Response.json({ item: "silver-coin" }));
+    await vi.waitFor(() => expect($("gift-news").textContent).toBe("You gave neighbour 1 Silver Coin."));
+    expect(buttons().map((b) => b.textContent)).toEqual(["Food (2)", "Hourglass (1)", "Silver Coin (1)"]);
+    expect(buttons().every((b) => !b.disabled)).toBe(true);
+    expect(p.window.document.activeElement).toBe(buttons()[2]);
+    p.send({ type: "feed:added", entry: { id: 5, kind: "gifted", pet: pet.id, other: opponent.id, item: "silver-coin", at: new Date().toISOString() } });
+    expect($("feed").textContent).toContain("You gave neighbour a Silver Coin.");
+    // A refusal is shown, not applied.
+    buttons()[1].click();
+    p.finish(Response.json({ error: "You have no hourglass to give." }, { status: 409 }));
+    await vi.waitFor(() => expect($("gift-error").textContent).toBe("You have no hourglass to give."));
+    expect($("gift-news").textContent).toBe("");
+    expect(buttons()[1].textContent).toBe("Hourglass (1)");
+    // The bot doesn't take gifts.
+    await p.visit("0");
+    expect(buttons().every((b) => b.disabled)).toBe(true);
+    expect($("gift-hint").textContent).toBe("The bot doesn't need presents.");
+  } finally {
+    p.dom.window.close();
+  }
+});
+
+it("tells the owner when someone gives their pet a gift", async () => {
+  const p = await page();
+  const { $, pet } = p;
+  try {
+    p.send({ type: "feed:added", entry: { id: 6, kind: "gifted", pet: "neighbour", other: pet.id, item: "hourglass", at: new Date().toISOString() } });
+    expect($("notice").textContent).toBe("neighbour gave you an Hourglass. It's in your backpack.");
+    expect($("feed").textContent).toContain("neighbour gave you an Hourglass.");
+    p.send({ type: "feed:added", entry: { id: 7, kind: "gifted", pet: "neighbour", other: pet.id, item: "food", at: new Date().toISOString() } });
+    expect($("notice").textContent).toBe("neighbour gave you some Food. It's in your backpack.");
+  } finally {
+    p.dom.window.close();
+  }
+});

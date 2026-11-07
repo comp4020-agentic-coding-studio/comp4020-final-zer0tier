@@ -15,7 +15,7 @@ import {
   WORK_COST_PER_HOUR, buy, findCourse, findItem, findLocation, getOrCreatePet, getPet, isShiftLength, isValidId,
   matchBot, study, upgrade, use, work, BOT_ID, FIGHT_COOLDOWN_MINUTES, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS,
   SPOILS, LEADERBOARD_ORDERS, LEADERBOARD_SIZE, fight, isLeaderboardOrder, leaderboard, listPets, recentFights,
-  APPEARANCES, isAppearance, setAppearance, STEAL, steal, help, theftsFor, revenge, equipCoin, FREE_SUPPLIES, collectSupplies,
+  APPEARANCES, isAppearance, setAppearance, STEAL, steal, help, gift, isGiftId, GIFTS, theftsFor, revenge, equipCoin, FREE_SUPPLIES, collectSupplies,
   ADVENTURE_COST, ADVENTURE_COOLDOWN_MINUTES, equipSkills, battleSessionsFor, battleSessionFor, actInBattle, type BattleSessionOutcome, type Outcome,
   SKILL_LOADOUTS, saveSkillLoadout, equipSkillLoadout,
 } from "./pets.ts";
@@ -547,6 +547,24 @@ app.post("/api/pets/:id/help/:pet", (req, res) => {
     action: "help", pet: outcome.pet.id, item: outcome.item, amount: outcome.amount,
   });
   broadcast({ type: "pet:updated", pet: outcome.helper });
+  broadcast({ type: "pet:updated", pet: outcome.pet });
+  followUp();
+  res.json(outcome);
+});
+
+// Giving one of your own items or spare coins to someone else's pet. Both
+// cupboards are saved together, then broadcast; the feed entry follows them.
+app.post("/api/pets/:id/gift/:pet", (req, res) => {
+  if (!isValidId(req.params.id) || !isValidId(req.params.pet)) return notFound(res, "pet");
+  const item = req.body?.item;
+  if (!isGiftId(item)) return void res.status(400).json({ error: `item must be one of ${GIFTS.join(", ")}` });
+  const outcome = gift(req.params.id, req.params.pet, item);
+  if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
+  logEvent("action_result", {
+    user: outcome.giver.id, room: ROOM, client_in_room: clientsInRoom(),
+    action: "gift", pet: outcome.pet.id, item: outcome.item,
+  });
+  broadcast({ type: "pet:updated", pet: outcome.giver });
   broadcast({ type: "pet:updated", pet: outcome.pet });
   followUp();
   res.json(outcome);

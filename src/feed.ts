@@ -1,5 +1,6 @@
 import { db } from "./db.ts";
 import { broadcast } from "./realtime.ts";
+import type { GiftId } from "./pets.ts";
 
 // The Arena's "Happening now": moments worth telling everyone about, so each
 // player sees the others playing. Entries are data; the page words them.
@@ -9,6 +10,8 @@ export type FeedEntry =
   | { id: number; at: string; kind: "fight"; pet: string; other: string; winner: string; spoils: number }
   | { id: number; at: string; kind: "stole"; pet: string; other: string; amount: number }
   | { id: number; at: string; kind: "helped"; pet: string; other: string; item: "food" | "soap" }
+  // `pet` handed one item or Unfair Coin from its own cupboard to `other`.
+  | { id: number; at: string; kind: "gifted"; pet: string; other: string; item: GiftId }
   | { id: number; at: string; kind: "school"; pet: string; school: string }
   | { id: number; at: string; kind: "promoted"; pet: string; location: string; rank: number }
   // The Slime King fell. `team` lists every pet, in battle order, that earned

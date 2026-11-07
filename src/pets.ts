@@ -9,7 +9,7 @@ import { inventoryFor, grantTreasure } from "./inventory.ts";
 import { JOBS, SKILLS, jobLevel, type JobId } from './skills.ts';
 import { logEvent, ROOM } from "./logging.ts";
 import { clientsInRoom } from "./realtime.ts";
-import { isCoinId, type CoinId } from "./treasure.ts";
+import { COINS, isCoinId, type CoinId } from "./treasure.ts";
 
 // Keep this literal list identical to public/app.js: the unbundled browser
 // cannot import this server module (which opens SQLite).
@@ -839,6 +839,57 @@ export function help(helperId: string, petId: string, itemId: "food" | "soap"): 
     write(pet);
     record({ kind: "helped", pet: helperId, other: petId, item: item.id });
     return { helper: getPet(helperId)!, pet: getPet(petId)!, item: item.id, amount };
+  });
+}
+
+// Gifting: a visitor hands one Food, Soap, Hourglass, or spare Unfair Coin from
+// their own cupboard to someone else's. Like helping, it only ever spends the
+// giver's own things, and both cupboards change together or not at all.
+export const GIFTS = [...ITEMS.map((item) => item.id), ...COINS.map((coin) => coin.id)] as const;
+export type GiftId = ItemId | CoinId;
+export const isGiftId = (value: unknown): value is GiftId => GIFTS.some((id) => id === value);
+export type GiftOutcome =
+  | { giver: Pet; pet: Pet; item: GiftId }
+  | { status: 400 | 404 | 409; error: string };
+
+const giftName = (id: GiftId): string => (ITEMS.find((i) => i.id === id) ?? COINS.find((c) => c.id === id))!.name;
+// How many of `id` the giver can hand over: the equipped coin's own copy stays.
+export const giftable = (pet: Pet, id: GiftId): number =>
+  isCoinId(id) ? pet.coins[id] - Number(pet.equippedCoin === id) : pet[id as ItemId];
+
+const takeCoin = db.prepare("UPDATE inventory SET quantity = quantity - 1 WHERE player_id = ? AND item_id = ? AND quantity > 1");
+const dropCoin = db.prepare("DELETE FROM inventory WHERE player_id = ? AND item_id = ? AND quantity = 1");
+
+export function gift(giverId: string, petId: string, itemId: GiftId): GiftOutcome {
+  if (giverId === petId) return { status: 400, error: "That's already in your own cupboard." };
+  if (giverId === BOT_ID || petId === BOT_ID) return { status: 400, error: "The bot doesn't need presents." };
+  return transaction(() => {
+    const giver = getPet(giverId);
+    const pet = getPet(petId);
+    if (!giver) return { status: 404, error: "no such pet" };
+    if (!pet) return { status: 404, error: `There's no pet called ${petId}.` };
+    const name = giftName(itemId);
+    if (giftable(giver, itemId) < 1) {
+      return { status: 409, error: isCoinId(itemId) && giver.coins[itemId] > 0
+        ? `You're wearing your only ${name}. Equip another coin, or none, to give it away.`
+        : `You have no ${name.toLowerCase()} to give.` };
+    }
+    const now = Date.now();
+    finishIfDue(giver, now);
+    finishIfDue(pet, now);
+    if (isCoinId(itemId)) {
+      // One spare copy moves; the last one's row goes. `giftable` has already
+      // kept the giver's equipped copy back.
+      if (takeCoin.run(giverId, itemId).changes === 0) dropCoin.run(giverId, itemId);
+      grantTreasure(petId, { category: "coin", id: itemId, name, quantity: 1 });
+    } else {
+      giver[itemId as ItemId]--;
+      pet[itemId as ItemId]++;
+    }
+    write(giver);
+    write(pet);
+    record({ kind: "gifted", pet: giverId, other: petId, item: itemId });
+    return { giver: getPet(giverId)!, pet: getPet(petId)!, item: itemId };
   });
 }
 

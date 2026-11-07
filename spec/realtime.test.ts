@@ -479,6 +479,40 @@ it("pet:touched — playing with someone else's pet reaches the visitor's and th
   }
 });
 
+it("pet:updated and feed:added — a gift reaches the giver's and the owner's windows within 1s, both cupboards before the news", async () => {
+  const giver = freshId(), owner = freshId();
+  await signUp(giver); await signUp(owner);
+  await post(`/api/pets/${giver}/collect-supplies`);
+  const windows = [await open(), await open()];
+  try {
+    const orders: string[][] = windows.map(() => []);
+    windows.forEach((ws, i) => ws.addEventListener("message", (msg) => {
+      const event = JSON.parse(String(msg.data));
+      if (event.type === "pet:updated" && [giver, owner].includes(event.pet.id)) orders[i].push(event.pet.id);
+      if (event.type === "feed:added" && event.entry.kind === "gifted" && event.entry.pet === giver) orders[i].push("news");
+    }));
+    const updates = windows.map((ws) => Promise.all([
+      nextUpdate(ws, giver, (pet) => pet.soap === 0),
+      nextUpdate(ws, owner, (pet) => pet.soap === 1),
+      nextFeed(ws, (entry) => entry.kind === "gifted" && entry.pet === giver),
+    ]));
+    const res = await post(`/api/pets/${giver}/gift/${owner}`, { item: "soap" });
+    expect(res.status).toBe(200);
+    const result = await res.json();
+    for (const [mine, theirs, news] of await Promise.all(updates)) {
+      expect(mine.pet).toEqual(result.giver);
+      expect(theirs.pet).toEqual(result.pet);
+      expect(news.entry).toMatchObject({ pet: giver, other: owner, item: "soap" });
+    }
+    for (const order of orders) {
+      expect(order.indexOf(giver)).toBeLessThan(order.indexOf("news"));
+      expect(order.indexOf(owner)).toBeLessThan(order.indexOf("news"));
+    }
+  } finally {
+    for (const ws of windows) ws.close();
+  }
+});
+
 it("pet:updated and feed:added — feeding someone else's pet reaches the helper's and the owner's windows within 1s, both pets before the news", async () => {
   const helper = freshId(), owner = freshId();
   await signUp(helper); await signUp(owner);
