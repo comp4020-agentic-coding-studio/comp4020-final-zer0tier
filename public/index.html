@@ -461,6 +461,12 @@
           <p id="fight-news" class="fight-news" role="status"></p>
           <p id="arena-error" class="error" role="alert"></p>
           <div id="arena-pets" role="tabpanel" aria-labelledby="tab-pets">
+            <section id="arena-live" class="arena-live" aria-labelledby="arena-live-heading" hidden>
+              <h4 id="arena-live-heading" class="arena-live-heading"><span class="live-dot" aria-hidden="true"></span>Live now</h4>
+              <ul id="arena-live-list" class="arena-live-list"></ul>
+              <button type="button" id="arena-live-more" class="chip-btn" aria-expanded="false" aria-controls="arena-live-list" hidden></button>
+              <p id="arena-live-error" class="error" role="alert"></p>
+            </section>
             <form id="lookup" class="lookup">
               <label for="lookup-id">Find a pet by player ID</label>
               <div class="lookup-row">

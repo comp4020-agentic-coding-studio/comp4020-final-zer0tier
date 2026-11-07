@@ -8,6 +8,7 @@ import type { BattleSession, Fight, Pet } from "./pets.ts";
 import type { Team } from "./teams.ts";
 import type { Touch } from "./touches.ts";
 import { stopWorld, type WorldEmote, type WorldPosition } from './world.ts';
+import { audienceOf, unwatch, type WatcherCount } from './watch.ts';
 
 // Server -> client events. Clients act over HTTP; the socket only carries news.
 export type ServerEvent =
@@ -18,7 +19,11 @@ export type ServerEvent =
   | { type: "pet:updated"; pet: Pet }
   // Sent after both fighters' pet:updated, so clients can tell the story.
   | { type: "fight:finished"; fight: Fight }
+  // Reaches both fighters, and every player watching that fight from the stands.
   | { type: "battle:updated"; session: BattleSession }
+  // How many players watch a live fight, as saved. Everyone hears it: the
+  // Arena's live list shows the crowd, and the fighters see their audience.
+  | { type: "battle:watchers"; watchers: WatcherCount }
   // Sent last, after the change it describes, for the Arena's "Happening now".
   | { type: "feed:added"; entry: FeedEntry }
   // A team forming in the Team up window changed or set off. Players it no
@@ -67,11 +72,29 @@ export function refreshPresence(): string[] {
     if (id) next.add(id);
   }
   const changed = next.size !== online.size || [...next].some(id => !online.has(id));
-  for (const id of online) if (!next.has(id)) stopping.add(id);
+  for (const id of online) if (!next.has(id)) { stopping.add(id); leavingStands.add(id); }
   online = next;
   if (changed) broadcast({ type: 'presence:updated', players: [...online] });
   stopPending();
+  leaveStandsPending();
   return [...online];
+}
+
+// Players whose last window closed, still to be taken out of the stands. Like
+// `stopping`, each stays listed until the write succeeds.
+const leavingStands = new Set<string>();
+function leaveStandsPending(): void {
+  for (const id of leavingStands) {
+    if (online.has(id)) { leavingStands.delete(id); continue; } // came straight back
+    try {
+      const counts = unwatch(id);
+      leavingStands.delete(id);
+      for (const watchers of counts) broadcast({ type: 'battle:watchers', watchers });
+    } catch (error) {
+      console.error('could not leave the stands; retrying at the next presence check', error);
+      return;
+    }
+  }
 }
 export const isOnline = (id: string): boolean => refreshPresence().includes(id);
 
@@ -121,13 +144,13 @@ export function attachRealtime(server: Server): void {
 export function broadcast(event: ServerEvent): void {
   if (!wss) return;
   const message = JSON.stringify(event);
+  // A live fight's turns reach its two fighters and its saved audience.
+  const audience = event.type === "battle:updated"
+    ? new Set([event.session.attacker, event.session.defender, ...audienceOf(event.session.id)]) : null;
   let recipients = 0;
   for (const client of wss.clients) {
     if (client.readyState === WebSocket.OPEN) {
-      if (event.type === "battle:updated") {
-        const player = playerFor(credentials.get(client));
-        if (player !== event.session.attacker && player !== event.session.defender) continue;
-      }
+      if (audience && !audience.has(playerFor(credentials.get(client)) ?? "")) continue;
       client.send(message);
       recipients++;
     }

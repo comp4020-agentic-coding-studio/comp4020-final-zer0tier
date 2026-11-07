@@ -664,11 +664,169 @@ let feedPets = new Map(); // only pets mentioned in the visible feed; null while
 const powerOf = (pet) =>
   Object.entries(rules.fight.powerWeights).reduce((sum, [attribute, weight]) => sum + weight * pet[attribute], 0);
 
+// "Live now": Arena and revenge fights anyone can watch from the stands, kept
+// current by battle:watchers. Each entry holds both fighters and the crowd.
+let liveFights = new Map(); // battle ID -> { id, attacker, defender, watchers }
+let watchingBattle = null; // the fight this window watches from the stands
+let joiningStands = null; // the fight a Watch request is waiting on
+const arrivingFights = new Map(); // battle ID -> newest crowd count, while its fighters load
+
+// A busy arena shows its few biggest crowds, so the pets list stays in reach.
+const LIVE_SHOWN = 3;
+let showAllLive = false;
+$("arena-live-more").addEventListener("click", () => {
+  showAllLive = !showAllLive;
+  renderLiveFights();
+});
+function renderLiveFights() {
+  // Your own fight first, then the biggest crowds, then the newest.
+  const order = [...liveFights.values()];
+  const entries = order.filter((live) => live.attacker && live.defender)
+    .map((live, i) => ({ live, i, mine: live.attacker.id === current?.id || live.defender.id === current?.id }))
+    .sort((a, b) => Number(b.mine) - Number(a.mine) || (b.live.watchers ?? 0) - (a.live.watchers ?? 0) || a.i - b.i)
+    .map(({ live }) => live);
+  $("arena-live").hidden = entries.length === 0;
+  const more = $("arena-live-more");
+  more.hidden = entries.length <= LIVE_SHOWN;
+  more.textContent = showAllLive ? "Show fewer" : `Show all ${entries.length} live fights`;
+  more.setAttribute("aria-expanded", String(showAllLive));
+  const focused = document.activeElement?.dataset?.watch;
+  // Never hide the Watch button the keyboard is on.
+  if (focused && entries.findIndex((live) => live.id === focused) >= LIVE_SHOWN) showAllLive = true;
+  const shown = showAllLive ? entries : entries.slice(0, LIVE_SHOWN);
+  $("arena-live-list").replaceChildren(...shown.map((live) => {
+    const li = document.createElement("li");
+    li.className = "arena-live-fight";
+    const who = document.createElement("span");
+    who.className = "arena-live-fighters";
+    for (const [i, pet] of [live.attacker, live.defender].entries()) {
+      if (i) who.append(" vs ");
+      const name = document.createElement("b");
+      name.textContent = pet.id === current?.id ? "You" : pet.id;
+      who.append(petAvatar(pet, true), name);
+    }
+    const crowd = document.createElement("span");
+    crowd.className = "arena-live-crowd";
+    crowd.textContent = live.watchers ? `${live.watchers} watching` : "No one watching yet";
+    li.append(who, crowd);
+    const mine = live.attacker.id === current?.id || live.defender.id === current?.id;
+    if (!mine) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "chip-btn chip-buy";
+      button.dataset.watch = live.id;
+      button.textContent = joiningStands === live.id ? "Joining…" : watchingBattle === live.id ? "Watching" : "Watch";
+      button.disabled = joiningStands !== null || watchingBattle === live.id;
+      button.setAttribute("aria-label", `Watch ${live.attacker.id} versus ${live.defender.id}`);
+      button.addEventListener("click", () => watchFight(live.id));
+      li.append(button);
+    }
+    return li;
+  }));
+  if (focused) $("arena-live-list").querySelector(`[data-watch="${focused}"]:not(:disabled)`)?.focus({ preventScroll: true });
+}
+
+async function loadLiveFights() {
+  if (!current) return;
+  const owner = current.id;
+  try {
+    const list = await (await fetch("/api/arena/live", { cache: "no-store" })).json();
+    if (current?.id !== owner || !Array.isArray(list)) return;
+    liveFights = new Map(list.map((live) => [live.id, live]));
+    renderLiveFights();
+  } catch {
+    // The next reconnect or broadcast fills the list in.
+  }
+}
+
+// A fight started, gained or lost watchers, or ended. Starting fights bring
+// their fighters' IDs; the pets come from the Arena list or a quick lookup.
+async function onWatchers(news) {
+  if (!news || !current) return;
+  document.dispatchEvent(new CustomEvent("battle:watchers", { detail: news }));
+  if (!news.live) {
+    liveFights.delete(news.battle);
+    arrivingFights.delete(news.battle); // a lookup still loading must not bring it back
+    if (watchingBattle === news.battle) watchingBattle = null;
+    return renderLiveFights();
+  }
+  const known = liveFights.get(news.battle);
+  if (known) { known.watchers = news.count; return renderLiveFights(); }
+  if (!news.attacker || !news.defender) return; // only a live fight's news names its fighters
+  // Later news may land while the fighters load; the newest count wins.
+  const pending = arrivingFights.get(news.battle);
+  arrivingFights.set(news.battle, news.count);
+  if (pending !== undefined) return;
+  const owner = current.id;
+  const pet = async (id) => (id === current?.id ? current : rivals.get(id) ?? await (await fetch(`/api/pets/${encodeURIComponent(id)}`)).json());
+  try {
+    const [attacker, defender] = await Promise.all([pet(news.attacker), pet(news.defender)]);
+    if (current?.id !== owner || liveFights.has(news.battle) || !arrivingFights.has(news.battle)) return;
+    liveFights.set(news.battle, { id: news.battle, attacker, defender, watchers: arrivingFights.get(news.battle) });
+    renderLiveFights();
+  } catch {
+    // Shown at the next load instead.
+  } finally {
+    arrivingFights.delete(news.battle);
+  }
+}
+
+// Watching shows the fight as saved, then each turn as it's broadcast. A
+// spectator can't choose or forfeit; Leave gives up the seat.
+async function watchFight(battleId) {
+  if (!current || joiningStands) return;
+  const owner = current.id;
+  joiningStands = battleId;
+  $("arena-live-error").textContent = "";
+  renderLiveFights();
+  try {
+    const response = await fetch(`/api/arena/live/${encodeURIComponent(battleId)}/watch`, { method: "POST" });
+    if (current?.id !== owner) return;
+    if (response.status === 401) return sessionEnded();
+    const body = await response.json();
+    if (!response.ok) {
+      $("arena-live-error").textContent = body.error ?? "Couldn't find a seat. Try again.";
+      if (response.status === 404) { liveFights.delete(battleId); }
+      return;
+    }
+    watchingBattle = battleId;
+    const live = liveFights.get(battleId);
+    if (live) live.watchers = body.watching.watchers;
+    showWatchedBattle(body.session, body.watching.watchers);
+  } catch {
+    if (current?.id === owner) $("arena-live-error").textContent = "Couldn't reach the arena. Try again.";
+  } finally {
+    joiningStands = null;
+    renderLiveFights();
+  }
+}
+
+function showWatchedBattle(session, watchers) {
+  if (!session?.battle || watchingBattle !== session.id) return;
+  const fight = session.result?.fight;
+  const [a, b] = [session.attacker, session.defender];
+  document.dispatchEvent(new CustomEvent("battle:show", { detail: {
+    key: `session:${session.id}`, battle: session.battle, viewer: session.attacker,
+    title: `${session.kind === "revenge" ? "Revenge" : "Arena"}: ${a} vs ${b}`,
+    manual: true, spectating: true, showLog: false, allowReplay: false, watchers,
+    result: fight ? (fight.spoils ? `${fight.winner} took $${fight.spoils}.` : "") : "",
+  } }));
+}
+
+// Closing the window, or the fight ending, gives up the seat.
+document.addEventListener("battle:closed", ({ detail }) => {
+  if (!watchingBattle || detail?.key !== `session:${watchingBattle}`) return;
+  watchingBattle = null;
+  renderLiveFights();
+  fetch("/api/arena/live/leave", { method: "POST" }).catch(() => {});
+});
+
 async function loadArena() {
   if (!current || !rules) return;
   const { id } = current;
   const previousRivals = new Map(rivals);
   feedPets = new Map(); // reconnects must refresh older pets outside the arena list
+  loadLiveFights();
   try {
     const [list, fights, news] = await Promise.all([
       fetch("/api/pets?limit=20").then((res) => res.json()),
@@ -1176,7 +1334,7 @@ function showLiveBattle(session) {
   document.dispatchEvent(new CustomEvent("battle:show", { detail: {
     key: `session:${session.id}`, battle: session.battle, viewer: owner,
     title: session.kind === "revenge" ? "Revenge battle" : "Arena battle",
-    manual: true, result: text, showLog: false, allowReplay: false,
+    manual: true, result: text, showLog: false, allowReplay: false, watchers: liveFights.get(session.id)?.watchers,
     onChoose: (ability, revision) => actInBattle(session.id, "turn", { ability, revision }),
     onForfeit: revision => actInBattle(session.id, "forfeit", { revision }),
   } }));
@@ -1568,6 +1726,15 @@ let theftSession = 0; // late actions belong only to the login that started them
 function clearThefts() {
   fighting = false;
   updatePresence([]);
+  // Signing out or switching accounts leaves the stands; the server frees the
+  // seat when this login's windows close.
+  watchingBattle = null;
+  joiningStands = null;
+  liveFights = new Map();
+  arrivingFights.clear();
+  $("arena-live").hidden = true;
+  $("arena-live-list").replaceChildren();
+  $("arena-live-error").textContent = "";
   document.dispatchEvent(new CustomEvent("battle:reset"));
   document.dispatchEvent(new CustomEvent("adventure:reset"));
   theftSession++;
@@ -1805,6 +1972,13 @@ function connect() {
     if (!current) return;
     loadThefts();
     loadLiveBattles();
+    loadLiveFights();
+    // A dropped connection gave up the seat; take it again to keep watching.
+    if (watchingBattle) {
+      const seat = watchingBattle;
+      watchingBattle = null;
+      watchFight(seat);
+    }
     document.dispatchEvent(new CustomEvent("realtime:resync")); // touches missed while disconnected
     const { id } = current;
     const before = current;
@@ -1846,7 +2020,10 @@ function connect() {
     } else if (event.type === "fight:finished") {
       onFight(event.fight);
     } else if (event.type === "battle:updated") {
-      showLiveBattle(event.session);
+      if (event.session?.id === watchingBattle) showWatchedBattle(event.session, liveFights.get(watchingBattle)?.watchers);
+      else showLiveBattle(event.session);
+    } else if (event.type === "battle:watchers") {
+      onWatchers(event.watchers);
     } else if (event.type === "feed:added" && current && rules) {
       feed.set(event.entry.id, event.entry);
       renderFeed();

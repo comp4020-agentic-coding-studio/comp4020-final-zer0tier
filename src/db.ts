@@ -231,3 +231,13 @@ db.exec("CREATE INDEX IF NOT EXISTS adventures_by_team ON adventures (team_id)")
 if (!adventureColumns.has("ally_id")) db.exec("ALTER TABLE adventures ADD COLUMN ally_id TEXT");
 if (!adventureColumns.has("ally_json")) db.exec("ALTER TABLE adventures ADD COLUMN ally_json TEXT");
 db.exec("CREATE INDEX IF NOT EXISTS adventures_by_ally ON adventures (ally_id)");
+// Who is watching which live Arena or revenge battle from the stands. One row
+// per player, so a player watches one battle at a time and the table can never
+// outgrow the player count. Rows go when the battle ends or the player leaves.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS battle_watchers (
+    player_id TEXT PRIMARY KEY REFERENCES accounts (id),
+    battle_id TEXT NOT NULL REFERENCES manual_battles (id)
+  );
+  CREATE INDEX IF NOT EXISTS battle_watchers_by_battle ON battle_watchers (battle_id);
+`);

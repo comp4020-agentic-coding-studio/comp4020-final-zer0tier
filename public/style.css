@@ -550,6 +550,21 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
   border: 2px solid var(--border);
 }
 .rival[data-pinned] { border-color: var(--pet); }
+/* "Live now": fights you can watch from the stands, above the pets list. */
+.arena-live { margin: 0 0 1rem; }
+.arena-live[hidden] { display: none; }
+.arena-live-heading { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.5rem; font-size: 0.875rem; }
+.live-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--error, #dc2626); }
+.arena-live-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.arena-live-fight {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0.15rem 0.75rem;
+  padding: 0.6rem 0.9rem; border-radius: var(--radius-sm); background: var(--surface); border: 2px solid var(--pet);
+}
+.arena-live-fighters { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; min-width: 0; overflow-wrap: anywhere; }
+.arena-live-crowd { grid-column: 1; font-size: 0.8rem; color: var(--muted); }
+.arena-live-fight > button { grid-column: 2; grid-row: 1 / span 2; min-height: 40px; }
+#arena-live-more { margin-top: 0.5rem; }
+#arena-live-more[hidden] { display: none; }
 .rival-name { font-weight: 700; overflow-wrap: anywhere; }
 .rival-identity { display: flex; align-items: center; gap: 0.4rem; }
 /* A woodland clear's crown, in the Slime King's colour. */

@@ -199,6 +199,10 @@
 }
 #battle-status { margin: 0; font-weight: 700; font-size: .9rem; overflow-wrap: anywhere; }
 .battle-strategy { margin: 10px 0 0; color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
+/* The crowd in the stands: a quiet line under the battle text. */
+.battle-watchers { margin: 6px 0 0; color: var(--muted); font-size: .8rem; font-weight: 700; }
+.battle-watchers::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--pet, var(--primary)); vertical-align: 1px; }
+.battle-watchers[hidden] { display: none; }
 .battle-intent { padding: 12px; border: 1px solid var(--stamina); border-left-width: 4px; border-radius: 10px; background: var(--bg-glow); color: var(--fg); font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; }
 .battle-intent[hidden], .battle-strategy[hidden] { display: none; }
 .battle-log { font-size: .8rem; color: var(--muted); }

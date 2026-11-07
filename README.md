@@ -35,12 +35,14 @@ the point of the game, not boxes to tick:
   fight, reaches every open window within a second — no reload needed. Your
   rival's shift ending, their level-up, the fight they just started against
   you: all of it. The Arena's **Happening now** list shows the whole room
-  what everyone else is doing. Adventure is the deliberate exception: it's
-  one player's own exploration, so its state is never broadcast to anyone
-  else's window.
+  what everyone else is doing, and its **Live now** list lets anyone watch a
+  player-versus-player fight turn by turn, with the fighters seeing their
+  audience. Adventure is the deliberate exception: it's one player's own
+  exploration, so its state is never broadcast to anyone else's window.
   *Enforced:* `spec/realtime.test.ts` opens real WebSockets and fails if any
   event takes longer than a second; `spec/feed.test.ts` checks what the feed
-  records.
+  records; `spec/watch.test.ts` checks the stands get each turn and the crowd
+  count within a second, and nobody else does.
 - **Nothing you did is lost (persists).** Pets, accounts, fights, and
   unfinished lessons and shifts all live in SQLite on the Fly volume. A shift
   still running when the server restarts still finishes and pays.
@@ -596,6 +598,29 @@ studying, it needs enough left for an hour's shift afterward (20 stamina and
 live battle at a time. The defender pays nothing. Wins, losses, spoils, and
 the finished fight record are saved once the battle ends.
 
+### Watching live fights
+
+The top of the Arena's **Pets** tab lists **Live now**: every Arena and
+revenge fight under way between two players, each with its fighters and how
+many are watching. Practice against the bot isn't listed, and Adventure
+battles never are. Your own fight is listed first, as yours, and the rest by
+the biggest crowd; a busy arena shows three, with **Show all** for the rest.
+New fights appear and finished ones disappear live, without a reload.
+
+Choose **Watch** (or press Enter on it) to take a seat in the stands. The
+battle window opens on the fight as saved, then plays each turn the moment a
+fighter chooses it, with the same animation, sounds, and HP/MP bars the
+fighters see. You can't choose a skill or forfeit for anyone. **Leave** (or
+Escape) closes the window and gives up your seat; it never asks to forfeit.
+When the fight ends, the window names the winner. You sit in one fight's
+stands at a time: watching another moves your seat.
+
+Both fighters see **N watching from the stands** under their battle text,
+updated live as people arrive and leave. Watching needs a signed-in player
+who isn't in that fight. Your seat is saved, and frees itself when you sign
+out, close your last window, or lose your connection; reconnecting takes it
+back.
+
 ### Theft notifications and revenge
 
 The theft API (`POST /api/pets/:id/steal/:opponent`) transfers $10–$30,
@@ -816,11 +841,19 @@ and the built-in `node:sqlite` for storage.
   `team:updated` event whenever a team in the **Team up** window changes or
   sets off, and a `pet:touched` event, carrying the saved touch, whenever a
   visitor plays with someone else's pet. The feed keeps its newest 500
-  entries in SQLite. A private `battle:updated` event sends saved
-  Arena/revenge session changes only to its participants, and each fighter's
-  screen shows the turn from that event. The browser re-reads a live battle
-  only on reconnecting, after a refused move, on returning to its tab, or
-  every 10 seconds as a backstop.
+  entries in SQLite. A `battle:updated` event sends saved Arena/revenge
+  session changes to its two participants and the players watching it, and
+  each screen shows the turn from that event. The browser re-reads a live
+  battle only on reconnecting, after a refused move, on returning to its tab,
+  or every 10 seconds as a backstop.
+  `battle:watchers` tells everyone a watchable fight's crowd as saved:
+  `{ battle, count, live }`, plus its `attacker` and `defender` while live.
+  It's sent when a fight starts, gains or loses a watcher, or ends.
+  `GET /api/arena/live` lists live fights with both pets and their
+  `watchers`. Authenticated `POST /api/arena/live/:battle/watch` takes a
+  seat (one per player, saved in `battle_watchers`) and answers with the
+  fight as saved; `POST /api/arena/live/leave` gives it up. Watching your
+  own fight is 409; a finished or bot fight is 404.
   `presence:updated` lists authenticated players with open connections;
   `world:updated` carries a saved home/town position and character `outfit`. `GET /api/world`
   resyncs online players and positions. Authenticated `POST /api/world`

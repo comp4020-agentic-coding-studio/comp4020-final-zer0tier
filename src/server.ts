@@ -29,6 +29,7 @@ import { recentFeed } from "./feed.ts";
 import { followUp } from "./followups.ts";
 import { attachRealtime, broadcast, cancelStop, clientsInRoom, isOnline, refreshPresence } from "./realtime.ts";
 import { emoteWorld, moveWorld, setWorldOutfit, worldPosition } from './world.ts';
+import { closeStands, emptyStands, liveBattles, standsNews, unwatch, watch } from './watch.ts';
 import { logEvent, ROOM } from "./logging.ts";
 import { logRequest } from "./request-logging.ts";
 import { schedule, scheduleAll } from "./scheduler.ts";
@@ -181,12 +182,46 @@ app.get('/api/battles/:battle', (req, res) => {
   if (!session) return void res.status(404).json({ error: 'No such battle for your pet.' });
   res.json({ session });
 });
+// Live Arena and revenge fights anyone else can watch, newest first, with
+// their fighters and how many are watching. Practice against the bot isn't listed.
+app.get('/api/arena/live', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(liveBattles().map(live => ({ ...live, attacker: getPet(live.attacker), defender: getPet(live.defender) })));
+});
+// Taking a seat in the stands. The answer carries the fight as saved; its later
+// turns arrive as battle:updated, and everyone hears the new crowd size.
+app.post('/api/arena/live/:battle/watch', (req, res) => {
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: 'Sign in first.' });
+  const outcome = watch(id, req.params.battle);
+  if ('error' in outcome) return void res.status(outcome.status).json({ error: outcome.error });
+  for (const watchers of outcome.counts) broadcast({ type: 'battle:watchers', watchers });
+  const session = battleSessionFor(outcome.battle.attacker, outcome.battle.id)!;
+  res.json({ watching: outcome.battle, session });
+});
+app.post('/api/arena/live/leave', (req, res) => {
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: 'Sign in first.' });
+  const counts = unwatch(id);
+  for (const watchers of counts) broadcast({ type: 'battle:watchers', watchers });
+  res.json({ left: counts.map(count => count.battle) });
+});
+
 function announceBattle(outcome: Exclude<BattleSessionOutcome, { error: string }>, finished: boolean, petsChanged = true): void {
   if (petsChanged) {
     broadcast({ type: 'pet:updated', pet: outcome.attacker });
     broadcast({ type: 'pet:updated', pet: outcome.defender });
   }
   broadcast({ type: 'battle:updated', session: outcome.session });
+  // A fight that just started joins every Arena's live list; one that just
+  // ended leaves it, once the stands have seen its final turn.
+  const { id: battle, attacker, defender, battle: state } = outcome.session;
+  const live = state.status === 'active';
+  if (!live) closeStands(battle);
+  if (!live || state.revision === 0) {
+    const news = standsNews(battle, attacker, defender, live);
+    if (news) broadcast({ type: 'battle:watchers', watchers: news });
+  }
   if (finished && outcome.fight) {
     logEvent('action_result', { user: outcome.attacker.id, room: ROOM, client_in_room: clientsInRoom(),
       action: 'fight', opponent: outcome.defender.id, winner: outcome.fight.winner, spoils: outcome.fight.spoils });
@@ -642,6 +677,8 @@ app.use(express.static("public", {
 }));
 
 const server = createServer(app);
+// Nobody is connected at start, so nobody is in the stands yet.
+emptyStands();
 attachRealtime(server);
 scheduleAll(); // lessons and shifts that were running when the app last stopped
 getOrCreatePet(BOT_ID);

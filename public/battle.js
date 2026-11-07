@@ -282,6 +282,7 @@ function buildDialog() {
         <p id="battle-status"></p>
         <p id="battle-intent" class="battle-intent" hidden></p>
       </div>
+      <p id="battle-watchers" class="battle-watchers" hidden></p>
       <div id="battle-skills" class="battle-skills" role="group" aria-label="Choose your pet's skill" hidden></div>
       <p id="battle-error" class="error" role="alert"></p>
       <details class="battle-log"><summary>Attack log</summary><ol id="battle-log"></ol></details>
@@ -324,7 +325,7 @@ function buildDialog() {
   $('battle-close').addEventListener('click', closeBattle);
   dialog.addEventListener('cancel', event => {
     if (opening) { event.preventDefault(); skipOpening(); return; }
-    if (!scene?.manual || scene.battle.status !== 'active') return;
+    if (!scene?.manual || scene.spectating || scene.battle.status !== 'active') return;
     event.preventDefault();
     closeBattle();
   });
@@ -518,7 +519,10 @@ function finish() {
   meters(scene.resultResources?.hp ?? scene.battle.hp ?? last?.hp ?? scene.battle.initialHp,
     scene.resultResources?.mp ?? scene.battle.mp ?? last?.mp ?? scene.battle.initialMp);
   const won = scene.won ?? scene.battle.winner === scene.viewer;
-  $('battle-status').textContent = `${won ? 'Victory!' : 'Defeat.'} ${scene.result}`;
+  if (scene.spectating) {
+    const winner = scene.battle.fighters.find(f => f.id === scene.battle.winner);
+    $('battle-status').textContent = `${winner ? `${fighterName(winner)} wins!` : 'The fight is over.'} ${scene.result ?? ''}`.trim();
+  } else $('battle-status').textContent = `${won ? 'Victory!' : 'Defeat.'} ${scene.result}`;
   const skipped = document.activeElement === $('battle-skip');
   $('battle-skip').hidden = true;
   $('battle-skills').hidden = true;
@@ -534,8 +538,9 @@ function finish() {
 // The finished battle's outcome pops out over the scene, its Leave and
 // Replay controls moved into the overlay rather than duplicated.
 function showResult(won, focusDefault) {
-  dialog.dataset.result = won ? 'won' : 'lost';
-  $('battle-result-kind').textContent = won ? 'Victory!' : 'Defeat.';
+  const winner = scene.spectating && scene.battle.fighters.find(f => f.id === scene.battle.winner);
+  dialog.dataset.result = scene.spectating ? 'watched' : won ? 'won' : 'lost';
+  $('battle-result-kind').textContent = scene.spectating ? (winner ? `${fighterName(winner)} wins!` : 'Fight over') : won ? 'Victory!' : 'Defeat.';
   $('battle-result-text').textContent = scene.result || '';
   $('battle-result-actions').append($('battle-replay'), $('battle-close'));
   $('battle-result').hidden = false;
@@ -580,10 +585,23 @@ function awaitChoice() {
     $(`battle-fighter-${card}`).classList.remove('striking', 'hit');
     $(`battle-fighter-${card}`).classList.toggle('taking-turn', cards[card] === battle.actor);
   });
+  const fighter = battle.fighters[battle.actor];
+  // From the stands, every turn is someone else's: no skills and no forfeit.
+  if (scene.spectating) {
+    dialog.dataset.waiting = 'true';
+    $('battle-mode').textContent = `Turn ${battle.turns.length + 1} · Watching`;
+    $('battle-status').textContent = `Waiting for ${fighter ? fighterName(fighter) : 'the next player'} to choose a skill…`;
+    $('battle-ability-name').textContent = 'Watching from the stands';
+    $('battle-ability-cost').textContent = 'Each move appears as soon as its player chooses it.';
+    $('battle-skills').hidden = true;
+    $('battle-close').disabled = false;
+    $('battle-close').textContent = 'Leave';
+    $('battle-close').setAttribute('aria-label', 'Leave the stands');
+    return;
+  }
   const mine = battle.fighters.findIndex(fighter => fighter.id === scene.viewer);
   const myTurn = battle.actor === mine;
   dialog.dataset.waiting = 'true';
-  const fighter = battle.fighters[battle.actor];
   $('battle-mode').textContent = `Turn ${battle.turns.length + 1} · ${myTurn ? 'Your move' : 'Waiting'}`;
   $('battle-status').textContent = myTurn ? 'What will your pet do?' : `Waiting for ${fighter ? fighterName(fighter) : 'the next player'} to choose a skill…`;
   $('battle-ability-name').textContent = myTurn ? 'Choose a skill' : 'Their turn';
@@ -635,7 +653,8 @@ async function chooseSkill(ability) {
   }
 }
 async function closeBattle() {
-  if (!scene?.manual || scene.battle.status !== 'active') return dialog.close();
+  // Spectators just leave the stands; only a fighter is asked about forfeiting.
+  if (!scene?.manual || scene.spectating || scene.battle.status !== 'active') return dialog.close();
   if (submitting || confirming) return;
   const active = scene, version = sceneVersion;
   confirming = true;
@@ -687,6 +706,8 @@ function play(next) {
   $('battle-backdrop-art').firstElementChild.setAttribute('href', `/scenes/battle-backdrops.svg#${dialog.dataset.backdrop}`);
   dialog.dataset.manual = String(Boolean(next.manual));
   $('battle-title').textContent = next.title || 'Arena battle';
+  if (crowds.has(next.key)) next.watchers = crowds.get(next.key);
+  showWatchers(next.watchers);
   $('battle-close').textContent = next.returnLabel || 'Leave';
   $('battle-close').setAttribute('aria-label', next.returnLabel || 'Leave battle');
   $('battle-log').replaceChildren();
@@ -710,7 +731,7 @@ function play(next) {
   allyCards(next.battle);
   cards.forEach((fighterIndex, card) => {
     const fighter = fighters[fighterIndex];
-    $(`battle-name-${card}`).textContent = fighter.id === next.viewer ? `${fighterName(fighter)} (you)` : fighterName(fighter);
+    $(`battle-name-${card}`).textContent = fighter.id === next.viewer && !next.spectating ? `${fighterName(fighter)} (you)` : fighterName(fighter);
     const tag = $(`battle-type-${card}`) ?? document.createElement('p');
     tag.id = `battle-type-${card}`;
     tag.className = 'battle-type';
@@ -738,7 +759,8 @@ document.addEventListener('battle:show', ({ detail }) => {
     if (detail.battle.revision < scene.battle.revision) return;
     const duplicate = detail.battle.revision === scene.battle.revision && detail.battle.status === scene.battle.status;
     const finishedAnimating = !animating && turn >= scene.battle.turns.length;
-    scene = detail;
+    // The crowd count comes from its own broadcast; a new turn keeps the latest.
+    scene = { ...detail, watchers: scene.watchers ?? detail.watchers };
     if (duplicate) return;
     if (finishedAnimating) {
       cancelAdvance();
@@ -758,11 +780,31 @@ document.addEventListener('battle:show', ({ detail }) => {
   if (dialog?.open) { queue.push(detail); return; }
   play(detail);
 });
+// The crowd in the stands, as last broadcast. Fighters and spectators both see it.
+function showWatchers(count) {
+  const line = $('battle-watchers');
+  if (!line) return;
+  line.hidden = !(count > 0);
+  line.textContent = count > 0 ? `${count} watching from the stands` : '';
+}
+// The newest crowd per fight, kept even before its window opens: a spectator
+// can take a seat before a fighter's window has finished opening.
+const crowds = new Map();
+document.addEventListener('battle:watchers', ({ detail }) => {
+  if (!detail?.battle) return;
+  const key = `session:${detail.battle}`;
+  if (detail.live) crowds.set(key, detail.count); else crowds.delete(key);
+  if (crowds.size > 50) crowds.delete(crowds.keys().next().value);
+  if (!scene || !dialog || scene.key !== key) return;
+  scene.watchers = detail.count;
+  showWatchers(detail.count);
+});
 document.addEventListener('battle:reset', () => {
   sceneVersion++;
   cancelAdvance(); clearOpening(); clearSkillVisuals();
   queue.length = 0;
   seen.clear();
+  crowds.clear();
   scene = null;
   submitting = false;
   confirming = false;
