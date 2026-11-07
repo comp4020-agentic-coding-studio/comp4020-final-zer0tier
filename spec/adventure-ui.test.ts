@@ -334,9 +334,17 @@ it('ignores a cancelled route response after reopening so it cannot interrupt a 
   const { dom, window, $ } = page();
   Object.defineProperty(window.document, 'hidden', { value: false });
   const saved = map(), requests: { body: any; finish: (response: Response) => void }[] = [];
-  window.fetch = vi.fn((_url: string, options: RequestInit) => new Promise<Response>(finish => {
-    requests.push({ body: JSON.parse(options.body as string), finish });
-  })) as unknown as typeof fetch;
+  // The page is visible, so the once-a-second map refresh may run between
+  // steps on a slow machine. It isn't part of the route: like the real
+  // server, it answers with the newest saved map, and it isn't counted.
+  let latest: any = saved;
+  window.fetch = vi.fn((_url: string, options: RequestInit) => {
+    const body = JSON.parse(options.body as string);
+    if (body.action === 'patrol') return Promise.resolve(Response.json(latest));
+    return new Promise<Response>(resolve => {
+      requests.push({ body, finish: response => { void response.clone().json().then(map => { latest = map; }); resolve(response); } });
+    });
+  }) as unknown as typeof fetch;
   const tap = (x: number) => $('adventure-terrain').querySelector<HTMLElement>(`[data-x="${x}"][data-y="2"]`)!.click();
   try {
     window.eval(readFileSync('public/adventure.js', 'utf8'));
