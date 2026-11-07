@@ -10,7 +10,10 @@ export type FeedEntry =
   | { id: number; at: string; kind: "stole"; pet: string; other: string; amount: number }
   | { id: number; at: string; kind: "helped"; pet: string; other: string; item: "food" | "soap" }
   | { id: number; at: string; kind: "school"; pet: string; school: string }
-  | { id: number; at: string; kind: "promoted"; pet: string; location: string; rank: number };
+  | { id: number; at: string; kind: "promoted"; pet: string; location: string; rank: number }
+  // The Slime King fell. `team` lists every pet, in battle order, that earned
+  // the woodland reward; `pet` is the first of them.
+  | { id: number; at: string; kind: "cleared"; pet: string; team: string[] };
 
 type Fields<E> = E extends unknown ? Omit<E, "id" | "at"> : never;
 export type NewFeedEntry = Fields<FeedEntry>;

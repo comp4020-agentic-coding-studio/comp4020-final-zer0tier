@@ -57,6 +57,7 @@ adventure.innerHTML = `
         <p class="section-label">RUN FINISHED</p>
         <h2 id="adventure-summary-title">Adventure over</h2>
         <p id="adventure-completion" role="status" hidden>The Slime King is defeated!</p>
+        <p id="adventure-prize" role="status" hidden></p>
         <p id="adventure-failure" role="status" hidden></p>
         <p id="adventure-result" role="status"></p>
         <button type="button" id="adventure-replay" class="chip-btn chip-buy" aria-expanded="false" aria-controls="adventure-records">Battle records</button>
@@ -124,6 +125,7 @@ guide.innerHTML = `
       <li>The Slime King guards the final grove. Walk up to it to battle.</li>
       <li>HP and MP carry between battles. A win gives back 20%.</li>
       <li>Each win trains your pet: +1 to the main attribute of your final hit (Strength for Tide Crash, Intelligence for Firebolt, Charisma for Vine Lash), or a random one for Claw Strike and Heavy Strike. Beating the Slime King gives +1 to all three.</li>
+      <li>Clearing the woodland pays each pet still standing that landed a hit $150, an Unfair Coin it doesn't own yet (any coin once it has all three), and a crown every player can see. Everyone hears about it in Happening now.</li>
       <li>A coin toss decides who strikes first.</li>
       <li>Choose an equipped skill on your turn. Equip learned skills at your storage chest at home.</li>
       <li>Your highest stat determines your type when it leads both others by at least 20%. STR beats CHA, CHA beats INT, INT beats STR: +20% damage and 20% damage mitigation. Normal is neutral.</li>
@@ -368,6 +370,10 @@ function renderMap() {
     ? `The ↓ stairs are at column 14, row 14. ${exitHint()}`
     : state.completed ? 'Final floor. The Slime King is defeated.' : 'Final floor. The Slime King lives here.';
   adventure.querySelector('#adventure-completion').hidden = !state.completed;
+  // The final battle's saved prize; a teammate who never struck has none.
+  const prize = state.completed ? state.records?.findLast(battle => battle.enemyId === 'slime-king')?.cleared : undefined;
+  adventure.querySelector('#adventure-prize').hidden = !prize;
+  adventure.querySelector('#adventure-prize').textContent = prizeText(prize).trim();
   adventure.querySelector('#adventure-failure').hidden = !state.failed && !state.abandoned;
   adventure.querySelector('#adventure-failure').textContent =
     state.abandoned ? 'You left the woodland. Your next visit starts a fresh adventure.' : 'Your pet was defeated. Your next adventure starts fresh.';
@@ -678,6 +684,10 @@ function trainedText(trained) {
   if (gains.length === 3 && gains.every(([, amount]) => amount === gains[0][1])) return ` +${gains[0][1]} to each attribute.`;
   return gains.map(([attribute, amount]) => ` +${amount} ${attribute[0].toUpperCase()}${attribute.slice(1)}.`).join('');
 }
+// The Slime King's prize, as saved with this pet's victory.
+const prizeText = cleared => cleared
+  ? ` Woodland prize: $${cleared.money} and a ${cleared.coin.name}. ${cleared.clears > 1 ? `Woodland cleared ${cleared.clears} times.` : 'Your pet earned a crown.'}`
+  : '';
 // In a team battle the team can win while this pet is knocked out.
 function battleResult(battle) {
   const knockedOut = battle.after?.hp === 0;
@@ -686,7 +696,7 @@ function battleResult(battle) {
   const skillDrop = battle.skillDrop ? ` ${battle.skillDrop.learned ? 'Learned' : 'Found an already learned scroll:'} ${battle.skillDrop.name}! Equip skills at your home chest.` : '';
   if (battle.won && knockedOut) return `${team} defeated ${battle.enemyName} on floor ${battle.floor}, but your pet was knocked out. Its adventure is over; your teammates explore on.${keyDrop}`;
   return battle.won
-    ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${trainedText(battle.trained)}${keyDrop}${skillDrop}${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}`
+    ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${trainedText(battle.trained)}${keyDrop}${skillDrop}${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}${prizeText(battle.cleared)}`
     : `${battle.enemyName} defeated ${team === 'You' ? 'you' : 'your team'}. Adventure failed. Start a new adventure to try again.`;
 }
 function renderRecords() {

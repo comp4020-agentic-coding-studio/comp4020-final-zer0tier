@@ -38,6 +38,7 @@ it("signing up creates a pet with base stats and starts a session", async () => 
     reward: null,
     wins: 0,
     losses: 0,
+    woodlandClears: 0,
     equippedCoin: null,
     equippedAbilities: ['claw-strike'],
     skillLoadouts: {},

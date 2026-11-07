@@ -443,6 +443,34 @@ it('shows a saved Floor Key drop in live playback and retains it after returning
   } finally { dom.window.close(); }
 });
 
+it('names the saved woodland prize after the Slime King falls and keeps it on the finished-run card', async () => {
+  const { dom, window, $ } = page();
+  const fought = battleProgress();
+  const cleared = { money: 150, clears: 1, coin: { category: 'coin', id: 'gold-coin', name: 'Gold Coin', quantity: 1 } };
+  const battle = { ...fought.battle, enemyId: 'slime-king', enemyName: 'Slime King', floor: 5, cleared };
+  let saved: any = { ...fought, completed: true, battle };
+  window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
+    const body = JSON.parse(options.body as string);
+    if (body.action === 'continue') {
+      saved = { ...saved, revision: 'cleared', battle: { ...battle, pending: false }, records: [{ ...battle, pending: false }], battleCount: 1 };
+    }
+    return Response.json(saved);
+  }) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement).open).toBe(true));
+    $('battle-skip').click();
+    expect($('battle-status').textContent).toContain('Woodland complete! Woodland prize: $150 and a Gold Coin. Your pet earned a crown.');
+    $('battle-close').click();
+    await vi.waitFor(() => expect($('adventure-battle-summary').hidden).toBe(false));
+    expect($('adventure-summary-title').textContent).toBe('Adventure complete');
+    expect($('adventure-prize').hidden).toBe(false);
+    expect($('adventure-prize').textContent).toBe('Woodland prize: $150 and a Gold Coin. Your pet earned a crown.');
+  } finally { dom.window.close(); }
+});
+
 it('ends the battle scene at the HP/MP the pet carries back, without a spent Copper shield', async () => {
   const { dom, window, $ } = page();
   const saved = battleProgress();

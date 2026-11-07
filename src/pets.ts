@@ -52,6 +52,7 @@ export interface Pet extends ReturnType<typeof inventoryFor> {
   combat?: { type: string; maxHp: number; maxMp: number; balanced: boolean };
   wins: number;
   losses: number;
+  woodlandClears: number; // Slime King victories, shown as a crown to every player
   equippedCoin: CoinId | null; // global to the pet; applies in Adventure, Arena, and revenge
   equippedAbilities: AbilityId[];
   skillLoadouts: Partial<Record<SkillLoadoutId, AbilityId[]>>;
@@ -172,7 +173,8 @@ const select = db.prepare(
   `SELECT id, color, appearance, strength, intelligence, charisma, money, activity, school, credits, stamina, hygiene, food, soap,
           hourglass, construction_rank, office_rank, theatre_rank, task, busy_since, busy_until, reward, wins, losses,
           steal_available_at AS stealAvailableAt, supplies_available_at AS suppliesAvailableAt, equipped_coin AS equippedCoin,
-          equipped_abilities AS equippedAbilities, skill_loadouts AS skillLoadouts, skill_jobs AS skillJobs
+          equipped_abilities AS equippedAbilities, skill_loadouts AS skillLoadouts, skill_jobs AS skillJobs,
+          woodland_clears AS woodlandClears
      FROM pets WHERE id = ?`,
 );
 // The bot first, then the newest pets, so a player who just joined is easy to

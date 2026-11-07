@@ -8,7 +8,8 @@ import {
   ADVENTURE_COOLDOWN_MINUTES, ADVENTURE_COST, busyNow, consumeHourglass, findItem, getPet, ITEMS, LUCK, MAX_CARE,
   powerOf, spendForAdventure, train, use, type Pet,
 } from './pets.ts';
-import { grantTreasure } from './inventory.ts';
+import { record } from './feed.ts';
+import { grantTreasure, grantWoodlandClear } from './inventory.ts';
 import { COINS, rollTreasure, type TreasureReward } from './treasure.ts';
 import { monsterSkills, MONSTER_SKILL_DROP_RATE } from './skills.ts';
 import { monsterBuild, monsterMoves } from './monsters.ts';
@@ -28,7 +29,12 @@ export type AdventureBattle = {
   keyDrop?: { floor: number; name: 'Floor Key' };
   skillDrop?: TreasureReward;
   trained?: Partial<Record<'strength' | 'intelligence' | 'charisma', number>>; // this pet's victory gain
+  cleared?: WoodlandReward; // this pet's reward for felling the Slime King
 };
+// Clearing the woodland is the run's only fixed prize: money, an Unfair Coin
+// (one the pet doesn't own yet, when there is one), and a permanent crown.
+export const WOODLAND_REWARD_MONEY = 150;
+export type WoodlandReward = { money: number; coin: TreasureReward; clears: number };
 export const ADVENTURE_RECORD_LIMIT = 50;
 type BattleRecords = { total: number; battles: AdventureBattle[] };
 type SavedAdventure = {
@@ -171,10 +177,11 @@ function busyRefusal(id: string) {
 // Position, removed monsters, and the exact playback are one atomic write.
 // A stale retry (even after Continue) cannot apply the same movement twice.
 // A team run's map is the team's, written alongside.
-// `trained` is a finished victory's attribute gain. It is written only with
-// the revision it belongs to, so a stale retry can never train a pet twice.
-function save(id: string, saved: Progress, trained?: AdventureBattle['trained']) {
-  transaction(() => {
+// `trained` is a finished victory's attribute gain and `cleared` the Slime
+// King's prize. They're written only with the revision they belong to, so a
+// stale retry can never train or pay a pet twice. Reports whether it saved.
+function write(id: string, saved: Progress, trained?: AdventureBattle['trained'], cleared?: WoodlandReward): boolean {
+  return transaction(() => {
     const written = db.prepare('UPDATE adventures SET x = ?, y = ?, floor = ?, world_json = ?, battle_json = ?, records_json = ?, entry_id = ?, awaiting_entry = ?, hp = ?, mp = ?, cooldown_until = ?, abandoned = ?, team_id = ?, started = 1, revision = ? WHERE player_id = ? AND revision = ?')
       .run(saved.x, saved.y, saved.floor, saved.teamId === null ? JSON.stringify(saved.world) : null, saved.battle ? JSON.stringify(saved.battle) : null,
         JSON.stringify(saved.records), saved.entryId, Number(saved.awaitingEntry),
@@ -183,8 +190,22 @@ function save(id: string, saved: Progress, trained?: AdventureBattle['trained'])
       db.prepare('UPDATE teams SET world_json = ? WHERE id = ?').run(JSON.stringify(saved.world), saved.teamId);
     }
     if (written.changes === 1 && trained) train(id, trained);
+    if (written.changes === 1 && cleared) grantWoodlandClear(id, cleared);
+    return written.changes === 1;
   });
+}
+function save(id: string, saved: Progress) {
+  write(id, saved);
   return adventureFor(id);
+}
+
+// A coin the pet doesn't own yet, so a clear widens its choices; any coin
+// once it owns all three.
+function woodlandCoin(pet: Pet): TreasureReward {
+  const missing = COINS.filter(coin => pet.coins[coin.id] === 0);
+  const pool = missing.length ? missing : COINS;
+  const coin = pool[Math.floor(Math.random() * pool.length)];
+  return { category: 'coin', id: coin.id, name: coin.name, quantity: 1 };
 }
 
 // Teammates beside the pet join its battle, unless they're out, already in
@@ -240,11 +261,17 @@ function saveBattle(saved: Progress, participants: Progress[], playback: ActiveB
       const trained = !attribute ? undefined : monster.monster === 'slime-king'
         ? { strength: 1, intelligence: 1, charisma: 1 }
         : { [attribute]: 1 };
+      // Felling the Slime King also pays the woodland's prize, to the same pets
+      // its victory trains. The coin is chosen now and saved with the battle.
+      const cleared = trained && monster.monster === 'slime-king' ? {
+        money: WOODLAND_REWARD_MONEY, coin: woodlandCoin(fighter.pet), clears: fighter.pet.woodlandClears + 1,
+      } : undefined;
       fighter.battle = {
         ...fighter.battle!, won, playback, recovery,
         ...(finished ? { after: { hp: fighter.hp, mp: fighter.mp } } : {}),
         ...(keyDrop ? { keyDrop: { floor: encounter.floor, name: 'Floor Key' as const } } : {}),
         ...(trained ? { trained } : {}),
+        ...(cleared ? { cleared } : {}),
       };
       if (standing && monster.monster && (monster.monster === 'slime-king' || Math.random() < MONSTER_SKILL_DROP_RATE)) {
         const eligible = monsterSkills(monster.monster, encounter.floor);
@@ -262,7 +289,12 @@ function saveBattle(saved: Progress, participants: Progress[], playback: ActiveB
       // world with each row so one participant cannot restore a defeated enemy.
       fighter.world = saved.world;
     }
-    for (const fighter of participants) save(fighter.id, fighter, finished ? fighter.battle?.trained : undefined);
+    // Only pets whose own row saved with this revision are paid and announced.
+    const cleared = participants.filter(fighter => {
+      const rewards = finished ? fighter.battle : undefined;
+      return write(fighter.id, fighter, rewards?.trained, rewards?.cleared) && rewards?.cleared;
+    }).map(fighter => fighter.id);
+    if (cleared.length) record({ kind: 'cleared', pet: cleared[0], team: cleared });
     return adventureFor(saved.id);
   });
 }

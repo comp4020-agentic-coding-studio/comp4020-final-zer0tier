@@ -7,8 +7,8 @@ with saved HP/MP and outcomes; atomic chest rewards, persistent inventory, item
 use, and learned abilities; a coin-toss initiative with reusable, equippable
 Copper/Silver/Gold coins; an entry cost and cooldown on starting fresh; the
 Slime King's Bump; no adventuring while the pet studies or works; and
-multiplayer teams (below). Still open: a completion reward for defeating the
-Slime King.
+multiplayer teams (below); and a completion reward for defeating the Slime
+King.
 This document preserves the owner's requirements.
 
 Owner's confirmed rule for monster movement, replacing the earlier one-step
@@ -139,8 +139,14 @@ authoritative; new real-time events require the existing one-second tests.
 
 ## Decisions to settle before the relevant phase
 
-- What is the completion reward for defeating the Slime King? Review the
-  initial enemy stat curves after monster battles are playable.
+- Resolved completion reward (owner, 2026-11-07): defeating the Slime King pays
+  each pet still standing that landed a hit $150, a guaranteed Unfair Coin it
+  doesn't own yet (any coin once it has all three), and one more woodland
+  clear, shown as a crown in pet details and on Arena pets. Happening now
+  announces each clear with every pet that earned it. The prize is saved once
+  with the victory, beside its +1 to all three attributes.
+- Still to review: the initial enemy stat curves now that monster battles are
+  playable.
 
 Resolved boss ability: the Slime King knows Bump (5 MP), dealing ceil(2/3 ×
 the pet's current HP). It is chosen like any attack (the strongest affordable

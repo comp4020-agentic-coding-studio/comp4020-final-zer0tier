@@ -206,6 +206,37 @@ it('rolls one shared Floor Key per team victory, saves it in each replay, and le
   } finally { random.mockRestore(); }
 });
 
+it('pays the Slime King prize only to teammates still standing who struck, and announces them together', () => {
+  const [lead, mate, idle] = [player('king-lead', [60, 30, 30]), player('king-mate', [60, 30, 30]), player('king-idle', [60, 30, 30])];
+  team(lead, mate, idle);
+  // All three stand beside the king; the lead and its teammate share the work.
+  place(lead, 9, 11, 5); place(mate, 9, 10, 5); place(idle, 9, 12, 5);
+  const feedBefore = (db.prepare('SELECT coalesce(max(id), 0) AS id FROM feed').get() as { id: number }).id;
+  ok(adventure.moveAdventure(lead, 'd', adventure.adventureFor(lead).revision));
+  // Choose moves explicitly: the idle pet guards each turn, so it never lands a hit.
+  let state = adventure.adventureFor(lead);
+  for (let turn = 0; turn < 500; turn++) {
+    const battle = state.battle?.playback as ActiveBattle | null;
+    if (!battle || battle.status !== 'active') break;
+    const actor = battle.actor!, fighter = battle.fighters[actor].id;
+    const choices = battle.attacks[actor].filter(move => move.mpCost <= battle.mp[actor]);
+    const skill = fighter === idle ? choices.find(move => move.damage === 0) ?? choices[0]
+      : choices.sort((a, b) => b.damage - a.damage || a.mpCost - b.mpCost)[0];
+    if (fighter === idle && skill.damage > 0) ok(adventure.forfeitAdventureBattle(idle, state.battle!.id, battle.revision));
+    else ok(adventure.adventureBattleSkill(fighter, state.battle!.id, battle.revision, skill.id));
+    state = adventure.adventureFor(lead);
+  }
+  expect(state.battle).toMatchObject({ won: true, enemyId: 'slime-king' });
+  const earned = [lead, mate, idle].filter(id => adventure.adventureFor(id).battle?.cleared);
+  expect(earned).toContain(lead);
+  expect(earned).not.toContain(idle);
+  for (const id of [lead, mate, idle]) {
+    expect(pets.getPet(id)!.woodlandClears).toBe(earned.includes(id) ? 1 : 0);
+  }
+  const news = db.prepare('SELECT kind, pet, detail FROM feed WHERE id > ? AND kind = ?').all(feedBefore, 'cleared') as { pet: string; detail: string }[];
+  expect(news).toEqual([{ kind: 'cleared', pet: lead, detail: JSON.stringify({ team: earned }) }]);
+});
+
 it('preserves legacy shared routes and defeated monsters while migrating missing floor gates once', () => {
   const [lead, mate] = ['old-key-lead', 'old-key-mate'].map(id => player(id));
   const { id } = team(lead, mate);

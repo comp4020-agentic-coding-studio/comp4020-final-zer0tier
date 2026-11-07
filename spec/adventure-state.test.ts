@@ -239,6 +239,52 @@ it.each(['slime', 'goblin', 'slime-king'] as const)('saves a %s victory, removes
   expect(afterRestart(id).battle.trained).toEqual(gain);
 });
 
+it('pays the woodland prize once for the Slime King: $150, a coin the pet lacks, and one more clear', () => {
+  const id = 'woodland-prize';
+  setupBattle(id, 'slime-king', [100, 100, 100]);
+  // It already owns Copper and Silver, so the guaranteed coin is the Gold one.
+  db.prepare('INSERT INTO inventory (player_id, item_id, quantity) VALUES (?, ?, 1), (?, ?, 1)').run(id, 'copper-coin', id, 'silver-coin');
+  db.prepare('UPDATE pets SET money = 40 WHERE id = ?').run(id);
+  const before = pets.getPet(id)!;
+  expect(before.woodlandClears).toBe(0);
+  const fought = step(id, 'd');
+  expect(fought.battle!.cleared).toEqual({
+    money: adventure.WOODLAND_REWARD_MONEY, clears: 1,
+    coin: { category: 'coin', id: 'gold-coin', name: 'Gold Coin', quantity: 1 },
+  });
+  const paid = { money: 40 + adventure.WOODLAND_REWARD_MONEY, woodlandClears: 1, coins: { 'copper-coin': 1, 'silver-coin': 1, 'gold-coin': 1 } };
+  expect(pets.getPet(id)).toMatchObject(paid);
+  // Retries, reads, acknowledging the win, and a restart never pay again.
+  expect(adventure.moveAdventure(id, 'd', fought.revision)).toEqual(fought);
+  expect(afterRestart(id)).toEqual(fought);
+  const done = continueRun(id);
+  expect(done.records.at(-1)!.cleared).toEqual(fought.battle!.cleared);
+  expect(adventure.continueAdventure(id, fought.battle!.id, fought.revision)).toEqual(done);
+  expect(pets.getPet(id)).toMatchObject(paid);
+});
+
+it('gives a pet that owns every coin another of any kind, and counts each clear', () => {
+  const id = 'woodland-twice';
+  setupBattle(id, 'slime-king', [100, 100, 100]);
+  db.prepare('INSERT INTO inventory (player_id, item_id, quantity) VALUES (?, ?, 1), (?, ?, 1), (?, ?, 1)')
+    .run(id, 'copper-coin', id, 'silver-coin', id, 'gold-coin');
+  db.prepare('UPDATE pets SET woodland_clears = 2 WHERE id = ?').run(id);
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  try { expect(step(id, 'd').battle!.cleared).toMatchObject({ clears: 3, coin: { id: 'silver-coin' } }); }
+  finally { random.mockRestore(); }
+  expect(pets.getPet(id)).toMatchObject({ woodlandClears: 3, coins: { 'copper-coin': 1, 'silver-coin': 2, 'gold-coin': 1 } });
+});
+
+it('pays nothing for ordinary monsters or a defeat by the Slime King', () => {
+  for (const [id, kind, stats] of [['prize-goblin', 'goblin', [100, 100, 100]], ['prize-lost', 'slime-king', [1, 1, 1]]] as const) {
+    setupBattle(id, kind, [...stats]);
+    const before = pets.getPet(id)!;
+    const fought = step(id, 'd');
+    expect(fought.battle).not.toHaveProperty('cleared');
+    expect(pets.getPet(id)).toMatchObject({ money: before.money, woodlandClears: 0, coins: before.coins });
+  }
+});
+
 it.each([[0, true], [0.049999, true], [0.05, false], [0.999999, false]] as const)(
   'uses the exact 5%% key threshold at %s and saves its result without rerolling', (roll, dropped) => {
     const id = `key-threshold-${roll}`, before = setupBattle(id, 'slime', [100, 100, 100]);

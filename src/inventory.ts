@@ -26,3 +26,9 @@ export function grantTreasure(id: string, reward: TreasureReward): TreasureRewar
   }
   return reward;
 }
+
+// The Slime King's prize, written by the transaction that saves the victory.
+export function grantWoodlandClear(id: string, reward: { money: number; coin: TreasureReward }): void {
+  grantTreasure(id, reward.coin);
+  db.prepare('UPDATE pets SET money = money + ?, woodland_clears = woodland_clears + 1 WHERE id = ?').run(reward.money, id);
+}

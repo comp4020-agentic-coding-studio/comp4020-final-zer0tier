@@ -187,6 +187,8 @@ if (!columns.has("equipped_coin")) db.exec("ALTER TABLE pets ADD COLUMN equipped
 if (!columns.has("equipped_abilities")) db.exec("ALTER TABLE pets ADD COLUMN equipped_abilities TEXT NOT NULL DEFAULT '[\"claw-strike\"]'");
 if (!columns.has("skill_loadouts")) db.exec("ALTER TABLE pets ADD COLUMN skill_loadouts TEXT NOT NULL DEFAULT '{}'");
 if (!columns.has("skill_jobs")) db.exec("ALTER TABLE pets ADD COLUMN skill_jobs TEXT NOT NULL DEFAULT '{}'");
+// How many times this pet has helped defeat the Slime King and clear the woodland.
+if (!columns.has("woodland_clears")) db.exec("ALTER TABLE pets ADD COLUMN woodland_clears INTEGER NOT NULL DEFAULT 0");
 const fightColumns = new Set(
   (db.prepare("SELECT name FROM pragma_table_info('fights')").all() as { name: string }[]).map((c) => c.name),
 );

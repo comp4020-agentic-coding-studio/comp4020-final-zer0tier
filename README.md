@@ -517,7 +517,9 @@ Open **Arena** on the town map to see other pets: the bot first, then the
 newest. A player who
 joins while you're playing shows up in your arena right away. You can also
 look up any pet by its player ID. Each shows its school, what it's doing,
-its attributes, its power, and its wins and losses.
+its attributes, its power, and its wins and losses. A pet that has cleared
+the woodland wears a small purple crown beside its name, with the number of
+clears once there's more than one (see **Clearing the woodland** below).
 
 Human opponents must be **online** (signed in with a live connection) to
 start a fight, including revenge. Online status updates automatically;
@@ -678,9 +680,10 @@ train, and your own pet is highlighted when it makes the board.
 Below your fights, the Arena shows the 15 newest things that happened
 anywhere in the game, live: a player joining, every theft, every time
 someone feeds or cleans another player's pet, every fight (who won, and any
-money taken), a pet moving up a school, and a pet getting promoted at work.
-Ordinary lessons and shifts stay out of it, so it isn't flooded. Entries
-about your pet are highlighted.
+money taken), a pet moving up a school, a pet getting promoted at work, and
+a pet or team clearing the woodland. Ordinary lessons and shifts stay out of
+it, so it isn't flooded. Entries about your pet, including a clear you shared,
+are highlighted.
 
 Still to come: recruiting other players' pets.
 
@@ -1117,6 +1120,25 @@ gives +1 to all three.**
 A knocked-out pet, or one whose teammates finished the monster before it
 struck, gains nothing. The gain is saved once with the victory, raises the
 maximum HP/MP without refilling them, and appears in the battle result.
+
+**Clearing the woodland.** Defeating the Slime King also pays the woodland's
+prize to the same pets its victory trains: each pet still standing that
+landed a hit gets
+
+- **$150**,
+- a guaranteed **Unfair Coin** it doesn't own yet, chosen at random (any of
+  the three once it owns them all), and
+- a **crown**: the pet's count of woodland clears goes up by one. The crown
+  shows in its pet details and beside its name in the Arena, for every
+  player to see, with the count once it has cleared more than once.
+
+The prize is chosen and saved together with the victory, so retrying,
+reloading, replaying, or a server restart never pays it twice or rolls a
+different coin. The battle result and the finished-run panel name what
+your pet received. **Happening now** tells everyone, live, which pets
+cleared the woodland: one entry per victory, naming the whole team that
+earned the prize. A knocked-out teammate, or one that never struck, gets
+neither the prize nor a mention.
 
 **Defeat ends the adventure.** HP stays at zero, and movement and stairs
 are disabled. Completing the woodland, losing, or choosing **End

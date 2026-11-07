@@ -225,6 +225,18 @@ function renderPetAvatar(svg, pet) {
   svg.querySelector("use").setAttribute("href", `#pet-${appearance}`);
 }
 
+// The Slime King's lasting prize: a crown counting each woodland clear.
+const clearsText = (clears) => (clears === 1 ? "Woodland cleared" : `Woodland cleared ×${clears}`);
+function crownTag(clears) {
+  const tag = document.createElement("span");
+  tag.className = "crown-tag";
+  tag.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-crown" /></svg><span></span>';
+  tag.querySelector("span").textContent = clears === 1 ? "Woodland" : `Woodland ×${clears}`;
+  tag.title = clearsText(clears);
+  tag.setAttribute("aria-label", clearsText(clears));
+  return tag;
+}
+
 function petAvatar(pet, inline = false) {
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("class", `pet pet-small${inline ? " pet-inline" : ""}`);
@@ -706,6 +718,7 @@ function rivalRow(pet) {
   li.querySelector(".rival-identity").prepend(petAvatar(pet));
   if (pet.id === rules.botId) li.querySelector(".rival-name").insertAdjacentHTML("afterend", '<span class="tag">bot</span>');
   li.querySelector(".rival-meta").textContent = `${school} · ${doing} · ${pet.wins}W ${pet.losses}L`;
+  if (pet.woodlandClears > 0) li.querySelector(".rival-meta").prepend(crownTag(pet.woodlandClears));
   if (pet.id !== rules.botId) {
     const status = document.createElement('span');
     status.dataset.onlinePlayer = pet.id;
@@ -1158,6 +1171,13 @@ function feedText(entry) {
       const school = rules.schools.find((s) => s.id === entry.school)?.name ?? entry.school;
       return [entry.pet, ` moved up to ${school.toLowerCase()}.`];
     }
+    case "cleared": {
+      // Every pet that earned the prize, in bold, joined like a sentence.
+      const team = entry.team?.length ? entry.team : [entry.pet];
+      return team.flatMap((id, i) => [id, i === team.length - 1
+        ? (team.length > 1 ? " cleared the woodland together!" : " cleared the woodland!")
+        : i === team.length - 2 ? " and " : ", "]);
+    }
     case "promoted": {
       const place = rules.locations.find((l) => l.id === entry.location);
       return [entry.pet, ` became ${place?.ranks[entry.rank]?.title ?? "promoted"} at the ${place?.name.toLowerCase()}.`];
@@ -1191,7 +1211,7 @@ function renderFeed() {
         identity.append(b);
         text.append(identity);
       });
-      li.toggleAttribute("data-mine", entry.pet === current?.id || entry.other === current?.id);
+      li.toggleAttribute("data-mine", entry.pet === current?.id || entry.other === current?.id || Boolean(entry.team?.includes(current?.id)));
       const time = document.createElement("time");
       time.dateTime = entry.at;
       time.textContent = new Date(entry.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -1405,6 +1425,8 @@ function render(pet) {
     $("appearance-status").textContent = "Appearance saved.";
   }
   $("pet-name").textContent = pet.id;
+  $("pet-crown").hidden = !(pet.woodlandClears > 0);
+  $("pet-crown-text").textContent = pet.woodlandClears > 0 ? clearsText(pet.woodlandClears) : "";
   $("activity").textContent = pet.activity;
   for (const stat of ["strength", "intelligence", "charisma", "money"]) {
     const el = $(`stat-${stat}`);
