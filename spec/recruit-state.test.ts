@@ -203,3 +203,68 @@ it('team runs: each teammate\'s ally fights in shared battles and the coin still
   expect(battle.automaticIds).toEqual([friend]);
   expect([0, 1]).toContain(battle.coinProvider);
 });
+
+it('forfeiting withdraws the ally too, so it never plays on alone, wins, or earns', () => {
+  const me = player('quit-me', [5, 5, 5]), friend = player('quit-friend', [200, 5, 5]);
+  readyRun(me);
+  ok(recruit(me, friend));
+  const before = pets.getPet(friend)!.money;
+  // Heads: my pet moves first, so the battle waits on my turn.
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+  try { ok(adventure.moveAdventure(me, 'd', adventure.adventureFor(me).revision)); } finally { random.mockRestore(); }
+  const state = adventure.adventureFor(me);
+  const live = state.battle!.playback as ActiveBattle;
+  expect(live).toMatchObject({ status: 'active', actor: 0 });
+  // My 200-Strength friend would win this alone in one hit; leaving takes it home.
+  ok(adventure.forfeitAdventureBattle(me, state.battle!.id, live.revision));
+  const after = adventure.adventureFor(me);
+  const ended = after.battle!.playback as ActiveBattle;
+  expect(ended.status).toBe('finished');
+  expect(ended.winner).toBe('monster:f1-enemy-0');
+  expect(ended.turns.some(turn => turn.actor === 1)).toBe(false);
+  expect(ended.forfeited).toEqual([0, 1]);
+  expect(after.battle).toMatchObject({ won: false, allyPay: { ally: friend, money: 0, knockedOut: false } });
+  expect(after.enemies.some(enemy => enemy.id === 'f1-enemy-0')).toBe(true);
+  expect(pets.getPet(friend)!.money).toBe(before);
+});
+
+it('leaving mid-battle withdraws the ally the same way', () => {
+  const me = player('leave-me', [5, 5, 5]), friend = player('leave-friend', [200, 5, 5]);
+  readyRun(me);
+  ok(recruit(me, friend));
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+  try { ok(adventure.moveAdventure(me, 'd', adventure.adventureFor(me).revision)); } finally { random.mockRestore(); }
+  ok(adventure.leaveAdventure(me, adventure.adventureFor(me).revision));
+  const ended = adventure.adventureFor(me).battle!.playback as ActiveBattle;
+  expect(ended.winner).toBe('monster:f1-enemy-0');
+  expect(ended.turns.some(turn => turn.actor === 1)).toBe(false);
+});
+
+it("a friend whose pet fights as someone's ally stays free to play: nothing of theirs is busy", () => {
+  const me = player('busy-me', [5, 5, 5]), friend = player('busy-friend', [5, 5, 5]);
+  readyRun(me);
+  ok(recruit(me, friend));
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+  try { ok(adventure.moveAdventure(me, 'd', adventure.adventureFor(me).revision)); } finally { random.mockRestore(); }
+  // My battle waits on me, with the friend's pet standing in it.
+  const live = adventure.adventureFor(me).battle!.playback as ActiveBattle;
+  expect(live.status).toBe('active');
+  expect(live.hp[1]).toBeGreaterThan(0);
+  expect(pets.combatBusy(friend)).toBeUndefined();
+  expect(pets.busyNow(pets.getPet(friend)!)).toBeUndefined();
+  expect(pets.study(friend, 'math')).not.toHaveProperty('error');
+});
+
+it("keeps the run's whole ally pay after old replays are trimmed", () => {
+  const me = player('long-me', [100, 100, 100]), friend = player('long-friend', [5, 5, 5]);
+  readyRun(me);
+  ok(recruit(me, friend));
+  // Pretend 60 paid wins already happened; only the newest 50 replays remain.
+  const row = db.prepare('SELECT records_json FROM adventures WHERE player_id = ?').get(me) as { records_json: string | null };
+  const records = row.records_json ? JSON.parse(row.records_json) : { total: 0, battles: [] };
+  db.prepare('UPDATE adventures SET records_json = ? WHERE player_id = ?')
+    .run(JSON.stringify({ ...records, total: 60, allyEarned: 60 * adventure.ALLY_PAY.win }), me);
+  const fought = fight(me);
+  expect(fought.battle).toMatchObject({ won: true, allyPay: { money: adventure.ALLY_PAY.win } });
+  expect(fought.ally).toMatchObject({ earned: 61 * adventure.ALLY_PAY.win });
+});

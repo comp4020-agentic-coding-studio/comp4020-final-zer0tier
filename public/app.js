@@ -686,13 +686,14 @@ function renderLiveFights() {
     .sort((a, b) => Number(b.mine) - Number(a.mine) || (b.live.watchers ?? 0) - (a.live.watchers ?? 0) || a.i - b.i)
     .map(({ live }) => live);
   $("arena-live").hidden = entries.length === 0;
+  const focused = document.activeElement?.dataset?.watch;
+  // Never hide the Watch button the keyboard is on; decide that before the
+  // toggle is labelled, so it never reads "Show all" over an expanded list.
+  if (focused && entries.findIndex((live) => live.id === focused) >= LIVE_SHOWN) showAllLive = true;
   const more = $("arena-live-more");
   more.hidden = entries.length <= LIVE_SHOWN;
   more.textContent = showAllLive ? "Show fewer" : `Show all ${entries.length} live fights`;
   more.setAttribute("aria-expanded", String(showAllLive));
-  const focused = document.activeElement?.dataset?.watch;
-  // Never hide the Watch button the keyboard is on.
-  if (focused && entries.findIndex((live) => live.id === focused) >= LIVE_SHOWN) showAllLive = true;
   const shown = showAllLive ? entries : entries.slice(0, LIVE_SHOWN);
   $("arena-live-list").replaceChildren(...shown.map((live) => {
     const li = document.createElement("li");
@@ -786,7 +787,13 @@ async function watchFight(battleId) {
     const body = await response.json();
     if (!response.ok) {
       $("arena-live-error").textContent = body.error ?? "Couldn't find a seat. Try again.";
-      if (response.status === 404) { liveFights.delete(battleId); }
+      if (response.status === 404) {
+        // The fight ended, perhaps while this window was offline and missed its
+        // last turn: close a stands window still waiting on it.
+        liveFights.delete(battleId);
+        $("arena-live-error").textContent = "That fight has finished.";
+        document.dispatchEvent(new CustomEvent("battle:dismiss", { detail: { key: `session:${battleId}` } }));
+      }
       return;
     }
     watchingBattle = battleId;

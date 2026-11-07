@@ -372,7 +372,9 @@ export function takeBattleTurn(battle: ActiveBattle, actorId: string, ability: u
   if (attack.unavailable) return { error: attack.unavailable, status: 409 };
   strike(next, actor, attack, random); advance(next, random); return next;
 }
-export function forfeitBattle(battle: ActiveBattle, actorId: string, revision?: unknown): ActiveBattle | legacy.BattleActionError {
+// `withdraws` are game-controlled fighters (a recruited ally) who leave with
+// this player, in the same step, so they never fight on without them.
+export function forfeitBattle(battle: ActiveBattle, actorId: string, revision?: unknown, withdraws: readonly string[] = []): ActiveBattle | legacy.BattleActionError {
   if (battle.rulesVersion !== 2) return legacy.forfeitBattle(battle as legacy.ActiveBattle, actorId, revision) as ActiveBattle | legacy.BattleActionError;
   if (revision !== undefined && (!Number.isInteger(revision) || revision !== battle.revision)) return { error: 'The battle has moved on. Refresh it before leaving.', status: 409 };
   const actor = battle.fighters.findIndex(f => f.id === actorId);
@@ -381,6 +383,9 @@ export function forfeitBattle(battle: ActiveBattle, actorId: string, revision?: 
   if (battle.forfeited.includes(actor)) return battle;
   const next = structuredClone(battle); delete next.rng;
   next.effectTick = effectTime(next);
-  next.hp[actor] = 0; next.forfeited.push(actor); next.revision++;
+  const leaving = [actor, ...withdraws.filter(id => next.automaticIds.includes(id)).map(id => next.fighters.findIndex(f => f.id === id))]
+    .filter(index => index >= 0 && !next.forfeited.includes(index));
+  for (const index of leaving) { next.hp[index] = 0; next.forfeited.push(index); }
+  next.revision++;
   advance(next); return next;
 }

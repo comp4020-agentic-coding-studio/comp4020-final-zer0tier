@@ -59,7 +59,8 @@ export interface Pet extends ReturnType<typeof inventoryFor> {
 }
 
 // Always there to fight, so a new player has someone to test themselves on.
-export const BOT_ID = "0";
+export { BOT_ID } from "./bot.ts";
+import { BOT_ID } from "./bot.ts";
 
 export type Attribute = "strength" | "intelligence" | "charisma";
 const ATTRIBUTES: Attribute[] = ["strength", "intelligence", "charisma"];
@@ -979,10 +980,11 @@ export function battleSessionFor(id: string, battleId: string): BattleSession | 
 export function combatBusy(id: string): string | undefined {
   if (id === BOT_ID) return undefined;
   if (selectActiveSessions.get(id, id)) return 'Your pet is busy in a battle. Finish it or forfeit first.';
-  // Its own run's battle, or a battle on a run it was recruited onto as an ally.
-  const rows = db.prepare('SELECT battle_json, abandoned FROM adventures WHERE player_id = ? OR ally_id = ?').all(id, id) as { battle_json: string | null; abandoned: number }[];
-  for (const row of rows) {
-    if (!row.battle_json || row.abandoned) continue;
+  // Only its own run's battle. Fighting as someone's recruited ally never makes
+  // a pet busy: the game plays that turn, its owner couldn't finish or forfeit
+  // it, and the ally's HP lives on the recruiter's run, not the pet.
+  const row = db.prepare('SELECT battle_json, abandoned FROM adventures WHERE player_id = ?').get(id) as { battle_json: string | null; abandoned: number } | undefined;
+  if (row?.battle_json && !row.abandoned) {
     const wrapper = JSON.parse(row.battle_json) as { pending: boolean; playback?: ActiveBattle };
     const battle = wrapper.playback, mine = battle?.fighters.findIndex(fighter => fighter.id === id) ?? -1;
     if (wrapper.pending && battle?.status === 'active' && mine >= 0 && battle.hp[mine] > 0) {

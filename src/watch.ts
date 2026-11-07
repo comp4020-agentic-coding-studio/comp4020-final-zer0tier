@@ -3,7 +3,7 @@ import { db, transaction } from "./db.ts";
 // Watching live Arena and revenge fights from the stands. The database holds
 // who watches what; realtime.ts reads it to decide who hears each turn, and
 // broadcasts each battle's count as read back from it.
-export const BOT_ID = "0";
+import { BOT_ID } from "./bot.ts";
 
 // Live player-versus-player fights anyone else may watch: Arena and revenge,
 // never practice against the bot. (Adventure battles live elsewhere entirely.)

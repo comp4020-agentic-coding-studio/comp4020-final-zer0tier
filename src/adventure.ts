@@ -44,7 +44,8 @@ export const ALLY_PAY = { win: 2, boss: 15 } as const;
 export const WOODLAND_REWARD_MONEY = 150;
 export type WoodlandReward = { money: number; coin: TreasureReward; clears: number };
 export const ADVENTURE_RECORD_LIMIT = 50;
-type BattleRecords = { total: number; battles: AdventureBattle[] };
+// `allyEarned` keeps the whole run's ally pay, like `total`, after old replays are trimmed.
+type BattleRecords = { total: number; battles: AdventureBattle[]; allyEarned?: number };
 type SavedAdventure = {
   x: number; y: number; floor: number; world_json: string | null;
   revision: string | null; battle_json: string | null;
@@ -181,8 +182,11 @@ function view(saved: Progress) {
 
 // The recruited ally as the map and backpack show it: its look, carried HP/MP,
 // whether it's sitting out, and what it has earned on this run so far.
+// The whole run's ally pay. Runs saved before the running total add up their records.
+const earnedOn = (records: BattleRecords) => records.allyEarned
+  ?? records.battles.reduce((sum, battle) => sum + (battle.allyPay?.money ?? 0), 0);
 function allyView(saved: Progress) {
-  const earned = saved.records.battles.reduce((sum, battle) => sum + (battle.allyPay?.money ?? 0), 0);
+  const earned = earnedOn(saved.records);
   if (!saved.ally) return earned ? { id: null, earned } : null;
   const pet = getPet(saved.ally.id);
   if (!pet) return null;
@@ -317,6 +321,8 @@ function saveBattle(saved: Progress, participants: Progress[], playback: ActiveB
         const skill = pool[Math.floor(Math.random() * pool.length)];
         if (skill) fighter.battle.skillDrop = grantTreasure(fighter.id, { category: 'ability', id: skill.id, name: skill.name, quantity: 1 });
       }
+      // The ally's pay so far, read before this battle's record is added.
+      const earnedBefore = earnedOn(fighter.records);
       if (finished) {
         fighter.records.total++;
         fighter.records.battles.push({ ...fighter.battle, pending: false });
@@ -335,9 +341,12 @@ function saveBattle(saved: Progress, participants: Progress[], playback: ActiveB
             ally.hp = Math.min(caps.maxHp, ally.hp + Math.ceil(caps.maxHp * 0.2));
             ally.mp = Math.min(caps.maxMp, ally.mp + Math.ceil(caps.maxMp * 0.2));
           }
-          // Every ally that started the battle fought in it, even one knocked out.
-          const money = won ? ALLY_PAY.win + (monster.monster === 'slime-king' ? ALLY_PAY.boss : 0) : 0;
-          fighter.battle.allyPay = { ally: ally.id, money, knockedOut: ally.hp === 0 };
+          // Every ally that stayed fought in it, even one knocked out; one that
+          // left with its recruiter wasn't there for the win and earns nothing.
+          const left = 'forfeited' in playback && playback.forfeited.includes(allyIndex);
+          const money = won && !left ? ALLY_PAY.win + (monster.monster === 'slime-king' ? ALLY_PAY.boss : 0) : 0;
+          fighter.battle.allyPay = { ally: ally.id, money, knockedOut: ally.hp === 0 && !left };
+          fighter.records.allyEarned = earnedBefore + money;
           if (ally.hp === 0) fighter.ally = null;
           fighter.records.battles[fighter.records.battles.length - 1] = { ...fighter.battle, pending: false };
         }
@@ -420,7 +429,8 @@ function battleAction(id: string, battleId: unknown, turnRevision: unknown, abil
     if (!activeBattle(battle.playback)) return view(saved);
     if (turnRevision !== battle.playback.revision) return view(saved);
     if (saved.abandoned) return { error: 'You have already left this battle.', status: 409 };
-    const playback = forfeit ? forfeitBattle(battle.playback, id, turnRevision)
+    // A recruited ally only fights beside its recruiter: forfeiting takes it too.
+    const playback = forfeit ? forfeitBattle(battle.playback, id, turnRevision, saved.ally ? [saved.ally.id] : [])
       : takeBattleTurn(battle.playback, id, ability, turnRevision);
     if ('error' in playback) return playback;
     if (forfeit) { saved.abandoned = true; battle.pending = false; saved.awaitingEntry = false; }
@@ -519,7 +529,7 @@ export function abandonAdventure(id: string, revision: unknown) {
 function endRun(saved: Progress) {
   if (saved.abandoned && !saved.battle?.pending) return view(saved);
   if (saved.battle && activeBattle(saved.battle.playback)) {
-    const playback = forfeitBattle(saved.battle.playback, saved.id);
+    const playback = forfeitBattle(saved.battle.playback, saved.id, undefined, saved.ally ? [saved.ally.id] : []);
     if ('error' in playback) return playback;
     saved.abandoned = true; saved.battle.pending = false; saved.awaitingEntry = false;
     saveBattle(saved, battleParticipants(saved), playback);
@@ -673,9 +683,14 @@ export function openAdventureChest(id: string, revision: unknown) {
 // Why a recruited ally sits out the next battle, if it does: its owner came
 // back and took it on an adventure of its own, or into a live fight. It
 // rejoins once that's over. The recruiter's run is never rewritten for this.
+// Runs that might still be under way, without parsing any saved map: started,
+// not left, and not failed. Only these few need a full load to rule out a
+// cleared woodland. The map view checks this on every refresh.
+const ownRunMayBeLive = db.prepare('SELECT 1 FROM adventures WHERE player_id = ? AND started = 1 AND abandoned = 0 AND (hp IS NULL OR hp > 0)');
+const runsHoldingAlly = db.prepare('SELECT player_id FROM adventures WHERE ally_id = ? AND started = 1 AND abandoned = 0 AND (hp IS NULL OR hp > 0)');
+const liveRun = (id: string) => { const run = load(id); return !over(run) && !complete(run) ? run : undefined; };
 function allyAway(friend: string): string | undefined {
-  const own = db.prepare('SELECT 1 FROM adventures WHERE player_id = ? AND started = 1').get(friend) ? load(friend) : undefined;
-  if (own && !over(own) && !complete(own)) return 'is on an adventure of its own';
+  if (ownRunMayBeLive.get(friend) && liveRun(friend)) return 'is on an adventure of its own';
   if (combatBusy(friend)) return 'is in another battle';
   return undefined;
 }
@@ -689,8 +704,9 @@ export function recruitRefusal(id: string, friend: string): string | undefined {
   if (friend === id) return "You can't recruit your own pet; it's already here.";
   if (friend === BOT_ID) return 'The training bot stays in the arena.';
   if (!getPet(friend) || !db.prepare('SELECT 1 FROM accounts WHERE id = ?').get(friend)) return `No player called ${friend}.`;
-  const holders = db.prepare('SELECT player_id FROM adventures WHERE ally_id = ?').all(friend) as { player_id: string }[];
-  const holder = holders.map(row => load(row.player_id)).find(run => run.ally?.id === friend && !over(run) && !complete(run));
+  // Ended runs keep their ally's name as history; only possibly-live ones are loaded.
+  const holders = runsHoldingAlly.all(friend) as { player_id: string }[];
+  const holder = holders.map(row => liveRun(row.player_id)).find(run => run?.ally?.id === friend);
   if (holder) return `${friend}'s pet is already helping ${holder.id === id ? 'you' : 'someone else'} on an adventure.`;
   const away = allyAway(friend);
   return away && `${friend}'s pet ${away}.`;
@@ -716,9 +732,12 @@ export function recruitAlly(id: string, friend: unknown, revision: unknown) {
 
 // The recruited allies a step by this pet could pull into a battle: its own,
 // and its teammates' on a team run. The server compares their saved pets.
+// One indexed read, no saved maps parsed: every step and stair runs this.
+const runAllies = db.prepare(`SELECT DISTINCT a.ally_id FROM adventures a
+  WHERE a.ally_id IS NOT NULL AND (a.player_id = ?1
+    OR (a.team_id IS NOT NULL AND a.team_id = (SELECT team_id FROM adventures WHERE player_id = ?1)))`);
 export function alliesNear(id: string): string[] {
-  const saved = load(id);
-  return [saved, ...teammates(saved)].flatMap(run => run.ally ? [run.ally.id] : []);
+  return (runAllies.all(id) as { ally_id: string }[]).map(row => row.ally_id);
 }
 
 // Sending the ally home ends its part in the run. It keeps what it earned.

@@ -267,8 +267,12 @@ app.post("/api/adventure", (req, res) => {
   // A won battle trains every pet still standing and pays a recruited ally, so
   // compare each fighter. A step can start a battle a fast ally and monster
   // finish at once, so moves compare the recruiter's ally too.
+  // Leaving, entering, or restarting mid-battle forfeits, and the teammates who
+  // stay can still win, training them and paying their allies; compare those too.
   const moving = req.body?.direction !== undefined || ['ascend', 'descend'].includes(req.body?.action);
+  const ending = ['leave', 'enter', 'restart', 'abandon'].includes(req.body?.action);
   const fighters = ['battle-skill', 'battle-forfeit'].includes(req.body?.action) ? battleFighters(id)
+    : ending ? [...new Set([id, ...battleFighters(id), ...alliesNear(id)])]
     : moving ? [id, ...alliesNear(id)] : [];
   const fightersBefore = fighters.map(fighter => getPet(fighter));
   const result = req.body?.action === 'open-chest' ? openAdventureChest(id, req.body.revision)

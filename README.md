@@ -1153,7 +1153,9 @@ Their pet joins your run at full HP and MP, walks at your pet's heel
   for its owner's choice, so the saved battle always rests on a player's turn.
   Nobody, not even its owner, can choose or forfeit a move for an ally. It
   takes its turn after the players' pets and before the monster, and the
-  monster may target it like any pet (the one with the most HP).
+  monster may target it like any pet (the one with the most HP). It only
+  fights beside you: if you forfeit or leave mid-battle, it withdraws with
+  you in the same step, so it never fights on, wins, or earns without you.
 - **Coins and rewards:** an ally never supplies the coin; only players' pets
   do, even if the ally has the highest attributes. It never trains, never
   takes skill drops, keys, chest rewards, or the woodland prize, and isn't
@@ -1169,8 +1171,10 @@ Their pet joins your run at full HP and MP, walks at your pet's heel
 - **Send home** (in the same menu) ends its part in the run outside a
   battle. So does the run ending: clearing the woodland, your pet's defeat,
   or leaving. The next run starts without an ally.
-- **When the friend comes back:** if they start an adventure of their own,
-  or their pet joins another battle, it sits out your fights until that's
+- **When the friend comes back:** being your ally never makes their own pet
+  busy, even mid-battle. They can study, work, shop, fight, or start their
+  own adventure right away. If they start an adventure of their own, or
+  their pet joins another battle, it sits out your fights until that's
   over. The menu says so, and it rejoins you after. Your run is never
   rewritten for this, so your next move never fails for it.
 - On a **team**, each teammate can recruit one ally. Every ally beside a
