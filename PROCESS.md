@@ -210,6 +210,42 @@ land in the harness rather than as a retry:
   previous commit to show my change wasn't the cause, then measured WSL's wall
   clock jumping up to about 7 seconds against a steady clock. The same specs
   pass in CI, so the fix is restarting WSL, not changing the game.
+- For the Slime King reward I first chose a 10% share of the run's money for
+  a recruited ally. Before building it, the agent pointed out that a run's only
+  money is the $150 boss prize, so the share would be $0 on almost every run.
+  It asked me again rather than building something that looked done, and I
+  changed it to $2 a win
+  ([`bccd0d1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/bccd0d1)).
+  Recruiting also broke a `CLAUDE.md` rule (only monsters and the bot choose
+  attacks), so the agent asked how an ally should fight instead of quietly
+  bending the rule, and the rule was rewritten to name the exception.
+- Several new tests passed the first time without testing anything: their
+  checks sat inside `if` branches that never ran. The agent printed what each
+  test actually exercised, rewrote them to fail when the behaviour is wrong,
+  and that exposed two setup mistakes of its own
+  ([`bccd0d1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/bccd0d1)).
+- Page tests in jsdom passed, but driving the real app in a browser found what
+  they missed: the Recruit button stayed disabled until the next map redraw
+  ([`bccd0d1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/bccd0d1)),
+  and a fighter's audience count stayed at 0 when someone sat down the moment
+  the fight began
+  ([`8ae2251`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/8ae2251)).
+  Both were fixed before committing, at desktop and phone sizes, from the
+  keyboard alone.
+- An old Adventure route spec began failing most runs. The agent ran it on
+  the commit before that week's work, where it also failed, so the new
+  features weren't the cause; it was racing the map's once-a-second refresh.
+  The fix went to the spec, in its own commit so it wasn't hidden inside a
+  feature
+  ([`3ce1287`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/3ce1287)).
+- A review of the week's four features (woodland reward, gifts, recruiting,
+  watching) found ten problems. The agent checked each against the code before
+  fixing it. The worst two: an ally kept fighting after its recruiter forfeited
+  and could win alone, getting its owner paid; and being an ally locked the
+  friend's own pet out of studying, working, and fighting while the recruiter
+  sat idle. For both, it undid the fix to show the new spec fails, then put it
+  back
+  ([`8aafd31`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/8aafd31)).
 
 ## What the history shows, honestly
 
@@ -292,5 +328,9 @@ session. Then write the concurrency decision record, arguing against at least
 one option I didn't take (polling instead of WebSockets, or broadcasting only
 to the players involved). Play with other people to judge what the spec can't:
 whether helping is worth a $15 food, and whether teams need a smaller entry
-cost. Gifting and recruiting are now built; play-test whether an ally's $2 a
-win is worth a friend's while, and whether trading is still wanted.
+cost. Gifting, recruiting, watching live fights, and guestbook notes are now
+built; play-test whether an ally's $2 a win is worth a friend's while, whether
+a busy arena's "Live now" list feels like an event, and whether eight fixed
+phrases are enough to say what players want to say. Watching makes the
+decision record's broadcast question concrete: a fight's turns now reach its
+fighters and the players watching it, but nobody else.
