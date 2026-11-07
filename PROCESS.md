@@ -292,4 +292,5 @@ session. Then write the concurrency decision record, arguing against at least
 one option I didn't take (polling instead of WebSockets, or broadcasting only
 to the players involved). Play with other people to judge what the spec can't:
 whether helping is worth a $15 food, and whether teams need a smaller entry
-cost. And decide between trading and recruiting pets as the next interaction.
+cost. Gifting and recruiting are now built; play-test whether an ally's $2 a
+win is worth a friend's while, and whether trading is still wanted.

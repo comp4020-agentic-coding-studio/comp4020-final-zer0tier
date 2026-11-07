@@ -1604,3 +1604,83 @@ it.each(['broadcast', 'response'])('enters a shared run once when the set-off %s
     expect($('adventure-status').textContent).not.toContain('Rest before another adventure');
   } finally { window.close(); }
 });
+
+it('recruits an offline friend from the menu, draws it at your heel, explains refusals, and sends it home', async () => {
+  const { dom, window, $ } = page();
+  Object.defineProperty(window.document, 'hidden', { value: true }); // no patrol steps
+  const pal = { id: 'pal', color: '#123456', appearance: 'panda', type: 'int', hp: 25, mp: 6, maxHp: 25, maxMp: 6, skills: ['Claw Strike', 'Paperplane Dart'], away: null, earned: 0 };
+  let saved: any = { ...map(), started: true, ally: null, allyPay: { win: 2, boss: 15 } };
+  const bodies: any[] = [];
+  let respond: ((response: Response) => void) | null = null;
+  window.fetch = vi.fn(async (_url: string, options?: RequestInit) => {
+    const body = options?.body ? JSON.parse(options.body as string) : {};
+    bodies.push(body);
+    if (body.action === 'recruit' && body.friend === 'busy') {
+      return Response.json({ error: 'busy is online. Invite them to your team so they can play themselves.' }, { status: 409 });
+    }
+    if (body.action === 'recruit') return new Promise<Response>(resolve => { respond = resolve; });
+    if (body.action === 'dismiss-ally') saved = { ...saved, revision: 'home', ally: { id: null, earned: 2 } };
+    return Response.json(saved);
+  }) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect($('adventure-player')).not.toBeNull());
+    $('adventure-pack-toggle').click();
+    expect($('adventure-ally').hidden).toBe(false);
+    expect($('adventure-ally-help').textContent).toContain('The game pays its owner $2 for each win (+$15 for the Slime King); it costs you nothing.');
+    const input = $('adventure-ally-id') as HTMLInputElement;
+    // Typing a friend's ID in the menu never walks the pet.
+    input.focus();
+    input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    expect(bodies.some(body => body.direction)).toBe(false);
+    // A refusal is shown, and nothing changes.
+    input.value = 'busy';
+    $('adventure-ally-form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await vi.waitFor(() => expect($('adventure-ally-error').textContent).toBe('busy is online. Invite them to your team so they can play themselves.'));
+    expect($('adventure-ally-card').hidden).toBe(true);
+    // Recruiting waits for the server; the button can't be pressed twice meanwhile.
+    input.value = 'pal';
+    $('adventure-ally-form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    expect(($('adventure-ally-recruit') as HTMLButtonElement).disabled).toBe(true);
+    $('adventure-ally-form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    expect(bodies.filter(body => body.action === 'recruit')).toHaveLength(2);
+    expect(bodies.at(-1)).toEqual({ action: 'recruit', friend: 'pal', revision: 'saved-map' });
+    expect($('adventure-grid').querySelector('[data-ally]')).toBeNull();
+    saved = { ...saved, revision: 'recruited', ally: pal };
+    respond!(Response.json(saved));
+    await vi.waitFor(() => expect($('adventure-ally-card').hidden).toBe(false));
+    expect($('adventure-ally-news').textContent).toBe("pal's pet joined you. It walks with your pet and fights in your battles.");
+    expect($('adventure-ally-status').textContent).toBe("pal's pet · INT · HP 25 / 25 · MP 6 / 6 · Skills: Claw Strike, Paperplane Dart · Earned $0 this run");
+    expect($('adventure-ally-form').hidden).toBe(true);
+    expect(window.document.activeElement?.id).toBe('adventure-ally-dismiss');
+    // It stands on your tile, drawn in its own look, and the map says so.
+    const ally = $('adventure-grid').querySelector<HTMLElement>('.adventure-ally[data-ally="pal"]')!;
+    expect(ally.style.transform).toBe($('adventure-player').style.transform);
+    expect(ally.querySelector('use')?.getAttribute('href')).toBe('#pet-panda');
+    expect($('adventure-grid').getAttribute('aria-label')).toContain("with your ally pal's pet at its heel");
+    // Sending it home removes it and says what it earned.
+    $('adventure-ally-dismiss').click();
+    await vi.waitFor(() => expect($('adventure-ally-card').hidden).toBe(true));
+    expect(bodies.at(-1)).toEqual({ action: 'dismiss-ally', revision: 'recruited' });
+    expect($('adventure-ally-news').textContent).toBe("pal's pet went home with what it earned.");
+    expect($('adventure-grid').querySelector('[data-ally]')).toBeNull();
+    expect(window.document.activeElement?.id).toBe('adventure-ally-id');
+  } finally { dom.window.close(); }
+});
+
+it('names the ally\'s pay, or that it went home knocked out, in the battle result', async () => {
+  const { dom, window, $ } = page();
+  const fought = battleProgress();
+  const saved: any = { ...fought, battle: { ...fought.battle, allyPay: { ally: 'pal', money: 2, knockedOut: true } } };
+  window.fetch = vi.fn(async () => Response.json(saved)) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/battle.js', 'utf8'));
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement).open).toBe(true));
+    $('battle-skip').click();
+    expect($('battle-status').textContent).toContain("pal's pet was knocked out and went home, earning pal $2.");
+  } finally { dom.window.close(); }
+});

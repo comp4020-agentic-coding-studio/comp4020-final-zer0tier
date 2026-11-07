@@ -86,7 +86,10 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   drops. Keys and permanent gate unlocks belong to the shared floor, and saved
   battle replays never reroll drops. Preserve unlocked exits within a run.
 - Pet attacks require their owner's explicit skill choice on each turn;
-  only monsters and the training bot choose attacks automatically. Keep
+  only monsters, the training bot, and recruited Adventure allies choose
+  attacks automatically. A recruited ally is an offline friend's pet: it
+  fights from its owner's saved skills, never supplies the coin, never
+  trains, and earns its owner a game-paid share per victory. Keep
   the coin effects. New battles derive pet and monster types from their
   stats: a unique highest stat with at least a 20% lead gives STR, CHA, or
   INT; otherwise Normal. STR beats CHA, CHA beats INT, and INT beats STR,
@@ -96,7 +99,8 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   In PvP (including
   revenge), the pet with the highest Strength + Intelligence + Charisma supplies the coin;
   in cooperative encounters use the strongest participating pet, and in
-  solo encounters always use the player's coin. Compare unboosted attributes,
+  solo encounters always use the player's coin (a recruited ally never
+  supplies it). Compare unboosted attributes,
   with the initiating pet winning ties.
 - Equip learned battle skills at the storage chest at home. Keep Claw Strike
   available for free. Persist active turns, validate the acting owner and

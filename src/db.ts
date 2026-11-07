@@ -226,3 +226,8 @@ if (!adventureColumns.has("started")) {
   db.exec("UPDATE adventures SET started = 1");
 }
 db.exec("CREATE INDEX IF NOT EXISTS adventures_by_team ON adventures (team_id)");
+// An offline friend's pet recruited onto this run, fighting with its owner's
+// saved skills: its ID, and its carried HP/MP for the run as JSON.
+if (!adventureColumns.has("ally_id")) db.exec("ALTER TABLE adventures ADD COLUMN ally_id TEXT");
+if (!adventureColumns.has("ally_json")) db.exec("ALTER TABLE adventures ADD COLUMN ally_json TEXT");
+db.exec("CREATE INDEX IF NOT EXISTS adventures_by_ally ON adventures (ally_id)");

@@ -979,8 +979,10 @@ export function battleSessionFor(id: string, battleId: string): BattleSession | 
 export function combatBusy(id: string): string | undefined {
   if (id === BOT_ID) return undefined;
   if (selectActiveSessions.get(id, id)) return 'Your pet is busy in a battle. Finish it or forfeit first.';
-  const row = db.prepare('SELECT battle_json, abandoned FROM adventures WHERE player_id = ?').get(id) as { battle_json: string | null; abandoned: number } | undefined;
-  if (row?.battle_json && !row.abandoned) {
+  // Its own run's battle, or a battle on a run it was recruited onto as an ally.
+  const rows = db.prepare('SELECT battle_json, abandoned FROM adventures WHERE player_id = ? OR ally_id = ?').all(id, id) as { battle_json: string | null; abandoned: number }[];
+  for (const row of rows) {
+    if (!row.battle_json || row.abandoned) continue;
     const wrapper = JSON.parse(row.battle_json) as { pending: boolean; playback?: ActiveBattle };
     const battle = wrapper.playback, mine = battle?.fighters.findIndex(fighter => fighter.id === id) ?? -1;
     if (wrapper.pending && battle?.status === 'active' && mine >= 0 && battle.hp[mine] > 0) {

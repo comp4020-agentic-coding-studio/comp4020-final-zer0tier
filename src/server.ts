@@ -1,6 +1,7 @@
 import {
   abandonAdventure, adventureFor, changeFloor, continueAdventure, enterAdventure, leaveAdventure, moveAdventure, openAdventureChest, patrolAdventure,
   restartAdventure, skipAdventureCooldown, useAdventureItem, adventureBattleSkill, forfeitAdventureBattle, battleFighters,
+  recruitAlly, dismissAlly, alliesNear,
 } from "./adventure.ts";
 import { accept, invite, leave, setOff, teamFor, type TeamOutcome } from "./teams.ts";
 import express from "express";
@@ -220,10 +221,23 @@ app.post("/api/adventure", (req, res) => {
   }
   const inventoryAction = ['open-chest', 'use-item', 'restart', 'enter', 'skip-cooldown'].includes(req.body?.action);
   const before = inventoryAction ? getPet(id) : undefined;
-  // A won battle trains every pet still standing, so compare each fighter.
-  const fighters = ['battle-skill', 'battle-forfeit'].includes(req.body?.action) ? battleFighters(id) : [];
+  // Recruiting needs the friend offline: an online player is invited to the team instead.
+  if (req.body?.action === 'recruit') {
+    if (!isValidId(req.body.friend)) return notFound(res, 'player');
+    if (isOnline(req.body.friend)) {
+      return void res.status(409).json({ error: `${req.body.friend} is online. Invite them to your team so they can play themselves.` });
+    }
+  }
+  // A won battle trains every pet still standing and pays a recruited ally, so
+  // compare each fighter. A step can start a battle a fast ally and monster
+  // finish at once, so moves compare the recruiter's ally too.
+  const moving = req.body?.direction !== undefined || ['ascend', 'descend'].includes(req.body?.action);
+  const fighters = ['battle-skill', 'battle-forfeit'].includes(req.body?.action) ? battleFighters(id)
+    : moving ? [id, ...alliesNear(id)] : [];
   const fightersBefore = fighters.map(fighter => getPet(fighter));
   const result = req.body?.action === 'open-chest' ? openAdventureChest(id, req.body.revision)
+    : req.body?.action === 'recruit' ? recruitAlly(id, req.body.friend, req.body.revision)
+    : req.body?.action === 'dismiss-ally' ? dismissAlly(id, req.body.revision)
     : req.body?.action === 'use-item' ? useAdventureItem(id, req.body.item, req.body.revision)
     : req.body?.action === 'battle-skill' ? adventureBattleSkill(id, req.body.battleId, req.body.turnRevision, req.body.ability)
     : req.body?.action === 'battle-forfeit' ? forfeitAdventureBattle(id, req.body.battleId, req.body.turnRevision)

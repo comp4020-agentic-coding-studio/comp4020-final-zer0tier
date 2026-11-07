@@ -5,7 +5,7 @@ import {
   type ActiveBattle, type Battle,
 } from './combat.ts';
 import {
-  ADVENTURE_COOLDOWN_MINUTES, ADVENTURE_COST, busyNow, consumeHourglass, findItem, getPet, ITEMS, LUCK, MAX_CARE,
+  ADVENTURE_COOLDOWN_MINUTES, ADVENTURE_COST, BOT_ID, busyNow, combatBusy, consumeHourglass, findItem, getPet, ITEMS, LUCK, MAX_CARE,
   powerOf, spendForAdventure, train, use, type Pet,
 } from './pets.ts';
 import { record } from './feed.ts';
@@ -30,7 +30,15 @@ export type AdventureBattle = {
   skillDrop?: TreasureReward;
   trained?: Partial<Record<'strength' | 'intelligence' | 'charisma', number>>; // this pet's victory gain
   cleared?: WoodlandReward; // this pet's reward for felling the Slime King
+  allyPay?: AllyPay; // what this run's recruited ally earned from the battle
 };
+// A recruited ally: an offline friend's pet that walks with the recruiter and
+// fights with its owner's saved skills, chosen by the game. It keeps its own
+// HP/MP for the run and earns money for each victory it fought in, paid by
+// the game, never by the recruiter. It never trains or takes other rewards.
+export type Ally = { id: string; hp: number; mp: number };
+export type AllyPay = { ally: string; money: number; knockedOut: boolean };
+export const ALLY_PAY = { win: 2, boss: 15 } as const;
 // Clearing the woodland is the run's only fixed prize: money, an Unfair Coin
 // (one the pet doesn't own yet, when there is one), and a permanent crown.
 export const WOODLAND_REWARD_MONEY = 150;
@@ -43,6 +51,7 @@ type SavedAdventure = {
   hp: number | null; mp: number | null; cooldown_until: number | null; abandoned: number; patrolled_at: number | null;
   team_id: number | null; team_world: string | null; started: number;
   records_json: string | null; entry_id: string | null; awaiting_entry: number;
+  ally_id: string | null; ally_json: string | null;
 };
 type Progress = {
   id: string; pet: Pet;
@@ -54,6 +63,7 @@ type Progress = {
   started: boolean; // false until the pet first acts on the map, or sets off with a team
   records: BattleRecords; entryId: string | null; awaitingEntry: boolean;
   inventory: ReturnType<typeof inventoryView>;
+  ally: Ally | null;
 };
 
 function inventoryView(pet: Pet) {
@@ -83,7 +93,8 @@ function vacatePlayerTile(floor: Floor, player: Point): void {
 function load(id: string): Progress {
   db.prepare('INSERT OR IGNORE INTO adventures (player_id, x, y) VALUES (?, ?, ?)').run(id, 2, 2);
   const saved = db.prepare(`SELECT a.x, a.y, a.floor, a.world_json, a.revision, a.battle_json, a.hp, a.mp, a.cooldown_until, a.abandoned,
-      a.patrolled_at, a.team_id, t.world_json AS team_world, a.started, a.records_json, a.entry_id, a.awaiting_entry
+      a.patrolled_at, a.team_id, t.world_json AS team_world, a.started, a.records_json, a.entry_id, a.awaiting_entry,
+      a.ally_id, a.ally_json
     FROM adventures a LEFT JOIN teams t ON t.id = a.team_id WHERE a.player_id = ?`).get(id) as SavedAdventure;
   const pet = getPet(id)!;
   const maxHp = maxHpFor(pet), maxMp = maxMpFor(pet);
@@ -113,7 +124,8 @@ function load(id: string): Progress {
   return { id, pet, x: saved.x, y: saved.y, floor: saved.floor, world, revision, hp, mp, maxHp, maxMp,
     cooldownUntil: saved.cooldown_until, abandoned: saved.abandoned === 1, patrolledAt: saved.patrolled_at ?? 0,
     teamId: saved.team_id, started: saved.started === 1, inventory: inventoryView(pet),
-    battle, records, entryId: saved.entry_id, awaitingEntry: saved.awaiting_entry === 1 };
+    battle, records, entryId: saved.entry_id, awaitingEntry: saved.awaiting_entry === 1,
+    ally: saved.ally_id && saved.ally_json ? { id: saved.ally_id, ...JSON.parse(saved.ally_json) } : null };
 }
 
 // A run ends when the pet falls, the player leaves, or the Slime King falls.
@@ -163,6 +175,23 @@ function view(saved: Progress) {
     encounters: floor.enemies.filter(e => e.kind === 'slime-king' && nearby(e, saved)).map(e => e.id),
     cooldownUntil: saved.cooldownUntil, timeScale: TIME_SCALE, patrolMs: PATROL_MS,
     restartCost: ADVENTURE_COST, cooldownMinutes: ADVENTURE_COOLDOWN_MINUTES,
+    ally: allyView(saved), allyPay: ALLY_PAY,
+  };
+}
+
+// The recruited ally as the map and backpack show it: its look, carried HP/MP,
+// whether it's sitting out, and what it has earned on this run so far.
+function allyView(saved: Progress) {
+  const earned = saved.records.battles.reduce((sum, battle) => sum + (battle.allyPay?.money ?? 0), 0);
+  if (!saved.ally) return earned ? { id: null, earned } : null;
+  const pet = getPet(saved.ally.id);
+  if (!pet) return null;
+  const live = !over(saved) && !complete(saved) && !saved.battle?.pending;
+  return {
+    id: pet.id, color: pet.color, appearance: pet.appearance, type: mainAttribute(pet),
+    hp: saved.ally.hp, mp: saved.ally.mp, maxHp: maxHpFor(pet), maxMp: maxMpFor(pet),
+    skills: ABILITIES.filter(a => pet.equippedAbilities.includes(a.id)).map(a => a.name),
+    away: live ? allyAway(pet.id) ?? null : null, earned,
   };
 }
 export function adventureFor(id: string) { return view(load(id)); }
@@ -182,10 +211,12 @@ function busyRefusal(id: string) {
 // stale retry can never train or pay a pet twice. Reports whether it saved.
 function write(id: string, saved: Progress, trained?: AdventureBattle['trained'], cleared?: WoodlandReward): boolean {
   return transaction(() => {
-    const written = db.prepare('UPDATE adventures SET x = ?, y = ?, floor = ?, world_json = ?, battle_json = ?, records_json = ?, entry_id = ?, awaiting_entry = ?, hp = ?, mp = ?, cooldown_until = ?, abandoned = ?, team_id = ?, started = 1, revision = ? WHERE player_id = ? AND revision = ?')
+    const written = db.prepare('UPDATE adventures SET x = ?, y = ?, floor = ?, world_json = ?, battle_json = ?, records_json = ?, entry_id = ?, awaiting_entry = ?, hp = ?, mp = ?, cooldown_until = ?, abandoned = ?, team_id = ?, ally_id = ?, ally_json = ?, started = 1, revision = ? WHERE player_id = ? AND revision = ?')
       .run(saved.x, saved.y, saved.floor, saved.teamId === null ? JSON.stringify(saved.world) : null, saved.battle ? JSON.stringify(saved.battle) : null,
         JSON.stringify(saved.records), saved.entryId, Number(saved.awaitingEntry),
-        saved.hp, saved.mp, saved.cooldownUntil, Number(saved.abandoned), saved.teamId, randomUUID(), id, saved.revision);
+        saved.hp, saved.mp, saved.cooldownUntil, Number(saved.abandoned), saved.teamId,
+        saved.ally?.id ?? null, saved.ally ? JSON.stringify({ hp: saved.ally.hp, mp: saved.ally.mp }) : null,
+        randomUUID(), id, saved.revision);
     if (written.changes === 1 && saved.teamId !== null) {
       db.prepare('UPDATE teams SET world_json = ? WHERE id = ?').run(JSON.stringify(saved.world), saved.teamId);
     }
@@ -197,6 +228,12 @@ function write(id: string, saved: Progress, trained?: AdventureBattle['trained']
 function save(id: string, saved: Progress) {
   write(id, saved);
   return adventureFor(id);
+}
+
+// The game, not the recruiter, pays an ally's owner for each win it fought in.
+// Called only once the recruiter's victory has saved with its revision.
+function payAlly(pay: AllyPay): void {
+  db.prepare('UPDATE pets SET money = money + ? WHERE id = ?').run(pay.money, pay.ally);
 }
 
 // A coin the pet doesn't own yet, so a clear widens its choices; any coin
@@ -285,6 +322,26 @@ function saveBattle(saved: Progress, participants: Progress[], playback: ActiveB
         fighter.records.battles.push({ ...fighter.battle, pending: false });
         fighter.records.battles = fighter.records.battles.slice(-ADVENTURE_RECORD_LIMIT);
       }
+      // A recruited ally carries its HP/MP back the same way, recovers 20% after
+      // a win if it's still standing, and is paid for the win; it goes home
+      // once knocked out. It never trains or takes the run's other rewards.
+      const allyIndex = fighter.ally ? playback.fighters.findIndex(member => member.id === fighter.ally!.id) : -1;
+      if (fighter.ally && allyIndex >= 0 && recruited(playback, fighter.ally.id)) {
+        const ally = fighter.ally, caps = { maxHp: playback.initialMaxHp![allyIndex], maxMp: playback.initialMaxMp![allyIndex] };
+        ally.hp = Math.min(playback.hp[allyIndex], caps.maxHp);
+        ally.mp = Math.min(playback.mp[allyIndex], caps.maxMp);
+        if (finished) {
+          if (won && ally.hp > 0) {
+            ally.hp = Math.min(caps.maxHp, ally.hp + Math.ceil(caps.maxHp * 0.2));
+            ally.mp = Math.min(caps.maxMp, ally.mp + Math.ceil(caps.maxMp * 0.2));
+          }
+          // Every ally that started the battle fought in it, even one knocked out.
+          const money = won ? ALLY_PAY.win + (monster.monster === 'slime-king' ? ALLY_PAY.boss : 0) : 0;
+          fighter.battle.allyPay = { ally: ally.id, money, knockedOut: ally.hp === 0 };
+          if (ally.hp === 0) fighter.ally = null;
+          fighter.records.battles[fighter.records.battles.length - 1] = { ...fighter.battle, pending: false };
+        }
+      }
       // Loaders may have read the team map separately; save the current shared
       // world with each row so one participant cannot restore a defeated enemy.
       fighter.world = saved.world;
@@ -292,7 +349,9 @@ function saveBattle(saved: Progress, participants: Progress[], playback: ActiveB
     // Only pets whose own row saved with this revision are paid and announced.
     const cleared = participants.filter(fighter => {
       const rewards = finished ? fighter.battle : undefined;
-      return write(fighter.id, fighter, rewards?.trained, rewards?.cleared) && rewards?.cleared;
+      const written = write(fighter.id, fighter, rewards?.trained, rewards?.cleared);
+      if (written && rewards?.allyPay?.money) payAlly(rewards.allyPay);
+      return written && rewards?.cleared;
     }).map(fighter => fighter.id);
     if (cleared.length) record({ kind: 'cleared', pet: cleared[0], team: cleared });
     return adventureFor(saved.id);
@@ -300,18 +359,27 @@ function saveBattle(saved: Progress, participants: Progress[], playback: ActiveB
 }
 
 // A surprise encounter keeps the pet on the grass tile it just entered. Only
-// monsters choose attacks automatically: a pet's saved turn waits for its owner.
+// monsters, and recruited allies following their owners' saved skills, choose
+// attacks automatically: a player's pet's saved turn waits for its owner.
 function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = false) {
   const allies = alliesOf(saved), participants = [saved, ...allies];
+  // Each participant's recruited ally fights after the players' pets. Its
+  // owner's coin never applies: only a player's pet can supply the coin.
+  const recruits = participants.flatMap(fighter => {
+    const pet = fighter.ally && fighter.ally.hp > 0 && allyAway(fighter.ally.id) === undefined && getPet(fighter.ally.id);
+    return pet ? [{ pet: { ...pet, equippedCoin: null }, ally: fighter.ally! }] : [];
+  });
   const build = monsterBuild(enemy);
   const monster = { ...enemy, id: `monster:${enemy.id}`, monster: enemy.kind, abilities: monsterMoves(enemy, saved.floor),
     tactic: build?.tactic, strategy: build?.strategy,
     color: build?.color ?? { slime: '#0891b2', goblin: '#15803d', 'slime-king': '#c026d3' }[enemy.kind] };
   const roll = (stats: Parameters<typeof powerOf>[0]) => powerOf(stats) * (LUCK.min + Math.random() * (LUCK.max - LUCK.min));
-  const playback = startBattle(participants.map(fighter => fighter.pet), monster,
-    [...participants.map(fighter => roll(fighter.pet)), roll(monster)], {
-      mode: 'monster', hp: [...participants.map(fighter => fighter.hp), maxHpFor(monster)],
-      mp: [...participants.map(fighter => fighter.mp), maxMpFor(monster)],
+  const pets = [...participants.map(fighter => fighter.pet), ...recruits.map(r => r.pet)];
+  const playback = startBattle(pets, monster,
+    [...pets.map(pet => roll(pet)), roll(monster)], {
+      mode: 'monster', hp: [...participants.map(fighter => fighter.hp), ...recruits.map(r => r.ally.hp), maxHpFor(monster)],
+      mp: [...participants.map(fighter => fighter.mp), ...recruits.map(r => r.ally.mp), maxMpFor(monster)],
+      automaticIds: recruits.map(r => r.pet.id), coinProviders: participants.length,
     });
   const battleId = randomUUID();
   participants.forEach((fighter, index) => {
@@ -324,14 +392,21 @@ function resolveBattle(id: string, saved: Progress, enemy: Enemy, surprise = fal
   return saveBattle(saved, participants, playback);
 }
 
-// The pets in this player's current battle, whose saved rows a win may train.
+// The pets in this player's current battle, whose saved rows a win may train
+// or (for a recruited ally) pay.
 export function battleFighters(id: string): string[] {
   const battle = load(id).battle;
   return battle?.pending ? battle.playback.fighters.filter(fighter => !fighter.monster).map(fighter => fighter.id) : [];
 }
 
+// The players' runs in this battle. A recruited ally fights in it too, but
+// rides on its recruiter's run rather than having one of its own.
+const recruited = (playback: Battle | ActiveBattle, id: string) =>
+  'automaticIds' in playback && playback.automaticIds.includes(id);
 function battleParticipants(saved: Progress): Progress[] {
-  return saved.battle!.playback.fighters.filter(fighter => !fighter.monster).map(fighter => fighter.id === saved.id ? saved : load(fighter.id))
+  const playback = saved.battle!.playback;
+  return playback.fighters.filter(fighter => !fighter.monster && !recruited(playback, fighter.id))
+    .map(fighter => fighter.id === saved.id ? saved : load(fighter.id))
     .filter(fighter => fighter.battle?.id === saved.battle!.id);
 }
 
@@ -481,6 +556,7 @@ function freshRun(saved: Progress, entryId: string) {
   saved.world = createWorld(); saved.floor = 1; saved.x = 2; saved.y = 2; saved.teamId = null;
   saved.hp = saved.maxHp; saved.mp = saved.maxMp; saved.battle = null; saved.abandoned = false;
   saved.records = { total: 0, battles: [] }; saved.entryId = entryId; saved.awaitingEntry = false;
+  saved.ally = null; // a fresh run starts without an ally
   return save(saved.id, saved);
 }
 
@@ -532,7 +608,7 @@ export function startTeamRun(teamId: number, ids: readonly string[]): void {
     if ('error' in outcome) throw new Error(outcome.error);
     const { strength, intelligence, charisma } = outcome.pet;
     db.prepare(`UPDATE adventures SET x = ?, y = ?, floor = ?, world_json = NULL, battle_json = NULL, records_json = NULL,
-        entry_id = NULL, awaiting_entry = 1, hp = ?, mp = ?, cooldown_until = ?,
+        entry_id = NULL, awaiting_entry = 1, hp = ?, mp = ?, cooldown_until = ?, ally_id = NULL, ally_json = NULL,
         abandoned = 0, patrolled_at = NULL, team_id = ?, started = 1, revision = ? WHERE player_id = ?`)
       .run(2, 2, 1, maxHpFor({ strength, intelligence, charisma }), maxMpFor({ strength, intelligence, charisma }), now + realMs(ADVENTURE_COOLDOWN_MINUTES), teamId, randomUUID(), id);
   }
@@ -590,6 +666,69 @@ export function openAdventureChest(id: string, revision: unknown) {
     // Each chest holds one reward per run, so on a team's map it goes to whoever opens it first.
     chest.reward = grantTreasure(id, rollTreasure(Math.random, saved.floor));
     if (saved.teamId !== null) chest.openedBy = id;
+    return save(id, saved);
+  });
+}
+
+// Why a recruited ally sits out the next battle, if it does: its owner came
+// back and took it on an adventure of its own, or into a live fight. It
+// rejoins once that's over. The recruiter's run is never rewritten for this.
+function allyAway(friend: string): string | undefined {
+  const own = db.prepare('SELECT 1 FROM adventures WHERE player_id = ? AND started = 1').get(friend) ? load(friend) : undefined;
+  if (own && !over(own) && !complete(own)) return 'is on an adventure of its own';
+  if (combatBusy(friend)) return 'is in another battle';
+  return undefined;
+}
+
+// Why `friend`'s pet can't be recruited right now, if it can't. Its owner must
+// be offline (checked at the HTTP edge), and the pet free: not anyone's ally on
+// a run still under way, not exploring a run of its own, and not mid-battle.
+// Studying, working, and its own stamina don't matter: it fights from its
+// owner's saved plan, and nothing about its own pet changes but its money.
+export function recruitRefusal(id: string, friend: string): string | undefined {
+  if (friend === id) return "You can't recruit your own pet; it's already here.";
+  if (friend === BOT_ID) return 'The training bot stays in the arena.';
+  if (!getPet(friend) || !db.prepare('SELECT 1 FROM accounts WHERE id = ?').get(friend)) return `No player called ${friend}.`;
+  const holders = db.prepare('SELECT player_id FROM adventures WHERE ally_id = ?').all(friend) as { player_id: string }[];
+  const holder = holders.map(row => load(row.player_id)).find(run => run.ally?.id === friend && !over(run) && !complete(run));
+  if (holder) return `${friend}'s pet is already helping ${holder.id === id ? 'you' : 'someone else'} on an adventure.`;
+  const away = allyAway(friend);
+  return away && `${friend}'s pet ${away}.`;
+}
+
+// Recruiting brings an offline friend's pet into this run at full HP/MP. It
+// walks with the recruiter and joins every battle the recruiter fights.
+export function recruitAlly(id: string, friend: unknown, revision: unknown) {
+  if (typeof friend !== 'string' || typeof revision !== 'string') return { error: 'Choose a friend to recruit.', status: 400 };
+  return transaction(() => {
+    const saved = load(id);
+    if (revision !== saved.revision) return view(saved);
+    if (!saved.started || over(saved) || complete(saved)) return { error: 'Start an adventure before recruiting.', status: 409 };
+    if (saved.battle?.pending) return { error: 'Finish this battle before recruiting.', status: 409 };
+    if (saved.ally) return { error: `${saved.ally.id}'s pet is already with you. Send it home first.`, status: 409 };
+    const refusal = recruitRefusal(id, friend);
+    if (refusal) return { error: refusal, status: refusal.startsWith('No player') ? 404 : 409 };
+    const pet = getPet(friend)!;
+    saved.ally = { id: friend, hp: maxHpFor(pet), mp: maxMpFor(pet) };
+    return save(id, saved);
+  });
+}
+
+// The recruited allies a step by this pet could pull into a battle: its own,
+// and its teammates' on a team run. The server compares their saved pets.
+export function alliesNear(id: string): string[] {
+  const saved = load(id);
+  return [saved, ...teammates(saved)].flatMap(run => run.ally ? [run.ally.id] : []);
+}
+
+// Sending the ally home ends its part in the run. It keeps what it earned.
+export function dismissAlly(id: string, revision: unknown) {
+  if (typeof revision !== 'string') return { error: 'Reload the map first.', status: 400 };
+  return transaction(() => {
+    const saved = load(id);
+    if (revision !== saved.revision || !saved.ally) return view(saved);
+    if (saved.battle?.pending) return { error: 'Finish this battle before sending your ally home.', status: 409 };
+    saved.ally = null;
     return save(id, saved);
   });
 }

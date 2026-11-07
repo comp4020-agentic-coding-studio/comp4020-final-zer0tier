@@ -259,6 +259,16 @@
   background: #75984f; clip-path: polygon(0 100%, 2% 15%, 15% 68%, 23% 0, 37% 75%, 49% 20%, 56% 76%, 70% 0, 79% 66%, 94% 10%, 100% 100%);
 }
 .adventure-player.adventure-shared::after { clip-path: none; left: auto; right: 0; bottom: 0; height: auto; background: var(--intelligence); content: attr(data-shared); }
+/* A recruited ally trots at your pet's heel: smaller, a step behind and to the left. */
+.adventure-actor.adventure-ally { z-index: 2; outline: 0; background: none; }
+.adventure-actor.adventure-ally::before { left: -8px; bottom: 2px; width: 28px; height: 10px; }
+.adventure-actor.adventure-ally > svg { inset: auto auto 4px -14px; width: 34px; height: 36px; }
+#adventure-ally-card { margin: 0 0 8px; }
+#adventure-ally-status { margin: 0 0 8px; font-size: .8rem; }
+.adventure-ally-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 8px; align-items: center; }
+.adventure-ally-form label { grid-column: 1 / -1; font-size: .8rem; font-weight: 700; }
+.adventure-ally-form input { min-width: 0; min-height: 40px; }
+.adventure-ally-form [hidden], #adventure-ally[hidden], .adventure-ally-form[hidden] { display: none; }
 .adventure-actor.adventure-marker-slime-king > svg { inset: -14px -5px auto; width: 74px; height: 74px; animation: adventure-monster-breathe 3s ease-in-out infinite; transform-origin: 50% 85%; }
 .adventure-air { overflow: hidden; }
 .adventure-air i { position: absolute; width: 8px; height: 5px; border-radius: 80% 0 80% 0; background: #e9d789; opacity: .6; animation: adventure-leaf-drift 12s ease-in-out infinite; }

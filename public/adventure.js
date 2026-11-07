@@ -34,6 +34,21 @@ adventure.innerHTML = `
         <h3 id="adventure-team-heading">Your team</h3>
         <ul id="adventure-team-list"></ul>
       </section>
+      <section id="adventure-ally" aria-labelledby="adventure-ally-heading">
+        <h3 id="adventure-ally-heading">Recruit an ally</h3>
+        <p class="help" id="adventure-ally-help"></p>
+        <div id="adventure-ally-card" hidden>
+          <p id="adventure-ally-status" role="status"></p>
+          <button type="button" id="adventure-ally-dismiss" class="chip-btn">Send home</button>
+        </div>
+        <form id="adventure-ally-form" class="adventure-ally-form">
+          <label for="adventure-ally-id">Friend's player ID</label>
+          <input id="adventure-ally-id" name="friend" maxlength="32" pattern="[A-Za-z0-9_\\-]+" autocomplete="off" autocapitalize="none" spellcheck="false" required />
+          <button type="submit" id="adventure-ally-recruit" class="chip-btn chip-buy">Recruit</button>
+        </form>
+        <p id="adventure-ally-news" class="help" role="status"></p>
+        <p id="adventure-ally-error" class="error" role="alert"></p>
+      </section>
       <details class="adventure-backpack">
         <summary id="adventure-backpack-title">Your backpack</summary>
         <p class="help" id="adventure-care"></p>
@@ -135,6 +150,7 @@ guide.innerHTML = `
       <li>Learn skills from job specializations, monster victories (25% chance; boss guaranteed), and treasure scrolls. Check your home skill book for each source and required floor.</li>
       <li>Your coin always applies in solo battles. In a team, the pet with the highest total attributes supplies the coin.</li>
       <li>Teammates beside you join your battles.</li>
+      <li>Recruit an offline friend's pet from the Menu. It fights in your battles with its owner's saved skills, chosen by the game, never supplies the coin, and earns its owner $2 a win (+$15 for the Slime King).</li>
       <li>On a team, each chest opens once, for whoever gets there first.</li>
     </ul>
   </section>
@@ -163,6 +179,7 @@ const cooldownProgress = adventure.querySelector('#adventure-cooldown-progress')
 const cooldownFill = adventure.querySelector('#adventure-cooldown-fill');
 const cooldownPercent = adventure.querySelector('#adventure-cooldown-percent');
 let pending = false, generation = 0, state = null, pet = null, shownBattle = null;
+let allyPending = false; // a recruit or send-home request is in flight
 let entryReady = false, acceptedEntryId = null, openingAdventure = false, openingVersion = 0;
 const runEnded = () => Boolean(state?.failed || state?.completed || state?.abandoned);
 const recordsAvailable = () => runEnded() && !state?.battle?.pending;
@@ -256,6 +273,10 @@ function syncControls() {
   disable(open, blocked || !chest || Boolean(chest.reward));
   adventure.querySelectorAll('[data-use-item]').forEach(button => disable(button,
     !entryReady || pending || Boolean(state?.battle?.pending) || !state?.inventory?.items.find(item => item.id === button.dataset.useItem)?.usable));
+  // The ally form lives in the menu, so a busy moment keeps focus where it is.
+  const allyBlocked = !entryReady || pending || allyPending || Boolean(state?.battle?.pending);
+  adventure.querySelector('#adventure-ally-recruit').disabled = allyBlocked;
+  adventure.querySelector('#adventure-ally-dismiss').disabled = allyBlocked;
   if (terrain) for (const cell of terrain.querySelectorAll('.adventure-marker-chest, .adventure-marker-up, .adventure-marker-down')) {
     const here = state && Number(cell.dataset.x) === state.x && Number(cell.dataset.y) === state.y;
     cell.classList.toggle('is-interactable', Boolean(here && !blocked && cell.dataset.opened !== 'true' &&
@@ -279,6 +300,11 @@ function clearMap() {
   guide.querySelector('#adventure-enemies').replaceChildren();
   adventure.querySelector('#adventure-team').hidden = true;
   adventure.querySelector('#adventure-team-list').replaceChildren();
+  adventure.querySelector('#adventure-ally').hidden = true;
+  adventure.querySelector('#adventure-ally-card').hidden = true;
+  adventure.querySelector('#adventure-ally-id').value = '';
+  for (const id of ['adventure-ally-status', 'adventure-ally-news', 'adventure-ally-error']) adventure.querySelector(`#${id}`).textContent = '';
+  allyPending = false;
   adventure.querySelector('#adventure-floor-key').replaceChildren();
   adventure.querySelector('#adventure-notice').textContent = '';
   adventure.querySelector('#adventure-battle-summary').hidden = true;
@@ -395,12 +421,86 @@ function renderMap() {
   adventure.querySelector('#adventure-treasure').textContent = opened && at(opened) ? rewardText(opened.reward) : '';
   renderInventory();
   renderMonsters();
+  renderAlly();
   status.textContent = `Column ${state.x + 1} · Row ${state.y + 1}`;
   syncControls();
   syncAdventureMotion();
 }
 // Teammates still exploring this floor stand on the map with your pet.
 const teammatesHere = () => (state?.team?.members ?? []).filter(m => m.floor === state.floor && m.status === 'exploring');
+// The recruited ally walking with your pet, if it's here and not sitting out.
+const allyHere = () => (state?.ally?.id && !state.ally.away && !runEnded() ? state.ally : null);
+// An offline friend's pet, recruited onto this run: it fights in your battles
+// with its owner's saved skills, chosen by the game, and earns its owner money.
+function renderAlly() {
+  const ally = state?.ally, pay = state?.allyPay ?? { win: 2, boss: 15 };
+  const live = Boolean(state?.started) && !runEnded();
+  const section = adventure.querySelector('#adventure-ally');
+  section.hidden = !live && !ally?.earned;
+  adventure.querySelector('#adventure-ally-heading').textContent = ally?.id ? 'Your ally' : 'Recruit an ally';
+  adventure.querySelector('#adventure-ally-help').textContent = ally?.id
+    ? `It fights beside you with ${ally.id}'s saved skills, chosen by the game, and earns ${ally.id} $${pay.win} for each win (+$${pay.boss} for the Slime King).`
+    : `Bring an offline friend's pet along. It fights in your battles with its owner's saved skills, chosen by the game. The game pays its owner $${pay.win} for each win (+$${pay.boss} for the Slime King); it costs you nothing.`;
+  const card = adventure.querySelector('#adventure-ally-card');
+  card.hidden = !ally?.id;
+  if (ally?.id) {
+    const skills = ally.skills?.length ? ally.skills.join(', ') : 'Claw Strike';
+    const away = ally.away ? ` · Sitting out: ${ally.id}'s pet ${ally.away}. It rejoins when that's over.` : '';
+    adventure.querySelector('#adventure-ally-status').textContent =
+      `${ally.id}'s pet · ${typeName(ally.type ?? 'normal')} · HP ${ally.hp} / ${ally.maxHp} · MP ${ally.mp} / ${ally.maxMp} · Skills: ${skills} · Earned $${ally.earned ?? 0} this run${away}`;
+  }
+  const form = adventure.querySelector('#adventure-ally-form');
+  form.hidden = Boolean(ally?.id) || !live;
+  if (!ally?.id && ally?.earned) {
+    adventure.querySelector('#adventure-ally-news').textContent ||= `Your ally earned its owner $${ally.earned} this run.`;
+  }
+  syncControls();
+}
+async function allyAction(payload, done) {
+  if (allyPending || pending) return;
+  allyPending = true;
+  const news = adventure.querySelector('#adventure-ally-news'), error = adventure.querySelector('#adventure-ally-error');
+  news.textContent = ''; error.textContent = '';
+  renderAlly();
+  const version = generation, order = ++sent;
+  try {
+    const response = await fetch('/api/adventure', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...payload, revision: state?.revision }),
+    });
+    const result = await response.json();
+    if (version !== generation) return;
+    if (!response.ok) { error.textContent = result.error || 'Could not reach your friend. Try again.'; return; }
+    if (!matchesCurrentEntry(result)) return;
+    state = result; shown = order;
+    news.textContent = done(result);
+    renderMap();
+  } catch {
+    if (version === generation) error.textContent = 'Connection lost. Try again.';
+  } finally {
+    allyPending = false;
+    if (version === generation) renderAlly();
+  }
+}
+adventure.querySelector('#adventure-ally-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const input = adventure.querySelector('#adventure-ally-id');
+  const friend = input.value.trim();
+  if (!friend) return;
+  allyAction({ action: 'recruit', friend }, result => {
+    if (result.ally?.id !== friend) return '';
+    input.value = '';
+    return `${friend}'s pet joined you. It walks with your pet and fights in your battles.`;
+  }).then(() => {
+    if (state?.ally?.id) adventure.querySelector('#adventure-ally-dismiss').focus({ preventScroll: true });
+  });
+});
+adventure.querySelector('#adventure-ally-dismiss').addEventListener('click', () => {
+  const friend = state?.ally?.id;
+  allyAction({ action: 'dismiss-ally' }, () => `${friend}'s pet went home with what it earned.`).then(() => {
+    if (!state?.ally?.id) adventure.querySelector('#adventure-ally-id').focus({ preventScroll: true });
+  });
+});
 function renderTeam() {
   const roster = adventure.querySelector('#adventure-team');
   roster.hidden = !state?.team;
@@ -552,6 +652,13 @@ function renderMonsters() {
     node.dataset.player = mate.id;
     node.hidden = at(mate);
   }
+  // A recruited ally walks at your pet's heel, drawn small on the same tile.
+  const ally = allyHere();
+  if (ally) {
+    active.add('ally');
+    const node = placeActor('ally', { x: state.x, y: state.y, color: ally.color }, 'adventure-teammate adventure-ally', avatarFor(ally), `${ally.id}'s pet, your ally · HP ${ally.hp} / ${ally.maxHp}`);
+    node.dataset.ally = ally.id;
+  }
   for (const enemy of state.enemies.filter(enemy => !hiddenEnemy(enemy))) {
     const key = `enemy:${enemy.id}`;
     active.add(key);
@@ -600,7 +707,7 @@ function renderMonsters() {
   player.classList.toggle('adventure-shared', sharing.length > 0);
   player.dataset.shared = String(sharing.length + 1);
   player.classList.toggle('in-grass', onGrass(state.x, state.y));
-  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Tall grass can hide surprise encounters. Clear paths are safe. Trees and water block movement. Space opens a chest or takes the stairs your pet stands on.${state.down ? ` ${exitHint()}` : ''}`);
+  grid.setAttribute('aria-label', `Floor ${state.floor} of ${state.floorCount}, 16 by 16 woodland map. Your pet is at column ${state.x + 1}, row ${state.y + 1}${sharing.length ? `, with ${sharing.join(', ')}` : ''}${allyHere() ? `, with your ally ${allyHere().id}'s pet at its heel` : ''}. ${state.enemies.length} monsters and ${state.chests.length} chest.${mates.length ? ` ${mates.length} ${mates.length > 1 ? 'teammates' : 'teammate'} here; positions are in Your team.` : ''} Tall grass can hide surprise encounters. Clear paths are safe. Trees and water block movement. Space opens a chest or takes the stairs your pet stands on.${state.down ? ` ${exitHint()}` : ''}`);
   const nearby = state.enemies.filter(e => !hiddenEnemy(e) && state.encounters.includes(e.id));
   const notice = busyText() || (nearby.length
     ? `${nearby.map(e => e.name).join(', ')} guards this grove. Walk up to challenge it.`
@@ -691,13 +798,22 @@ const prizeText = cleared => cleared
 // In a team battle the team can win while this pet is knocked out.
 function battleResult(battle) {
   const knockedOut = battle.after?.hp === 0;
+  // A recruited ally fights on your side, so it makes a team too.
   const team = (battle.playback?.fighters.length ?? 0) > 2 ? 'Your team' : 'You';
+  const players = (battle.playback?.fighters ?? []).filter(f => !f.monster && !battle.playback.automaticIds?.includes(f.id)).length;
   const keyDrop = battle.keyDrop ? ` Found a Floor Key! The stairs on floor ${battle.keyDrop.floor} can now be unlocked.` : '';
   const skillDrop = battle.skillDrop ? ` ${battle.skillDrop.learned ? 'Learned' : 'Found an already learned scroll:'} ${battle.skillDrop.name}! Equip skills at your home chest.` : '';
-  if (battle.won && knockedOut) return `${team} defeated ${battle.enemyName} on floor ${battle.floor}, but your pet was knocked out. Its adventure is over; your teammates explore on.${keyDrop}`;
+  const ally = battle.allyPay;
+  const allyNote = !ally ? '' : ally.knockedOut
+    ? ` ${ally.ally}'s pet was knocked out and went home${ally.money ? `, earning ${ally.ally} $${ally.money}` : ''}.`
+    : ally.money ? ` Your ally earned ${ally.ally} $${ally.money}.` : '';
+  if (battle.won && knockedOut) {
+    const after = players > 1 ? 'Its adventure is over; your teammates explore on.' : 'Its adventure is over.';
+    return `${team} defeated ${battle.enemyName} on floor ${battle.floor}, but your pet was knocked out. ${after}${keyDrop}${allyNote}`;
+  }
   return battle.won
-    ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${trainedText(battle.trained)}${keyDrop}${skillDrop}${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}${prizeText(battle.cleared)}`
-    : `${battle.enemyName} defeated ${team === 'You' ? 'you' : 'your team'}. Adventure failed. Start a new adventure to try again.`;
+    ? `${team} defeated ${battle.enemyName} on floor ${battle.floor}. Recovered ${battle.recovery.hp} HP and ${battle.recovery.mp} MP.${trainedText(battle.trained)}${keyDrop}${skillDrop}${battle.enemyId === 'slime-king' ? ' Woodland complete!' : ''}${prizeText(battle.cleared)}${allyNote}`
+    : `${battle.enemyName} defeated ${team === 'You' ? 'you' : 'your team'}. Adventure failed. Start a new adventure to try again.${allyNote}`;
 }
 function renderRecords() {
   const list = adventure.querySelector('#adventure-records');

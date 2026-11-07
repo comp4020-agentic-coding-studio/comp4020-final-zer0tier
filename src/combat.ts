@@ -322,7 +322,7 @@ export function startBattle(pets: PetStats[], opponent: PetStats, rolls: number[
   if (new Set(all.map(p => p.id)).size !== all.length) throw new Error('Each fighter must be different.');
   if (all.some(p => ![p.strength, p.intelligence, p.charisma].every(n => Number.isFinite(n) && n >= 0) || total(p) <= 0)) throw new Error('Fighter attributes must be valid.');
   if (all.some((_, i) => !Number.isFinite(rolls[i]) || rolls[i] < 0)) throw new Error('Each fighter needs a valid battle roll.');
-  const candidates = mode === 'monster' ? pets : all;
+  const candidates = mode === 'monster' ? pets.slice(0, options.coinProviders ?? pets.length) : all;
   const provider = candidates.reduce((best, p, i) => total(p) > total(candidates[best]) ? i : best, 0);
   const coin = legacy.coinEffect(all[provider].equippedCoin, options.random);
   const prepared = all.map((p, i) => withAttributeBonus(p, i === provider ? coin.attributeBonus : 0));

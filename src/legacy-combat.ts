@@ -159,9 +159,14 @@ export interface StartBattleOptions {
   mode?: 'pvp' | 'monster';
   hp?: number[]; mp?: number[];
   random?: () => number;
-  // Only the server's fixed training bot belongs here. Human participants must
-  // always select their own move, including when they disconnect.
+  // Only the server's fixed training bot and recruited Adventure allies (an
+  // offline friend's pet following its owner's saved skills) belong here.
+  // Players' own pets must always select their own move, even when they
+  // disconnect.
   automaticIds?: string[];
+  // In a monster battle, only the first this many pets may supply the coin:
+  // the players' own pets, never a recruited ally after them.
+  coinProviders?: number;
 }
 
 export function isActiveBattle(battle: Battle): battle is ActiveBattle {

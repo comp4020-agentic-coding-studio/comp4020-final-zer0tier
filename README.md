@@ -80,7 +80,8 @@ with a room full of people — the capstone showcase this is built for.
 **What I chose not to build (yet):** chat and trading. You can give another
 player your own items and spare coins (see **Visit, play and steal**), but
 nothing comes back in exchange, so a gift can never be a lopsided trade.
-Recruiting other players' pets is also still to come. Each would add
+You can recruit an offline friend's pet into your Adventure (see
+**Recruiting an ally**), but not take control of it. Each would add
 interaction, but the first version proves the core loop — train, work,
 fight, see others do the same — before widening it.
 
@@ -700,7 +701,9 @@ a pet or team clearing the woodland. Ordinary lessons and shifts stay out of
 it, so it isn't flooded. Entries about your pet, including a clear you shared,
 are highlighted.
 
-Still to come: recruiting other players' pets.
+Recruiting a friend's pet as an Adventure ally is described under
+**Recruiting an ally**; it pays the friend with each win but stays out of
+this feed, so a long run doesn't flood it.
 
 ## Running it locally
 
@@ -1075,6 +1078,53 @@ after leaving starts a new solo run, or players can form a new team.
 **Each chest opens once for the whole team.** The first teammate to choose
 **Open chest** gets its reward; for everyone else it shows as opened, by
 them.
+
+### Recruiting an ally
+
+A friend who isn't online can still help. Open **Menu** during a run and,
+under **Recruit an ally**, enter their player ID and choose **Recruit**.
+Their pet joins your run at full HP and MP, walks at your pet's heel
+(drawn smaller on your tile), and fights in every battle you fight.
+
+- **Who:** any player with an account whose owner is **offline**. Someone
+  online is refused with a reminder to invite them to your team, so they can
+  play themselves. You can't recruit your own pet or the training bot. A pet
+  helps one run at a time, and not while it's on an adventure of its own.
+  Studying, working, stamina, and hygiene don't matter: nothing about the
+  friend's pet changes except the money it earns.
+- **How it fights:** its owner chose its skills when they last equipped them
+  at the home chest; the game picks the strongest one it can afford each turn,
+  the same simple plan as the training bot. Every *player's* pet still waits
+  for its owner's choice, so the saved battle always rests on a player's turn.
+  Nobody, not even its owner, can choose or forfeit a move for an ally. It
+  takes its turn after the players' pets and before the monster, and the
+  monster may target it like any pet (the one with the most HP).
+- **Coins and rewards:** an ally never supplies the coin; only players' pets
+  do, even if the ally has the highest attributes. It never trains, never
+  takes skill drops, keys, chest rewards, or the woodland prize, and isn't
+  counted as the Slime King's victor.
+- **Pay:** for every victory it fought in, the game pays its owner **$2**,
+  plus **$15** more if the Slime King falls. It's paid the moment the win is
+  saved, never taken from you, and never twice for the same battle. The
+  friend's pet updates live in every window, and the battle result says what
+  your ally earned.
+- **HP and MP** carry between battles for the run, like yours, and it
+  recovers 20% after each win. Knocked out, it **goes home** with what it
+  earned, and you can recruit someone again.
+- **Send home** (in the same menu) ends its part in the run outside a
+  battle. So does the run ending: clearing the woodland, your pet's defeat,
+  or leaving. The next run starts without an ally.
+- **When the friend comes back:** if they start an adventure of their own,
+  or their pet joins another battle, it sits out your fights until that's
+  over. The menu says so, and it rejoins you after. Your run is never
+  rewritten for this, so your next move never fails for it.
+- On a **team**, each teammate can recruit one ally. Every ally beside a
+  battle fights in it, and its pay goes to its own owner.
+
+`POST /api/adventure` takes `{ "action": "recruit", "friend": "…",
+"revision": "…" }` and `{ "action": "dismiss-ally", "revision": "…" }`. The
+map's `ally` shows the recruited pet's look, carried HP/MP, equipped skill
+names, `away` (why it's sitting out, or `null`), and `earned` this run.
 
 ### Monster battles
 
