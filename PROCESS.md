@@ -24,10 +24,17 @@ be used by just friends, and then there's no need for a complex system. That
 position decided the stack below: one process and one SQLite file on one small
 machine, no database server, no framework, because a game for a room of friends
 doesn't need to survive a million players. Where I went further than Sloan is
-the game itself. His app does one thing; mine kept gaining ways for friends to
-play together. The system stayed home-cooked, but the menu got long, and I
-judged that each feature had to earn its place by being something friends play
-*with* each other.
+the game itself. Reading also convinced me that keeping people engaged in a
+game is a better way for them to socialise than small, one-off clicks. So I
+gave up making it a completely pet-like game: battles that once played
+themselves
+([`45f9a90`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/45f9a90))
+became Pokémon-like fights, with monsters hiding in grass and every skill
+chosen by hand
+([`489051f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/489051f),
+[`22068e9`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/22068e9)).
+The system stayed home-cooked, but the game grew, and each feature had to earn
+its place by being something friends play *with* each other.
 
 ## The harness, and the stack it implies
 
@@ -59,9 +66,8 @@ answers are mine: pets recover with food and soap bought in a shop, a pet too
 tired refuses work, and helping someone else's pet spends the visitor's own
 food so it can't drain another player's cupboard
 ([`4a18fed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4a18fed)).
-Adventure, the biggest feature, I planned first in `ADVENTURE_PLAN.md`
-([`9f1732f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/9f1732f));
-its open coin rules were put to me rather than defaulted.
+Adventure I planned first in `ADVENTURE_PLAN.md`
+([`9f1732f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/9f1732f)).
 
 For crit 10, the weak spot was visiting: at someone else's pet, the only thing
 you could do was steal. So I directed the work at things two players do
@@ -90,10 +96,6 @@ I aimed for every fix to land in the harness rather than as a retry:
   jumping backwards, so the Arena orders by insertion, and activities finish on
   time despite a jump, shown by simulating it against old and new code
   ([`204a74b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/204a74b)).
-- When a coin toss changed a rule two specs had hardcoded, the agent recomputed
-  the expected numbers by running the new rule, rather than pasting whatever
-  made them pass
-  ([`2d2177d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/2d2177d)).
 - Several new tests passed without testing anything: their checks sat inside
   `if` branches that never ran. Rewriting them to fail when the behaviour is
   wrong exposed two setup mistakes

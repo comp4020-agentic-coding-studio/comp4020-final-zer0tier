@@ -18,8 +18,8 @@ their pet. Every rule, control and the API are in the
 **Good means friends can really play with each other in real time, rather than
 just interact through some simple clicks.** A virtual pet you raise alone is
 just a to-do list, and a "like" button on someone else's pet isn't much better.
-QQ Pets was worth coming back to because your pet lived beside everyone else's.
-So I added features where friends actually play together, live:
+Keeping people engaged in a game together is a better way to socialise, so
+VirtuePets grew from a pet game into Pokémon-like play with friends, live:
 
 - **Pokémon-like fights in the Adventure.** Up to four friends set off on one
   shared woodland map and fight its monsters together, turn by turn. Each
