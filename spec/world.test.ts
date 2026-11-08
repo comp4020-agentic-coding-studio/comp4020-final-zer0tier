@@ -609,6 +609,31 @@ it('opens the visited pet controls from the home hotspot and leaves personal car
   } finally { p.window.close(); }
 });
 
+it("lets a visitor use only the host's pet and the door, never the host's furniture, and gives it all back at home", () => {
+  const p = page();
+  try {
+    const object = (action: string) => p.window.document.querySelector<HTMLButtonElement>(`[data-home-action="${action}"]`)!;
+    const furniture = ['tv', 'couch', 'fire', 'bed', 'feed', 'clean', 'chest', 'menu'];
+    p.window.document.dispatchEvent(new p.window.CustomEvent('home:visit', { detail: { id: 'neighbour' } }));
+    // The host's things are off-limits: disabled, so click, tap and Tab all skip them.
+    for (const action of furniture) expect(object(action).disabled, action).toBe(true);
+    expect(object('pet').disabled).toBe(false);
+    expect(object('door').disabled).toBe(false);
+    // Clicking one anyway opens nothing (it used to open the visitor's own journal or backpack).
+    object('tv').disabled = false; object('tv').click(); object('tv').disabled = true;
+    object('chest').disabled = false; object('chest').click(); object('chest').disabled = true;
+    expect((p.$('world-dialog') as HTMLDialogElement).open).toBe(false);
+    // The host's pet still opens the visit window.
+    p.homeAction('pet');
+    expect(p.$('world-dialog').dataset.place).toBe('visit');
+    p.$('world-dialog-close').click();
+    // Back home, every object works again.
+    p.window.document.dispatchEvent(new p.window.CustomEvent('home:leave'));
+    p.$('town-home').click();
+    for (const action of [...furniture, 'pet', 'door']) expect(object(action).disabled, action).toBe(false);
+  } finally { p.window.close(); }
+});
+
 it("opens your own pet's details from the game menu while visiting and keeps its care for your own home", () => {
   const p = page();
   try {

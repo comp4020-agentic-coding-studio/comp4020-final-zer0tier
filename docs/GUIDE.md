@@ -602,7 +602,10 @@ with the same keyboard or floor-click controls. Everyone in the same home
 sees each other's character positions, direction, and walking in real time.
 Players in a different home are not drawn in yours. Select the pet to see
 its appearance, activity, balance, and visiting actions; **Leave home** or
-the front door returns to town. The game menu's **Pet details** still shows
+the front door returns to town. You're a guest there: the host's pet and the
+front door are the only things you can use. Their TV, chest, wall clock,
+furniture, food bowl and bath don't respond to visitors, by click, tap, or
+Space. **Escape** still opens your own game menu. The game menu's **Pet details** still shows
 your own pet; feeding, cleaning, and playing with it wait until you are home.
 Town also shows the players walking there.
 Signing out or losing the live connection removes your character; reconnecting

@@ -601,6 +601,13 @@ function worldRenderVisit() {
   homePet.hidden = Boolean(visiting);
   visitPet.hidden = !visiting;
   visitBar.hidden = !visiting;
+  // A visitor is a guest: only the host's pet and the door are theirs to use.
+  // The host's TV, chest, clock and the rest stay put (Escape still opens
+  // your own game menu, which is yours, not the house's).
+  for (const object of worldShell.querySelectorAll('[data-home-action]')) {
+    if (['pet', 'door'].includes(object.dataset.homeAction)) continue;
+    object.disabled = Boolean(visiting);
+  }
   if (!visiting) return;
   visitBar.querySelector('span').textContent = `${worldHome}'s home`;
   visitPet.setAttribute('aria-label', `Visit ${worldHome}'s pet`);
@@ -1050,7 +1057,8 @@ worldById('home-clean').addEventListener('click', () => worldCare('soap'));
 for (const button of worldShell.querySelectorAll('[data-home-action]')) {
   button.addEventListener('click', () => {
     const action = button.dataset.homeAction;
-    if (worldVisiting() && ['feed', 'clean', 'bed', 'couch'].includes(action)) return worldOpenPlace('visit');
+    // A guest uses only the host's pet (its own handler) and the door.
+    if (worldVisiting() && action !== 'door') return;
     if (action === 'tv') worldOpenPlace('journal');
     if (action === 'bed') worldOpenPlace('appearance');
     if (action === 'chest') worldOpenPlace('backpack');
@@ -1135,6 +1143,9 @@ function worldWalkable(x, y) {
   return !worldObstacles[worldScene].some(([left, top, width, height]) => x > left - 9 && x < left + width + 9 && y > top - 5 && y < top + height + 10);
 }
 function worldTargets() {
+  if (worldVisiting()) return [
+    [480, 375, `Visit ${worldHome}'s pet`, '[data-home-action="pet"]', 90], [480, 565, 'Leave for town', '#home-door'],
+  ];
   if (worldScene === 'home') return [
     [220, 241, 'Watch town TV', '[data-home-action="tv"]'], [215, 390, 'Sit on the couch', '[data-home-action="couch"]'],
     [748, 237, 'Warm up by the fire', '[data-home-action="fire"]'], [748, 391, "Visit your pet's nook", '[data-home-action="bed"]'],
