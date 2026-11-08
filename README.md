@@ -169,8 +169,8 @@ shopfronts, leafy gardens, a stone fountain, and a riverside footbridge.
 The garden fences block movement; use the front opening or walk around the rails.
 Buildings block movement along their drawn outline, so the shop's sloping
 roof leaves the lane corner open between the main road and Part-time Jobs.
-Destinations include **Shops**, **Adventure**, **Arena**, **Part-time Jobs**, and
-**School**. Walk near a building to see its outline, then press **Space**,
+Destinations include **Shops**, **Adventure**, **Arena**, **Part-time Jobs**,
+**School**, and the **Town goal** at the fountain. Walk near a building to see its outline, then press **Space**,
 or click or tap the building to open its activities. **Sweet Home**
 returns you to your pet. Your **Backpack** holds supplies, learned abilities, and
 Unfair Coins. At home's storage chest, choose **Battle skills** to equip
@@ -523,6 +523,29 @@ button reads **Collected today** until midnight UTC (shown in your local
 time), then it wakes up again without a reload. Like theft protection, the
 reset uses real UTC days, even on the accelerated test clock.
 
+### Town goal
+
+Each week the whole town works toward one goal: **feed 100 pets**. Every
+Food a pet eats counts as one meal for whoever served it, whether you feed
+your own pet (at home or from the Adventure backpack) or a neighbour's pet
+on a visit. Soap, and a feeding refused because the pet was already full,
+don't count. Meals past 100 still count.
+
+In town, a small bar under the activity bar shows how far the town has got,
+for example *Town goal · 37 / 100 meals*, and moves live in every window as
+anyone serves a meal. It stays out of your home. Press it, or walk to the
+**fountain** in the middle of town and press **Space** (or tap it), to open
+the goal: the town's progress, your own meals this week, how many players
+have helped, when it starts again, and the reward.
+
+Once the town reaches 100, everyone who served at least one meal that week
+can **Collect $25 and 1 Food**, once. The bar says *Reward ready* until you
+do. You collect it yourself rather than receiving it automatically, so it
+lands when you're there to see it. Players who join in after the goal is
+reached still earn a share. Weeks run from Monday 00:00 to the next Monday
+00:00 UTC, in real time even on the accelerated test clock. Each week starts
+again from zero, and an uncollected reward lapses with its week.
+
 ### Other pets and fights
 
 Open **Arena** on the town map to see other pets: the bot first, then the
@@ -820,6 +843,14 @@ and the built-in `node:sqlite` for storage.
   someone not starred changes nothing; 400 for yourself or the bot, 404 for a
   player with no account, 409 past 50 friends), and `equip-coin/:coin` (`:coin` is
   `copper-coin`, `silver-coin`, `gold-coin`, or `none` to unequip).
+  `GET /api/town-goal` is this week's town goal for anyone: `{ week, endsAt,
+  target, meals, helpers, reached, reward }` (`week` and `endsAt` are epoch
+  milliseconds of the Mondays it runs between). Signed in, it adds `mine:
+  { meals, claimed, canClaim }`. Authenticated `POST /api/town-goal/claim`
+  pays your pet the reward once the goal is reached, answering with the new
+  status and broadcasting your pet; it's 401 without a session and 409 before
+  the goal, without a meal this week, or a second time. A meal is saved in the
+  same transaction as the feeding it counts.
   `collect-supplies` adds the free daily Food and Soap, and sets the pet's
   `suppliesAvailableAt` (epoch milliseconds of the next UTC midnight, or
   `null` before the first collection). A second collection that day returns
@@ -891,7 +922,11 @@ and the built-in `node:sqlite` for storage.
   `color`, `appearance`, and when they were starred) to that player's own
   windows only, after each star or unstar; `GET /api/pets/:id/friends` reads
   it, for its owner alone. Online status isn't saved with it: the page marks
-  friends from `presence:updated`. The feed keeps its newest 500
+  friends from `presence:updated`. `town:goal` tells everyone the town goal's
+  saved total (`{ week, endsAt, target, meals, helpers, reached, reward }`,
+  never anyone's own share) after each meal, and when a new week's first meal
+  starts it again; each window re-reads its own share only after its own pet
+  ate or gave Food, or when the goal is first reached. The feed keeps its newest 500
   entries in SQLite. A `battle:updated` event sends saved Arena/revenge
   session changes to its two participants and the players watching it, and
   each screen shows the turn from that event. The browser re-reads a live
@@ -959,7 +994,9 @@ and the built-in `node:sqlite` for storage.
   victim and amount. A finished lesson or shift names the task and what it
   paid — logged when it ends, not when it starts. A team change
   (`team_invite`, `team_accept`, `team_leave`, `team_set-off`) names the
-  team. Starring or unstarring (`star`, `unstar`) names the `friend`. Logs exclude passwords, session cookies, query strings, request
+  team. Starring or unstarring (`star`, `unstar`) names the `friend`.
+  Collecting the town goal's reward (`town_goal_claim`) names the `week`
+  and what it paid. Logs exclude passwords, session cookies, query strings, request
   bodies, and snapshot contents; values containing spaces are quoted.
 
   Example lines (IDs shortened):

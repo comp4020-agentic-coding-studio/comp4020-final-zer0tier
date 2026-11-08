@@ -59,6 +59,7 @@ export interface Pet extends ReturnType<typeof inventoryFor> {
 }
 
 // Always there to fight, so a new player has someone to test themselves on.
+import { countMeal } from "./town-goal.ts";
 export { BOT_ID } from "./bot.ts";
 import { BOT_ID } from "./bot.ts";
 
@@ -537,7 +538,17 @@ export function buy(id: string, itemId: ItemId): Outcome {
   });
 }
 
+// A pet eating Food is a meal for the town goal, saved with the feeding: both
+// or neither.
 export function use(id: string, itemId: ItemId): Outcome {
+  return transaction(() => {
+    const outcome = useItem(id, itemId);
+    if ("pet" in outcome && itemId === "food") countMeal(id);
+    return outcome;
+  });
+}
+
+function useItem(id: string, itemId: ItemId): Outcome {
   const item = findItem(itemId)!;
   return act(id, (pet) => {
     if (pet[item.id] < 1) return `No ${item.name.toLowerCase()} left. Buy some at the shop.`;
@@ -838,6 +849,8 @@ export function help(helperId: string, petId: string, itemId: "food" | "soap"): 
     pet[item.restores] += amount;
     write(helper);
     write(pet);
+    // A visitor's Food is the helper's meal for the town goal.
+    if (item.id === "food") countMeal(helperId);
     record({ kind: "helped", pet: helperId, other: petId, item: item.id });
     return { helper: getPet(helperId)!, pet: getPet(petId)!, item: item.id, amount };
   });

@@ -2053,6 +2053,8 @@ function connect() {
       document.dispatchEvent(new CustomEvent("pet:noted", { detail: event.note }));
     } else if (event.type === "notes:cleared") {
       document.dispatchEvent(new CustomEvent("notes:cleared", { detail: event.pet }));
+    } else if (event.type === "town:goal") {
+      document.dispatchEvent(new CustomEvent("town:goal", { detail: event.goal }));
     } else if (event.type === "friends:updated") {
       document.dispatchEvent(new CustomEvent("friends:updated", { detail: { player: event.player, friends: event.friends } }));
     } else if (event.type === "fight:finished") {

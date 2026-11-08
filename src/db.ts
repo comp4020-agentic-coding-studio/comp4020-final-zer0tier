@@ -252,6 +252,18 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS battle_watchers_by_battle ON battle_watchers (battle_id);
 `);
+// The town's weekly goal: how many meals each player served that week (week
+// is the epoch ms of its Monday 00:00 UTC), and whether they collected the
+// reward. src/town-goal.ts deletes past weeks as a new one begins.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS town_goal_meals (
+    week      INTEGER NOT NULL,
+    player_id TEXT    NOT NULL REFERENCES pets (id),
+    meals     INTEGER NOT NULL CHECK (meals > 0),
+    claimed   INTEGER NOT NULL DEFAULT 0 CHECK (claimed IN (0, 1)),
+    PRIMARY KEY (week, player_id)
+  );
+`);
 // Players each player has starred as a friend. One-way and private: a row says
 // only that player_id starred friend_id. src/friends.ts caps each player's list.
 db.exec(`

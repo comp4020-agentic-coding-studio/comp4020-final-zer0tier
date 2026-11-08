@@ -409,6 +409,31 @@
           <div class="town-activity-clock"><span id="town-activity-left"></span><span id="town-activity-percent"></span></div>
         </div>
 
+        <!-- The town's weekly goal: a small bar on the town map, and its window at the fountain. -->
+        <button type="button" id="town-goal-bar" hidden aria-describedby="town-goal-bar-label">
+          <span id="town-goal-bar-label"></span>
+          <span id="town-goal-bar-progress" class="progress" role="progressbar" aria-labelledby="town-goal-bar-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <span id="town-goal-bar-fill" class="progress-fill"></span>
+          </span>
+        </button>
+        <section id="town-goal" aria-labelledby="town-goal-heading">
+          <h3 class="section-label" id="town-goal-heading">This week's goal</h3>
+          <p id="town-goal-target" class="town-goal-target"></p>
+          <div id="town-goal-progress" class="progress town-goal-progress" role="progressbar" aria-labelledby="town-goal-target" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="town-goal-fill" class="progress-fill"></div>
+          </div>
+          <p id="town-goal-count" class="town-goal-count"></p>
+          <dl class="town-goal-facts">
+            <div><dt>Your meals</dt><dd id="town-goal-mine"></dd></div>
+            <div><dt>Helpers</dt><dd id="town-goal-helpers"></dd></div>
+            <div><dt>Starts again</dt><dd id="town-goal-ends"></dd></div>
+          </dl>
+          <p id="town-goal-reward" class="help"></p>
+          <button type="button" id="town-goal-claim" class="chip-btn chip-use" hidden></button>
+          <p id="town-goal-news" class="hint" role="status" tabindex="-1"></p>
+          <p id="town-goal-error" class="error" role="alert"></p>
+        </section>
+
         <dl class="stats">
           <div class="stat stat-strength">
             <dt><svg class="icon" aria-hidden="true"><use href="#i-strength" /></svg>Strength</dt>
@@ -640,6 +665,7 @@
     <script type="module" src="/interact.js"></script>
     <script type="module" src="/notes.js"></script>
     <script type="module" src="/friends.js"></script>
+    <script type="module" src="/town-goal.js"></script>
     <script type="module" src="/world.js"></script>
     <script type="module" src="/music.js"></script>
     <script type="module" src="/battle-audio.js"></script>

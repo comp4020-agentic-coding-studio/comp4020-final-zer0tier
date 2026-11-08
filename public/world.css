@@ -833,7 +833,52 @@ body.world-playing #world-shell[data-scene="town"] #town-activity {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  #town-activity-fill { transition: none; }
+  #town-activity-fill, #town-goal-bar-fill, #town-goal-fill { transition: none; }
+}
+/* The town goal's small bar: the town map only, under the activity bar when
+   both show. It's a button, so a tap or Enter opens the fountain's window. */
+#town-goal-bar { display: none; }
+body.world-playing #world-shell[data-scene="town"] #town-goal-bar:not([hidden]) {
+  display: grid;
+  gap: 5px;
+  position: fixed;
+  top: max(18px, env(safe-area-inset-top));
+  right: max(18px, env(safe-area-inset-right));
+  z-index: 10;
+  width: 280px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: left;
+  cursor: var(--cursor-pointer);
+  touch-action: manipulation;
+}
+body.world-playing #world-shell[data-scene="town"] #town-activity:not([hidden]) ~ #town-goal-bar:not([hidden]) { top: calc(max(18px, env(safe-area-inset-top)) + 96px); }
+body.world-playing #town-goal-bar:hover { border-color: var(--pet); }
+body.world-playing #town-goal-bar:focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
+body.world-playing #town-goal-bar[data-reached="true"] { border-color: var(--money); }
+body.world-playing #town-goal-bar[data-claimable="true"]::after { content: "Reward ready"; justify-self: start; padding: 0 8px; border-radius: 999px; color: var(--on-primary); background: var(--money); font-size: .7rem; }
+#town-goal-bar-label { overflow-wrap: anywhere; }
+#town-goal-bar-progress { display: block; height: 6px; }
+#town-goal-bar-fill { display: block; }
+#town-goal-bar[data-reached="true"] .progress-fill, #town-goal[data-reached="true"] .progress-fill { background: var(--money); }
+@media (max-width: 560px) {
+  body.world-playing #world-shell[data-scene="town"] #town-goal-bar:not([hidden]) {
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+    width: min(240px, calc(100vw - 152px));
+    padding: 6px 10px;
+    font-size: .72rem;
+  }
+  body.world-playing #world-shell[data-scene="town"] #town-activity:not([hidden]) ~ #town-goal-bar:not([hidden]) { top: calc(max(12px, env(safe-area-inset-top)) + 84px); }
 }
 body.world-playing #home-feedback {
   left: 50%;

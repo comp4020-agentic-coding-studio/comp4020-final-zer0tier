@@ -36,6 +36,7 @@ import { schedule, scheduleAll } from "./scheduler.ts";
 import { TOUCH_KINDS, isTouchKind, touch, touchesOn } from "./touches.ts";
 import { NOTE_COOLDOWN_MS, NOTES_KEPT, PHRASES, clearNotes, isPhraseId, leaveNote, notesFor } from "./notes.ts";
 import { FRIENDS_MAX, friendsOf, star, unstar } from "./friends.ts";
+import { TOWN_GOAL, claimTownGoal, townGoal, townGoalFor } from "./town-goal.ts";
 
 const app = express();
 app.use((req, res, next) => {
@@ -347,6 +348,28 @@ app.post("/api/team", (req, res) => {
   res.json(teamFor(id));
 });
 
+// The town's weekly goal. Anyone can read the shared total; a signed-in
+// player also gets their own meals and whether they can collect the reward.
+app.get("/api/town-goal", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const id = playerFor(req.headers.cookie);
+  res.json(id ? townGoalFor(id) : townGoal());
+});
+// Collecting the reward pays the player's own pet once, and it updates live.
+app.post("/api/town-goal/claim", (req, res) => {
+  const id = playerFor(req.headers.cookie);
+  if (!id) return void res.status(401).json({ error: "Sign in first." });
+  const outcome = claimTownGoal(id);
+  if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
+  logEvent("action_result", {
+    user: id, room: ROOM, client_in_room: clientsInRoom(), action: "town_goal_claim",
+    week: outcome.goal.week, money: TOWN_GOAL.reward.money, food: TOWN_GOAL.reward.food,
+  });
+  broadcast({ type: "pet:updated", pet: getPet(id)! });
+  followUp();
+  res.json(outcome.goal);
+});
+
 // Theft reports are private to the signed-in victim.
 app.get("/api/thefts", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -439,6 +462,7 @@ app.get("/api/rules", (_req, res) => {
     leaderboardSize: LEADERBOARD_SIZE,
     guestbook: { phrases: PHRASES, kept: NOTES_KEPT, cooldownMs: NOTE_COOLDOWN_MS },
     friends: { max: FRIENDS_MAX },
+    townGoal: TOWN_GOAL,
   });
 });
 

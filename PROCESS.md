@@ -333,6 +333,8 @@ built; play-test whether an ally's $2 a win is worth a friend's while, whether
 a busy arena's "Live now" list feels like an event, and whether eight fixed
 phrases are enough to say what players want to say. Friends lists are built
 too; play-test whether a one-way star is enough, or whether players expect a
-friend request that both sides accept. Watching makes the
+friend request that both sides accept. The weekly town goal is built too;
+watch whether 100 meals is a week's stretch for the real player count, and
+whether $25 and 1 Food is enough to make players feed a neighbour's pet. Watching makes the
 decision record's broadcast question concrete: a fight's turns now reach its
 fighters and the players watching it, but nobody else.

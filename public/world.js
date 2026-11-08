@@ -139,6 +139,7 @@ worldShell.innerHTML = `
           <button type="button" class="town-stop" data-place="work" data-town-action="work" style="--x:26.72%;--y:18.52%;--w:19.69%;--h:21.09%"><span class="stop-name">Part-time Jobs</span><span class="stop-detail">Earn a little extra</span></button>
           <button type="button" class="town-stop" data-place="school" data-town-action="school" style="--x:50.21%;--y:21.64%;--w:17.29%;--h:24.53%"><span class="stop-name">School</span><span class="stop-detail">Learn &amp; grow</span></button>
           <span id="town-adventure-slot"></span>
+          <button type="button" class="town-stop" data-place="goal" data-town-action="fountain" style="--x:49.17%;--y:49.84%;--w:9.4%;--h:9.6%" aria-label="Fountain: this week's town goal"><span class="stop-name">Town goal</span><span class="stop-detail">Feed pets together</span></button>
           <button type="button" class="town-stop" data-place="shop" data-town-action="shop" style="--x:21.25%;--y:46.88%;--w:19.17%;--h:19.69%"><span class="stop-name">Shops</span><span class="stop-detail">Stock up on supplies</span></button>
           <button type="button" class="town-stop" data-place="arena" data-town-action="arena" style="--x:78.33%;--y:55.31%;--w:19.38%;--h:22.19%"><span class="stop-name">Arena</span><span class="stop-detail">Meet, visit &amp; battle</span></button>
           <button type="button" id="town-home" class="town-stop" data-town-action="home" style="--x:50.21%;--y:76.33%;--w:16.88%;--h:21.09%"><span class="stop-name">Sweet Home</span><span class="stop-detail">Your cozy corner</span></button>
@@ -362,6 +363,9 @@ const worldStage = worldById('world-stage');
 const worldAvatar = worldById('world-avatar');
 // Keep the activity indicator fixed to the viewport, outside the moving map.
 worldShell.querySelector('.world-main').append(worldById('town-activity'));
+// The town goal's small bar shares that corner, under the activity bar.
+worldShell.querySelector('.world-main').append(worldById('town-goal-bar'));
+worldById('town-goal-bar').addEventListener('click', () => worldOpenPlace('goal'));
 const homeInteractionOutline = worldById('home-interaction-outline');
 const homeOutlineStrokes = homeInteractionOutline.querySelectorAll('use');
 const townInteractionOutline = worldById('town-interaction-outline');
@@ -379,7 +383,7 @@ worldDialog.setAttribute('aria-labelledby', 'world-dialog-title');
 worldDialog.innerHTML = `<header class="place-heading"><div><p class="world-eyebrow" id="world-place-eyebrow">AROUND TOWN</p><h2 id="world-dialog-title"></h2></div><button type="button" class="world-button" id="world-dialog-close" aria-label="Close window">Close <span aria-hidden="true">×</span></button></header><p id="world-place-intro" class="place-intro"></p><div class="place-body"></div>`;
 document.body.append(worldDialog);
 const worldPanels = {};
-for (const name of ['school', 'work', 'shop', 'arena', 'journal', 'friends', 'appearance', 'pet', 'menu', 'visit']) {
+for (const name of ['school', 'work', 'shop', 'arena', 'journal', 'friends', 'goal', 'appearance', 'pet', 'menu', 'visit']) {
   const panel = document.createElement('section');
   panel.id = `world-panel-${name}`;
   panel.className = 'world-panel';
@@ -394,6 +398,7 @@ worldPanels.arena.append(original.arena);
 worldPanels.visit.append(worldById('visit'));
 worldPanels.appearance.append(worldById('outfit-settings'), worldById('appearance-settings'));
 worldPanels.friends.append(worldById('friends'));
+worldPanels.goal.append(worldById('town-goal'));
 worldPanels.pet.classList.add('world-companion');
 worldPanels.menu.innerHTML = '<p class="help">Take your time. Your pet and progress are saved.</p><p><a href="/readme/" target="_blank" rel="noopener">How to play</a></p><button type="button" class="world-button" id="world-pet-details" data-place="pet">Pet details</button> <button type="button" class="world-button" data-place="backpack">Backpack</button> <button type="button" class="world-button" data-place="journal">Town journal</button> <button type="button" class="world-button" id="world-friends" data-place="friends">Friends</button> <button type="button" class="world-button" data-place="appearance">Appearance</button>';
 for (const selector of ['#world-pet-summary', '#home-interaction-label', '.home-care', '#home-care-hint', '#home-care-error', '#world-play', '#town-care-hint', '.companion-footer']) {
@@ -430,6 +435,7 @@ const worldPlaces = {
   arena: ['The town arena', 'Meet your neighbours, visit their pets, or challenge someone to a friendly rivalry.'],
   journal: ['Your town journal', 'Recent visitors, their notes, battles, town news, and any theft reports that need your attention.'],
   friends: ['Your friends', 'Players you starred. See who is online, visit their homes, and invite them on adventures.'],
+  goal: ['The town fountain', 'Every pet fed this week counts toward a goal the whole town shares. Reach it together, and everyone who helped shares the reward.'],
   appearance: ['A style of your own', 'Dress for your next stroll, or give your companion a new look.'],
   pet: ['Your companion', 'A little affection goes a long way. Play, care, or see how your pet is doing.'],
   menu: ['Make yourself at home', ''],
@@ -1136,7 +1142,7 @@ function worldTargets() {
     [480, 375, 'Spend time with your pet', '[data-home-action="pet"]', 90], [480, 565, 'Leave for town', '#home-door'],
     [366, 525, 'Open your backpack', '[data-home-action="chest"]'], [350, 220, 'Game menu', '[data-home-action="menu"]'],
   ];
-  return [[250, 194, 'Browse part-time jobs', '[data-place="work"]'], [482, 233, 'Visit school', '[data-place="school"]'], [751, 189, 'Enter the woodland', '#adventure-open'], [204, 379, 'Visit the shops', '[data-place="shop"]'], [752, 440, 'Enter the arena', '[data-place="arena"]'], [482, 571, 'Go home', '#town-home']];
+  return [[250, 194, 'Browse part-time jobs', '[data-place="work"]'], [482, 233, 'Visit school', '[data-place="school"]'], [751, 189, 'Enter the woodland', '#adventure-open'], [204, 379, 'Visit the shops', '[data-place="shop"]'], [752, 440, 'Enter the arena', '[data-place="arena"]'], [472, 368, 'Check the town goal', '[data-town-action="fountain"]'], [482, 571, 'Go home', '#town-home']];
 }
 function worldHighlight(destination) {
   const target = !worldDashboard.hidden && !worldModalOpen() && destination && !destination.disabled ? destination : null;

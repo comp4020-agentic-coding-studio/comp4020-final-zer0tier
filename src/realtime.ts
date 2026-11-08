@@ -9,6 +9,7 @@ import type { Team } from "./teams.ts";
 import type { Touch } from "./touches.ts";
 import type { Note } from "./notes.ts";
 import type { Friend } from "./friends.ts";
+import type { TownGoal } from "./town-goal.ts";
 import { stopWorld, type WorldEmote, type WorldPosition } from './world.ts';
 import { audienceOf, unwatch, type WatcherCount } from './watch.ts';
 
@@ -40,7 +41,10 @@ export type ServerEvent =
   | { type: "notes:cleared"; pet: string }
   // A player starred or unstarred a friend: their whole list, as saved. Only
   // that player's own windows hear it; the starred player isn't told.
-  | { type: "friends:updated"; player: string; friends: Friend[] };
+  | { type: "friends:updated"; player: string; friends: Friend[] }
+  // The town's weekly meal total changed (someone fed a pet) or a new week
+  // began. Everyone hears it: the town map's progress bar is shared.
+  | { type: "town:goal"; goal: TownGoal };
 
 let wss: WebSocketServer | undefined;
 const credentials = new WeakMap<WebSocket, string | undefined>();

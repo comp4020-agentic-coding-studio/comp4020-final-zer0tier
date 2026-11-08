@@ -623,6 +623,17 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .friend-status[data-online="true"]::before { background: var(--money); }
 .friend .chip-btn { padding-inline: 0.9rem; }
 #friends-empty[hidden] { display: none; }
+/* The town goal, in the fountain's window. */
+.town-goal-target { margin: 0.25rem 0 0.75rem; font-family: "Varela Round", "Nunito Sans", system-ui, sans-serif; font-size: 1.25rem; }
+.town-goal-progress { height: 18px; }
+.town-goal-count { margin: 0.5rem 0 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.town-goal-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin: 0 0 1rem; }
+.town-goal-facts > div { padding: 0.6rem 0.75rem; border-radius: var(--radius-sm); background: var(--bg); min-width: 0; }
+.town-goal-facts dt { font-size: 0.75rem; color: var(--muted); }
+.town-goal-facts dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#town-goal-claim { margin-top: 0.75rem; padding-inline: 1.25rem; }
+#town-goal-claim[hidden] { display: none; }
+@media (max-width: 420px) { .town-goal-facts { grid-template-columns: 1fr 1fr; } }
 #friend-add { margin-top: 0.75rem; }
 .visit-pet { display: flex; align-items: center; gap: 1rem; margin-block: 1rem; }
 .visit-pet .pet-touch { width: 100px; }
