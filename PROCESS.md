@@ -15,6 +15,20 @@ enforced by `spec/` or judged by hand, and I wouldn't keep a claim I hadn't
 checked: survival across a restart went in only after I killed the server
 mid-shift and watched the shift still pay.
 
+## What I read, and my position
+
+Robin Sloan's "An app can be a home-cooked meal" describes an app he built for
+just his family, never meant to scale. I agree with him: software doesn't need
+to be offered to thousands of strangers like an industrial restaurant. It can
+be used by just friends, and then there's no need for a complex system. That
+position decided the stack below: one process and one SQLite file on one small
+machine, no database server, no framework, because a game for a room of friends
+doesn't need to survive a million players. Where I went further than Sloan is
+the game itself. His app does one thing; mine kept gaining ways for friends to
+play together. The system stayed home-cooked, but the menu got long, and I
+judged that each feature had to earn its place by being something friends play
+*with* each other.
+
 ## The harness, and the stack it implies
 
 Before any game code I wrote `CLAUDE.md`
@@ -25,16 +39,13 @@ Every rule follows from one 256 MB Fly machine with one volume:
   request reads a pet, applies a rule and writes it back with nothing
   interleaving, which made costs, refusals and two-pet fights simple to get
   right. The obvious alternative, Postgres, is a second Fly app outside the
-  course setup; the cost is that this can't scale past one machine, which a
-  game for a room of friends doesn't need.
+  course setup; the cost is that this can't scale past one machine, which, as
+  above, a game for a room of friends doesn't need.
 - **WebSockets one way.** Players act over HTTP; the socket only carries news,
   and the database is the only source of truth. Clients never update
   optimistically, so two windows can't disagree.
-- **No front-end framework or build step.** Less to fit in 256 MB and nothing
-  to break in CI, but `public/app.js` is now the largest file, the first thing
-  I'd revisit.
-- **Timed activities stored, not held in memory.** A shift records when it
-  ends, and timers are rebuilt from the database at boot.
+- **No front-end framework or build step.** Less to fit in 256 MB, but
+  `public/app.js` is now the largest file, the first thing I'd revisit.
 
 The rule that carries the most weight is that every real-time event needs a
 spec that opens real WebSockets and sees it arrive within a second. `spec/`
@@ -58,8 +69,8 @@ together: team runs on one shared map
 ([`534215f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/534215f)),
 touching a visited pet through the server so its owner knows someone came
 ([`12cdf79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/12cdf79)),
-then gifts, recruiting a friend's pet, watching live fights, and guestbook
-notes. The last week followed the same test: friends lists
+then gifts and watching live fights. The last week followed the same test:
+friends lists
 ([`f8c4c9b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/f8c4c9b))
 and a weekly town goal where every pet fed counts for the whole town
 ([`9daa5be`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/9daa5be)).
@@ -96,9 +107,6 @@ I aimed for every fix to land in the harness rather than as a retry:
   winning alone after its recruiter forfeited, the agent undid each fix to show
   the new spec fails, then put it back
   ([`8aafd31`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/8aafd31)).
-- An Adventure route spec started failing. Run on the commit before, it failed
-  too, so the fix went to the spec in its own commit
-  ([`3ce1287`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/3ce1287)).
 
 ## Testing with a room full of people
 
@@ -124,6 +132,5 @@ rule and the API moved to `docs/GUIDE.md`.
 ## Next
 
 Play-test what the spec can't judge: whether coming back to a hungrier pet is a
-reason to return or a chore (switch `NEEDS_DECAY=on`), whether 100 meals is a
-week's stretch for the real player count, and whether eight fixed phrases are
-enough to say what players want to say.
+reason to return or a chore (switch `NEEDS_DECAY=on`), and whether 100 meals is
+a week's stretch for the real player count.

@@ -23,7 +23,7 @@ So I added features where friends actually play together, live:
 
 - **Pokémon-like fights in the Adventure.** Up to four friends set off on one
   shared woodland map and fight its monsters together, turn by turn. Each
-  player picks their own pet's skill every turn; nothing plays itself.
+  player picks their own pet's skill every turn.
   *Enforced:* `spec/team.test.ts`, `spec/combat-turns.test.ts` (every human
   turn waits for its owner's choice).
 - **Fighting each other in the Arena.** Challenge an online player and both of
@@ -36,12 +36,9 @@ So I added features where friends actually play together, live:
   can help, but never use up or harm what someone else owns. *Enforced:*
   `spec/world-realtime.test.ts`, `spec/touch.test.ts`, `spec/help.test.ts`.
 
-Underneath all three, the final project's fixed requirements are what make it
-play rather than poke: every change reaches every open window within a second
-(`spec/realtime.test.ts` fails if any event is slower), only a pet's owner can
-act for it (`spec/pets.test.ts`), and nothing is lost: pets, fights and
-unfinished shifts live in SQLite on the Fly volume. *Checked by hand:* I killed
-the server halfway through a shift; it still finished and paid on time.
+Every change reaches every open window within a second (`spec/realtime.test.ts`),
+and nothing is lost: pets and fights live in SQLite on the Fly volume.
+*Checked by hand:* I killed the server mid-shift; it still finished and paid.
 
 Some of "good" can only be judged by playing, not by `spec/`: whether a
 turn-based fight with a friend is more fun than one against the bot, and
@@ -55,6 +52,12 @@ things, so it can never be a lopsided trade.
 
 **What I read or looked at:**
 
+- Robin Sloan,
+  ["An app can be a home-cooked meal"](https://www.robinsloan.com/notes/home-cooked-app/)
+  (2020). He built a messaging app for just his family, never meant to scale.
+  It convinced me software doesn't need to serve thousands of strangers like an
+  industrial restaurant: VirtuePets is for a room of friends, so it runs on one
+  small machine with one database file.
 - Clay Shirky,
   ["Situated Software"](https://gwern.net/doc/technology/2004-03-30-shirky-situatedsoftware.html)
   (2004). Software for a small group works when it shows the group to itself
@@ -64,8 +67,5 @@ things, so it can never be a lopsided trade.
   shows who else is playing.
 - The
   [Final Project brief](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/assessments/final-project/):
-  its multi-user, real-time, and persists requirements are the backbone of
-  this definition.
-- QQ Pets (Tencent, 2005), the game this one is modelled on: study for
-  stats, work for money, care for your pet's needs, and share a world with
-  other players.
+  its multi-user, real-time, and persists requirements.
+- QQ Pets (Tencent, 2005), the game this one is modelled on.
