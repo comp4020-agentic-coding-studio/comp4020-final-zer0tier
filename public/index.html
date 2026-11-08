@@ -31,6 +31,7 @@
       <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9" /></symbol>
       <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></symbol>
       <symbol id="i-swords" viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M9.5 6.5 14 2h3v3l-4.5 4.5M5 14l-2 2 3 3 2-2M7 17l-3 3" /></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.1 1.1 6L12 16.7l-5.3 2.9 1.1-6-4.4-4.1 6-.8L12 3.2Z" /></symbol>
       <symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5L3 8ZM5 19h14" /></symbol>
       <symbol id="i-school" viewBox="0 0 24 24"><path d="M22 9 12 4 2 9l10 5 10-5ZM6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5M22 9v6" /></symbol>
       <symbol id="monster-slime" viewBox="0 0 24 24">
@@ -487,6 +488,7 @@
             <section id="visit" class="visit" aria-labelledby="visit-heading" hidden>
               <div class="visit-head">
                 <h4 id="visit-heading" tabindex="-1"></h4>
+                <button type="button" id="visit-star" class="star-btn" data-star="" data-star-error="steal-error" aria-pressed="false" hidden><svg class="icon" aria-hidden="true"><use href="#i-star" /></svg></button>
                 <button type="button" id="visit-close" class="chip-btn chip-buy">Leave visit</button>
               </div>
               <div class="visit-pet">
@@ -598,6 +600,24 @@
           </details>
         </section>
 
+        <section id="friends" class="block friends" aria-labelledby="friends-heading">
+          <div class="friends-head">
+            <h3 class="section-label" id="friends-heading">Friends</h3>
+            <span id="friends-count" class="friends-count"></span>
+          </div>
+          <ul id="friends-list" class="friends-list" aria-labelledby="friends-heading"></ul>
+          <p id="friends-empty" class="help">No friends yet. Press the star beside a pet in the Arena or while visiting, or star a player by ID below.</p>
+          <form id="friend-add" class="lookup">
+            <label for="friend-add-id">Star a player by ID</label>
+            <div class="lookup-row">
+              <input id="friend-add-id" name="id" required maxlength="32" pattern="[A-Za-z0-9_\-]+" spellcheck="false" autocomplete="off" autocapitalize="none" />
+              <button type="submit" class="chip-btn chip-buy">Star</button>
+            </div>
+          </form>
+          <p id="friends-news" class="hint" role="status"></p>
+          <p id="friends-error" class="error" role="alert"></p>
+        </section>
+
         <section class="block" aria-labelledby="care-heading">
           <h3 class="section-label" id="care-heading">Supplies</h3>
           <div id="free-supplies" class="item item-free">
@@ -619,6 +639,7 @@
     <script type="module" src="/confirm.js"></script>
     <script type="module" src="/interact.js"></script>
     <script type="module" src="/notes.js"></script>
+    <script type="module" src="/friends.js"></script>
     <script type="module" src="/world.js"></script>
     <script type="module" src="/music.js"></script>
     <script type="module" src="/battle-audio.js"></script>

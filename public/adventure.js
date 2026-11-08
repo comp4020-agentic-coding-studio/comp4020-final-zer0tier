@@ -975,6 +975,9 @@ teamUp.innerHTML = `
   <section aria-labelledby="team-members-heading">
     <h3 id="team-members-heading">Your team</h3><ul id="team-members"></ul>
   </section>
+  <section id="team-friends" aria-labelledby="team-friends-heading" hidden>
+    <h3 id="team-friends-heading">Invite a friend</h3><ul id="team-friend-list"></ul>
+  </section>
   <form id="team-invite">
     <label for="team-invite-id">Invite a player by ID</label>
     <div class="team-invite-row">
@@ -991,6 +994,8 @@ teamUp.innerHTML = `
   </div>`;
 document.body.append(teamUp);
 let lobby = null, lobbyGeneration = 0, lobbyPending = false;
+// Starred friends and who is online, from friends.js, for one-press invites.
+let teamFriends = [], teamOnline = new Set(), teamInviting = null;
 const avatarFor = member => {
   const shape = ['cat', 'dog', 'hedgehog', 'lizard', 'panda', 'bird', 'dragon', 'blob'].includes(member.appearance) ? member.appearance : 'blob';
   const color = /^#[0-9a-f]{6}$/i.test(member.color) ? member.color : '#f59e0b';
@@ -1033,6 +1038,7 @@ function renderLobby() {
   const full = (team?.members.length ?? 1) >= lobby.size;
   teamUp.querySelector('#team-invite button').disabled = lobbyPending || full;
   teamUp.querySelector('#team-invite-id').disabled = lobbyPending || full;
+  renderTeamFriends(Boolean(team) && !leader, full);
   const setOff = teamUp.querySelector('#team-set-off');
   setOff.hidden = !leader;
   setOff.disabled = lobbyPending || !team || team.members.filter(m => m.joined).length < 2 || team.members.some(m => m.waiting);
@@ -1046,6 +1052,51 @@ function renderLobby() {
     : leader ? (team.members.length < 2 ? 'Invite a player to team up.' : setOff.disabled ? 'Waiting for every teammate to join and be ready.' : 'Everyone is ready. Set off together!')
     : `Waiting for ${team.leader} to set off.`;
 }
+// Friends, online first, each a press away from an invitation. Friends
+// already on the team (or invited) say so instead.
+function renderTeamFriends(hidden, full) {
+  const section = teamUp.querySelector('#team-friends'), list = teamUp.querySelector('#team-friend-list');
+  const focused = list.contains(document.activeElement) ? document.activeElement.dataset.invite : null;
+  section.hidden = hidden || teamFriends.length === 0;
+  const members = new Map((lobby?.team?.members ?? []).map(member => [member.id, member]));
+  const sorted = [...teamFriends].sort((a, b) => Number(teamOnline.has(b.id)) - Number(teamOnline.has(a.id)) || a.id.localeCompare(b.id));
+  list.replaceChildren(...sorted.map(friend => {
+    const row = document.createElement('li'), name = document.createElement('strong'), detail = document.createElement('span');
+    const member = members.get(friend.id);
+    row.innerHTML = avatarFor(friend);
+    name.textContent = friend.id;
+    detail.textContent = member ? (member.joined ? 'On your team' : 'Invited') : teamOnline.has(friend.id) ? 'Online' : 'Offline';
+    detail.dataset.online = String(teamOnline.has(friend.id));
+    const invite = document.createElement('button');
+    invite.type = 'button';
+    invite.className = 'chip-btn chip-buy';
+    invite.dataset.invite = friend.id;
+    invite.textContent = teamInviting === friend.id ? 'Inviting…' : 'Invite';
+    invite.setAttribute('aria-label', `Invite ${friend.id} to your team`);
+    // The pressed button stays focusable while it sends; the rest wait.
+    invite.disabled = Boolean(member) || full || (lobbyPending && teamInviting !== friend.id);
+    invite.setAttribute('aria-disabled', String(teamInviting === friend.id));
+    invite.addEventListener('click', async () => {
+      if (lobbyPending) return;
+      teamInviting = friend.id;
+      try { await teamRequest({ action: 'invite', player: friend.id }); } finally { teamInviting = null; renderLobby(); }
+    });
+    row.append(name, detail, invite);
+    return row;
+  }));
+  // Once invited, a friend's button rests; move on to the next one you can press.
+  if (focused) {
+    const again = list.querySelector(`[data-invite="${focused}"]`);
+    const next = again && !again.disabled ? again : list.querySelector('[data-invite]:not(:disabled)') ?? teamUp.querySelector('#team-invite-id');
+    if (!next.disabled) next.focus({ preventScroll: true });
+    else teamUp.querySelector('#team-close').focus({ preventScroll: true });
+  }
+}
+document.addEventListener('friends:changed', ({ detail }) => {
+  teamFriends = detail.friends;
+  teamOnline = new Set(detail.online);
+  if (teamUp.open) renderLobby();
+});
 // A run under way (solo or a team's) reopens on the map; otherwise the
 // player chooses how to start.
 async function loadLobby() {
@@ -1071,7 +1122,9 @@ async function teamRequest(body) {
     if (!response.ok) throw new Error(result.error || 'Could not update the team. Try again.');
     ++lobbyGeneration;
     lobby = result;
-    if (body.action === 'invite') teamUp.querySelector('#team-invite-id').value = '';
+    // A friend's Invite leaves whatever is typed in the ID box alone.
+    const box = teamUp.querySelector('#team-invite-id');
+    if (body.action === 'invite' && box.value.trim() === body.player) box.value = '';
     // The set-off broadcast may already have opened this run. Both paths
     // consume the open lobby so a late response cannot enter a second time.
     if (teamUp.open && lobby.run.state === 'exploring' && lobby.run.team) return openMap();

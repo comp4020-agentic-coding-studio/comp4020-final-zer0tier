@@ -8,6 +8,7 @@ import type { BattleSession, Fight, Pet } from "./pets.ts";
 import type { Team } from "./teams.ts";
 import type { Touch } from "./touches.ts";
 import type { Note } from "./notes.ts";
+import type { Friend } from "./friends.ts";
 import { stopWorld, type WorldEmote, type WorldPosition } from './world.ts';
 import { audienceOf, unwatch, type WatcherCount } from './watch.ts';
 
@@ -36,7 +37,10 @@ export type ServerEvent =
   // A visitor left a guestbook note. Only the pet's owner and that visitor hear it.
   | { type: "pet:noted"; note: Note }
   // An owner cleared their guestbook. Only the owner's own windows hear it.
-  | { type: "notes:cleared"; pet: string };
+  | { type: "notes:cleared"; pet: string }
+  // A player starred or unstarred a friend: their whole list, as saved. Only
+  // that player's own windows hear it; the starred player isn't told.
+  | { type: "friends:updated"; player: string; friends: Friend[] };
 
 let wss: WebSocketServer | undefined;
 const credentials = new WeakMap<WebSocket, string | undefined>();
@@ -150,11 +154,13 @@ export function broadcast(event: ServerEvent): void {
   if (!wss) return;
   const message = JSON.stringify(event);
   // A live fight's turns reach its two fighters and its saved audience; a
-  // guestbook note, only the owner and the visitor who wrote it.
+  // guestbook note, only the owner and the visitor who wrote it; a friends
+  // list, only the player who keeps it.
   const audience = event.type === "battle:updated"
     ? new Set([event.session.attacker, event.session.defender, ...audienceOf(event.session.id)])
     : event.type === "pet:noted" ? new Set([event.note.pet, event.note.visitor])
     : event.type === "notes:cleared" ? new Set([event.pet])
+    : event.type === "friends:updated" ? new Set([event.player])
     : null;
   let recipients = 0;
   for (const client of wss.clients) {

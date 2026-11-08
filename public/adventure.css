@@ -166,6 +166,13 @@
 .team-avatar { display: block; width: 40px; height: 37px; color: var(--pet-color, #f59e0b); }
 #team-invitation-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 #team-invitation-list li span { flex: 1 1 100%; overflow-wrap: anywhere; }
+#team-friends[hidden] { display: none; }
+#team-friend-list li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; column-gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+#team-friend-list li .team-avatar { grid-row: span 2; }
+#team-friend-list li strong { overflow-wrap: anywhere; }
+#team-friend-list li span { grid-column: 2; color: var(--muted); font-size: .8rem; }
+#team-friend-list li span[data-online="true"] { color: var(--money); font-weight: 700; }
+#team-friend-list li button { grid-column: 3; grid-row: 1 / span 2; padding-inline: 1rem; }
 #team-invite { margin-top: 16px; }
 #team-invite[hidden] { display: none; }
 #team-invite label { font-size: .875rem; }

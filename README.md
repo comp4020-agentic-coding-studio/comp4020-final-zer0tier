@@ -178,7 +178,7 @@ learned moves before heading out. Save **Adventure**, **Arena**, and **Support**
 loadouts there to switch between your favorite skill setups. The **Journal** keeps recent visitors, activity, fight
 history, and saved theft reports with revenge options. Press **Escape** in
 either scene to open the game menu for your pet's details, Backpack,
-Journal, Appearance, help, and Sign out. Pet details open in a compact window;
+Journal, **Friends**, Appearance, help, and Sign out. Pet details open in a compact window;
 head home to feed, clean, and play with your pet.
 
 While your pet works or studies, the town map shows a compact activity bar in
@@ -726,6 +726,27 @@ the target's daily protection, and protection survives signing out and
 server restarts. Both balances update live; the owner gets a notification
 and the theft appears in **Happening now**.
 
+### Friends
+
+**Star** a player to keep them close. Every other player in the Arena has a
+star beside their name, and so does the pet you're visiting; press it to
+star them, and again to unstar. The bot can't be starred. Open **Friends**
+from the game menu (**Escape**, or the wall clock at home) to see everyone
+you starred, online friends first, each marked **Online** or **Offline**
+as they come and go, live. The menu button counts how many are online.
+**Visit** goes straight to a friend's home, whether they're there,
+elsewhere, or offline. **Star a player by ID** adds someone you haven't met
+in the Arena yet. When you start an adventure, the **Team up?** window lists
+your friends, online ones first, under **Invite a friend**: one press
+invites them, with no ID to type, and a friend already invited or on your
+team says so instead.
+
+Starring is one-way and private, like a bookmark. Only you see your list,
+the starred player isn't told, and starring someone doesn't let you do
+anything to their pet that any visitor couldn't. You can star up to 50
+players. A star is saved before it shows: the button lights up, in every
+window you have open, once the server confirms it.
+
 ### Leaderboard
 
 The Arena's **Leaderboard** tab ranks the top 10 players by **most wins**
@@ -794,7 +815,10 @@ and the built-in `node:sqlite` for storage.
   409 when you have none spare, 400 for yourself or the bot),
   `touch/:pet` (with `{"kind": "pat"}`), `note/:pet` (with `{"phrase":
   "rematch"}`, a phrase ID from `/api/rules`; 429 within 10 seconds of your
-  last note to that pet), `notes/clear`, and `equip-coin/:coin` (`:coin` is
+  last note to that pet), `notes/clear`, `star/:player` and `unstar/:player`
+  (both answer with your friends list as saved; starring twice or unstarring
+  someone not starred changes nothing; 400 for yourself or the bot, 404 for a
+  player with no account, 409 past 50 friends), and `equip-coin/:coin` (`:coin` is
   `copper-coin`, `silver-coin`, `gold-coin`, or `none` to unequip).
   `collect-supplies` adds the free daily Food and Soap, and sets the pet's
   `suppliesAvailableAt` (epoch milliseconds of the next UTC midnight, or
@@ -862,7 +886,12 @@ and the built-in `node:sqlite` for storage.
   visitor plays with someone else's pet. `pet:noted` carries a saved
   guestbook note to that pet's owner and the visitor only, and `notes:cleared`
   reaches only the owner's windows; `GET /api/pets/:id/notes` is the owner's
-  guestbook, newest 10, for the owner alone. The feed keeps its newest 500
+  guestbook, newest 10, for the owner alone. `friends:updated` carries a
+  player's whole friends list (`{ player, friends }`, each friend's `id`,
+  `color`, `appearance`, and when they were starred) to that player's own
+  windows only, after each star or unstar; `GET /api/pets/:id/friends` reads
+  it, for its owner alone. Online status isn't saved with it: the page marks
+  friends from `presence:updated`. The feed keeps its newest 500
   entries in SQLite. A `battle:updated` event sends saved Arena/revenge
   session changes to its two participants and the players watching it, and
   each screen shows the turn from that event. The browser re-reads a live
@@ -930,7 +959,7 @@ and the built-in `node:sqlite` for storage.
   victim and amount. A finished lesson or shift names the task and what it
   paid — logged when it ends, not when it starts. A team change
   (`team_invite`, `team_accept`, `team_leave`, `team_set-off`) names the
-  team. Logs exclude passwords, session cookies, query strings, request
+  team. Starring or unstarring (`star`, `unstar`) names the `friend`. Logs exclude passwords, session cookies, query strings, request
   bodies, and snapshot contents; values containing spaces are quoted.
 
   Example lines (IDs shortened):

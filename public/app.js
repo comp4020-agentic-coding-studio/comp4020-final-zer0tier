@@ -883,6 +883,17 @@ function rivalRow(pet) {
   li.querySelector(".rival-name").textContent = pet.id;
   li.querySelector(".rival-identity").prepend(petAvatar(pet));
   if (pet.id === rules.botId) li.querySelector(".rival-name").insertAdjacentHTML("afterend", '<span class="tag">bot</span>');
+  else {
+    // friends.js presses it to match the saved friends list.
+    const star = document.createElement("button");
+    star.type = "button";
+    star.className = "star-btn";
+    star.dataset.star = pet.id;
+    star.dataset.starError = "arena-error";
+    star.setAttribute("aria-label", `Star ${pet.id} as a friend`);
+    star.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-star" /></svg>';
+    li.querySelector(".rival-identity").append(star);
+  }
   li.querySelector(".rival-meta").textContent = `${school} · ${doing} · ${pet.wins}W ${pet.losses}L`;
   if (pet.woodlandClears > 0) li.querySelector(".rival-meta").prepend(crownTag(pet.woodlandClears));
   if (pet.id !== rules.botId) {
@@ -919,9 +930,12 @@ function trimRivals() {
 function renderRivals() {
   const rank = (pet) => (pet.id === pinned ? 2 : pet.id === rules.botId ? 1 : 0);
   const order = [...rivals.values()].sort((a, b) => rank(b) - rank(a) || arrival.get(b.id) - arrival.get(a.id));
+  const focusedStar = $("rivals").contains(document.activeElement) ? document.activeElement.dataset.star : null;
   $("rivals").replaceChildren(...order.map(rivalRow));
+  if (focusedStar) $("rivals").querySelector(`[data-star="${focusedStar}"]`)?.focus({ preventScroll: true });
   renderFightButtons();
   renderVisit();
+  document.dispatchEvent(new CustomEvent("stars:rendered"));
 }
 
 function renderVisit() {
@@ -933,6 +947,10 @@ function renderVisit() {
     return;
   }
   $("visit-heading").textContent = `Visiting ${pet.id}`;
+  $("visit-star").hidden = pet.id === rules?.botId;
+  $("visit-star").dataset.star = pet.id === rules?.botId ? "" : pet.id;
+  $("visit-star").setAttribute("aria-label", `Star ${pet.id} as a friend`);
+  document.dispatchEvent(new CustomEvent("stars:rendered"));
   renderPetAvatar($("visit-avatar"), pet);
   $("visit-activity").textContent = pet.activity === "idle" ? '' : busyText(pet);
   $("visit-money").textContent = `$${pet.money} saved`;
@@ -1619,14 +1637,15 @@ $("revenge").addEventListener("click", async () => {
 });
 $("attacked-close").addEventListener("click", hideAttacked);
 
-$("lookup").addEventListener("submit", async (e) => {
-  e.preventDefault();
+// Looks a pet up by ID and visits its home: the Arena's search, and a
+// friend's Visit button. `form` is where the request started; closing its
+// window cancels the visit, and errors show on `errorId`.
+async function lookUpAndVisit(id, form, errorId) {
   if (!current) return;
   const owner = current.id, login = theftSession, visit = visitLoads, request = ++lookupRequest;
-  const id = $("lookup-id").value.trim();
-  $("arena-error").textContent = "";
-  if (id === owner) return void ($("arena-error").textContent = "That's your own pet.");
-  const dialog = $("lookup").closest('dialog');
+  $(errorId).textContent = "";
+  if (id === owner) return void ($(errorId).textContent = "That's your own pet.");
+  const dialog = form.closest('dialog');
   let closed = false;
   // The native close event may arrive after the same dialog reopens. Watch
   // removal of its open attribute, scoped to this request, instead.
@@ -1643,7 +1662,7 @@ $("lookup").addEventListener("submit", async (e) => {
   try {
     const res = await fetch(`/api/pets/${encodeURIComponent(id)}`);
     if (!active()) return;
-    if (!res.ok) return void ($("arena-error").textContent = `There's no pet called ${id}.`);
+    if (!res.ok) return void ($(errorId).textContent = `There's no pet called ${id}.`);
     const pet = await res.json();
     if (!active()) return;
     pinned = pet.id;
@@ -1654,11 +1673,17 @@ $("lookup").addEventListener("submit", async (e) => {
     // avoids a second request that could outlive the player's next search.
     openVisit(pet.id, true, rivals.get(pet.id));
   } catch {
-    if (active()) $("arena-error").textContent = "Couldn't reach the server. Try again.";
+    if (active()) $(errorId).textContent = "Couldn't reach the server. Try again.";
   } finally {
     closing?.disconnect();
   }
+}
+$("lookup").addEventListener("submit", (e) => {
+  e.preventDefault();
+  lookUpAndVisit($("lookup-id").value.trim(), $("lookup"), "arena-error");
 });
+// A friend's Visit button, from friends.js.
+document.addEventListener("friends:visit", (e) => lookUpAndVisit(e.detail, $("friends"), "friends-error"));
 
 function render(pet) {
   const previous = current;
@@ -2028,6 +2053,8 @@ function connect() {
       document.dispatchEvent(new CustomEvent("pet:noted", { detail: event.note }));
     } else if (event.type === "notes:cleared") {
       document.dispatchEvent(new CustomEvent("notes:cleared", { detail: event.pet }));
+    } else if (event.type === "friends:updated") {
+      document.dispatchEvent(new CustomEvent("friends:updated", { detail: { player: event.player, friends: event.friends } }));
     } else if (event.type === "fight:finished") {
       onFight(event.fight);
     } else if (event.type === "battle:updated") {

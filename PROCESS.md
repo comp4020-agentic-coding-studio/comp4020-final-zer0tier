@@ -331,6 +331,8 @@ whether helping is worth a $15 food, and whether teams need a smaller entry
 cost. Gifting, recruiting, watching live fights, and guestbook notes are now
 built; play-test whether an ally's $2 a win is worth a friend's while, whether
 a busy arena's "Live now" list feels like an event, and whether eight fixed
-phrases are enough to say what players want to say. Watching makes the
+phrases are enough to say what players want to say. Friends lists are built
+too; play-test whether a one-way star is enough, or whether players expect a
+friend request that both sides accept. Watching makes the
 decision record's broadcast question concrete: a fight's turns now reach its
 fighters and the players watching it, but nobody else.

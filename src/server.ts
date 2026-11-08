@@ -35,6 +35,7 @@ import { logRequest } from "./request-logging.ts";
 import { schedule, scheduleAll } from "./scheduler.ts";
 import { TOUCH_KINDS, isTouchKind, touch, touchesOn } from "./touches.ts";
 import { NOTE_COOLDOWN_MS, NOTES_KEPT, PHRASES, clearNotes, isPhraseId, leaveNote, notesFor } from "./notes.ts";
+import { FRIENDS_MAX, friendsOf, star, unstar } from "./friends.ts";
 
 const app = express();
 app.use((req, res, next) => {
@@ -437,6 +438,7 @@ app.get("/api/rules", (_req, res) => {
     steal: STEAL,
     leaderboardSize: LEADERBOARD_SIZE,
     guestbook: { phrases: PHRASES, kept: NOTES_KEPT, cooldownMs: NOTE_COOLDOWN_MS },
+    friends: { max: FRIENDS_MAX },
   });
 });
 
@@ -655,6 +657,31 @@ app.post("/api/pets/:id/notes/clear", (req, res) => {
   broadcast({ type: "notes:cleared", pet: req.params.id });
   res.json({ cleared });
 });
+
+// Friends: players you starred. Only you read your list or change it (the
+// owner check above covers star/unstar); each change is saved, logged, then
+// sent as friends:updated to your own windows alone.
+app.get("/api/pets/:id/friends", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (!isValidId(req.params.id) || !getPet(req.params.id)) return notFound(res, "pet");
+  const player = playerFor(req.headers.cookie);
+  if (!player) return void res.status(401).json({ error: "Sign in first." });
+  if (player !== req.params.id) return void res.status(403).json({ error: "Only its owner can read a friends list." });
+  res.json(friendsOf(req.params.id));
+});
+for (const action of ["star", "unstar"] as const) {
+  app.post(`/api/pets/:id/${action}/:friend`, (req, res) => {
+    if (!isValidId(req.params.id)) return notFound(res, "pet");
+    if (!isValidId(req.params.friend)) return notFound(res, "player");
+    const outcome = action === "star" ? star(req.params.id, req.params.friend) : unstar(req.params.id, req.params.friend);
+    if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
+    logEvent("action_result", {
+      user: req.params.id, room: ROOM, client_in_room: clientsInRoom(), action, friend: req.params.friend,
+    });
+    broadcast({ type: "friends:updated", player: req.params.id, friends: outcome.friends });
+    res.json(outcome.friends);
+  });
+}
 
 // Playing with someone else's pet, as your own: saved, logged, then broadcast
 // so it reacts in every window showing it, its owner's included.

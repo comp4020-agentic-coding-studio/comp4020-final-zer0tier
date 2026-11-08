@@ -586,12 +586,44 @@ code { font-size: 0.9em; padding: 0 0.25em; border-radius: 4px; background: var(
 .rival-stats b { color: var(--fg); }
 .rival > div { grid-column: 1; min-width: 0; }
 .rival > .rival-actions { grid-column: 2; grid-row: 1 / span 3; display: grid; gap: 0.4rem; min-width: 5.5rem; }
+/* A friend star: outlined until pressed, then filled in the Charisma gold. */
+.star-btn {
+  display: inline-grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0;
+  color: var(--muted); background: transparent; border: 0; border-radius: 12px;
+  cursor: var(--cursor-pointer); touch-action: manipulation;
+}
+.star-btn .icon { width: 1.4rem; height: 1.4rem; }
+.star-btn:hover:not(:disabled) { color: var(--stamina); background: var(--bg-glow); }
+.star-btn[aria-pressed="true"] { color: var(--stamina); }
+.star-btn[aria-pressed="true"] .icon { fill: currentColor; }
+.star-btn[aria-busy="true"] { opacity: 0.6; }
+.star-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.star-btn[hidden] { display: none; }
+.rival-identity .star-btn { margin: -10px 0 -10px -4px; }
 .rival .fight-btn { color: var(--on-primary); background: var(--primary); border: 0; box-shadow: var(--shadow-inset); }
 .rival .fight-btn:hover:not(:disabled) { background: var(--primary-hover); }
 .visit { margin-top: 1rem; padding: 1rem; border: 2px solid var(--pet); border-radius: var(--radius-sm); background: var(--surface); }
 .visit-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
 .visit-head h4 { margin: 0; overflow-wrap: anywhere; min-width: 0; flex: 1 1 12rem; }
 .visit-head .chip-btn { padding-inline: 0.75rem; }
+.visit-head .star-btn { margin-inline-start: -0.5rem; }
+/* Friends: starred players, online first. */
+.friends-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.friends-count { font-size: 0.8rem; font-weight: 700; color: var(--money); }
+.friends-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
+.friend {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 0.25rem 0.6rem;
+  padding: 0.35rem 0.4rem 0.35rem 0.75rem; border-radius: var(--radius-sm); background: var(--surface); border: 2px solid var(--border);
+}
+.friend-who { display: grid; min-width: 0; line-height: 1.3; }
+.friend-who b { overflow-wrap: anywhere; }
+.friend-status { font-size: 0.8rem; color: var(--muted); }
+.friend-status::before { content: ""; display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.3rem; border-radius: 50%; background: var(--border); vertical-align: 0.05em; }
+.friend-status[data-online="true"] { color: var(--money); font-weight: 700; }
+.friend-status[data-online="true"]::before { background: var(--money); }
+.friend .chip-btn { padding-inline: 0.9rem; }
+#friends-empty[hidden] { display: none; }
+#friend-add { margin-top: 0.75rem; }
 .visit-pet { display: flex; align-items: center; gap: 1rem; margin-block: 1rem; }
 .visit-pet .pet-touch { width: 100px; }
 .visit-pet .pet-touch .pet { height: 92px; }

@@ -252,3 +252,13 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS battle_watchers_by_battle ON battle_watchers (battle_id);
 `);
+// Players each player has starred as a friend. One-way and private: a row says
+// only that player_id starred friend_id. src/friends.ts caps each player's list.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS friends (
+    player_id TEXT NOT NULL REFERENCES accounts (id),
+    friend_id TEXT NOT NULL REFERENCES accounts (id),
+    at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (player_id, friend_id)
+  );
+`);

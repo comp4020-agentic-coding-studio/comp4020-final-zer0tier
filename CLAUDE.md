@@ -35,6 +35,9 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
 - Human opponents must be online to start Arena or revenge fights. Visits
   remain available whether the owner is home, elsewhere, or offline. Share
   saved character positions live between everyone in the same home or town.
+- Friends are one-way, private stars kept in the `friends` table. Only the
+  player who starred reads their list or hears `friends:updated`; online
+  status comes from presence, never a saved column.
 - Preserve the original sign-in and create-account theme and use its colors,
   typefaces, rounded controls, and light/dark appearance throughout the game.
   Scope world styles to the signed-in game rather than restyling account screens.
@@ -42,7 +45,7 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
   upper-left tip: W/A/S/D to move, Space bar to interact. Keep persistent
   dashboard, navigation, and stats panels out of both scenes. Reach activities
   through the pet, furniture, and town buildings; Escape opens the game menu
-  for pet details, appearance, supplies, the journal, help, and account controls.
+  for pet details, appearance, supplies, the journal, friends, help, and account controls.
   Show these windows only when requested and keep pet care at home.
 - While the pet works or studies, show a compact progress bar and time remaining
   on the town map. Keep it hidden at home and when the pet is idle, and use the

@@ -379,7 +379,7 @@ worldDialog.setAttribute('aria-labelledby', 'world-dialog-title');
 worldDialog.innerHTML = `<header class="place-heading"><div><p class="world-eyebrow" id="world-place-eyebrow">AROUND TOWN</p><h2 id="world-dialog-title"></h2></div><button type="button" class="world-button" id="world-dialog-close" aria-label="Close window">Close <span aria-hidden="true">×</span></button></header><p id="world-place-intro" class="place-intro"></p><div class="place-body"></div>`;
 document.body.append(worldDialog);
 const worldPanels = {};
-for (const name of ['school', 'work', 'shop', 'arena', 'journal', 'appearance', 'pet', 'menu', 'visit']) {
+for (const name of ['school', 'work', 'shop', 'arena', 'journal', 'friends', 'appearance', 'pet', 'menu', 'visit']) {
   const panel = document.createElement('section');
   panel.id = `world-panel-${name}`;
   panel.className = 'world-panel';
@@ -393,8 +393,9 @@ worldPanels.shop.append(original.supplies, original.adventure);
 worldPanels.arena.append(original.arena);
 worldPanels.visit.append(worldById('visit'));
 worldPanels.appearance.append(worldById('outfit-settings'), worldById('appearance-settings'));
+worldPanels.friends.append(worldById('friends'));
 worldPanels.pet.classList.add('world-companion');
-worldPanels.menu.innerHTML = '<p class="help">Take your time. Your pet and progress are saved.</p><p><a href="/readme/" target="_blank" rel="noopener">How to play</a></p><button type="button" class="world-button" id="world-pet-details" data-place="pet">Pet details</button> <button type="button" class="world-button" data-place="backpack">Backpack</button> <button type="button" class="world-button" data-place="journal">Town journal</button> <button type="button" class="world-button" data-place="appearance">Appearance</button>';
+worldPanels.menu.innerHTML = '<p class="help">Take your time. Your pet and progress are saved.</p><p><a href="/readme/" target="_blank" rel="noopener">How to play</a></p><button type="button" class="world-button" id="world-pet-details" data-place="pet">Pet details</button> <button type="button" class="world-button" data-place="backpack">Backpack</button> <button type="button" class="world-button" data-place="journal">Town journal</button> <button type="button" class="world-button" id="world-friends" data-place="friends">Friends</button> <button type="button" class="world-button" data-place="appearance">Appearance</button>';
 for (const selector of ['#world-pet-summary', '#home-interaction-label', '.home-care', '#home-care-hint', '#home-care-error', '#world-play', '#town-care-hint', '.companion-footer']) {
   worldPanels.pet.append(worldShell.querySelector(selector));
 }
@@ -428,6 +429,7 @@ const worldPlaces = {
   work: ['Part-time jobs', 'Find a shift that suits your pet. Build skills, earn money, and work your way up.'],
   arena: ['The town arena', 'Meet your neighbours, visit their pets, or challenge someone to a friendly rivalry.'],
   journal: ['Your town journal', 'Recent visitors, their notes, battles, town news, and any theft reports that need your attention.'],
+  friends: ['Your friends', 'Players you starred. See who is online, visit their homes, and invite them on adventures.'],
   appearance: ['A style of your own', 'Dress for your next stroll, or give your companion a new look.'],
   pet: ['Your companion', 'A little affection goes a long way. Play, care, or see how your pet is doing.'],
   menu: ['Make yourself at home', ''],
