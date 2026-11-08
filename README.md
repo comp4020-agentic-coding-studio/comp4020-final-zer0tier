@@ -70,3 +70,5 @@ things, so it can never be a lopsided trade.
   window live, and the Arena shows who else is playing.
 - QQ Pets (Tencent, 2005), the game this one is modelled on, and the
   [Final Project brief](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/assessments/final-project/).
+
+Music by Kevin MacLeod (CC BY 4.0): see [CREDITS.md](CREDITS.md) for every outside asset and its licence.

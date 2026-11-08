@@ -138,6 +138,8 @@ it('starts one quiet loop after a signed-in gesture and keeps music controls ins
     expect(credit.querySelector('a[href*="USUAN1600063"]')?.textContent).toBe('“Rainbows”');
     expect(credit.querySelector('a[href*="USUAN1900012"]')?.textContent).toBe('“Raving Energy (faster)”');
     expect(credit.querySelector('a[href="https://creativecommons.org/licenses/by/4.0/"]')?.textContent).toBe('CC BY 4.0');
+    // CC BY 4.0 asks that changes be stated: the files were only re-encoded.
+    expect(credit.textContent).toContain('re-encoded smaller, otherwise unchanged');
     p.$('world-dialog-close').click();
     // Normal server renders can set hidden=false repeatedly.
     p.$('dashboard').hidden = false;

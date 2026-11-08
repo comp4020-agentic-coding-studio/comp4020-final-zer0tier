@@ -30,7 +30,7 @@ musicControls.innerHTML = `
     Home &amp; town: <a href="https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600063" target="_blank" rel="noopener noreferrer">“Rainbows”</a>.<br>
     Battles: <a href="https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900012" target="_blank" rel="noopener noreferrer">“Raving Energy (faster)”</a>.<br>
     Both by <a href="https://incompetech.com/" target="_blank" rel="noopener noreferrer">Kevin MacLeod</a>.<br>
-    Licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.<br>
+    Licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>; re-encoded smaller, otherwise unchanged.<br>
     Thank you, Kevin, for sharing your music.
   </p>`;
 document.getElementById('world-panel-menu').append(musicControls);

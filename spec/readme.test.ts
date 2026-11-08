@@ -16,6 +16,9 @@ it("serves README.md rendered as HTML at /readme/", async () => {
 it("serves docs/GUIDE.md rendered at /guide/, linked both ways with /readme/", async () => {
   const readme = await (await fetch(new URL("/readme/", baseUrl))).text();
   expect(readme).toContain('href="/guide/"');
+  // The credits link must work from /readme/, not only on GitHub.
+  expect(readme).toContain('href="https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/blob/main/CREDITS.md"');
+  expect(readme).not.toContain('href="CREDITS.md"');
   const res = await fetch(new URL("/guide/", baseUrl));
   expect(res.status).toBe(200);
   expect(res.headers.get("content-type")).toMatch(/text\/html/);

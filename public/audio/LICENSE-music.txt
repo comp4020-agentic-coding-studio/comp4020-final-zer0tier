@@ -1,0 +1,24 @@
+Music licence
+
+rainbows.mp3 and raving-energy-faster.mp3 are by Kevin MacLeod
+(incompetech.com) and are used under the Creative Commons Attribution 4.0
+International licence (CC BY 4.0). Incompetech supplies no licence file with
+its downloads; this is the attribution notice the artist supplies, with the
+changes VirtuePets made, as the licence requires.
+
+"Rainbows" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+http://creativecommons.org/licenses/by/4.0/
+Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600063
+
+"Raving Energy (faster)" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+http://creativecommons.org/licenses/by/4.0/
+Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900012
+
+Changes: both files were re-encoded from the supplied MP3s to 128 kbps MP3 so
+they download faster on phones. Nothing was edited, trimmed, sped up, or
+otherwise changed. Kevin MacLeod does not endorse VirtuePets.
+
+Full licence: https://creativecommons.org/licenses/by/4.0/legalcode
+Credits for every outside asset: CREDITS.md in the repository root.

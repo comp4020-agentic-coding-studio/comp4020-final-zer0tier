@@ -72,7 +72,11 @@ function markdownPage(file: string, title: string, fix: (html: string) => string
   };
 }
 // The repo's relative links between the two files become the served pages' links.
-app.get("/readme/", markdownPage("README.md", "README", html => html.replaceAll('href="docs/GUIDE.md', 'href="/guide/')));
+// CREDITS.md isn't served by the app, so its link goes to the public repo's copy.
+const CREDITS_URL = "https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/blob/main/CREDITS.md";
+app.get("/readme/", markdownPage("README.md", "README", html => html
+  .replaceAll('href="docs/GUIDE.md', 'href="/guide/')
+  .replaceAll('href="CREDITS.md"', `href="${CREDITS_URL}"`)));
 app.get("/guide/", markdownPage("docs/GUIDE.md", "Guide", html => html.replaceAll('href="../README.md', 'href="/readme/')));
 
 // On Fly, its proxy names the real client in Fly-Client-IP (and overwrites
