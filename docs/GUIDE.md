@@ -388,7 +388,12 @@ get its new needs within a second of you connecting. That gives neighbours'
 **Feed** and **Clean** more to do while you're gone. The pet window says how it
 works only while it's on. It ships off, so live players are unaffected until a
 play-test switches it on: set `NEEDS_DECAY=on` (see `fly.toml`), and unset it to
-switch it off again, with no code change.
+switch it off again, with no code change. **Not ready to switch on yet:** a
+review found three ways it can take too much, all fixed only by more work in
+`src/needs.ts` and `src/pets.ts`: using an Hourglass counts the away time twice;
+a battle saving a pet after one of its refused actions can lose or skip owed
+time; and after a restart, time a player spent online counts as away, because
+the restart never saw them leave. With it off, none of these can happen.
 
 ### Work
 
@@ -1072,8 +1077,12 @@ a team. The finished-run panel offers **Team up** for later adventures.
   marked *Asked to join*, where the leader chooses **Let in** or **Turn down**.
   Let in, you're on the team as if you'd accepted an invitation, and your visit
   says so. A request counts toward the 4-pet limit and lapses if the team sets
-  off without answering. You can't ask an offline host, a full team, or someone
-  who isn't forming a team.
+  off without answering. You can ask more than one host; each answer reaches
+  you, as a notice if you've walked away. A pet joins one team at a time, so
+  joining a team, or starting your own, withdraws your other requests, and
+  those hosts' windows update. If the host disbands instead, you're told they
+  stopped getting a team together. You can't ask an offline host, a full team,
+  or someone who isn't forming a team.
 - **Set off together** (leader only) needs at least one other pet to have
   joined, and every joined pet to be ready. Each pet is checked the way
   a new adventure would check it: no run in progress (end it first), no

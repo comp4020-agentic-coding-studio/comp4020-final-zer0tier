@@ -112,3 +112,17 @@ it('costs nothing while the owner is online', () => {
   now += 5 * HOUR;
   expect(pets.freshenNeeds(id)).toMatchObject({ stamina: 90, hygiene: 90 });
 });
+
+it('does no database work on arriving or leaving while decay is off', async () => {
+  vi.resetModules();
+  vi.stubEnv('NEEDS_DECAY', '');
+  const offPets = await import('../src/pets.ts');
+  const { db: offDb } = await import('../src/db.ts');
+  const spy = vi.spyOn(offDb, 'prepare');
+  const calls = spy.mock.calls.length;
+  expect(offPets.freshenNeeds('anyone-at-all')).toBeUndefined();
+  // Not even a transaction: presence changes cost nothing with decay off.
+  expect(spy.mock.calls.length).toBe(calls);
+  spy.mockRestore();
+  vi.stubEnv('NEEDS_DECAY', 'on');
+});

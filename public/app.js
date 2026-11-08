@@ -1089,7 +1089,7 @@ async function giveGift(choice) {
 // Asking to join the adventure team your host is getting together. The host
 // answers from their Team up window; their team:updated tells us the result.
 let asking = false; // an ask request is in flight
-let askedHost = null; // the host this window last asked, until their answer
+const askedHosts = new Set(); // hosts this window has asked, until each answers
 function renderJoinControls() {
   const pet = rivals.get(visiting);
   if (!pet || !rules || !current) return;
@@ -1097,12 +1097,12 @@ function renderJoinControls() {
   const online = onlinePlayers.has(pet.id);
   const button = $("visit-ask-join");
   $("visit-join").hidden = bot;
-  button.textContent = asking ? "Asking…" : askedHost === pet.id ? "Asked" : "Ask to join";
-  button.disabled = asking || askedHost === pet.id || !online;
+  button.textContent = asking ? "Asking…" : askedHosts.has(pet.id) ? "Asked" : "Ask to join";
+  button.disabled = asking || askedHosts.has(pet.id) || !online;
   button.setAttribute("aria-busy", String(asking));
   $("visit-join-hint").textContent = !online
     ? `${pet.id} is offline. You can ask to join their adventure when they're online.`
-    : askedHost === pet.id ? `Waiting for ${pet.id} to answer in their Team up window.`
+    : askedHosts.has(pet.id) ? `Waiting for ${pet.id} to answer in their Team up window.`
     : `If ${pet.id} is getting an adventure team together, ask to come along.`;
 }
 async function askToJoin() {
@@ -1119,7 +1119,7 @@ async function askToJoin() {
     const body = await res.json().catch(() => ({}));
     if (current?.id !== owner || visit !== visitLoads) return;
     if (!res.ok) { $("visit-join-error").textContent = body.error ?? `Couldn't reach ${host}. Try again.`; return; }
-    askedHost = host;
+    askedHosts.add(host);
     $("visit-join-news").textContent = `You asked to join ${host}'s adventure.`;
   } catch {
     if (current?.id === owner && visit === visitLoads) $("visit-join-error").textContent = `Couldn't reach ${host}. Try again.`;
@@ -1130,11 +1130,12 @@ async function askToJoin() {
 $("visit-ask-join").addEventListener("click", askToJoin);
 // The host let us in or turned us down: their saved team says which.
 document.addEventListener("team:updated", ({ detail: team }) => {
-  if (!current || !askedHost || team?.leader !== askedHost) return;
+  // Each host we asked answers on their own team; any of them can be news.
+  if (!current || !team || !askedHosts.has(team.leader)) return;
   const me = team.members.find((m) => m.id === current.id);
   if (me?.requested) return;
-  const host = askedHost;
-  askedHost = null;
+  const host = team.leader;
+  askedHosts.delete(host);
   const news = me?.joined
     ? `${host} let you in! Open Adventure to see your team.`
     : team.status === "forming" ? `${host} can't take you this time.`
@@ -1836,6 +1837,9 @@ function clearThefts() {
   // seat when this login's windows close.
   watchingBattle = null;
   joiningStands = null;
+  // A new login hasn't asked anyone to join yet.
+  askedHosts.clear();
+  asking = false;
   liveFights = new Map();
   arrivingFights.clear();
   $("arena-live").hidden = true;

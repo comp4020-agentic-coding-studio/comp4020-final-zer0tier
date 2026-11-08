@@ -87,10 +87,14 @@ export function invite(id: string, other: string): TeamOutcome {
     if (typeof teamId !== 'number') return teamId;
     const already = read(teamId).members;
     const member = already.find(m => m.id === other);
-    if (member) return refuse(`${other} is already ${member.joined ? 'on your team' : 'invited'}.`);
+    if (member) {
+      return refuse(member.requested ? `${other} already asked to join. Let them in from your team.`
+        : `${other} is already ${member.joined ? 'on your team' : 'invited'}.`);
+    }
     if (already.length >= TEAM_SIZE) return refuse(`A team holds at most ${TEAM_SIZE} pets, invitations included.`);
     db.prepare('INSERT INTO team_members (team_id, player_id, joined) VALUES (?, ?, 0)').run(teamId, other);
-    return { team: read(teamId) };
+    // Leading a team of your own withdraws your requests to join anyone else's.
+    return { team: read(teamId), withdrawn: withdrawRequests(id, teamId) };
   });
 }
 

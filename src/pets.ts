@@ -398,11 +398,11 @@ export function settle(id: string, endedAt = 0): { pet: Pet; finished: boolean }
 // them only if they changed (an activity that ended on the way is paid out
 // too). Returns the pet if anything was saved, for the caller to broadcast.
 export function freshenNeeds(id: string): Pet | undefined {
-  if (id === BOT_ID) return undefined;
+  // With decay off (production), arriving and leaving touch nothing at all.
+  if (id === BOT_ID || !NEEDS_DECAY.enabled) return undefined;
   return transaction(() => {
     const pet = getPet(id);
     if (!pet) return undefined;
-    if (!NEEDS_DECAY.enabled) return undefined;
     const before = { stamina: pet.stamina, hygiene: pet.hygiene, needsAt: needsAtOf(id) };
     const finished = finishIfDue(pet, Date.now());
     const changed = finished || before.stamina !== pet.stamina || before.hygiene !== pet.hygiene;

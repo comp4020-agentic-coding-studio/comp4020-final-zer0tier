@@ -107,3 +107,18 @@ it("joining a team withdraws the player's requests to join others, so no leader 
   expect((await (await team(hostA)).json()).team.members.some((m: any) => m.id === visitor)).toBe(false);
   expect((await team(hostA, { action: 'answer', player: visitor, accept: true })).status).toBe(404);
 });
+
+it("starting your own team withdraws your requests to join others, and inviting someone who asked points to Let in", async () => {
+  const hostA = freshId(), mateA = freshId(), visitor = freshId(), friend = freshId();
+  for (const id of [hostA, mateA, visitor, friend]) await signUp(id);
+  await team(hostA, { action: 'invite', player: mateA });
+  expect((await team(visitor, { action: 'ask', player: hostA })).status).toBe(200);
+  // The leader invites someone who already asked: Let in is the way.
+  const already = await team(hostA, { action: 'invite', player: visitor });
+  expect(already.status).toBe(409);
+  expect((await already.json()).error).toBe(`${visitor} already asked to join. Let them in from your team.`);
+  // The visitor starts a team of their own by inviting a friend instead.
+  expect((await team(visitor, { action: 'invite', player: friend })).status).toBe(200);
+  // A's leader no longer sees a request they could never let in.
+  expect((await (await team(hostA)).json()).team.members.some((m: any) => m.id === visitor)).toBe(false);
+});
