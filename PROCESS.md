@@ -44,11 +44,10 @@ Before any game code I wrote `CLAUDE.md`
 Every rule follows from one 256 MB Fly machine with one volume:
 
 - **One process and one SQLite file.** `DatabaseSync` is synchronous, so a
-  request reads a pet, applies a rule and writes it back with nothing
-  interleaving, which made costs, refusals and two-pet fights simple to get
-  right. The obvious alternative, Postgres, is a second Fly app outside the
-  course setup; the cost is that this can't scale past one machine, which, as
-  above, a game for a room of friends doesn't need.
+  request reads, applies a rule and writes with nothing interleaving, which
+  made two-pet fights simple to get right. Postgres would be a second Fly app
+  outside the course setup; the cost is one machine, which a room of friends
+  doesn't outgrow.
 - **WebSockets one way.** Players act over HTTP; the socket only carries news,
   and the database is the only source of truth, so two windows can't disagree.
   I tried polling for live battles and replaced it; why WebSockets beat polling
@@ -57,9 +56,9 @@ Every rule follows from one 256 MB Fly machine with one volume:
 - **No front-end framework or build step.** Less to fit in 256 MB, but
   `public/app.js` has grown the largest.
 
-The rule that carries the most weight is that every real-time event needs a
-spec that opens real WebSockets and sees it arrive within a second. `spec/`
-grew with each feature, and a change is done only when `pnpm check` is green.
+The rule carrying the most weight: every real-time event needs a spec that sees
+it reach real WebSockets within a second, and a change is done only when
+`pnpm check` is green.
 
 ## How I directed the agent
 
@@ -85,13 +84,21 @@ a weekly town goal where every pet fed counts for the whole town
 ([`9daa5be`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/9daa5be)),
 and asking to join a friend's adventure from their home
 ([`39d44f2`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/39d44f2)).
-A review of that last feature caught a request that could go stale when the
-asker joined another team; joining now withdraws it, with a spec that fails
-without the fix
+A review caught a request in it that could go stale; joining now withdraws it
 ([`4607291`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4607291)).
 Needs that drop while you're away went in **switched off**
 ([`0d639e8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0d639e8)),
 waiting for a play-test rather than shipping on a guess.
+
+Playing it myself on the last morning found what 750 green specs had missed,
+all in my own definition of good. After a first adventure you could
+only ever go solo, so a host could never invite anyone
+([`bc059a2`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/bc059a2));
+visitors could walk out of a friend's home
+([`c1d00e0`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/c1d00e0));
+and when a leader set off, teammates who'd closed Team up were left behind
+([`5772ebd`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/5772ebd)).
+Each fix came with a spec that fails without it, checked in real browsers.
 
 ## Corrections, and where they landed
 
@@ -100,9 +107,8 @@ I aimed for every fix to land in the harness rather than as a retry:
 - A review found one malformed WebSocket frame crashed the server. The agent
   reproduced the crash first, and a spec now sends that frame
   ([`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f)).
-- New players went missing from the Arena. A flaky test showed WSL's clock
-  jumping backwards, so the Arena orders by insertion, and activities finish on
-  time despite a jump, shown by simulating it against old and new code
+- New players went missing from the Arena because WSL's clock jumped
+  backwards; the Arena now orders by insertion, shown against old and new code
   ([`204a74b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/204a74b)).
 - Several new tests passed without testing anything: their checks sat inside
   `if` branches that never ran. Rewriting them to fail when the behaviour is
