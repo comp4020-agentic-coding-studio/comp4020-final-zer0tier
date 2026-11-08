@@ -4,6 +4,32 @@ A multiplayer virtual pet game (see README.md for what good means, and
 docs/GUIDE.md for every rule and the API). It runs on one Fly.io machine
 with 256 MB of memory and one volume at `/data`. Every rule here follows from that.
 
+## What good means, as rules
+
+The README's definition: **good means the game is interactable with the other
+people playing it.** A feature earns its place only if what one player does
+reaches another player, or what another does reaches them. Hold every change to
+these, each enforced in `spec/`:
+
+- **Act only as your own pet.** Every action on another pet is done by the
+  signed-in player's own pet, checked by session (401/403) and logged by player
+  (`spec/pets.test.ts`, `spec/touch.test.ts`).
+- **A visitor can help, never harm what someone else owns.** Feeding, cleaning
+  and gifts spend only the visitor's own things and can only add to the other
+  pet; theft is capped and once a day (`spec/help.test.ts`, `spec/gift.test.ts`,
+  `spec/steal.test.ts`).
+- **The other person sees it within a second.** Anything that changes another
+  player's view is broadcast after it's saved (Rule 2 below;
+  `spec/realtime.test.ts`, `spec/watch.test.ts`).
+- **Private stays private.** One player's own business (a solo Adventure run,
+  theft reports, a guestbook, a friends list) reaches only them
+  (`spec/notes.test.ts`, `spec/friends.test.ts`).
+- **Fair, so playing together stays fun.** Published fight rules, a bot at the
+  median player, and no draining a weaker pet (`spec/fight.test.ts`).
+
+Before building a feature, ask which player it reaches. If the answer is only
+the one doing it, raise that with the owner instead of building it.
+
 ## Working with the owner
 
 - Read this file before starting each task, changing direction, or making
