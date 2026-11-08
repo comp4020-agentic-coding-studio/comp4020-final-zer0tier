@@ -55,19 +55,25 @@ app.use(((err, _req, res, next) => {
   next(err);
 }) as express.ErrorRequestHandler);
 
-// Rendered on each request so the page never lags behind README.md.
-app.get("/readme/", (_req, res) => {
-  const body = marked.parse(readFileSync("README.md", "utf8"), { async: false });
-  res.type("html").send(`<!doctype html>
+// Rendered on each request so the page never lags behind its markdown.
+// /readme/ is the argument for what good means; /guide/ is every rule and the API.
+function markdownPage(file: string, title: string, fix: (html: string) => string = html => html) {
+  return (_req: express.Request, res: express.Response) => {
+    const body = fix(marked.parse(readFileSync(file, "utf8"), { async: false }));
+    res.type("html").send(`<!doctype html>
 <html lang="en-AU">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>VirtuePets — README</title>
+    <title>VirtuePets — ${title}</title>
   </head>
   <body><main>${body}</main></body>
 </html>`);
-});
+  };
+}
+// The repo's relative links between the two files become the served pages' links.
+app.get("/readme/", markdownPage("README.md", "README", html => html.replaceAll('href="docs/GUIDE.md', 'href="/guide/')));
+app.get("/guide/", markdownPage("docs/GUIDE.md", "Guide", html => html.replaceAll('href="../README.md', 'href="/readme/')));
 
 // On Fly, its proxy names the real client in Fly-Client-IP (and overwrites
 // any the client sent). Anywhere else that header could be forged, so the

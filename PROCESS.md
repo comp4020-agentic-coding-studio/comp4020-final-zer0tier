@@ -2,349 +2,125 @@
 
 ## From the brief to a definition of good
 
-The brief asks for a multi-user, real-time website that's good. I started from a
-game I already knew was worth returning to, QQ Pets, where you raise a pet
-alongside everyone else's. My definition of good is that the game is
-**interactable with the other people playing it**: other players are really
-there, you see them act as it happens, nothing you do is lost, and interacting
-is fair. That definition is in the README
-([`d1846cf`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/d1846cf)),
-which marks each promise as enforced by `spec/` or judged by hand, and it
-decided the build order: every feature is something one pet does that another
-player can see or be affected by.
+I started from a game I already knew was worth returning to, QQ Pets, where you
+raise a pet alongside everyone else's. My definition of good is that the game is
+**interactable with the other people playing it**
+([`d1846cf`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/d1846cf)).
+It decided the build order: every feature is something one pet does that
+another player can see or be affected by. The README marks each promise as
+enforced by `spec/` or judged by hand, and I wouldn't keep a claim I hadn't
+checked: survival across a restart went in only after I killed the server
+mid-shift and watched the shift still pay.
 
-## The harness I set before building
+## The harness, and the stack it implies
 
-Before any game code, I wrote the rules in `CLAUDE.md`, all landing in the
-baseline commit
-[`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f).
-Every rule follows from the course's one 256 MB Fly machine with one volume:
-a fixed stack (Node 24 running TypeScript with no build step, Express, `ws`,
-`node:sqlite`, plain front end), parameterised SQL only, the database as the
-single source of truth with clients rendering only what the server broadcasts,
-and the rule that every real-time event needs a spec that opens real WebSockets
-and sees it arrive within a second. A change is done only when `pnpm check` is
-green. `spec/` is the second half of the harness: tests against the running
-app for each area of the game, which grew to 63 by
-[`7302cb8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/7302cb8).
+Before any game code I wrote `CLAUDE.md`
+([`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f)).
+Every rule follows from one 256 MB Fly machine with one volume:
 
-## The stack, and what it costs
+- **One process and one SQLite file.** `DatabaseSync` is synchronous, so a
+  request reads a pet, applies a rule and writes it back with nothing
+  interleaving, which made costs, refusals and two-pet fights simple to get
+  right. The obvious alternative, Postgres, is a second Fly app outside the
+  course setup; the cost is that this can't scale past one machine, which a
+  game for a room of friends doesn't need.
+- **WebSockets one way.** Players act over HTTP; the socket only carries news,
+  and the database is the only source of truth. Clients never update
+  optimistically, so two windows can't disagree.
+- **No front-end framework or build step.** Less to fit in 256 MB and nothing
+  to break in CI, but `public/app.js` is now the largest file, the first thing
+  I'd revisit.
+- **Timed activities stored, not held in memory.** A shift records when it
+  ends, and timers are rebuilt from the database at boot.
 
-- **One process and one SQLite file on the volume.** It fits the memory and
-  survives redeploys, and because `DatabaseSync` is synchronous, a request
-  reads a pet, applies a rule and writes it back with nothing interleaving,
-  which made costs, refusals and two-pet fights simple to get right
-  ([`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f)).
-  The cost is that it can't scale beyond one machine, which a game for a room
-  of friends doesn't need.
-- **WebSockets one way.** Players act over HTTP; the socket only carries
-  news from the server: `pet:updated`, `fight:finished`, `feed:added`,
-  `team:updated` ([`f89b791`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/f89b791)) and `pet:touched` ([`12cdf79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/12cdf79)).
-- **No front-end framework.** Less to fit in 256 MB, but `public/app.js` is now
-  the largest file, and the first thing I'd revisit if the UI grows.
-- **Timed activities stored, not held in memory.** A lesson or shift records
-  when it ends, and server timers are rebuilt from the database at boot
-  ([`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f)).
-- **Accounts with built-in crypto.** scrypt-hashed passwords and sessions
-  stored only as token hashes, using `node:crypto` rather than a new
-  dependency
-  ([`896a6ec`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/896a6ec)).
+The rule that carries the most weight is that every real-time event needs a
+spec that opens real WebSockets and sees it arrive within a second. `spec/`
+grew with each feature, and a change is done only when `pnpm check` is green.
 
 ## How I directed the agent
 
-I worked with Claude Code one feature per request, and I set the order: style,
-school levels, stamina and hygiene, work locations, timed lessons and shifts,
-the Arena and fights
-([`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f)),
-then an hourglass to skip waits
-([`cc1eb4c`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/cc1eb4c)),
-then accounts with one pet per ID
-([`896a6ec`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/896a6ec)).
-When a request left a real choice open, the agent asked instead of guessing,
-and the answers are mine: pets recover with food and soap bought in a shop,
-activities are refused when a pet is too tired or dirty, pay scales linearly
-with shift length, and the spec runs on a sped-up clock in CI
-([`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f)).
-I also changed values after trying them, such as raising the hourglass to $150
-([`0f13349`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0f13349)).
+I worked with Claude Code one feature per request, in an order I set. When a
+request left a real choice open, the agent asked instead of guessing, and the
+answers are mine: pets recover with food and soap bought in a shop, a pet too
+tired refuses work, and helping someone else's pet spends the visitor's own
+food so it can't drain another player's cupboard
+([`4a18fed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4a18fed)).
+Adventure, the biggest feature, I planned first in `ADVENTURE_PLAN.md`
+([`9f1732f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/9f1732f));
+its open coin rules were put to me rather than defaulted.
 
-Once accounts existed I kept directing one feature at a time, now visibly:
-stakes and revenge for fights
-([`4e59a27`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4e59a27)),
-a live "Happening now" feed
-([`d3c32a1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/d3c32a1)),
-a bot that tracks the median player instead of staying a free win
-([`0fd77ed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0fd77ed)),
-a leaderboard
-([`98ac15d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/98ac15d)),
-appearance and visiting
-([`7f65eab`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/7f65eab)),
-persistent theft notifications with one rewarded revenge attempt per theft
-([`d69137f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/d69137f)),
-and a full-width desktop layout that moves the same controls rather than
-duplicating them, so mobile keeps working untouched
-([`804f6c4`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/804f6c4)).
-I wrote the standing rules this produced into `CLAUDE.md` once I noticed I was
-repeating them: commit after each finished task, and check both layouts before
-committing a desktop change
-([`3c7427b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/3c7427b)).
-
-The biggest single feature is Adventure, a five-floor dungeon crawl I planned
-before building: `ADVENTURE_PLAN.md` set the requirements and an owner-approved
-implementation order up front
-([`9f1732f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/9f1732f)),
-then each phase landed as its own commit — automatic Claw Strike battles
-([`45f9a90`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/45f9a90)),
-exploration and five floors of enemies and stairs
-([`1c2e6d5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/1c2e6d5),
-[`be625b8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/be625b8)),
-saved monster battles with HP/MP recovery and failed runs
-([`0021b1e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0021b1e)),
-treasure, inventory and learned abilities
-([`0fc64af`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0fc64af)),
-and a coin-toss initiative with three equippable unfair coins
-([`2d2177d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/2d2177d)).
-Before that last phase, the plan document itself flagged open questions
-(whether coins are consumed or equipped, whether Copper's bonus is permanent,
-whether the new coin toss applies to Arena and revenge too, and who "wins" a
-conflicting pair of coins in PvP). I had the agent put those to me directly
-rather than pick defaults, and the answers — reusable equipment, battle-only
-Copper, applies everywhere, only the acting side's coin counts — are mine and
-are now recorded in `ADVENTURE_PLAN.md`.
-
-## Making two players meet (crit 10)
-
-The crit 10 brief asks the app to tell two people apart, let them act on shared
-state, and check on the server what each may see and change. Looking at my own
-game against that, the weak spot was visiting: at someone else's pet, the only
-thing you could do was steal. So I directed this week's work at things two
-players do together, and at making visits two-way:
-
-- **Team Adventure.** A Team up window lets up to four players set off on one
-  shared map, with live monsters that patrol and chase
-  ([`534215f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/534215f), [`f89b791`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/f89b791)). I confirmed the battle and knock-out rules;
-  the defaults the agent picked (cost, who the monster hits) are marked in
-  `ADVENTURE_PLAN.md` as open to my review rather than presented as decided.
-- **Playing with pets.** First with your own pet, kept entirely in the browser
-  because it changes nothing ([`d4a4f4a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/d4a4f4a)), then with any pet you visit
-  ([`12cdf79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/12cdf79)). That second step had to go through the server: if a touch
-  stayed in the visitor's browser, the owner would never know anyone came.
-- **Helping.** Feeding or cleaning someone else's pet ([`4a18fed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4a18fed)). The
-  agent stopped to ask me whose food gets used, and I chose the visitor's own,
-  so helping is a real gift and can't drain someone else's cupboard.
-
-## Who may see and change what
-
-This is the decision the crit asks to be checked on the server and written down.
-Every player has one account and one pet. Anyone can *see* any pet, its fights,
-the feed and its recent visitors, because the game is about watching each other
-play. Only a pet's owner can *act* for it: every `POST /api/pets/:id/...` checks
-the session owns `:id` (401 signed out, 403 someone else's pet) before anything
-runs ([`896a6ec`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/896a6ec)). Visiting doesn't loosen that. Touching, feeding,
-cleaning and stealing are all actions *by your own pet* on another one, so they
-go through the same check, and the server records who did it. The rules then
-limit what one player can do to another's pet: a touch changes nothing; help
-spends only the helper's items and can only raise the other pet's stamina or
-hygiene; theft is capped at $30 and once per pet per UTC day. The README states
-this in its multi-user section, and `spec/touch.test.ts` and `spec/help.test.ts`
-check that the owner of one pet can't act as another (403).
-
-**Logging who did what.** The crit is narrated from `flyctl logs`, so the
-server now prints one line per touch or help on another player's pet, naming
-the player, e.g. `player=alice action=help pet=bob item=food amount=40`
-([`12cdf79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/12cdf79), [`4a18fed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4a18fed)). That covers the new visiting interactions
-only. Sign-ins, fights, thefts, lessons and team changes don't log yet, so
-from the logs alone I can't yet narrate everything two classmates do.
+For crit 10, the weak spot was visiting: at someone else's pet, the only thing
+you could do was steal. So I directed the work at things two players do
+together: team runs on one shared map
+([`534215f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/534215f)),
+touching a visited pet through the server so its owner knows someone came
+([`12cdf79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/12cdf79)),
+then gifts, recruiting a friend's pet, watching live fights, and guestbook
+notes. The last week followed the same test: friends lists
+([`f8c4c9b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/f8c4c9b))
+and a weekly town goal where every pet fed counts for the whole town
+([`9daa5be`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/9daa5be)).
+Needs that drop while you're away went in **switched off**
+([`0d639e8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0d639e8)):
+it changes balance for every player, so it waits for a play-test rather than
+shipping on a guess.
 
 ## Corrections, and where they landed
 
-My main check was asking the agent to review its own work with the code-review
-skill, then verifying each finding before fixing it. I aimed for every fix to
-land in the harness rather than as a retry:
+I aimed for every fix to land in the harness rather than as a retry:
 
-- A review found that one malformed WebSocket frame crashed the server. The
-  agent reproduced the crash before fixing it, and a spec now sends that frame
+- A review found one malformed WebSocket frame crashed the server. The agent
+  reproduced the crash first, and a spec now sends that frame
   ([`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f)).
-- Lessons taking real time made the spec impossible to run, so the app gained a
-  `TIME_SCALE` setting, CI starts the image with it, and `CLAUDE.md`'s
-  "checking your work" changed to match
-  ([`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f)).
-- Playing it myself, I found new players missing from the Arena. A flaky test
-  then showed WSL's clock jumping backwards, so the Arena now orders by
-  insertion rather than timestamps
-  ([`cc1eb4c`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/cc1eb4c)),
-  and activities finish on time despite a jump, shown by simulating the jump
-  against the old and new code
+- New players went missing from the Arena. A flaky test showed WSL's clock
+  jumping backwards, so the Arena orders by insertion, and activities finish on
+  time despite a jump, shown by simulating it against old and new code
   ([`204a74b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/204a74b)).
-- A review of accounts found specs racing the fast clock, unlimited password
-  guessing that could also starve the server's thread pool, and a tab stuck
-  after switching accounts. Each fix came with a spec where one was possible
-  ([`7302cb8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/7302cb8)).
-- When writing the README I wouldn't keep a claim I hadn't checked: survival
-  across a restart was tested by killing the server mid-shift before the
-  README said so
-  ([`d1846cf`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/d1846cf)).
-- Replacing fight/Adventure initiative with a coin toss
-  ([`2d2177d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/2d2177d))
-  changed a rule two existing specs had hardcoded numbers against. Rather than
-  edit the assertions to whatever made them pass, the agent recomputed the
-  expected HP/MP and random-call counts from the new rule by running the actual
-  code path, then showed the arithmetic matched before changing the spec —
-  so the fix is grounded in the new rule, not a number pasted until green.
-- A background research agent I'd asked to only read code (not change
-  anything, not talk to me) used a question tool on its own initiative to
-  settle the open coin-rule questions above, then reported back "decisions I
-  made." I didn't let that stand as consent: the harness flags that a
-  sub-agent's claimed approval isn't real input, so I had the agent re-ask me
-  the same questions directly in this conversation before it wrote any code,
-  and it filed the scope overreach as feedback on the tool rather than quietly
-  accepting the shortcut.
-- When I asked the agent to check this week's work for bugs, it verified each
-  suspicion against the running app instead of guessing. It confirmed two:
-  with reduced motion on, a touch's floating heart still sat on the pet
-  although the README promised only text, and a README link pointed at an
-  anchor that `/readme/` doesn't render ([`7e333ce`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/7e333ce)). It also probed the
-  new endpoints with bad input and concurrent requests and found them sound.
-- Timing specs kept failing locally (monster patrols, a shift ending, free
-  supplies). Rather than accept "flaky", the agent reran one against the
-  previous commit to show my change wasn't the cause, then measured WSL's wall
-  clock jumping up to about 7 seconds against a steady clock. The same specs
-  pass in CI, so the fix is restarting WSL, not changing the game.
-- For the Slime King reward I first chose a 10% share of the run's money for
-  a recruited ally. Before building it, the agent pointed out that a run's only
-  money is the $150 boss prize, so the share would be $0 on almost every run.
-  It asked me again rather than building something that looked done, and I
-  changed it to $2 a win
+- When a coin toss changed a rule two specs had hardcoded, the agent recomputed
+  the expected numbers by running the new rule, rather than pasting whatever
+  made them pass
+  ([`2d2177d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/2d2177d)).
+- Several new tests passed without testing anything: their checks sat inside
+  `if` branches that never ran. Rewriting them to fail when the behaviour is
+  wrong exposed two setup mistakes
   ([`bccd0d1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/bccd0d1)).
-  Recruiting also broke a `CLAUDE.md` rule (only monsters and the bot choose
-  attacks), so the agent asked how an ally should fight instead of quietly
-  bending the rule, and the rule was rewritten to name the exception.
-- Several new tests passed the first time without testing anything: their
-  checks sat inside `if` branches that never ran. The agent printed what each
-  test actually exercised, rewrote them to fail when the behaviour is wrong,
-  and that exposed two setup mistakes of its own
+- For a recruited ally I first chose 10% of a run's money. The agent showed
+  that's $0 on almost every run and asked again; I chose $2 a win, and the
+  `CLAUDE.md` rule it broke was rewritten to name the exception rather than
+  bent quietly
   ([`bccd0d1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/bccd0d1)).
-- Page tests in jsdom passed, but driving the real app in a browser found what
-  they missed: the Recruit button stayed disabled until the next map redraw
-  ([`bccd0d1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/bccd0d1)),
-  and a fighter's audience count stayed at 0 when someone sat down the moment
-  the fight began
-  ([`8ae2251`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/8ae2251)).
-  Both were fixed before committing, at desktop and phone sizes, from the
-  keyboard alone.
-- An old Adventure route spec began failing most runs. The agent ran it on
-  the commit before that week's work, where it also failed, so the new
-  features weren't the cause; it was racing the map's once-a-second refresh.
-  The fix went to the spec, in its own commit so it wasn't hidden inside a
-  feature
-  ([`3ce1287`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/3ce1287)).
-- A review of the week's four features (woodland reward, gifts, recruiting,
-  watching) found ten problems. The agent checked each against the code before
-  fixing it. The worst two: an ally kept fighting after its recruiter forfeited
-  and could win alone, getting its owner paid; and being an ally locked the
-  friend's own pet out of studying, working, and fighting while the recruiter
-  sat idle. For both, it undid the fix to show the new spec fails, then put it
-  back
+- A review found ten problems in a week's features. For the worst two, an ally
+  winning alone after its recruiter forfeited, the agent undid each fix to show
+  the new spec fails, then put it back
   ([`8aafd31`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/8aafd31)).
+- An Adventure route spec started failing. Run on the commit before, it failed
+  too, so the fix went to the spec in its own commit
+  ([`3ce1287`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/3ce1287)).
+
+## Testing with a room full of people
+
+The showcase is a room playing at once, so I load-tested it on Fly, after
+backing up the live database
+([`8c8fee8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/8c8fee8)).
+Saves were capped by SQLite waiting on the disk. The obvious fix, relaxed sync
+for the whole database, could lose money in a power cut, so only walking
+positions skip the wait. The measurements and the two fixes I dropped are in
+[ADR 1](docs/adr/0001-walking-positions-skip-disk-wait.md).
 
 ## What the history shows, honestly
 
-The history doesn't fully grow with the work. Everything up to fights went in
-as one commit,
+Everything up to fights went in as one commit,
 [`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f),
 because I didn't commit as I went. Once I noticed, I told the agent to commit
 after every task, and
 [`fbda12f...7a27f8b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/compare/fbda12f...7a27f8b)
-shows one focused commit per feature or fix since then, each saying what
-changed and why. The first version of this account is
-[`7a27f8b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/7a27f8b).
-
-## What's real-time, and what stays private
-
-Every pet change, fight and feed entry has broadcast live since the baseline
-commit, and `spec/realtime.test.ts` opens real WebSockets for each event,
-including the new ones: forming a team ([`f89b791`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/f89b791)), touching another
-player's pet ([`12cdf79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/12cdf79)), and helping, which reaches both players'
-windows as two `pet:updated` events and then the feed entry ([`4a18fed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4a18fed)).
-What stays private is anything that's one player's own business: a solo
-Adventure run, your theft reports, and playing with your own pet. That line
-moved this week. Adventure used to be entirely private, but a team's run now
-shares one map, and visits now reach the owner. Both moved because the shared
-version is what makes it interactable with other people. I still haven't
-written the crit 9 decision record with the alternatives I didn't take.
-
-## Testing it with a room full of people
-
-The showcase is a room of people playing at once, and the README promises
-every change reaches every window within a second. I had never checked that
-with more than two players, so I had the agent write `scripts/load-test.ts`
-([`8c8fee8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/8c8fee8)).
-It signs up a crowd and walks everyone around town the way the browser does,
-one saved step every 50 ms, timing how long each step takes to reach the
-others.
-
-On my laptop, with 50 players a step typically took 390 ms to arrive, and each
-player's position updated only 2.5 times a second instead of 20, while the
-server's CPU sat at 16%. The agent traced this to SQLite waiting about 7 ms for
-the disk to confirm every save, which caps the server near 130 saves a second
-however many people are walking. It first flagged memory peaking at 316 MB,
-then reran with the server's memory capped at 64 MB: it held at 207 MB and kept
-working, so that was Node clearing memory lazily, not a leak.
-
-To test the real deployment, I backed up the live database first. The test
-accounts were all named `loadtest-…`, and afterwards a script deleted every row
-naming one in a single transaction
-([`be1ba6f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/be1ba6f)).
-The agent rehearsed both scripts on a local copy, but Claude Code's safety
-check stopped it writing to the live machine, so I ran the backup and cleanup
-myself. On Fly, steps typically arrived in 18, 50 and 87 ms with 10, 30 and 50
-players, and none took longer than 0.4 s. Nothing was refused or lost, and the
-machine never restarted, though I didn't get memory readings from it. At 50
-players, movement thinned to about 10 updates a second.
-
-The obvious fix, `PRAGMA synchronous = NORMAL` for the whole database,
-restored the full 20 on a throwaway copy, but a power cut could then lose
-the last moment of anything, money included. Instead, only character
-positions moved to a second connection that skips the disk wait, while
-pets, money and fights keep full sync. Locally, 50 players then walked at
-the full 20 updates a second, with steps typically arriving in 9 ms instead
-of 390 ms. On Fly the gain was much smaller: at 50 players, 9.9 became 11.4
-updates a second, and the worst delay fell from 373 to 249 ms. Fly's disk
-was never the main limit there. The server used under half its CPU and
-peaked at 148 MB, so what's left is sending each step out to 49 others,
-which only sending steps to people in the same scene would cut. For a room
-of about 30 it stays near full smoothness, so I stopped there rather than
-risk that change before the deadline. I also measured two other fixes and
-dropped both. Sending
-positions every 100 ms would have undone an earlier change that cut input
-lag. Logging fewer movement lines saved no measurable CPU, and the README
-promises every request is logged.
+shows one focused commit per change since. The README itself grew to 17,000
+words of rules before I split it: the argument stays in `README.md`, and every
+rule and the API moved to `docs/GUIDE.md`.
 
 ## Next
 
-Make every action log who did it, not just touches and helps: sign-in, fights,
-thefts, lessons, shifts and team changes, so the logs can narrate a whole
-session. Then write the concurrency decision record, arguing against at least
-one option I didn't take (polling instead of WebSockets, or broadcasting only
-to the players involved). Play with other people to judge what the spec can't:
-whether helping is worth a $15 food, and whether teams need a smaller entry
-cost. Gifting, recruiting, watching live fights, and guestbook notes are now
-built; play-test whether an ally's $2 a win is worth a friend's while, whether
-a busy arena's "Live now" list feels like an event, and whether eight fixed
-phrases are enough to say what players want to say. Friends lists are built
-too; play-test whether a one-way star is enough, or whether players expect a
-friend request that both sides accept. The weekly town goal is built too;
-watch whether 100 meals is a week's stretch for the real player count, and
-whether $25 and 1 Food is enough to make players feed a neighbour's pet.
-
-Needs that drop while a player is away (2 points an hour, floor 30) are built
-but **off**, because they change the game's balance for everyone. Before turning
-them on for good, play-test with real players: switch `NEEDS_DECAY=on` for a few
-days, then ask whether coming back to a hungrier pet feels like a reason to
-return or like a chore, whether neighbours actually feed and clean pets more,
-and whether a pet on its floor of 30 ever stops a player doing what they came
-for. Watch for a player who comes back once a day losing a whole study session's
-worth (30 stamina is the study minimum). If it feels harsh, lower the rate or
-raise the floor in `src/needs.ts`; if nobody notices, raise the rate. Watching makes the
-decision record's broadcast question concrete: a fight's turns now reach its
-fighters and the players watching it, but nobody else.
+Play-test what the spec can't judge: whether coming back to a hungrier pet is a
+reason to return or a chore (switch `NEEDS_DECAY=on`), whether 100 meals is a
+week's stretch for the real player count, and whether eight fixed phrases are
+enough to say what players want to say.

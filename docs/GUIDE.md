@@ -1,0 +1,1564 @@
+# VirtuePets player and developer guide
+
+The full rules, controls, and API reference. [README.md](../README.md) says what good means for VirtuePets and why; this guide is how everything works. The deployed app serves it at `/guide/`.
+
+## Playing
+
+Your pet lives in **Sweet Home**, a furnished room with a television,
+couch, pet house, fireplace, food bowl, bath, and storage chest. Home and town
+fill the screen, with a camera that follows you and a small movement and
+interaction tip in the upper-left corner. Walk with **W/A/S/D** or the
+**arrow keys**, then press **Space**
+near your pet or a piece of furniture to interact. The nearby object that
+Space will interact with gets a thin outline matching its shape; your pet gets
+a small ring at its feet. These static highlights follow your position
+and disappear when you move out of range or open a window. You can also
+click or tap an empty spot to walk there, or select an object directly. Clicked routes
+continue smoothly around furniture and your pet, and walking keeps the same
+speed across display refresh rates. Movement pauses while a window is open
+or you are typing. Keys held before sign-in or during a pause must be released
+and pressed again to start walking.
+
+Press **1–4** to show an emote above your character: a **wave**, a **heart**,
+a **laugh**, or a **question** mark. On a touch screen, tap the four small
+round buttons in the lower corner instead. Everyone in the same home or town
+sees the bubble for a couple of seconds, including you. Emotes are saved
+before anyone sees them, wait about a second and a half between each, and
+pause along with movement while a window is open or you are typing. Delayed movement updates play at normal
+walking speed without a catch-up sprint. Home and town work on desktop and phones. Menus, windows,
+and controls share the sign-in screen's warm orange and cream palette,
+rounded shapes, typefaces, and light or dark appearance. Every window that
+pops up over a scene — the game menu, pet details, shops, the Yes/No
+confirmation, and the team-up window — stands out with a warm double-ring
+frame in the pet's orange and the sign-in screen's primary colour, so a
+prompt is never easy to miss against the scene behind it.
+
+Your character shares the town's illustrated style and turns to face the
+direction you walk, with a steady facing direction during diagonal steps.
+Alternating footsteps and arm swings animate movement, with gentle breathing
+and blinking while you stand still. The character and camera move together
+between server-confirmed positions. Releasing a movement key stops walking
+even when a reply is delayed, and new floor clicks continue from the latest
+requested route position. Character animation
+pauses while a window is open or the game is in the background; reduced-motion
+settings turn off these decorative animations. After sign-in or reconnection,
+animation resumes automatically once the live scene is ready.
+Home and town artwork starts loading with the page. Signing in sizes the scene
+immediately and reconnects the live session without the network-retry delay.
+After refreshing and signing in, your character appears directly at the default
+home spot once the server confirms it, without walking back from the previous
+session's position. Reconnecting during play keeps your current location.
+
+The room and town have gentle environmental animation: the fireplace flickers,
+the TV shows a moving landscape, bath water ripples, and the river and fountain
+flow. These effects also pause while a window is open or the game is in the
+background, and stay still with reduced-motion settings.
+
+Touch your pet or interact with its rug to open a small pop-up showing its
+needs, attributes, money, and current lesson or shift. Choose a care or play
+interaction there and see its response, with the room still visible behind it.
+Use the food bowl to feed it and the bath to clean it. The pet house opens
+**Appearance**, the chest opens your **Backpack**, and the television opens
+the **Journal**. The wall clock opens game help and **Sign out**. Step through
+the front door to visit town.
+
+The town shares home's warm illustrated style, with tiled roofs, timber
+shopfronts, leafy gardens, a stone fountain, and a riverside footbridge.
+The garden fences block movement; use the front opening or walk around the rails.
+Buildings block movement along their drawn outline, so the shop's sloping
+roof leaves the lane corner open between the main road and Part-time Jobs.
+Destinations include **Shops**, **Adventure**, **Arena**, **Part-time Jobs**,
+**School**, and the **Town goal** at the fountain. Walk near a building to see its outline, then press **Space**,
+or click or tap the building to open its activities. **Sweet Home**
+returns you to your pet. Your **Backpack** holds supplies, learned abilities, and
+Unfair Coins. At home's storage chest, choose **Battle skills** to equip
+learned moves before heading out. Save **Adventure**, **Arena**, and **Support**
+loadouts there to switch between your favorite skill setups. The **Journal** keeps recent visitors, activity, fight
+history, and saved theft reports with revenge options. Press **Escape** in
+either scene to open the game menu for your pet's details, Backpack,
+Journal, **Friends**, Appearance, help, and Sign out. Pet details open in a compact window;
+head home to feed, clean, and play with your pet.
+
+While your pet works or studies, the town map shows a compact activity bar in
+the upper-right corner with its current task, percentage completed, and time
+remaining. It stays accurate when you return to town and disappears when the
+activity finishes or you use an Hourglass. The final minute counts down in
+seconds; “finishing…” means the timer has ended and the server is confirming
+the result. The indicator stays out of the home scene.
+
+**“Rainbows” by Kevin MacLeod** plays as the background music at home and on the
+town map, starting after a signed-in click, tap, or key press. Open the game menu
+with **Escape** (or the home menu hotspot on touch screens) for **Background
+music** and its **Volume** slider. These preferences are remembered on this
+browser. Rainbows continues between home, town, and ordinary windows.
+Opening an Arena, revenge, or Adventure battle (including a replay) switches
+to **“Raving Energy (faster)” by Kevin MacLeod**. Closing the battle window
+resumes Rainbows from where it paused. Saved turn updates never restart the
+battle track. Only one track plays at a time, and both use the same mute and
+volume preferences. Music pauses when you switch tabs and stops when you sign
+out. Both recordings are served locally; they need no music service or extra
+runtime synthesis. The Sound controls include the artist and
+licence credit; full details appear under [Music credits and thanks](#music-credits-and-thanks).
+
+New live battles open with a 1.2-second transition inspired by the mainline
+Pokémon games: a bright screen flash, a diagonal light sweep, and the two
+pets sliding onto the field from opposite sides over a sky-to-grass backdrop.
+This original CSS sequence uses VirtuePets' own pet and monster artwork.
+Choose **Skip intro**, or press **Enter**, **Space**, or **Escape**, to go
+straight to battle without choosing a skill or forfeiting. Reduced-motion
+settings bypass the opening. It pauses while hidden or covered, and saved
+turn updates never restart it. Replays open directly so you can review
+their turns immediately.
+
+The battle stage matches where the fight happens. Arena fights, revenge, and
+the training bot take place in the town's sandstone arena, with a cheering
+crowd, terracotta and sage pennants, and a raked sand floor. Any fight with a
+monster takes place in a sunlit woodland clearing that matches the Adventure.
+Both backdrops dim to an evening light in dark mode. They come from one local
+file, `public/scenes/battle-backdrops.svg`.
+
+The battle screen itself echoes the same style and fills the whole screen,
+like Sweet Home, the town map, and Adventure. Fighters stand on shadowed
+platforms over a sky-and-grass stage, each with a rounded nameplate showing
+its name, type, and green/yellow/red HP and blue MP bars that recolour as
+health drops. A tall-grass encounter tints the stage and adds woodland
+scenery behind the platforms. As in the mainline games, your own pet stands
+closer to the camera, bigger and lower in the frame, while the opponent
+stands further back, smaller and higher — the same artwork, just given a
+sense of depth.
+
+When the battle ends, its Victory or Defeat message pops out in its own
+themed card over the dimmed stage instead of sitting inline with the log,
+with **Replay battle** (when allowed) and a **Leave** button inside it. The
+log and fighters stay visible but dimmed behind the overlay. Adventure keeps
+its own specific labels in this same spot — **Return to map** mid-run, or
+**Back to records** after reviewing a finished run's replays.
+
+Every battle skill, including Claw Strike, legacy moves, and the Slime
+King's Bump, has its own small illustrated badge, tinted by its type (STR,
+CHA, INT, or Normal). It appears beside the skill's name in the home skill
+book, equipped summary, and saved loadouts, on each battle choice, on the
+battle banner for the skill being used, and in the Adventure backpack.
+Unlearned skills show a faded badge. The badges are decorative; skill names
+stay in text. They come from one local sheet, `public/scenes/skill-icons.svg`.
+
+Battles also have original sound effects: each pet species has a distinct
+cartoon voice, and skills use swishes, impacts, magic, shields, or healing
+chimes to match their animations. Both attacking pets and struck opponents
+react, including monsters. Sounds follow confirmed turns and replays; misses
+use a dodge cue. Open **Escape → Sound** for **Battle sound effects** and
+**Effects volume**, or use **Sound effects: On/Off** inside the battle window.
+These settings are remembered separately from music on this browser. Effects
+start after a signed-in interaction and stop when a battle is skipped, closed,
+covered by another window, or hidden in another tab, and when you sign out.
+Quickly switching effects off and on keeps the latest setting. If the browser
+needs another interaction after a tab return, the next click, tap, or key press
+unlocks the effects without replaying missed turns.
+The effects are synthesized locally and use no third-party recordings.
+
+Town uses the same movement and **Space** interaction controls as home.
+Every destination and home object also works with Tab and Enter, and the
+camera brings focused objects into view. Close a window with its Close
+button or Escape to return to the scene. Movement keys work immediately when
+focus returns to a building or home object. Walking around home and town costs
+nothing; lessons, work, battles, and adventures keep their usual rules.
+
+Pet searches follow your latest lookup or visit. A delayed result from an older
+search or login cannot send you to a different home or show an outdated error.
+Closing the Arena window cancels its pending search.
+
+**Create an account** with a player ID (letters, digits, `-` or `_`, up to
+32 characters) and a password of at least 8 characters. Each ID has one
+account and one pet, so an ID someone else has taken is gone. A new pet
+starts with Strength 5, Intelligence 5, Charisma 5, and no money. **Sign in**
+with the same ID and password to come back to it. Opening or refreshing the
+game page always asks for a fresh login — even in a new tab, since tabs
+share a session. Your pet and progress are saved. After 5 wrong passwords
+for an ID, sign-ins to it from that address wait 15 minutes.
+Delayed account checks cannot undo a later sign-in or sign-out.
+
+The sign-in page keeps the player ID, password, and **Sign in** button together.
+Use **Create account** below the form to register; ID and password requirements
+appear only when creating an account.
+
+Anyone can look at any pet, but only its owner can study, work, shop, steal,
+or fight with it. The bot's ID, `0`, can't be signed up or signed into. A pet
+from before accounts existed is claimed by the first person to sign up with
+its ID.
+
+### Music credits and thanks
+
+**Thank you, Kevin MacLeod, for creating “Rainbows” and “Raving Energy
+(faster)” and sharing your music under a Creative Commons licence. Rainbows
+brings warmth to Sweet Home and town, while Raving Energy brings momentum to
+the battles.**
+
+The track and its details come from [Kevin MacLeod's Incompetech listing for
+“Rainbows”](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600063).
+
+| Detail | Credit |
+| --- | --- |
+| Title | Rainbows |
+| Composer / artist | Kevin MacLeod ([incompetech.com](https://incompetech.com/)) |
+| Genre | Soundtrack |
+| Album | Light (Lighter Faire) |
+| Length | 3:39 |
+| Tempo | 110 BPM |
+| Feel | Bright, Calming, Grooving |
+| Instruments | Marimba, Ukulele, Cello, Drums, Percussion |
+| ISRC | USUAN1600063 |
+| Uploaded | 2016-10-22 |
+| Licence | [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/) |
+
+Attribution supplied by the artist:
+
+```text
+"Rainbows" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+http://creativecommons.org/licenses/by/4.0/
+```
+
+The supplied MP3 is included as `public/audio/rainbows.mp3`, re-encoded from
+256 kbps to 128 kbps so it downloads faster; it has not been edited or
+trimmed. The game loops the recording and lets players adjust playback
+volume. The music remains licensed under CC BY 4.0.
+Asset attribution is also included in [public/audio/README.md](public/audio/README.md).
+
+Battle music comes from [Kevin MacLeod's Incompetech listing for
+“Raving Energy (faster)”](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900012).
+
+| Detail | Credit |
+| --- | --- |
+| Title | Raving Energy (faster) |
+| Composer / artist | Kevin MacLeod ([incompetech.com](https://incompetech.com/)) |
+| Genre | Electronica |
+| Album | Disco and Lounge (Electronic and Rock) |
+| Length | 4:04 |
+| Tempo | 134 BPM |
+| Feel | Bright, Grooving, Driving |
+| Instruments | Synths, Percussion |
+| ISRC | USUAN1900012 |
+| Uploaded | 2019-06-11 |
+| Licence | [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/) |
+
+Attribution supplied by the artist:
+
+```text
+"Raving Energy (faster)" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+http://creativecommons.org/licenses/by/4.0/
+```
+
+The supplied faster version is included as
+`public/audio/raving-energy-faster.mp3`, re-encoded from 320 kbps to 128 kbps
+so it downloads faster, with no editing, trimming, or speed change. It loops
+during the battle window. Each new battle
+window starts the track from the beginning; queued battles keep it playing.
+
+### Character outfits
+
+Open **Appearance** from the Escape menu or the pet house at home. Under
+**Character outfit**, choose **Amber, Forest, Ocean, Berry, Lavender, Rose,
+Slate, or Cream**. The preview shows the matching jacket, cap, and trousers;
+**Turn preview** lets you see every side. Press **Save outfit** to wear it.
+Trying colours only changes the preview until your save succeeds.
+
+Outfits are free and saved to your account across sign-outs and server
+restarts. Your walking character wears them at home, while visiting, and in
+town, and other players see saved changes live. New and existing characters
+start with the original Amber outfit. Pet colour and species have their own
+controls and save button below.
+
+### Pet appearance
+
+Open **Appearance**, or select the pet house at home, to pick a color and species:
+**cat, dog, hedgehog, lizard, panda, bird, dragon, or blob**. Press
+**Save appearance**. New pets start as an amber (`#f59e0b`) blob until you
+customize them; existing pets keep their saved species and color.
+Changing appearance is free, and works while studying or working. Only the
+owner can change it, and it stays saved across sign-outs and server
+restarts.
+
+The saved color and species show up at home, in Adventure and team lobbies,
+in battles, and on Arena pets, the leaderboard, and the **Happening now** feed
+— including older feed entries.
+
+Every pet has a cozy illustrated look, with rounded shapes, expressive
+eyes, soft shading, and recognizable animal details. The selected color
+personalizes the pet while keeping its markings clear. The artwork matches
+the home's warm palette and stays readable in small Arena and feed icons.
+Your companion at home, and a pet you visit, are
+alive. They breathe (a little faster while studying or working), blink every
+few seconds, follow your pointer with their eyes, and turn toward it in 3D.
+With reduced motion turned on, they stay still: no breathing, blinking, or
+following. The illustrations are drawn in the browser — no extra download.
+Every open window updates from the server's broadcast; picking or
+saving a setting never previews an unsaved change on the pet.
+
+### Playing with your pet
+
+Tap or click your pet at home to touch it there and open its compact pop-up,
+or interact with its rug and choose a play button. The pop-up shows the
+pet's reaction alongside its live status. The same four touches work on other players'
+pets while you visit them (see **Visit, play and steal** below):
+
+| Touch | Where on the pet | Reaction |
+| --- | --- | --- |
+| **Pat head** | The top of the head, or between the eyes | A happy squish and hearts |
+| **Tickle belly** | The belly | A giggling wiggle |
+| **Stroke cheek** | Either side of the face | A lean into your hand and sparkles |
+| **Shake paw** | The feet | A hop, its shadow shrinking below, and stars |
+
+Every touch closes the pet's eyes in a happy smile and makes it blush. The
+pet reacts with a short, springy animation and a line describing what it
+does, which screen readers announce. A pet that's studying or working still
+reacts, then gets back to its lesson or shift. Playing is just for fun: it
+costs nothing and changes nothing in the game. Playing with your own pet
+isn't saved, sent to the server, or shown to other players. With reduced
+motion turned on, the pet doesn't move — it only smiles and blushes, and the
+line still appears.
+
+In the Journal, **Recent visitors** lists the last five players who
+played with your pet, each with their latest touch and when it happened,
+newest first. When someone touches your pet while you're signed in, it
+reacts at home and says who did it.
+
+Below it, your **Guestbook** keeps the 10 newest notes visitors left you
+(see **Leave a note** under **Visit, play and steal**), each with who wrote
+it and when, newest first. A new note appears there live, with a notice
+saying who left it. Only you can read your guestbook. **Clear** removes
+every note after you confirm in the Yes/No window; every window you have
+open empties together.
+
+### School
+
+Visit **School** on the town map to take lessons. Every pet starts at
+primary school. There are four courses:
+
+| Course    | Raises                                         |
+| --------- | ---------------------------------------------- |
+| Math      | Intelligence                                   |
+| PE        | Strength                                       |
+| Drama     | Charisma                                       |
+| Electives | a random attribute, picked again for each point |
+
+Each lesson earns 1 credit. Lessons are worth more the further the pet
+gets, but each level takes more credits to finish:
+
+| School         | Each lesson adds | Credits to move up      |
+| -------------- | ----------------- | ----------------------- |
+| Primary school | +1                | 5, to middle school     |
+| Middle school  | +2                | 10, to high school      |
+| High school    | +3                | top level; credits keep counting |
+
+Moving up resets the credit count.
+
+### Stamina, hygiene and work
+
+Every pet has **stamina** and **hygiene**, each from 0 to 100, starting
+full. Studying wears a pet out; working mostly gets it dirty:
+
+| Activity          | Takes      | Stamina | Hygiene | Earns                         |
+| ----------------- | ---------- | ------- | ------- | ----------------------------- |
+| Study             | 30 minutes | −20     | −10     | attribute points and a credit |
+| Work, per hour    | 15 min–4 h | −10     | −20     | money (see Work below)        |
+
+Lessons and shifts take real time. The costs come off when the pet starts;
+the reward (points, the credit, or the pay) arrives when it finishes. A busy
+pet can't start another lesson or shift, but you can still shop, feed it,
+clean it, and upgrade its jobs.
+
+A pet that's too tired or too dirty refuses. A shift needs at least its own
+costs. Studying needs enough for the lesson *and* an hour's shift afterward
+(30 stamina and 30 hygiene), so a pet can always work its way back to
+health.
+
+**Needs that drop while you're away (play-test, off by default).** With the
+server's `NEEDS_DECAY` setting on, a pet slowly gets hungry and grubby while
+its owner is away: stamina and hygiene each drop **2 points an hour**, and stop
+at a floor of **30**. That's about half full after a day away; after that the
+pet rests on the floor however long you're gone. Thirty still covers an hour's
+shift or a fight, so a neglected pet can always work its way back, and a need
+that's already lower (after a long shift, say) never drops further. Nothing is
+lost while you're online, or while the pet is studying or working (those already
+cost it), and the bot never gets hungry. It runs on real time even on the
+accelerated test clock, so checking in often loses no more than staying away.
+What your pet lost shows when you come back: your windows, and anyone visiting,
+get its new needs within a second of you connecting. That gives neighbours'
+**Feed** and **Clean** more to do while you're gone. The pet window says how it
+works only while it's on. It ships off, so live players are unaffected until a
+play-test switches it on: set `NEEDS_DECAY=on` (see `fly.toml`), and unset it to
+switch it off again, with no code change.
+
+### Work
+
+Open **Part-time Jobs** on the town map. There are three places to work,
+each paying by one attribute. Shifts last
+15 minutes, 30 minutes, 1 hour, 2 hours, or 4 hours. An hour pays the pet's
+rank wage plus **$1 per point** of that attribute, so a strong pet earns
+more on the construction site than at the office. Pay and costs scale with
+the shift's length — a 15-minute shift is a quarter of an hour's; costs
+round up, pay rounds to the nearest dollar.
+
+| Location          | Attribute    | Rank 1 ($20/h) | Rank 2 ($40/h, needs 20) | Rank 3 ($70/h, needs 50) |
+| ----------------- | ------------ | -------------- | ------------------------ | ------------------------ |
+| Construction site | Strength     | Labourer     | Foreman                | Site manager           |
+| Office            | Intelligence | Clerk        | Analyst                | Director               |
+| Theatre           | Charisma     | Usher        | Actor                  | Star                   |
+
+Every pet starts at rank 1 everywhere. Once its attribute reaches the next
+rank's requirement, **Upgrade** moves it up for good. Each workplace also
+has a **Job specialization** selector: its progress shows completed minutes,
+the next mastery level, and the combat skill it teaches. Mastery grows when
+a shift finishes, independently of wage rank. See the skill table below.
+
+### Shop
+
+Open **Shops** on the town map to buy items with the pet's money. Use
+**Feed** and **Clean** at home to care for your pet with those supplies;
+the shop also keeps the item-use controls available:
+
+| Item      | Price | Use                                               |
+| --------- | ----- | ------------------------------------------------- |
+| Food      | $15   | Feed: +40 stamina                                 |
+| Soap      | $10   | Clean: +50 hygiene                                |
+| Hourglass | $150  | Skip: finishes the current lesson or shift now    |
+
+Stamina and hygiene cap at 100, and food or soap can't be used once that need
+is already full. An **hourglass** skips the wait: the lesson or shift ends
+right away and pays its full reward, as if it had run its whole time. It
+only works while the pet is studying or working — the busy banner has a Skip
+button for it. Open the same pet in two windows and both update together.
+
+**Free daily supplies.** Once per UTC calendar day, **Collect 1 Food + 1
+Soap** in Shops or your Backpack adds one of each to the pet's stock, free.
+They're ordinary items — they keep until used, and Adventure's backpack
+shares the same count. Missed days don't add up. After collecting, the
+button reads **Collected today** until midnight UTC (shown in your local
+time), then it wakes up again without a reload. Like theft protection, the
+reset uses real UTC days, even on the accelerated test clock.
+
+### Town goal
+
+Each week the whole town works toward one goal: **feed 100 pets**. Every
+Food a pet eats counts as one meal for whoever served it, whether you feed
+your own pet (at home or from the Adventure backpack) or a neighbour's pet
+on a visit. Soap, and a feeding refused because the pet was already full,
+don't count. Meals past 100 still count.
+
+In town, a small bar under the activity bar shows how far the town has got,
+for example *Town goal · 37 / 100 meals*, and moves live in every window as
+anyone serves a meal. It stays out of your home. Press it, or walk to the
+**fountain** in the middle of town and press **Space** (or tap it), to open
+the goal: the town's progress, your own meals this week, how many players
+have helped, when it starts again, and the reward.
+
+Once the town reaches 100, everyone who served at least one meal that week
+can **Collect $25 and 1 Food**, once. The bar says *Reward ready* until you
+do. You collect it yourself rather than receiving it automatically, so it
+lands when you're there to see it. Players who join in after the goal is
+reached still earn a share. Weeks run from Monday 00:00 to the next Monday
+00:00 UTC, in real time even on the accelerated test clock. Each week starts
+again from zero, and an uncollected reward lapses with its week.
+
+### Other pets and fights
+
+Open **Arena** on the town map to see other pets: the bot first, then the
+newest. A player who
+joins while you're playing shows up in your arena right away. You can also
+look up any pet by its player ID. Each shows its school, what it's doing,
+its attributes, its power, and its wins and losses. A pet that has cleared
+the woodland wears a small purple crown beside its name, with the number of
+clears once there's more than one (see **Clearing the woodland** below).
+
+Human opponents must be **online** (signed in with a live connection) to
+start a fight, including revenge. Online status updates automatically;
+offline players can still receive visits. Being at home or in town does
+not determine fight eligibility. The usual activity and battle restrictions
+still apply. A saved login alone does not count as online.
+
+Pet **`0` is a bot**. It always exists, so there's always someone to fight.
+It keeps pace with the players: each of its attributes is the **median** of
+every player's pet (rounded down, never below a new pet's 5), updated the
+moment any pet's change moves the median. So the bot is always an even match
+for a typical player — beating it reliably means your pet is ahead of the
+pack.
+
+Press **Fight** to open a turn-based battle in a small window. Every pet
+starts out knowing only **Claw Strike**, which costs **0 MP**. Each Arena
+fight starts with full **HP = 10 + 3 × Strength** and
+**MP = 5 + floor(max(0, Intelligence − 5) / 5)**. A new pet has 25 HP and 5 MP. These are battle resources, not stamina or hygiene,
+and they reset each Arena fight. Adventure keeps its own HP/MP between
+encounters — see below.
+
+Power is 2 × Strength + Intelligence + Charisma. Each pet rolls a luck
+factor between 0.8 and 1.2; Strength × luck, rounded to at least 1, is that
+pet's Claw Strike damage for the battle. Before the fight, a coin toss
+decides who strikes first — a fair 50/50 by default, unless the coin
+provider's equipped Unfair Coin overrides it (see below). Pets alternate
+turns until one reaches 0 HP. **Each player chooses an equipped skill on
+their own turn**; their pet never chooses or attacks automatically.
+Claw Strike stays free and restores 1 MP. Learned basics restore 2–3 MP; other skills spend MP. Unaffordable skills
+are disabled. The surviving pet wins; going first alone no longer
+guarantees victory. The winner gets a win and the loser a loss.
+
+In Arena and revenge, the pet with the higher **Strength + Intelligence +
+Charisma** supplies the coin; the initiating pet wins a tie. This comparison
+uses permanent attributes before any Copper bonus. Only the provider's
+equipped coin applies. In cooperative Adventure, the strongest participating
+teammate supplies it; in solo Adventure, the player always supplies it.
+
+The window animates each accepted move and shows the saved HP/MP. It waits
+for the other player when it is their turn, including while they are
+offline. Battles survive reconnects and server restarts. **Forfeit** or
+Escape asks for confirmation before withdrawing. The training bot and
+monsters choose their own responses; human pets always wait for their
+players. Finished Arena fights offer **Watch battle** with a saved attack
+log and replay. Replay controls never charge energy, advance a live turn,
+or award money again. Motion effects respect reduced-motion settings.
+
+**The winner takes 10% of the loser's money** (rounded down, at most $50),
+whichever side attacked — an attacker who loses pays the defender. Fights
+with the bot are practice: no money changes hands.
+
+**Winning also trains your pet: +1 to the main attribute of its final hit.**
+STR skills train Strength, INT skills train Intelligence, and CHA skills
+train Charisma. Normal skills (including Claw Strike) have no main
+attribute, so a win with one adds +1 to a random attribute instead, like
+Electives. So the way you fight decides how your pet grows. The attribute is
+chosen once when the win is saved, and the battle result says what was
+gained. Practice against the bot, losing, and winning by your opponent's
+forfeit (without landing a hit) train nothing, so wins can't be farmed.
+
+After attacking a pet, the attacker must wait **an hour** before attacking
+that same pet again. The pet it attacked can hit straight back (unless it
+attacked that pet itself within the last hour). If someone attacks you, a
+message pops up wherever you are on the page, saying who it was, how it
+went, and what money changed hands, with a **Revenge** button to fight them
+straight back.
+
+Starting a fight costs the attacker 10 stamina and 5 hygiene once. Like
+studying, it needs enough left for an hour's shift afterward (20 stamina and
+25 hygiene). Both pets must be available, and a pet can take part in only one
+live battle at a time. The defender pays nothing. Wins, losses, spoils, and
+the finished fight record are saved once the battle ends.
+
+### Watching live fights
+
+The top of the Arena's **Pets** tab lists **Live now**: every Arena and
+revenge fight under way between two players, each with its fighters and how
+many are watching. Practice against the bot isn't listed, and Adventure
+battles never are. Your own fight is listed first, as yours, and the rest by
+the biggest crowd; a busy arena shows three, with **Show all** for the rest.
+New fights appear and finished ones disappear live, without a reload.
+
+Choose **Watch** (or press Enter on it) to take a seat in the stands. The
+battle window opens on the fight as saved, then plays each turn the moment a
+fighter chooses it, with the same animation, sounds, and HP/MP bars the
+fighters see. You can't choose a skill or forfeit for anyone. **Leave** (or
+Escape) closes the window and gives up your seat; it never asks to forfeit.
+When the fight ends, the window names the winner. You sit in one fight's
+stands at a time: watching another moves your seat.
+
+Both fighters see **N watching from the stands** under their battle text,
+updated live as people arrive and leave. Watching needs a signed-in player
+who isn't in that fight. Your seat is saved, and frees itself when you sign
+out, close your last window, or lose your connection; reconnecting takes it
+back.
+
+### Theft notifications and revenge
+
+The theft API (`POST /api/pets/:id/steal/:opponent`) transfers $10–$30,
+limited by the victim's balance. A pet can be robbed at most once per UTC
+calendar day, across all players. Protection persists and resets at
+midnight UTC; failed attempts don't use it up. You can't steal from yourself
+or the bot.
+
+Thefts are saved separately from the public feed. The **Journal** shows a
+report count when unresolved thefts are waiting. Open it to see who stole
+from you, when, and how much, with a
+**Take revenge** button. They also appear live, and survive server restarts
+and public-feed pruning. Each theft allows one completed revenge attempt,
+using the same turn-based skill selection and combat energy as a fight.
+Both participants must be available — ordinary fight cooldowns don't block
+theft revenge, but the thief must be online. On a win, the
+thief pays **twice the stolen amount**, and you gain **+1 Strength, +1
+Intelligence, and +1 Charisma**. If the thief can't afford the full reward,
+no attempt or energy is spent — try later. A loss spends the attempt and
+combat energy, but costs no extra money. Revenge never removes daily theft
+protection.
+
+`GET /api/thefts` returns only your pending reports. `POST
+/api/pets/:id/revenge/:theft` accepts only a theft against your own pet.
+Completed attempts can't pay out twice. Signing out clears pending revenge
+controls; late responses from an earlier login can't change the new login's
+notifications or buttons.
+
+### Visit, play and steal
+
+Press **Visit** beside a pet in the Arena (or look it up by player ID) to
+enter its home, whether the owner is at home, elsewhere, or offline. Walk
+with the same keyboard or floor-click controls. Everyone in the same home
+sees each other's character positions, direction, and walking in real time.
+Players in a different home are not drawn in yours. Select the pet to see
+its appearance, activity, balance, and visiting actions; **Leave home** or
+the front door returns to town. The game menu's **Pet details** still shows
+your own pet; feeding, cleaning, and playing with it wait until you are home.
+Town also shows the players walking there.
+Signing out or losing the live connection removes your character; reconnecting
+resyncs the saved positions. Closing one of several connected tabs does not
+make the player offline.
+
+**Play with it** by tapping or clicking it where you'd like to touch it, or
+with **Pat head**, **Tickle belly**, **Stroke cheek**, and **Shake paw**
+under it. Unlike playing with your own pet, this is a visit: the server
+saves who touched which pet and how, and tells every open window. The pet
+reacts only once that news arrives — in your window, in its owner's (whose
+**Recent visitors** gains you), and in anyone else visiting it too. Each
+player can touch a given pet once a second. Touching costs nothing, works
+while either pet is busy, and changes no money, stats, stamina, or hygiene.
+
+**Leave a note** for its owner by choosing one of eight fixed phrases:
+*Your pet is adorable!*, *Thanks for the food!*, *Thanks for the gift!*,
+*Rematch?*, *Good fight!*, *Come visit me!*, *Want to team up?*, or
+*Sorry about that…*. There's no free text, so there's nothing to moderate.
+The note is saved as from your pet and lands in the owner's **Guestbook**;
+your window confirms it once it's saved. You can leave a given pet one note
+every 10 seconds. Notes cost nothing, work while either pet is busy, and
+can't be left for yourself or the bot. Only you and the owner hear about a
+note: it isn't announced to anyone else.
+
+**Help out** by feeding or cleaning it. The visit shows its stamina and
+hygiene; **Feed** and **Clean** give it one Food or Soap **from your own
+cupboard** (bought at the shop or collected as free daily supplies),
+restoring +40 stamina or +50 hygiene, never past 100. It's a gift: it costs
+you the item, and changes no money or stats. You can't help when you have
+none to give, when that need is already full, or the bot. Helping works
+while either pet is busy. Both pets update live in every window, its owner
+gets a notice saying who helped, and it appears in **Happening now**.
+
+**Give a gift** from your own cupboard. The visit lists a button for each
+thing you can hand over, with how many you have: **Food**, **Soap**, an
+**Hourglass**, or a **Copper, Silver, or Gold Coin**. Each press gives
+**one** of it, straight into that pet's backpack; press again to give
+another. Your equipped coin stays with you: you can give a coin only if
+you own a spare copy, or after you unequip it at your backpack. A gift
+costs you only the item and changes no money, stats, stamina, or hygiene.
+You can't give to yourself or the bot. Giving works while either pet is
+busy, and a lesson or shift keeps running. Both cupboards update live in
+every window, the owner gets a notice saying who gave what, and the gift
+appears in **Happening now** and so in the owner's Journal. If two gifts
+of your last item race, only one goes through.
+
+**Steal $10–$30** takes a random whole dollar amount from that pet and adds
+it to yours. The amount never exceeds its balance; a pet with less than $10
+can't be robbed. Visiting and stealing are instant, cost no stamina or
+hygiene, and work while either pet is busy. You can't steal from yourself or
+the bot.
+
+**Each pet can be robbed once per UTC calendar day, across all players.**
+After a successful theft, everyone must wait until midnight UTC to rob that
+pet again. The visit shows when its protection ends, in your local time.
+You can still steal from other eligible pets. Failed attempts don't use up
+the target's daily protection, and protection survives signing out and
+server restarts. Both balances update live; the owner gets a notification
+and the theft appears in **Happening now**.
+
+### Friends
+
+**Star** a player to keep them close. Every other player in the Arena has a
+star beside their name, and so does the pet you're visiting; press it to
+star them, and again to unstar. The bot can't be starred. Open **Friends**
+from the game menu (**Escape**, or the wall clock at home) to see everyone
+you starred, online friends first, each marked **Online** or **Offline**
+as they come and go, live. The menu button counts how many are online.
+**Visit** goes straight to a friend's home, whether they're there,
+elsewhere, or offline. **Star a player by ID** adds someone you haven't met
+in the Arena yet. When you start an adventure, the **Team up?** window lists
+your friends, online ones first, under **Invite a friend**: one press
+invites them, with no ID to type, and a friend already invited or on your
+team says so instead.
+
+Starring is one-way and private, like a bookmark. Only you see your list,
+the starred player isn't told, and starring someone doesn't let you do
+anything to their pet that any visitor couldn't. You can star up to 50
+players. A star is saved before it shows: the button lights up, in every
+window you have open, once the server confirms it.
+
+### Leaderboard
+
+The Arena's **Leaderboard** tab ranks the top 10 players by **most wins**
+(fewer losses breaks a tie) or by **most power**; on a tie, whoever joined
+first stays ahead. The bot isn't on it. It re-ranks live as pets fight and
+train, and your own pet is highlighted when it makes the board.
+
+### Happening now
+
+Below your fights, the Arena shows the 15 newest things that happened
+anywhere in the game, live: a player joining, every theft, every time
+someone feeds, cleans, or gives a gift to another player's pet, every fight (who won, and any
+money taken), a pet moving up a school, a pet getting promoted at work, and
+a pet or team clearing the woodland. Ordinary lessons and shifts stay out of
+it, so it isn't flooded. Entries about your pet, including a clear you shared,
+are highlighted.
+
+Recruiting a friend's pet as an Adventure ally is described under
+**Recruiting an ally**; it pays the friend with each win but stays out of
+this feed, so a long run doesn't flood it.
+
+## Running it locally
+
+```sh
+mise install
+pnpm install
+pnpm start        # http://localhost:8080, lessons and shifts in real time
+pnpm start:test   # the same on a fast clock (a game hour takes 0.1 s)
+pnpm check        # in a second terminal, against pnpm start:test
+```
+
+Data lives in SQLite at `./data/virtuepets.db` (`/data` on Fly, the attached
+volume).
+
+## How it's built
+
+Node 24 running TypeScript directly, Express for HTTP, `ws` for WebSockets,
+and the built-in `node:sqlite` for storage.
+
+- **Caching:** Fly's proxy compresses responses, so the app only sets how
+  long browsers may reuse files. The game page is `no-store`, so every visit
+  signs the browser out and picks up a new deploy. Scripts, styles, and scene
+  art are reused for five minutes, then revalidated by ETag in the
+  background. Music is kept for a week. API responses are unchanged by this.
+- **Countdowns:** activity, supplies, theft protection, and Adventure cooldown
+  timers share one once-a-second clock. It rests while the tab is hidden and
+  catches up the moment the player returns, so a background tab doesn't wake
+  the phone every second.
+- **Saved history:** so the single `/data` volume can't fill up, older
+  history is trimmed whenever new history is saved. Each pet keeps its newest
+  50 fights with replays (the journal shows 10), and a fight stays while
+  either fighter still keeps it. Each victim keeps every unresolved theft,
+  for revenge, and its newest 20 resolved ones. Each player keeps its newest
+  20 finished Arena and revenge battles; battles still being played are never
+  trimmed. Wins and losses are totals on the pet, so trimming never changes
+  a record. Older saved history is trimmed the next time each pet fights.
+
+- **Accounts:** `POST /api/signup`, `/api/signin`, and `/api/signout`, and
+  `GET /api/me`. Passwords are hashed with scrypt. A session is a random
+  token in an HttpOnly cookie, stored only as a hash.
+- **Actions** (owner only): `POST /api/pets/:id/study/:course`,
+  `work/:location` (with `{"minutes": 60}`), `upgrade/:location`,
+  `buy/:item`, `use/:item`, `collect-supplies`, `fight/:opponent`,
+  `steal/:opponent`, `help/:pet` (with `{"item": "food"}` or `"soap"`),
+  `gift/:pet` (with `{"item": "food"}`, `"soap"`, `"hourglass"`, or a coin ID;
+  409 when you have none spare, 400 for yourself or the bot),
+  `touch/:pet` (with `{"kind": "pat"}`), `note/:pet` (with `{"phrase":
+  "rematch"}`, a phrase ID from `/api/rules`; 429 within 10 seconds of your
+  last note to that pet), `notes/clear`, `star/:player` and `unstar/:player`
+  (both answer with your friends list as saved; starring twice or unstarring
+  someone not starred changes nothing; 400 for yourself or the bot, 404 for a
+  player with no account, 409 past 50 friends), and `equip-coin/:coin` (`:coin` is
+  `copper-coin`, `silver-coin`, `gold-coin`, or `none` to unequip).
+  `GET /api/town-goal` is this week's town goal for anyone: `{ week, endsAt,
+  target, meals, helpers, reached, reward }` (`week` and `endsAt` are epoch
+  milliseconds of the Mondays it runs between). Signed in, it adds `mine:
+  { meals, claimed, canClaim }`. Authenticated `POST /api/town-goal/claim`
+  pays your pet the reward once the goal is reached, answering with the new
+  status and broadcasting your pet; it's 401 without a session and 409 before
+  the goal, without a meal this week, or a second time. A meal is saved in the
+  same transaction as the feeding it counts.
+  `collect-supplies` adds the free daily Food and Soap, and sets the pet's
+  `suppliesAvailableAt` (epoch milliseconds of the next UTC midnight, or
+  `null` before the first collection). A second collection that day returns
+  429. Equipping is global to the pet and reusable — never consumed — and
+  applies to Adventure, Arena, and revenge alike. Equipping a coin the pet
+  doesn't own, or an unknown coin, returns 409.
+  `POST /api/pets/:id/equip-skills` takes `{ "abilities":
+  ["claw-strike", "firebolt"] }` and saves up to four different learned
+  skills, including Claw Strike. `POST /api/pets/:id/skill-loadouts/:slot/save`
+  takes the same body to save a setup without equipping it; `:slot` is
+  `adventure`, `arena`, or `support`. `POST /api/pets/:id/skill-loadouts/:slot/equip`
+  equips that saved setup, rejecting empty slots. Pet responses include
+  `skillLoadouts`, initially `{}`, mapping saved slots to skill ID arrays.
+  Saving again replaces only that slot. All three actions require being in
+  your own home, validate learned skills, refuse changes during a live battle,
+  and return and broadcast the saved pet through `pet:updated`.
+  Stealing returns `{ thief, victim, amount }`; both pets include
+  `stealAvailableAt` (epoch milliseconds, or `null` before any theft). The
+  server locks and checks the target before transferring money, saving
+  protection and recording the feed entry in one transaction. Repeated
+  thefts return 429; insufficient funds return 409; self/bot targets return
+  400. The daily limit uses real UTC days, independent of `TIME_SCALE`.
+  Helping returns `{ helper, pet, item, amount }` (`amount` is how much
+  stamina or hygiene it actually restored); both pets change in one
+  transaction and are broadcast as `pet:updated`, then a `helped` feed
+  entry. An empty cupboard or a full need returns 409; yourself, the bot, or
+  any item but food and soap return 400.
+  Touching saves and returns `{ id, visitor, pet, kind, at }`, where `kind`
+  is `pat`, `tickle`, `stroke`, or `paw` (anything else returns 400).
+  Touching your own pet returns 400, a missing pet 404, and a second touch
+  of the same pet within a second 429.
+- **Appearance** (owner only): `POST /api/pets/:id/appearance` with both
+  fields, e.g. `{"color":"#12abef","appearance":"dragon"}`. Color must match
+  `/^#[0-9a-f]{6}$/i`; appearance must be `cat`, `dog`, `hedgehog`, `lizard`,
+  `panda`, `bird`, `dragon`, or `blob`. Invalid fields return 400; invalid
+  player IDs return 404, like on other pet routes. The response and the
+  `pet:updated` broadcast carry the
+  complete saved pet, including `color` and `appearance`. Clients wait for
+  that broadcast before showing a change. Both columns migrate in place on
+  startup.
+- **Reading** (anyone): `GET /api/pets` lists pets, `GET /api/pets/:id`
+  shows one, `GET /api/pets/:id/fights` its recent fights, `GET
+  /api/pets/:id/touches` its five most recent visitors (each one's latest
+  touch, newest first), `GET /api/feed` what's been happening across the
+  game (newest first), `GET /api/leaderboard?by=wins` (or `power`) the top
+  10 players, and `GET /api/rules` the schools, courses, work locations,
+  items, and costs, plus each battle skill's type and the type chart
+  (`fight.types`), and `needsDecay` (`{ enabled, perHour, floor }`).
+- **Live battles** (participants only): `GET /api/battles` lists the signed-in
+  pet's active Arena/revenge sessions; `GET /api/battles/:battle` reads one
+  saved session. `POST /api/battles/:battle/turn` takes
+  `{ "ability": "claw-strike", "revision": 0 }`; `POST
+  /api/battles/:battle/forfeit` takes `{ "revision": 0 }`. A session holds
+  its persisted battle, current actor, HP/MP, selected skills, and numeric
+  turn revision. Wrong-player, stale, unknown-skill, and insufficient-MP
+  actions cannot advance the fight. A finished Arena win over another player
+  saves `result.trained: { pet, attribute, amount }`.
+- **Real time:** the server broadcasts a `pet:updated` event over the
+  socket after every change, a `fight:finished` event after each fight
+  (with the `spoils` the winner took), a `feed:added` event for each new
+  entry in Happening now (sent after the change it describes), a
+  `team:updated` event whenever a team in the **Team up** window changes or
+  sets off, and a `pet:touched` event, carrying the saved touch, whenever a
+  visitor plays with someone else's pet. `pet:noted` carries a saved
+  guestbook note to that pet's owner and the visitor only, and `notes:cleared`
+  reaches only the owner's windows; `GET /api/pets/:id/notes` is the owner's
+  guestbook, newest 10, for the owner alone. `friends:updated` carries a
+  player's whole friends list (`{ player, friends }`, each friend's `id`,
+  `color`, `appearance`, and when they were starred) to that player's own
+  windows only, after each star or unstar; `GET /api/pets/:id/friends` reads
+  it, for its owner alone. Online status isn't saved with it: the page marks
+  friends from `presence:updated`. `town:goal` tells everyone the town goal's
+  saved total (`{ week, endsAt, target, meals, helpers, reached, reward }`,
+  never anyone's own share) after each meal, and when a new week's first meal
+  starts it again; each window re-reads its own share only after its own pet
+  ate or gave Food, or when the goal is first reached. The feed keeps its newest 500
+  entries in SQLite. A `battle:updated` event sends saved Arena/revenge
+  session changes to its two participants and the players watching it, and
+  each screen shows the turn from that event. The browser re-reads a live
+  battle only on reconnecting, after a refused move, on returning to its tab,
+  or every 10 seconds as a backstop.
+  `battle:watchers` tells everyone a watchable fight's crowd as saved:
+  `{ battle, count, live }`, plus its `attacker` and `defender` while live.
+  It's sent when a fight starts, gains or loses a watcher, or ends.
+  `GET /api/arena/live` lists live fights with both pets and their
+  `watchers`. Authenticated `POST /api/arena/live/:battle/watch` takes a
+  seat (one per player, saved in `battle_watchers`) and answers with the
+  fight as saved; `POST /api/arena/live/leave` gives it up. Watching your
+  own fight is 409; a finished or bot fight is 404.
+  `presence:updated` lists authenticated players with open connections;
+  `world:updated` carries a saved home/town position and character `outfit`. `GET /api/world`
+  resyncs online players and positions. Authenticated `POST /api/world`
+  accepts `{ scene, home, x, y, facing, moving, revision }` for the caller
+  only; positions are saved in SQLite before broadcasting, and stale
+  revisions are refused. Movement is coalesced to at most one request per
+  50 ms, with short confirmed steps drawn at walking speed to reduce input lag.
+  Authenticated `POST /api/world/outfit` accepts `{ "outfit": "ocean" }`
+  for the caller only. Valid IDs are `amber`, `forest`, `ocean`, `berry`,
+  `lavender`, `rose`, `slate`, and `cream`. It saves with full disk sync,
+  increments the world revision, then returns and broadcasts the saved row.
+  Movement cannot change outfits; malformed colours are refused with 400,
+  and unauthenticated saves with 401.
+  Authenticated `POST /api/world/emote` accepts `{ "emote": "wave" }` (or
+  `heart`, `laugh`, `question`) for the caller only. It saves the emote with
+  the caller's current scene and home, then returns and broadcasts the saved
+  row as a `world:emoted` event; clients show the bubble only from that event,
+  and only to players in the same room. A second emote within 1.5 seconds is
+  refused with 429, an unknown emote with 400, and an unauthenticated one
+  with 401.
+  Positions use their own SQLite connection with `synchronous = NORMAL`, so
+  a step doesn't wait for the disk; everything else keeps the default full
+  sync. `scripts/load-test.ts` walks a crowd around town and times each
+  step's delivery. On the deployed app, every step reached every other
+  player within 0.25 s with 50 players, typically within 50 ms with 30,
+  and nothing was lost. Up to 30 players each walker sends 18–20 updates a
+  second; at 50 it drops to about 11, as each step goes out to 49 others.
+  `spec/world-realtime.test.ts` checks movement and presence delivery
+  to multiple sockets within one second, offline visits, and online fights.
+- **Logs:** server stdout (also visible in `flyctl logs`) records `join`,
+  `leave`, `action`, `broadcast`, `reject`, and `snapshot` events, each as
+  one line of `key = value` fields. The game's single shared WebSocket room
+  is `arena`. `client_in_room` counts open sockets, including separate
+  tabs, after each join or leave. A connection ID ties a join to its leave.
+  Socket users come from the session at connection time; sockets opened
+  before sign-in keep a generated `guest_…` identity until reconnecting.
+  HTTP actions use the current authenticated player, or `anonymous` when
+  there's no session.
+  Every mutating API request is logged before parsing its body. Its
+  request ID ties the receipt to its rejection or response. Rejections
+  include the HTTP status and reason — malformed JSON, authorization
+  failures, and unknown endpoints all count. Broadcasts name the message
+  type and how many open recipients got it, including updates from
+  scheduled activities. A `snapshot` records a successful JSON API response
+  sent to its one requester, such as a pet or arena refresh, a saved action
+  result, or private Adventure state. Snapshots use HTTP, as they do when
+  the client resyncs after reconnecting.
+  An `action_result` line follows most actions, naming who did it and the
+  outcome. Touch and help name the target pet and kind/item/amount. Signing
+  up or in names `created` (new pet or not). A fight or revenge names the
+  opponent and the winner, or whether revenge succeeded. Stealing names the
+  victim and amount. A finished lesson or shift names the task and what it
+  paid — logged when it ends, not when it starts. A team change
+  (`team_invite`, `team_accept`, `team_leave`, `team_set-off`) names the
+  team. Starring or unstarring (`star`, `unstar`) names the `friend`.
+  Collecting the town goal's reward (`town_goal_claim`) names the `week`
+  and what it paid. Logs exclude passwords, session cookies, query strings, request
+  bodies, and snapshot contents; values containing spaces are quoted.
+
+  Example lines (IDs shortened):
+
+  ```text
+  event = join user = alice room = arena client_in_room = 2 connection = c_12
+  event = action user = alice room = arena client_in_room = 2 request = req_7 action = /api/pets/alice/collect-supplies method = POST
+  event = broadcast user = server room = arena client_in_room = 2 message = pet:updated recipients = 2
+  event = reject user = alice room = arena client_in_room = 2 request = req_8 action = /api/pets/alice/use/food method = POST status = 409 reason = "No food left. Buy some at the shop."
+  event = snapshot user = alice room = arena client_in_room = 2 request = req_9 action = /api/pets/alice method = GET status = 200 recipients = 1 transport = http
+  event = leave user = alice room = arena client_in_room = 1 connection = c_12 code = 1000
+  ```
+
+## Adventure exploration
+
+Leave home for the town map and choose **Adventure**. Move with W/A/S/D,
+arrow keys, or the on-screen direction buttons; holding a movement key keeps
+walking. You can also click or tap a reachable tile to walk there. Each step
+waits for the server to confirm the position, and a battle, another window,
+or a blocked move stops the route. The map takes the keyboard as soon as it
+opens. **Space** acts on the tile your pet stands on: it opens an unopened
+chest, or uses the stairs there (Unlock & descend, Descend, or Ascend), so
+the whole adventure plays without a mouse. On a focused button, Space
+presses that button instead.
+
+The Adventure fills the whole screen with an illustrated woodland in the
+same warm style as home and town. The camera follows your pet through leafy
+trees, tall grass, flower patches, and stone paths. The persistent controls
+are a small floor and movement tip, **Menu**, HP/MP, and the direction pad.
+**Menu** opens **Backpack & team**, **Game guide**, and **End adventure**
+when needed. Escape opens or closes this menu while exploring.
+At the bottom left, two rings show your pet's **HP (red)** and **MP (blue)**:
+the coloured arc is what's left, and the number inside reads e.g. `12/15`. The
+arrow pad sits at the bottom right. **Open chest**, **Ascend**, and the
+down-stair action appear only while your pet stands on a chest or stairs,
+and the available object is highlighted. Battle records and replay controls
+stay off the map until the run ends. Monsters have original woodland
+artwork, and wooden treasure chests show their open and
+closed states. Gentle grass, creature, and treasure animations pause while
+the map is hidden or another window is open and respect reduced-motion
+preferences.
+
+A small upper-left tip explains movement, Space, and tall grass. Further
+help lives in the **Game guide** window: how to play, the map key, where the
+down stairs are, the remaining monsters' attributes, the treasure odds, and
+what a new run costs. Ordinary monsters' hiding places aren't revealed; the
+visible Slime King's position is listed. Open it through **Menu → Game
+guide**. Close or Escape returns the keyboard to the map. A battle that
+starts while it's open closes it.
+
+Each of the five fixed floors starts with a 16 × 16 grid, four regular
+enemies (slimes and goblins), and at least one marked treasure chest. Floor
+five also holds the **Slime King**. The map uses your pet's saved shape and
+color as soon as you sign in.
+
+**A busy pet can't adventure.** While it's studying or working, **Explore
+the woodland** is disabled, with the reason shown. The server refuses
+moves, stairs, opening chests, and starting over with 409 until the lesson
+or shift ends — an Hourglass can bring that forward. Viewing the map,
+returning from a saved battle, and using backpack items still work. An
+activity whose time is up no longer counts, even before it's been paid out.
+
+**Find a Floor Key to unlock the next floor.** In a new run, floors one
+through four have locked down stairs. Each monster victory on a locked
+floor has a **5% chance** to drop that floor's key while it is missing.
+The chance stays 5% each time; there is no guaranteed drop after a set
+number of battles. More monsters appear in the grass while the key is
+missing, so clearing the first four enemies cannot leave the exit
+permanently locked. Once the key drops, no more keys or replacement
+monsters appear on that floor.
+
+Stand on the down stairs at column 14, row 14 and press Space, or choose
+**Unlock & descend** when you have the key. This permanently unlocks the
+gate and takes you to the next floor's up stairs, at column 3, row 3.
+Later visits use **Descend** without another key. **Ascend** returns you
+to the previous floor's down stairs and never needs a key. Floor one has
+no up stairs; floor five has no down stairs or Floor Key.
+
+**Every new entry starts a fresh adventure.** Returning from town or
+reopening Adventure starts at floor one with full HP/MP, new monsters and
+chests, and locked gates with no keys. Leaving ends your current run; it
+cannot be resumed later. Your earned inventory and learned abilities stay
+with your pet. Map updates during the same visit keep the current floor,
+position, HP/MP, keys, and unlocked gates, including across server restarts.
+
+**Monsters hide in tall grass.** Walking through a grass patch can start a
+surprise battle with one of that floor's remaining slimes or goblins.
+Ordinary monsters aren't drawn on the map, and their coordinates aren't
+sent to the browser. Clear paths are safe from random encounters, and
+standing still never starts one. The **Slime King** remains visible in the
+final grove; walk onto its tile to challenge it.
+
+Only a successful step into tall grass advances the encounter counter.
+There are two quiet grass steps before another encounter can happen, then
+a chance on each grass step, with an encounter guaranteed by the sixth
+while regular monsters remain. The server saves the random seed and step
+counter with the floor, so repeated requests during the same run don't
+reroll them. Defeated monsters stay defeated, but fresh ordinary
+monsters replenish the grass while a locked floor still needs its key.
+After the key is found, or on a floor without a locked exit, clearing the
+remaining regular enemies makes its grass safe. A surprise battle leaves
+the pet on the grass tile it entered.
+
+Trees still block movement, and every stair and chest is reachable.
+Map refreshes use the existing `{ "action": "patrol" }` request to read
+saved progress, including teammates' positions. These background refreshes
+never reset the run, move monsters, or start a battle.
+
+New floors contain four enemy builds. Their stats and growth are STR/INT/CHA:
+
+| Enemy | Type | Floor-one stats | Added per deeper floor | Battle behavior |
+| --- | --- | --- | --- | --- |
+| Slime | STR | 3/1/2 | 2/1/1 | Heavy Breath Slam restores 2 MP. A straightforward starter opponent. |
+| Goblin Bruiser | STR | 5/3/2 | 2/1/1 | Uses Hardhat Guard between attacks and Heavy Breath Slam to recover MP. From floor 2, Feral Maul can pin evasive pets. |
+| Mind Slime | INT | 3/6/2 | 1/3/1 | Prioritizes Synapse Shock when its target has at least 3 MP; Paperplane Dart restores 3 MP. From floor 3, Gravity Formula adds damage based on the target's Max HP. |
+| Glimmer Goblin | CHA | 3/2/6 | 1/1/3 | Raises CHA with Makeover Glow, restores MP with Service Smile, and punishes a miss with Dazzling Riposte when affordable. |
+
+Bruisers and dodgers avoid recasting an active buff; a likely finishing hit
+takes priority over setup. All builds obey the same skill costs, accuracy,
+effects, and type triangle as pets. The battle scene and Game guide describe
+their strategies and the guide lists their skills. Names and small shields, books, or masks
+distinguish the variants; their underlying slime/goblin species keep the same
+skill-drop pools. Replenished grass encounters use these builds too. Existing
+saved enemies without a build keep their previous moves and stats, and
+already-started battles keep their saved behavior.
+
+The floor-five Slime King has **18/10/12**. Maximum HP is **10 + 3 × STR**; maximum MP
+is **5 + floor(max(0, INT − 5) / 5)**, for pets and monsters alike. A new run starts with full resources. Current HP/MP carry
+between battles and floors during one run. A server restart doesn't
+refill them; entering a new adventure does. Training raises the maximums
+without refilling current HP/MP.
+
+### Teaming up
+
+An adventure can be played alone or with up to three other players.
+The first visit opens **Team up?**, where players choose a solo run or form
+a team. The finished-run panel offers **Team up** for later adventures.
+
+- **Go solo** starts a fresh woodland run. The first solo adventure is
+  free; later starts use the normal cost and cooldown.
+- **Invite a player by ID** makes your pet a team's leader and invites that
+  player. A team holds at most **4 pets**, invitations included. Only
+  players with accounts can be invited, and only the leader invites.
+- An invited player sees the invitation in their own **Team up?** window
+  and can **Join** or **Decline**. A pet joins one forming team at a time.
+  **Leave team** takes it off, and the leader's **Disband team** ends the
+  team for everyone.
+- **Set off together** (leader only) needs at least one other pet to have
+  joined, and every joined pet to be ready. Each pet is checked the way
+  a new adventure would check it: no run in progress (end it first), no
+  battle awaiting **Return to map**, not studying or working, no
+  adventure cooldown, and enough stamina and hygiene. The window says what
+  each pet is waiting on. Setting off charges every pet **40 stamina and 20
+  hygiene**, and opens each pet's 4-hour cooldown — same as starting a new
+  adventure. Invitations still pending lapse.
+
+Every teammate then explores **one shared map**: one set of floors,
+monsters, and chests, starting together at floor one. Each pet keeps its
+own position, floor, HP, and MP, and the map shows teammates on the same
+floor (with their positions and HP under **Your team**). Every window
+refreshes the shared state about once a second, so each player sees the
+others move. Grass encounter progress and remaining monsters belong to the
+shared floor; only a teammate walking through grass advances that progress.
+Floor Keys and unlocked gates also belong to the shared floor. A key
+found by any teammate lets any teammate unlock that floor's exit, and the
+gate then stays open for everyone. A shared battle rolls for one key drop,
+not a separate drop for each pet.
+
+**Teammates beside your pet join its battles.** When a pet encounters a
+monster in grass or walks into the Slime King, every teammate exploring
+within 1 block of that pet (diagonals included) fights alongside it — unless
+that teammate is busy, already has a battle waiting, or is out of the run.
+A team battle waits for each standing pet's owner to choose an equipped
+skill. Pets take their turns in encounter order, then the monster strikes
+whichever pet has the most HP left. The teammate with the highest raw
+Strength + Intelligence + Charisma supplies the coin, with encounter order
+breaking ties. That coin decides whether the pet team or monster goes
+first; only its provider receives Copper's bonus or Gold's doubled first
+hit. Each pet uses its own equipped skills and carried HP/MP. Every player
+sees the same saved battle from their own side and returns to the map
+separately. A player who forfeits withdraws only their own pet; the remaining
+teammates continue taking their turns.
+If another player moves before your withdrawal is saved, the battle stays
+open and asks you to choose **Forfeit** again. If that move ends the battle,
+its result stays open until you return to the map.
+
+**A knocked-out pet is out; the team plays on.** A pet at 0 HP after a
+battle (won or lost) has failed its run, exactly like a solo defeat, while
+its teammates keep exploring. After a victory, every pet still standing
+recovers 20% of its maximum HP and MP, and the monster is removed for
+everyone. Grass encounters keep the pet on its grass tile; a surviving pet
+that challenged the Slime King takes the king's tile after winning. A team's
+run ends for each pet when it's defeated or leaves the adventure; the
+rest keep exploring. Opening the map for the first time after a team sets
+off joins that newly created shared run without charging again. Returning
+after leaving starts a new solo run, or players can form a new team.
+**Start new adventure** after that is always solo; to team up again, use
+**Team up**.
+
+**Each chest opens once for the whole team.** The first teammate to choose
+**Open chest** gets its reward; for everyone else it shows as opened, by
+them.
+
+### Recruiting an ally
+
+A friend who isn't online can still help. Open **Menu** during a run and,
+under **Recruit an ally**, enter their player ID and choose **Recruit**.
+Their pet joins your run at full HP and MP, walks at your pet's heel
+(drawn smaller on your tile), and fights in every battle you fight.
+
+- **Who:** any player with an account whose owner is **offline**. Someone
+  online is refused with a reminder to invite them to your team, so they can
+  play themselves. You can't recruit your own pet or the training bot. A pet
+  helps one run at a time, and not while it's on an adventure of its own.
+  Studying, working, stamina, and hygiene don't matter: nothing about the
+  friend's pet changes except the money it earns.
+- **How it fights:** its owner chose its skills when they last equipped them
+  at the home chest; the game picks the strongest one it can afford each turn,
+  the same simple plan as the training bot. Every *player's* pet still waits
+  for its owner's choice, so the saved battle always rests on a player's turn.
+  Nobody, not even its owner, can choose or forfeit a move for an ally. It
+  takes its turn after the players' pets and before the monster, and the
+  monster may target it like any pet (the one with the most HP). It only
+  fights beside you: if you forfeit or leave mid-battle, it withdraws with
+  you in the same step, so it never fights on, wins, or earns without you.
+- **Coins and rewards:** an ally never supplies the coin; only players' pets
+  do, even if the ally has the highest attributes. It never trains, never
+  takes skill drops, keys, chest rewards, or the woodland prize, and isn't
+  counted as the Slime King's victor.
+- **Pay:** for every victory it fought in, the game pays its owner **$2**,
+  plus **$15** more if the Slime King falls. It's paid the moment the win is
+  saved, never taken from you, and never twice for the same battle. The
+  friend's pet updates live in every window, and the battle result says what
+  your ally earned.
+- **HP and MP** carry between battles for the run, like yours, and it
+  recovers 20% after each win. Knocked out, it **goes home** with what it
+  earned, and you can recruit someone again.
+- **Send home** (in the same menu) ends its part in the run outside a
+  battle. So does the run ending: clearing the woodland, your pet's defeat,
+  or leaving. The next run starts without an ally.
+- **When the friend comes back:** being your ally never makes their own pet
+  busy, even mid-battle. They can study, work, shop, fight, or start their
+  own adventure right away. If they start an adventure of their own, or
+  their pet joins another battle, it sits out your fights until that's
+  over. The menu says so, and it rejoins you after. Your run is never
+  rewritten for this, so your next move never fails for it.
+- On a **team**, each teammate can recruit one ally. Every ally beside a
+  battle fights in it, and its pay goes to its own owner.
+
+`POST /api/adventure` takes `{ "action": "recruit", "friend": "…",
+"revision": "…" }` and `{ "action": "dismiss-ally", "revision": "…" }`. The
+map's `ally` shows the recruited pet's look, carried HP/MP, equipped skill
+names, `away` (why it's sitting out, or `null`), and `earned` this run.
+
+### Monster battles
+
+Encounters use the Arena's turn-based battle scene, with the monster's own
+appearance, name, and attributes. Monsters choose their build's skills
+automatically and retain the free **Claw Strike** as a fallback. Players choose
+their pets' equipped skills, and damage uses the same power and luck rolls as Arena.
+
+Pets and monsters derive their **type** from their current effective stats.
+The highest stat must be at least 20% above both others: STR beats CHA,
+CHA beats INT, and INT beats STR. The advantaged fighter deals 20% more
+damage and takes 20% less damage from the disadvantaged fighter. Normal
+is neutral. This applies in Adventure, Arena, and revenge. A skill's
+attribute determines its damage stat; the fighter's type determines the
+matchup. Buffs and debuffs can change types during battle. If no stat
+qualifies, the pet is Normal; Normal skill perks additionally require
+all three stats within 20% (maximum ≤ 1.2 × minimum). Exactly 20% dominance
+counts as a specialized type, so Golden Ratio remains unavailable there.
+
+Evasion is 1 percentage point per positive CHA difference, capped at 30%.
+Phantom Perfume doubles that bonus, capped at 60%. Accuracy minus evasion
+is the final hit chance, clamped to 0–100%; sure-hit skills ignore both.
+Utilities and defenses cannot miss. Peer Review adds 25 percentage points
+before that final clamp. Type bonuses, Guard, and Gold apply to damage
+before final rounding. Old saved battles finish under their original rules.
+
+The **Slime King** also knows **Bump** (5 MP), which deals two-thirds of the
+target's *current* HP at impact, rounded up: a pet at 70 HP takes 47 before
+type mitigation and shields. When Bump is its strongest affordable attack,
+the king spends a full turn **charging**, dealing no damage and spending no
+MP. A visible warning names the target and stays beside the skill choices.
+Every living teammate gets a turn before the king releases Bump. The target
+stays fixed even if another pet heals to higher HP.
+
+Use Hardhat Guard or Mana Barrier to reduce the hit, defeat the king during
+the charge, or drain its MP below Bump's current cost to interrupt it. MP is
+paid only when Bump is released. If it cannot pay, or its target withdraws,
+the king uses Claw Strike instead and records the interruption. Its 6 MP
+allow one Bump; free Claw Strikes restore MP for another. Charging, target,
+and results are saved, so reconnecting cannot skip the response turn or
+reroll an attack. Old battles without this behavior keep their original rules.
+Pets cannot learn Bump. A solo player's coin always applies, even against a stronger
+monster. In a team battle, the strongest participating pet supplies the
+coin. Monsters never supply coins. The scene starts at the pet's saved HP/MP (plus any Copper shield),
+and each monster starts at full HP/MP.
+
+On victory, the monster stays defeated. A grass encounter keeps the pet on
+the grass tile it entered; beating the Slime King moves it onto the king's
+tile. Victory restores **20% of maximum HP and MP, rounded up separately**,
+capped at their
+maximums. For example, maximums of 31 HP and 7 MP restore up to 7 HP and 2
+MP after a win. The server applies this recovery once, alongside the
+outcome. Defeating the Slime King completes the woodland.
+
+Each victory also **trains every pet still standing that landed a hit**:
++1 to the main attribute of its own final hit, as in the Arena (Strength for
+STR skills, Intelligence for INT skills, Charisma for CHA skills, and a random
+attribute for Normal skills). **Beating the Slime King
+gives +1 to all three.**
+A knocked-out pet, or one whose teammates finished the monster before it
+struck, gains nothing. The gain is saved once with the victory, raises the
+maximum HP/MP without refilling them, and appears in the battle result.
+
+**Clearing the woodland.** Defeating the Slime King also pays the woodland's
+prize to the same pets its victory trains: each pet still standing that
+landed a hit gets
+
+- **$150**,
+- a guaranteed **Unfair Coin** it doesn't own yet, chosen at random (any of
+  the three once it owns them all), and
+- a **crown**: the pet's count of woodland clears goes up by one. The crown
+  shows in its pet details and beside its name in the Arena, for every
+  player to see, with the count once it has cleared more than once.
+
+The prize is chosen and saved together with the victory, so retrying,
+reloading, replaying, or a server restart never pays it twice or rolls a
+different coin. The battle result and the finished-run panel name what
+your pet received. **Happening now** tells everyone, live, which pets
+cleared the woodland: one entry per victory, naming the whole team that
+earned the prize. A knocked-out teammate, or one that never struck, gets
+neither the prize nor a mention.
+
+**Defeat ends the adventure.** HP stays at zero, and movement and stairs
+are disabled. Completing the woodland, losing, or choosing **End
+adventure** opens the result panel with battle records, the next-start
+cooldown, **Start new adventure**, **Team up**, and **Return to town**.
+**End adventure** asks for Yes/No confirmation first. Ending a run is free
+and leaves earned inventory intact. A new run begins at floor one
+with full HP/MP and fresh monsters, treasure, and locked gates.
+
+**Every confirmation is a Yes/No window.** Whenever the game needs you to
+confirm something, it opens a small window with the question and **Yes**
+and **No** — never the browser's own prompt. Focus starts on **No**, so a
+stray key never confirms; Escape or a click outside the window also
+answers No. A battle that starts while the window is open (a teammate's
+encounter, or an Arena fight) answers it No too, since the question no
+longer fits the moment.
+
+**Battle records unlock after the adventure ends.** Encounters show live
+skill choices and animate the resulting turns. A live fight cannot be
+skipped; replay and the attack log are unavailable during exploration.
+**Return to map** appears after the fight finishes. Returning
+acknowledges the saved result; if that request fails, **Continue exploring**
+lets you retry it. After the run ends and any pending result is
+acknowledged, the result panel lists its battles and offers replays and
+attack logs. It keeps the latest **50 battles** and shows the total when a
+long run exceeds that limit. Starting a new run clears that run's record.
+Replays use saved turns and cannot reroll an outcome or Floor Key drop,
+grant more recovery, or resurrect a monster.
+
+All 30 learnable skills have distinct animated vector effects, including
+shields and healing on the caster, a field effect on every fighter, and
+visible misses. Claw Strike, retained legacy skills, and the Slime King's
+Bump have their own effects too, with a separate crown-and-rings animation
+on the king while it charges. Basics are brief; finishers take about a
+second. Effects use saved results, pause in hidden tabs or behind another
+dialog, and clear between turns and when the battle closes. Reduced-motion
+mode shows static skill artwork and the same result text without pet motion.
+Closing or reopening a battle also invalidates its old pending UI requests
+and confirmations. Dismissed encounters are removed from the waiting queue,
+so an obsolete fight cannot open after the replay in front of it closes.
+
+**The first solo adventure is free. Later fresh starts cost 40 stamina and
+20 hygiene**, and open a **4-hour cooldown**. This applies whenever the
+player re-enters, including after leaving an unfinished run. Starting is
+refused if the pet lacks stamina/hygiene or the cooldown is active. The
+old run still ends, so a refused start cannot be used to resume it. An
+Hourglass clears the wait early, from the same shared count used elsewhere.
+The cooldown begins when the fresh run does and doesn't interrupt that run.
+After it ends, the result panel shows a compact progress bar, the time
+remaining, and **Skip wait (use Hourglass)**. Town also shows the saved
+cooldown. Adventure doesn't alter Arena wins/losses. Monster victories
+grant recovery and attribute training and can drop a missing Floor Key;
+chests grant the items below.
+
+### Treasure and inventory
+
+Stand on a treasure chest and press Space or choose **Open chest**. Each
+chest awards one reward per run: **Food 30%, Soap 30%, Ability 20%,
+Hourglass 15%, Unfair coin 5%**. Eligible relic scrolls have equal chances
+within the ability category, gated by their minimum floor below; Copper, Silver, and Gold Coins have equal
+chances within the coin category. Opened chests stay on the map, keep their
+reward, and can't be looted again. New adventures have fresh chests.
+Defeat, restarting, and signing out don't remove inventory.
+
+Floor Keys come from monster victories, not chests. They belong to their
+adventure floor rather than the pet's backpack; a new run starts with fresh
+locked gates and no keys.
+
+**Your backpack**, inside **Menu → Backpack & team**, shows items,
+learned abilities, and coins. Coins have **Equip**/**Unequip** controls.
+Food restores 40 stamina; soap
+restores 50 hygiene, capped at 100. Hourglasses finish the current lesson
+or shift. These are the same items used at home and in **Shops**, with a shared
+count — they don't restore Adventure HP/MP or revive a failed run. The
+Adventure section's **Abilities & coins** also shows permanent discoveries
+and coin equipment. Change battle skills at the storage chest in Sweet Home.
+
+Ability rewards are learned immediately and permanently. **Learning a skill
+does not equip it**: at home's storage chest, equip up to four skills,
+including the permanently available Claw Strike. That loadout works in
+Adventure, Arena, and revenge and is fixed for a live battle. Duplicate drops say **already learned**,
+without stacking the ability or rerolling the reward.
+
+**Saved skill loadouts:** in the home chest's **Battle skills**, equip your
+skills and choose **Save current** under Adventure, Arena, or Support. Each
+slot previews its saved skills. **Use** equips a saved setup; **Update from
+equipped** replaces just that slot with your current skills. Individual
+skill changes leave saved setups intact. The slots persist across sign-ins
+and server restarts, and start empty for both new and existing pets.
+These names are labels: the equipped setup applies to every battle until
+you change it at home. Switching activities does not automatically change
+skills. Loadouts only store skills; equipped coins and inventory stay as they
+are. Claw Strike and the four-skill limit still apply.
+Skill controls keep keyboard focus after a change. If live updates overlap
+a save, the skill book checks the latest saved pet before reporting success;
+if that check fails, it tells you the change was saved but could not be
+refreshed. An expired login returns to sign-in, and a login changed in another
+tab switches the skill book to that account.
+
+**30 learnable combat skills** appear in the home skill book with power,
+accuracy, effects, and the exact acquisition source. Claw Strike remains a
+starter fallback; previously learned Firebolt, Heavy Strike, Tide Crash,
+and Vine Lash are retained but no longer drop from chests.
+
+Job specializations teach 16 skills. Choose a specialization at its workplace
+and complete shifts: Lv.1 after the first shift, Lv.2 at 60 total minutes,
+Lv.3 at 180, Lv.4 at 360, and Lv.5 at 600. Job mastery is separate from wage
+promotions. An Hourglass completes the scheduled job's progress too.
+
+Monster victories have a 25% chance to teach an eligible technique to each
+surviving participant; the Slime King guarantees Bloodlust Crash. Drops
+prefer unlearned skills in that monster's eligible pool. Existing woodland
+monsters carry the themed technique scrolls listed below. Six relic scrolls
+come only from chests. All rewards persist and retries cannot award them twice.
+
+Damage starts at the scaling attribute × Power / 40 × the battle luck roll.
+Normal hybrid moves use the average of all three stats. HP bonuses are added
+before mitigation. MP recovery cannot exceed the current maximum. Bloodlust
+costs rounded-up HP and cannot knock out its caster. Mind Gap measures the MP
+difference before paying its cost. Siren's surcharge affects the next paid
+skill; free skills neither pay nor consume it, preserving a recovery route.
+Mana Barrier absorbs at most the available MP, at one MP per damage.
+
+Timed effects last their listed number of rounds (one action per fighter).
+Knocked-out fighters' skipped turns still advance effect time; an off-turn
+forfeit does not. Accuracy rolls happen when the server accepts a move, and
+the saved outcome is reused on retries and in replays.
+Recasting refreshes duration; for each stat, only the strongest positive and
+strongest negative modifier apply. Stat buffs change maximum resources but
+do not refill them; expiry clamps excess resources. Golden Ratio's all-stat
+buff lasts three turns. Healing and MP recovery carry back into Adventure,
+subject to the pet's permanent caps. Equalizer disables advantages for all
+fighters but does not make unbalanced stats qualify for Normal skill perks.
+
+| Skill | Attribute | Category | Power | Accuracy | MP | Acquisition source | Effect |
+| --- | --- | --- | ---: | --- | ---: | --- | --- |
+| Heavy Breath Slam | STR | Basic | 40 | 100% | 0 | Part-Time Job (Mover Lv.1) | STR damage. Restore 2 MP, even on a miss. |
+| Lumberjack Sweep | STR | Attack | 55 | Sure-hit | 2 | Part-Time Job (Logger Lv.2) | Cannot miss; ignores CHA evasion. |
+| Humble Pie | STR | Attack | 65 | 95% | 3 | Part-Time Job (Bouncer Lv.3) | On hit: target CHA −25% for 2 turns. |
+| Feral Maul | STR | Attack | 75 | 90% | 3 | Monster Drop (Wild Beast scroll: Goblin, floor 1+) | On hit: pin the target, setting evasion to 0 for 1 turn. |
+| Bloodlust Crash | STR | Finisher | 115 | 90% | 4 | Monster Drop (Alpha Boss scroll: Slime King, floor 5+) | Pay 15% Max HP to cast. Cannot use if that would knock you out. |
+| Titan’s Relic Press | STR | Finisher | 95 | 95% | 5 | Treasure Box (Ruins Chest, floor 2+) | Add 15% of your current HP to damage before mitigation. |
+| Gym Pump | STR | Utility | 0 | 100% | 2 | Part-Time Job (Gym Trainer Lv.2) | STR +25% for 3 turns, increasing damage and Max HP. Does not heal. |
+| Apex Roar | STR | Utility | 0 | 100% | 3 | Monster Drop (Apex Predator scroll: Goblin, floor 3+) | Target CHA −35% for 3 turns. Cannot miss. |
+| Hardhat Guard | STR | Defensive | 0 | 100% | 2 | Part-Time Job (Construction Lv.3) | Take 30% less damage for 2 turns. Recover 1 MP each time an attack hits you. |
+| Service Smile | CHA | Basic | 35 | 100% | 0 | Part-Time Job (Cafe Waiter Lv.1) | CHA damage. Restore 2 MP and gain CHA +10% for 1 turn, even on a miss. |
+| Heckler’s Jab | CHA | Attack | 60 | 100% | 2 | Part-Time Job (Street Performer Lv.2) | On hit: target CHA −20% for 2 turns. |
+| Dazzling Riposte | CHA | Attack | 65 | 95% | 3 | Monster Drop (Fey Creature scroll: Slime, floor 1+) | 130 Power if the target missed an attack on its last turn. |
+| Siren’s Lure | CHA | Attack | 70 | 95% | 4 | Monster Drop (Siren/Mimic scroll: Slime, floor 3+) | On hit: target’s next paid skill costs 2 extra MP. Free basics stay free. |
+| VIP Velvet Rope | CHA | Finisher | 85 | 95% | 6 | Part-Time Job (Idol Stage Lv.5) | Add 2 Power for each point your CHA exceeds the target’s. |
+| Crown Jewel Beam | CHA | Finisher | 115 | 90% | 7 | Treasure Box (Royal Vault, floor 3+) | On hit: drain up to 3 MP from the target into your own pool. |
+| Makeover Glow | CHA | Utility | 0 | 100% | 3 | Part-Time Job (Stylist Lv.3) | CHA +40% for 3 turns. |
+| Phantom Perfume | CHA | Defensive | 0 | 100% | 4 | Treasure Box (Mirage Chest, floor 2+) | Double CHA evasion (up to 60%) for 2 turns. Restore 2 MP whenever an attack misses you. |
+| Standing Ovation | CHA | Defensive | 0 | 100% | 5 | Part-Time Job (Theater Actor Lv.4) | Cleanse all stat debuffs and heal 35% Max HP. |
+| Paperplane Dart | INT | Basic | 40 | Sure-hit | 0 | Part-Time Job (Librarian Lv.1) | INT damage; cannot miss. Restore 3 MP. |
+| Synapse Shock | INT | Attack | 55 | 95% | 3 | Monster Drop (Mind Slime scroll: Slime, floor 2+) | On hit: destroy up to 3 of the target’s MP. |
+| Gravity Formula | INT | Attack | 60 | 95% | 4 | Part-Time Job (Lab Assistant Lv.2) | Add 10% of target Max HP to damage before mitigation. |
+| Laser Trajectory | INT | Attack | 75 | Sure-hit | 5 | Part-Time Job (Alchemist Lv.3) | Cannot miss; ignores CHA evasion. |
+| Mind Gap | INT | Finisher | 90 | 90% | 8 | Monster Drop (Elder Construct scroll: Goblin, floor 4+) | Damage +10% per MP you have over the target, measured before paying the cost. |
+| Forbidden Grimoire | INT | Finisher | 140 | 85% | 12 | Treasure Box (Ancient Archive, floor 5+) | A 140 Power INT spell. Requires at least 12 current MP. |
+| Peer Review | INT | Utility | 0 | 100% | 3 | Part-Time Job (Tutor Lv.3) | For 2 turns, your favorable type bonus and mitigation become 40%; accuracy +25 percentage points. |
+| Mana Barrier | INT | Defensive | 0 | 100% | 3 | Treasure Box (Crystal Chest, floor 1+) | For 2 turns, redirect half of incoming damage to MP, at 1 MP per damage. Overflow hits HP. |
+| Coffee Break | INT | Defensive | 0 | 100% | 0 | Part-Time Job (Researcher Lv.4) | INT +20% for 2 turns; restore 50% of the resulting Max MP. Takes your turn. |
+| Jack of All Trades | Normal | Attack | 70 | Sure-hit | 2 | Part-Time Job (Freelancer Lv.3) | Scales with average STR/CHA/INT. Balanced Normal pets deal +25% damage and recover 1 MP. |
+| Equalizer Field | Normal | Utility | 0 | 100% | 3 | Monster Drop (Chameleon Beast scroll: Goblin, floor 2+) | For 3 turns, target becomes Normal and all type advantages on the field are disabled. |
+| Golden Ratio | Normal | Finisher | 110 | 100% | 5 | Treasure Box (Sacred Shrine, floor 4+) | Requires balanced Normal stats. On hit: heal 20% Max HP and gain all stats +15% for 3 turns. |
+
+Choose one equipped skill on each turn. Buttons show current MP cost,
+hit chance, and any restriction; battle messages show misses, recovery,
+shield absorption and effects. Saved playback retains each turn's resource
+caps and types. Replaying never spends MP or rerolls an outcome.
+
+### Unfair coins
+
+A coin toss decides initiative before every monster battle, Arena fight,
+and revenge attempt: a fair 50/50 by default, where **heads** means the
+coin provider's side strikes first, and **tails** means its opponent does.
+In PvP, the higher sum of Strength, Intelligence, and Charisma chooses the
+provider. In cooperative monster battles, compare participating teammates.
+In solo monster battles, the player is always the provider. Attribute ties
+keep the initiating pet or earlier teammate; Copper's bonus is excluded
+from this comparison. The battle scene shows the
+result above the fighters for the whole battle, and replays show the same
+saved toss. Equipping an Unfair Coin can change that for the pet wearing
+it, and the scene then names the coin instead:
+
+| Coin | Effect |
+| --- | --- |
+| Copper Coin | +1 to every attribute, for that battle's HP/MP/damage only. The toss stays a fair 50/50. |
+| Silver Coin | The pet always attacks first. |
+| Gold Coin | The pet always attacks second, but its first attack deals double damage. |
+
+Coins are **reusable equipment, never consumed**: equip one (or none) from
+the backpack, and it stays equipped — in Adventure, Arena, and revenge
+alike — until changed. Only the **coin provider's** equipped coin applies;
+other participants' coins are ignored. Copper's bonus never
+persists: the pet's real attributes, and its saved maximum HP/MP, are
+unchanged once the battle ends.
+
+In Adventure, Copper adds 3 temporary HP. Its +1 INT adds a temporary MP
+only when it crosses the next five-point MP threshold. The unused bonus
+cannot become permanent healing; actual skill healing and MP regeneration
+are retained, then victory recovery is applied. Arena and revenge start at
+full resources, so the bonus raises their starting caps for that fight.
+
+The private `POST /api/adventure` accepts an empty body to read the saved
+state without starting or resetting a run. Its response includes an opaque
+`revision`; supply that revision with each mutating action:
+
+- `{ "action": "enter", "entryId": "…", "revision": "…" }` enters a fresh
+  adventure. Use a new entry ID for each visit and reuse it when retrying
+  that entry, so a retry cannot reset or charge twice. The first map entry
+  after a team sets off joins its prepared run instead. A fresh entry ends
+  any earlier run and acknowledges its pending battle before checking the
+  new start's cost and cooldown.
+- `{ "action": "leave", "revision": "…" }` ends the caller's current run
+  without ending teammates' runs.
+- `{ "direction": "w" | "a" | "s" | "d", "revision": "…" }` moves one tile.
+- `{ "action": "ascend" | "descend", "revision": "…" }` uses matching
+  stairs. Descending first unlocks a locked exit if its Floor Key has been
+  found; without the key, it returns 409 and the pet stays on the current
+  floor.
+- `{ "action": "continue", "battleId": "…", "revision": "…" }`
+  acknowledges a finished battle.
+- `{ "action": "battle-skill", "battleId": "…", "turnRevision": 0,
+  "ability": "claw-strike" }` selects the caller's equipped skill on their
+  current turn. The numeric turn revision is distinct from the map revision.
+- `{ "action": "battle-forfeit", "battleId": "…", "turnRevision": 0 }`
+  withdraws only the caller's pet, allowing remaining teammates to continue.
+- The older `{ "action": "abandon", "revision": "…" }` and
+  `{ "action": "restart", "revision": "…" }` actions remain supported for
+  compatibility. Abandon ends a run without a pending battle; restart
+  requires an ended run and applies the usual cost and cooldown.
+- `{ "action": "patrol" }` is a read-only refresh of the saved state,
+  including shared team progress. It needs no revision and never moves
+  monsters, advances grass encounters, or starts a battle.
+- `{ "action": "skip-cooldown", "revision": "…" }` spends one Hourglass to
+  clear an active cooldown early; refused with 409 if there's no Hourglass
+  to spend. A no-op, returning the current state, if no cooldown is
+  active.
+- `{ "action": "open-chest", "revision": "…" }` opens the chest under the
+  pet.
+- `{ "action": "use-item", "item": "food" | "soap" | "hourglass",
+  "revision": "…" }` uses one backpack item.
+
+Each response also includes `started`, `entryId`, and `awaitingEntry`
+(the one-time initial entry to a newly prepared team run), plus `team`:
+`null` on a solo run, or the team's `id` and every other teammate's `id`, `color`, `appearance`,
+`floor`, `x`, `y`, `hp`, `maxHp`, and `status` (`exploring`, `defeated`, or
+`abandoned`). In a team battle, `battle.fighter` gives the pet's place in
+`battle.playback.fighters` (the pets in order, then the monster last).
+`battleCount` is the run's total number of battles, and `recordLimit` is
+50. `records` is empty until the run ends and its pending battle is
+acknowledged, then contains the latest saved battles. During an active run,
+only a pending encounter includes battle state for live skill selection and animation;
+acknowledged battle playback is withheld until the run ends.
+
+The `grass` array matches the 16 × 16 terrain grid: `g` marks tall grass
+and `.` marks other tiles. Ordinary entries in `enemies` have
+`hidden: true` and omit coordinates and patrol routes; the Slime King has
+`hidden: false` with its visible `x` and `y`. Every enemy includes its
+`type` and `weakness` (the pet types with an advantage against it), plus
+`moves`; new builds also include `build` and `strategy`. Active boss battles
+may include `monsterIntent: { ability: "bump", target }`, with a fighter index
+for the locked target. A charge is a saved turn with `telegraph: true`,
+zero damage, and zero MP cost. A battle triggered by grass
+includes `battle.surprise: true`. Encounter seeds and counters stay on the
+server.
+
+The current floor's `exit` is `{ keyFound, unlocked, dropRate: 0.05 }`,
+or `null` on the final floor, which has no down stairs. A successful key
+drop is recorded as `battle.keyDrop: { floor, name: "Floor Key" }` in the
+saved battle, and a pet's victory training as `battle.trained` (for example
+`{ "strength": 1 }`). Both the key and the unlocked gate are shared by the team;
+neither is a backpack item. Existing saved floors without exit state
+migrate to unlocked exits.
+
+The **Team up** window uses `GET /api/team` (signed in), which returns the
+forming `team` the pet has joined (or `null`), its pending `invitations`,
+its own `run` (`team` id or `null`, `state`: `new`, `exploring`, or
+`ended`, and `awaitingEntry` for a newly prepared team run), and the team
+`size` limit. Each team lists `members` (the leader first), each with
+`joined` and, while forming, `waiting`: why that pet
+can't set off yet, or `null`. `POST /api/team` takes one action and
+answers with the same view:
+
+- `{ "action": "invite", "player": "…" }` invites a player, forming a team
+  led by the pet if it has none; 400 for a malformed ID, 404 for an
+  unknown player, 409 if not the leader, already on the team, or the team
+  is full.
+- `{ "action": "accept", "team": 7 }` joins an invitation; 404 if it's no
+  longer open, 409 while on another team.
+- `{ "action": "leave", "team": 7 }` declines an invitation or leaves;
+  when the leader leaves, the team disbands (`status: "disbanded"`, no
+  members).
+- `{ "action": "set-off" }` (leader only) starts the shared run; 409 with
+  the reason if anyone isn't ready.
+
+Each accepted action saves first, then broadcasts `team:updated` with the
+team as saved. Setting off also broadcasts each member's `pet:updated`
+first, for the stamina and hygiene spent.
+The browser opens the shared run once whether the set-off response or its
+live update arrives first; a delayed confirmation does not start another run.
+
+Stale revisions return the current saved state without applying the
+action, including retries after a battle or a new run. Movement pauses
+while a battle awaits acknowledgement. The server saves position, enemy
+removal, HP/MP, recovery, any Floor Key drop, and the exact playback in one
+atomic update. Retrying or replaying that battle never rolls for a key
+again.
+Clients can't choose stats, battle outcomes, rewards, enemy positions, or
+floors. Chest opening and its inventory grant commit in one database
+transaction; item use and its new revision do too. These actions can't
+award or consume twice when retried. Adventure battle results stay
+private. Inventory changes use the existing `pet:updated` WebSocket event,
+so home care, Shops, and other open windows stay current.

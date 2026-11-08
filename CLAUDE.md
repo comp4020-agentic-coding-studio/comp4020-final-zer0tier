@@ -1,6 +1,7 @@
 # VirtuePets — agent harness
 
-A multiplayer virtual pet game (see README.md). It runs on one Fly.io machine
+A multiplayer virtual pet game (see README.md for what good means, and
+docs/GUIDE.md for every rule and the API). It runs on one Fly.io machine
 with 256 MB of memory and one volume at `/data`. Every rule here follows from that.
 
 ## Working with the owner
@@ -138,8 +139,11 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
 4. **Clients act over HTTP; the socket only carries server → client events.**
 5. Validate every player ID with `isValidId` at the edge.
 6. Don't break the course invariants: `/` answers 200, and `/readme/` serves
-   README.md in full, rendered. Keep `spec/invariants.test.ts`. When behaviour
-   changes, update README.md in the same change.
+   README.md in full, rendered. Keep `spec/invariants.test.ts`. README.md is
+   the argument for what good means (400--600 words); rules, controls and the
+   API live in docs/GUIDE.md, served at `/guide/`. When behaviour changes,
+   update docs/GUIDE.md in the same change, and README.md when what good means
+   or its enforced/judged claims change.
 
 ## Checking your work
 

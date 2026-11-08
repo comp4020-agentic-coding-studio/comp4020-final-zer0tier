@@ -8,6 +8,7 @@ RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 COPY src/ src/
 COPY public/ public/
 COPY README.md ./
+COPY docs/GUIDE.md docs/
 # /data is the Fly volume (a tmpfs in CI)
 ENV NODE_ENV=production DATA_DIR=/data
 CMD ["node", "src/server.ts"]

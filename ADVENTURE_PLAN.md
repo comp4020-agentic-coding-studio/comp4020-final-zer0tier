@@ -22,7 +22,7 @@ Owner's direction (2026-10-19), replacing "they never start a battle
 themselves": a monster that has caught up with the pet attacks it directly.
 Once beside the pet, its next step walks into it and starts the battle, which
 leaves the player one step to strike first or get away.
-Initial stats and scaling are documented in README.md and can be balanced later.
+Initial stats and scaling are documented in docs/GUIDE.md and can be balanced later.
 
 ## 1. Adventure entry and exploration
 

@@ -76,7 +76,7 @@ it("a much weaker attacker always loses", async () => {
 });
 
 // The bot follows the median player, which the shared spec database can't pin
-// down; README.md records the hand check. What always holds: it's never weaker
+// down; docs/GUIDE.md records the hand check. What always holds: it's never weaker
 // than a new pet, and it never goes off to study or work.
 it("the bot keeps pace with the players: never weaker than a new pet", async () => {
   await newPet();
