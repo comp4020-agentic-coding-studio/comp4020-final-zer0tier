@@ -86,6 +86,13 @@ export function refreshPresence(): string[] {
   }
   const changed = next.size !== online.size || [...next].some(id => !online.has(id));
   for (const id of online) if (!next.has(id)) { stopping.add(id); leavingStands.add(id); }
+  // The away time ends for arrivals and begins for departures. Both are
+  // brought up to date before `online` changes: an arrival still counts as
+  // away, so it loses what it missed; a departure still counts as here, so the
+  // time it spent online costs nothing and its away time starts now.
+  for (const id of next) if (!online.has(id)) freshening.set(id, true);
+  for (const id of online) if (!next.has(id)) freshening.set(id, false);
+  freshenPending();
   online = next;
   if (changed) broadcast({ type: 'presence:updated', players: [...online] });
   stopPending();
@@ -110,6 +117,33 @@ function leaveStandsPending(): void {
   }
 }
 export const isOnline = (id: string): boolean => refreshPresence().includes(id);
+// Whether `id` was online at the last presence check, without checking again:
+// cheap enough to ask while bringing any pet up to date (src/needs.ts).
+export const onlineNow = (id: string): boolean => online.has(id);
+
+// Players whose pets' needs must be brought up to date because they just
+// arrived (the away time ends) or just left (the away time starts). Like
+// `stopping`, each stays listed until the write succeeds. Arrivals hear their
+// pet's new needs; departures change nothing anyone sees yet.
+const freshening = new Map<string, boolean>(); // id -> arrived
+let freshen: ((id: string) => Pet | undefined) | undefined;
+// src/server.ts hands this over, since this module can't import pets.ts's code.
+export function onNeedsChange(update: (id: string) => Pet | undefined): void { freshen = update; }
+// A retry after `online` has moved on counts the player as here, so a failed
+// arrival loses nothing rather than too much: the game errs toward the pet.
+function freshenPending(): void {
+  if (!freshen) return;
+  for (const [id, arrived] of freshening) {
+    try {
+      const pet = freshen(id);
+      freshening.delete(id);
+      if (arrived && pet) broadcast({ type: "pet:updated", pet });
+    } catch (error) {
+      console.error("could not bring a pet's needs up to date; retrying at the next presence check", error);
+      return;
+    }
+  }
+}
 
 export function clientsInRoom(): number {
   let count = 0;

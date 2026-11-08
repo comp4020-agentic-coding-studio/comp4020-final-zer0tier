@@ -458,6 +458,12 @@ async function perform(button, path, errorId, body) {
 }
 
 function renderMeters(pet) {
+  // Needs that drop while away are under play-test; say so only while the server has them on.
+  const decay = rules?.needsDecay;
+  $("needs-decay-note").hidden = !decay?.enabled;
+  if (decay?.enabled) {
+    $("needs-decay-note").textContent = `While you're away, stamina and hygiene slowly drop: ${decay.perHour.stamina} an hour, never below ${decay.floor.stamina}. Neighbours can feed and clean your pet while you're gone.`;
+  }
   for (const need of ["stamina", "hygiene"]) {
     const track = $(`meter-${need}`);
     track.setAttribute("aria-valuenow", pet[need]);

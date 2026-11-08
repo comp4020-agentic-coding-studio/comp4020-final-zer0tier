@@ -8,7 +8,8 @@ import {
 import { inventoryFor, grantTreasure } from "./inventory.ts";
 import { JOBS, SKILLS, jobLevel, type JobId } from './skills.ts';
 import { logEvent, ROOM } from "./logging.ts";
-import { clientsInRoom } from "./realtime.ts";
+import { clientsInRoom, onlineNow } from "./realtime.ts";
+import { NEEDS_DECAY, decay } from "./needs.ts";
 import { COINS, isCoinId, type CoinId } from "./treasure.ts";
 
 // Keep this literal list identical to public/app.js: the unbundled browser
@@ -184,6 +185,17 @@ const select = db.prepare(
 // second, and follows the wall clock, which can jump backwards.
 const listIds = db.prepare("SELECT id FROM pets ORDER BY id = ? DESC, rowid DESC LIMIT ?");
 const busyPets = db.prepare("SELECT id, busy_until FROM pets WHERE busy_until IS NOT NULL");
+// When a pet's needs were last brought up to date (src/needs.ts). Kept off the
+// pet clients see: it's bookkeeping, and moves on every time it's saved.
+const selectNeedsAt = db.prepare("SELECT needs_at FROM pets WHERE id = ?");
+const saveNeedsAt = db.prepare("UPDATE pets SET needs_at = ? WHERE id = ?");
+const needsAtOf = (id: string): number | null => (selectNeedsAt.get(id) as { needs_at: number | null } | undefined)?.needs_at ?? null;
+// The needs_at worked out while bringing a pet up to date, by ID. Every write
+// path brings the pet up to date first, synchronously in one transaction, so
+// write() saves this with those needs and forgets it. A refused action that
+// writes nothing forgets it too, leaving the next read to work the same drop
+// out again from the saved needs_at.
+const pendingNeedsAt = new Map<string, number | null>();
 const insert = db.prepare("INSERT OR IGNORE INTO pets (id) VALUES (?)");
 const save = db.prepare(
   // Only stealing changes steal_available_at, and only collecting the free
@@ -300,9 +312,19 @@ export type Outcome = { pet: Pet } | { status: 404 | 409 | 429; error: string; s
 
 const schoolOf = (pet: Pet) => SCHOOLS.findIndex((s) => s.id === pet.school);
 
-// Pays out an activity that has ended, moving up a school level if its
-// credit completes one. Returns whether there was one to finish.
+// Brings the pet up to `now`: first its needs drop for any away time (while
+// NEEDS_DECAY is on), then an activity that has ended pays out, moving up a
+// school level if its credit completes one. Returns whether there was an
+// activity to finish; a need that dropped is saved with the next write, and
+// worked out again the same way until then.
 function finishIfDue(pet: Pet, now: number): boolean {
+  if (NEEDS_DECAY.enabled && pet.id !== BOT_ID) {
+    const tracked = { ...pet, needsAt: needsAtOf(pet.id) };
+    decay(tracked, now, !onlineNow(pet.id));
+    pet.stamina = tracked.stamina;
+    pet.hygiene = tracked.hygiene;
+    pendingNeedsAt.set(pet.id, tracked.needsAt);
+  }
   if (pet.busyUntil === null || pet.busyUntil > now) return false;
   const reward = pet.reward!;
   const activity = pet.activity;
@@ -340,6 +362,11 @@ function write(pet: Pet): void {
       pet.activity, pet.task, pet.busySince, pet.busyUntil, pet.reward === null ? null : JSON.stringify(pet.reward),
       pet.wins, pet.losses, pet.color, pet.appearance, pet.equippedCoin, JSON.stringify(pet.equippedAbilities), JSON.stringify(pet.skillLoadouts), JSON.stringify(pet.skillJobs), pet.id,
     );
+    // The needs just saved are up to date as of when they were worked out.
+    if (pendingNeedsAt.has(pet.id)) {
+      saveNeedsAt.run(pendingNeedsAt.get(pet.id) ?? null, pet.id);
+      pendingNeedsAt.delete(pet.id);
+    }
     for (const skill of SKILLS) {
       if (!pet.abilities.includes(skill.id) && skill.source.channel === 'job' && jobLevel(pet.skillJobs[skill.source.job] ?? 0) >= skill.source.level) {
         grantTreasure(pet.id, { category: 'ability', id: skill.id, name: skill.name, quantity: 1 });
@@ -367,17 +394,39 @@ export function settle(id: string, endedAt = 0): { pet: Pet; finished: boolean }
   return { pet: finished ? getPet(id)! : pet, finished };
 }
 
+// Brings a pet's needs up to date for its owner arriving or leaving, saving
+// them only if they changed (an activity that ended on the way is paid out
+// too). Returns the pet if anything was saved, for the caller to broadcast.
+export function freshenNeeds(id: string): Pet | undefined {
+  if (id === BOT_ID) return undefined;
+  return transaction(() => {
+    const pet = getPet(id);
+    if (!pet) return undefined;
+    if (!NEEDS_DECAY.enabled) return undefined;
+    const before = { stamina: pet.stamina, hygiene: pet.hygiene, needsAt: needsAtOf(id) };
+    const finished = finishIfDue(pet, Date.now());
+    const changed = finished || before.stamina !== pet.stamina || before.hygiene !== pet.hygiene;
+    if (!changed && before.needsAt === pendingNeedsAt.get(id)) { pendingNeedsAt.delete(id); return undefined; }
+    write(pet);
+    return changed ? getPet(id) : undefined;
+  });
+}
+
 // Reads the pet, finishes any activity that's due, lets `change` edit it (or
 // refuse with a reason), and writes it back. DatabaseSync is synchronous and
 // the app is one process, so nothing can slip in between the read and write.
 function act(id: string, change: (pet: Pet) => string | undefined): Outcome {
   const pet = getPet(id);
   if (!pet) return { status: 404, error: "no such pet" };
+  const saved = { stamina: pet.stamina, hygiene: pet.hygiene };
   const finished = finishIfDue(pet, Date.now());
+  // Needs that dropped while the owner was away are news even if the action
+  // is refused ("Too tired to study"), so the refusal saves and shows them.
+  const dropped = pet.stamina !== saved.stamina || pet.hygiene !== saved.hygiene;
   const next = { ...pet, jobs: { ...pet.jobs } };
   const refusal = combatBusy(id) ?? change(next);
   if (refusal) {
-    if (!finished) return { status: 409, error: refusal };
+    if (!finished && !dropped) { pendingNeedsAt.delete(id); return { status: 409, error: refusal }; }
     write(pet);
     return { status: 409, error: refusal, settled: getPet(id)! };
   }

@@ -50,6 +50,10 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
 - While the pet works or studies, show a compact progress bar and time remaining
   on the town map. Keep it hidden at home and when the pet is idle, and use the
   saved activity timing and server-confirmed completion.
+- Needs that drop while the owner is away (`src/needs.ts`) are an owner-run
+  play-test: keep them off unless `NEEDS_DECAY=on`, and with them off, keep pet
+  data and behaviour exactly as before. Never let decay go below its floor, take
+  online or busy time, or reach the bot. `needs_at` stays server-side.
 - The weekly town goal shows a compact bar on the town map, below the activity
   bar and hidden at home; the fountain opens its details. Every Food a pet eats
   is a meal for whoever served it, counted in the feeding's transaction. Helpers

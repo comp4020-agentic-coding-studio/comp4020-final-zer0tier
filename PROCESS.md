@@ -335,6 +335,16 @@ phrases are enough to say what players want to say. Friends lists are built
 too; play-test whether a one-way star is enough, or whether players expect a
 friend request that both sides accept. The weekly town goal is built too;
 watch whether 100 meals is a week's stretch for the real player count, and
-whether $25 and 1 Food is enough to make players feed a neighbour's pet. Watching makes the
+whether $25 and 1 Food is enough to make players feed a neighbour's pet.
+
+Needs that drop while a player is away (2 points an hour, floor 30) are built
+but **off**, because they change the game's balance for everyone. Before turning
+them on for good, play-test with real players: switch `NEEDS_DECAY=on` for a few
+days, then ask whether coming back to a hungrier pet feels like a reason to
+return or like a chore, whether neighbours actually feed and clean pets more,
+and whether a pet on its floor of 30 ever stops a player doing what they came
+for. Watch for a player who comes back once a day losing a whole study session's
+worth (30 stamina is the study minimum). If it feels harsh, lower the rate or
+raise the floor in `src/needs.ts`; if nobody notices, raise the rate. Watching makes the
 decision record's broadcast question concrete: a fight's turns now reach its
 fighters and the players watching it, but nobody else.

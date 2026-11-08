@@ -16,7 +16,7 @@ import {
   WORK_COST_PER_HOUR, buy, findCourse, findItem, findLocation, getOrCreatePet, getPet, isShiftLength, isValidId,
   matchBot, study, upgrade, use, work, BOT_ID, FIGHT_COOLDOWN_MINUTES, FIGHT_COST, FIGHT_NEEDS, LUCK, POWER_WEIGHTS,
   SPOILS, LEADERBOARD_ORDERS, LEADERBOARD_SIZE, fight, isLeaderboardOrder, leaderboard, listPets, recentFights,
-  APPEARANCES, isAppearance, setAppearance, STEAL, steal, help, gift, isGiftId, GIFTS, theftsFor, revenge, equipCoin, FREE_SUPPLIES, collectSupplies,
+  APPEARANCES, isAppearance, setAppearance, freshenNeeds, STEAL, steal, help, gift, isGiftId, GIFTS, theftsFor, revenge, equipCoin, FREE_SUPPLIES, collectSupplies,
   ADVENTURE_COST, ADVENTURE_COOLDOWN_MINUTES, equipSkills, battleSessionsFor, battleSessionFor, actInBattle, type BattleSessionOutcome, type Outcome,
   SKILL_LOADOUTS, saveSkillLoadout, equipSkillLoadout,
 } from "./pets.ts";
@@ -27,7 +27,8 @@ import {
 import { TIME_SCALE } from "./clock.ts";
 import { recentFeed } from "./feed.ts";
 import { followUp } from "./followups.ts";
-import { attachRealtime, broadcast, cancelStop, clientsInRoom, isOnline, refreshPresence } from "./realtime.ts";
+import { attachRealtime, broadcast, cancelStop, clientsInRoom, isOnline, onNeedsChange, refreshPresence } from "./realtime.ts";
+import { NEEDS_DECAY } from "./needs.ts";
 import { emoteWorld, moveWorld, setWorldOutfit, worldPosition } from './world.ts';
 import { closeStands, emptyStands, liveBattles, standsNews, unwatch, watch } from './watch.ts';
 import { logEvent, ROOM } from "./logging.ts";
@@ -462,6 +463,7 @@ app.get("/api/rules", (_req, res) => {
     leaderboardSize: LEADERBOARD_SIZE,
     guestbook: { phrases: PHRASES, kept: NOTES_KEPT, cooldownMs: NOTE_COOLDOWN_MS },
     friends: { max: FRIENDS_MAX },
+    needsDecay: NEEDS_DECAY,
     townGoal: TOWN_GOAL,
   });
 });
@@ -767,6 +769,8 @@ app.use(express.static("public", {
 const server = createServer(app);
 // Nobody is connected at start, so nobody is in the stands yet.
 emptyStands();
+// Arriving and leaving bring a pet's needs up to date (src/needs.ts).
+onNeedsChange(freshenNeeds);
 attachRealtime(server);
 scheduleAll(); // lessons and shifts that were running when the app last stopped
 getOrCreatePet(BOT_ID);

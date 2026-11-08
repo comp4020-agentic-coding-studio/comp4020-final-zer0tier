@@ -25,6 +25,10 @@ dockerfile = "Dockerfile"
 
 [env]
 PORT = "8080"
+# Needs that drop while players are away is a play-test, off by default. Add
+# this line (or `flyctl secrets set NEEDS_DECAY=on`) and redeploy to switch it
+# on; remove it to switch it off. See README "Stamina, hygiene and work".
+# NEEDS_DECAY = "on"
 
 [http_service]
 internal_port = 8080

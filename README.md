@@ -44,7 +44,11 @@ the point of the game, not boxes to tick:
   records; `spec/watch.test.ts` checks the stands get each turn and the crowd
   count within a second, and nobody else does.
 - **Nothing you did is lost (persists).** Pets, accounts, fights, and
-  unfinished lessons and shifts all live in SQLite on the Fly volume. A shift
+  unfinished lessons and shifts all live in SQLite on the Fly volume. While
+  needs that drop over time are on, each pet also keeps when its needs were
+  last brought up to date (`needs_at`, never sent to clients), so the time a
+  player was away is worked out from the database, never from memory, and is
+  never taken twice. A shift
   still running when the server restarts still finishes and pays.
   *Enforced:* signing back in returns the same pet (`spec/pets.test.ts`).
   *Checked by hand:* survival across a restart, which the spec can't
@@ -475,6 +479,23 @@ costs. Studying needs enough for the lesson *and* an hour's shift afterward
 (30 stamina and 30 hygiene), so a pet can always work its way back to
 health.
 
+**Needs that drop while you're away (play-test, off by default).** With the
+server's `NEEDS_DECAY` setting on, a pet slowly gets hungry and grubby while
+its owner is away: stamina and hygiene each drop **2 points an hour**, and stop
+at a floor of **30**. That's about half full after a day away; after that the
+pet rests on the floor however long you're gone. Thirty still covers an hour's
+shift or a fight, so a neglected pet can always work its way back, and a need
+that's already lower (after a long shift, say) never drops further. Nothing is
+lost while you're online, or while the pet is studying or working (those already
+cost it), and the bot never gets hungry. It runs on real time even on the
+accelerated test clock, so checking in often loses no more than staying away.
+What your pet lost shows when you come back: your windows, and anyone visiting,
+get its new needs within a second of you connecting. That gives neighbours'
+**Feed** and **Clean** more to do while you're gone. The pet window says how it
+works only while it's on. It ships off, so live players are unaffected until a
+play-test switches it on: set `NEEDS_DECAY=on` (see `fly.toml`), and unset it to
+switch it off again, with no code change.
+
 ### Work
 
 Open **Part-time Jobs** on the town map. There are three places to work,
@@ -898,7 +919,7 @@ and the built-in `node:sqlite` for storage.
   game (newest first), `GET /api/leaderboard?by=wins` (or `power`) the top
   10 players, and `GET /api/rules` the schools, courses, work locations,
   items, and costs, plus each battle skill's type and the type chart
-  (`fight.types`).
+  (`fight.types`), and `needsDecay` (`{ enabled, perHour, floor }`).
 - **Live battles** (participants only): `GET /api/battles` lists the signed-in
   pet's active Arena/revenge sessions; `GET /api/battles/:battle` reads one
   saved session. `POST /api/battles/:battle/turn` takes

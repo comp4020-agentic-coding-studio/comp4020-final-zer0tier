@@ -200,6 +200,10 @@ if (!columns.has("skill_loadouts")) db.exec("ALTER TABLE pets ADD COLUMN skill_l
 if (!columns.has("skill_jobs")) db.exec("ALTER TABLE pets ADD COLUMN skill_jobs TEXT NOT NULL DEFAULT '{}'");
 // How many times this pet has helped defeat the Slime King and clear the woodland.
 if (!columns.has("woodland_clears")) db.exec("ALTER TABLE pets ADD COLUMN woodland_clears INTEGER NOT NULL DEFAULT 0");
+// When this pet's needs were last brought up to date (epoch ms, real time):
+// they drop over the away time since, if NEEDS_DECAY is on (src/needs.ts).
+// NULL until the pet is first brought up to date, which counts from then.
+if (!columns.has("needs_at")) db.exec("ALTER TABLE pets ADD COLUMN needs_at INTEGER");
 const fightColumns = new Set(
   (db.prepare("SELECT name FROM pragma_table_info('fights')").all() as { name: string }[]).map((c) => c.name),
 );
