@@ -1058,8 +1058,9 @@ without refilling current HP/MP.
 ### Teaming up
 
 An adventure can be played alone or with up to three other players.
-The first visit opens **Team up?**, where players choose a solo run or form
-a team. The finished-run panel offers **Team up** for later adventures.
+Every new run starts with **Team up?**, where players choose a solo run or form
+a team: on a first visit, and whenever you press **Start new adventure** after a
+run ends (once its records have shown). A run still under way reopens as it was.
 
 - **Go solo** starts a fresh woodland run. The first solo adventure is
   free; later starts use the normal cost and cooldown.

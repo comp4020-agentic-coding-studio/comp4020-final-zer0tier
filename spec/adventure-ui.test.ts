@@ -503,6 +503,7 @@ it('shows a failed run with disabled movement and starts a fresh adventure only 
   let saved: ReturnType<typeof battleProgress> | ReturnType<typeof map> = failed;
   let entrances = 0;
   const requests = vi.fn(async (_url: string, options: RequestInit) => {
+    if (_url === '/api/team') return Response.json({ team: null, invitations: [], run: { team: null, state: 'ended' }, size: 4 });
     const body = JSON.parse(options.body as string);
     if (body.action === 'continue') saved = { ...saved, battle: { ...failed.battle, pending: false } };
     if (body.action === 'enter') saved = { ...(entrances++ ? map() : saved), entryId: body.entryId };
@@ -528,10 +529,14 @@ it('shows a failed run with disabled movement and starts a fresh adventure only 
     for (const button of $('adventure-dialog').querySelectorAll<HTMLButtonElement>('[data-direction]')) expect(button.disabled).toBe(true);
     $('adventure-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key: 's', bubbles: true }));
     expect(requests).toHaveBeenCalledTimes(3);
+    // Starting again asks "alone or with a team?" first; going solo starts the run.
     $('adventure-restart').click();
+    await vi.waitFor(() => expect(($('team-dialog') as HTMLDialogElement).open).toBe(true));
+    $('team-solo').click();
     await vi.waitFor(() => expect($('adventure-failure').hidden).toBe(true));
+    // The fresh run's HP arrives once its entry is saved.
+    await vi.waitFor(() => expect($('adventure-resources').textContent).toBe('HP 15 / 15 · MP 5 / 5'));
     expect($('adventure-restart').hidden).toBe(true);
-    expect($('adventure-resources').textContent).toBe('HP 15 / 15 · MP 5 / 5');
     expect($('adventure-battle-summary').hidden).toBe(true);
     expect($('adventure-grid').querySelectorAll('.adventure-marker-slime')).toHaveLength(0);
   } finally { dom.window.close(); }
@@ -892,6 +897,7 @@ it('after defeat keeps the Hourglass and new-adventure choices on the end card w
   let entrances = 0;
   const bodies: any[] = [];
   window.fetch = vi.fn(async (_url: string, options: RequestInit) => {
+    if (_url === '/api/team') return Response.json({ team: null, invitations: [], run: { team: null, state: 'ended' }, size: 4 });
     const body = JSON.parse(options.body as string);
     bodies.push(body);
     if (body.action === 'continue') saved = { ...saved, revision: 'returned', battle: { ...saved.battle, pending: false } };
@@ -914,9 +920,13 @@ it('after defeat keeps the Hourglass and new-adventure choices on the end card w
     await vi.waitFor(() => expect($('adventure-cooldown-panel').hidden).toBe(true));
     expect(bodies.at(-1)).toEqual({ action: 'skip-cooldown', revision: 'returned' });
     expect(($('confirm-dialog') as HTMLDialogElement | null)?.open).not.toBe(true);
+    // Starting again asks "alone or with a team?" first; going solo starts the run.
     $('adventure-restart').click();
+    await vi.waitFor(() => expect(($('team-dialog') as HTMLDialogElement).open).toBe(true));
+    $('team-solo').click();
     await vi.waitFor(() => expect($('adventure-failure').hidden).toBe(true));
-    expect(bodies.at(-1)).toMatchObject({ action: 'enter', revision: 'rested', entryId: expect.any(String) });
+    // Going solo saves a fresh entry for the new run.
+    await vi.waitFor(() => expect(bodies.at(-1)).toMatchObject({ action: 'enter', entryId: expect.any(String) }));
     expect(window.document.activeElement?.id).toBe('adventure-grid');
   } finally { dom.window.close(); }
 });
@@ -1690,5 +1700,31 @@ it('names the ally\'s pay, or that it went home knocked out, in the battle resul
     await vi.waitFor(() => expect(($('battle-dialog') as HTMLDialogElement).open).toBe(true));
     $('battle-skip').click();
     expect($('battle-status').textContent).toContain("pal's pet was knocked out and went home, earning pal $2.");
+  } finally { dom.window.close(); }
+});
+
+it('asks "alone or with a team?" before every new run, so a host can invite friends, while a run under way reopens as it was', async () => {
+  const { dom, window, $ } = page();
+  Object.defineProperty(window.document, 'hidden', { value: true });
+  const lobby = { team: null, invitations: [], run: { team: null, state: 'ended' }, size: 4 };
+  // A pet that has played before and finished its last run.
+  const saved: any = { ...map(), started: true, completed: true, records: [], battleCount: 0 };
+  window.fetch = vi.fn(async (url: string) => {
+    if (url === '/api/team') return Response.json(lobby);
+    return Response.json(saved);
+  }) as unknown as typeof fetch;
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    window.document.dispatchEvent(new window.CustomEvent('adventure:pet', { detail: { id: 'explorer', color: '#123456', appearance: 'cat', activity: 'idle', coins: {} } }));
+    $('adventure-open').click();
+    // The finished run still opens on its summary first, records and all.
+    await vi.waitFor(() => expect(($('adventure-dialog') as HTMLDialogElement).open).toBe(true));
+    await vi.waitFor(() => expect($('adventure-restart').hidden).toBe(false));
+    // Starting a new run asks first. Before the fix it went straight to a solo run.
+    $('adventure-restart').click();
+    await vi.waitFor(() => expect(($('team-dialog') as HTMLDialogElement).open).toBe(true));
+    expect(($('adventure-dialog') as HTMLDialogElement).open).toBe(false);
+    expect($('team-invite').hidden).toBe(false);
+    expect($('team-solo').hidden).toBe(false);
   } finally { dom.window.close(); }
 });

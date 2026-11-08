@@ -1404,9 +1404,10 @@ adventure.querySelector('#adventure-replay').addEventListener('click', () => {
   adventure.querySelector('#adventure-replay').setAttribute('aria-expanded', String(!list.hidden));
 });
 adventure.querySelector('#adventure-open-chest').addEventListener('click', () => request({ action: 'open-chest' }));
-adventure.querySelector('#adventure-restart').addEventListener('click', async () => {
-  await enterMap();
-});
+// Starting a new run always asks first: alone, or with a team. Without this,
+// a host could only ever go solo after their first adventure, with no way to
+// invite friends or be asked to join. Go solo there starts the run as before.
+adventure.querySelector('#adventure-restart').addEventListener('click', chooseTeam);
 // Once a run is over, the next can be a team's instead.
 adventure.querySelector('#adventure-team-up').addEventListener('click', chooseTeam);
 // Asks Yes or No in the game's confirmation window (public/confirm.js).
