@@ -54,7 +54,7 @@ Every rule follows from one 256 MB Fly machine with one volume:
   and server-sent events is in
   [ADR 2](docs/adr/0002-websockets-for-server-news.md).
 - **No front-end framework or build step.** Less to fit in 256 MB, but
-  `public/app.js` is now the largest file, the first thing I'd revisit.
+  `public/app.js` has grown the largest.
 
 The rule that carries the most weight is that every real-time event needs a
 spec that opens real WebSockets and sees it arrive within a second. `spec/`
@@ -79,13 +79,18 @@ touching a visited pet through the server so its owner knows someone came
 ([`12cdf79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/12cdf79)),
 then gifts and watching live fights. The last week followed the same test:
 friends lists
-([`f8c4c9b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/f8c4c9b))
-and a weekly town goal where every pet fed counts for the whole town
-([`9daa5be`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/9daa5be)).
+([`f8c4c9b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/f8c4c9b)),
+a weekly town goal where every pet fed counts for the whole town
+([`9daa5be`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/9daa5be)),
+and asking to join a friend's adventure from their home
+([`39d44f2`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/39d44f2)).
+A review of that last feature caught a request that could go stale when the
+asker joined another team; joining now withdraws it, with a spec that fails
+without the fix
+([`4607291`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/4607291)).
 Needs that drop while you're away went in **switched off**
-([`0d639e8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0d639e8)):
-it changes balance for every player, so it waits for a play-test rather than
-shipping on a guess.
+([`0d639e8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/0d639e8)),
+waiting for a play-test rather than shipping on a guess.
 
 ## Corrections, and where they landed
 
@@ -107,8 +112,8 @@ I aimed for every fix to land in the harness rather than as a retry:
   `CLAUDE.md` rule it broke was rewritten to name the exception rather than
   bent quietly
   ([`bccd0d1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/bccd0d1)).
-- A review found ten problems in a week's features. For the worst two, an ally
-  winning alone after its recruiter forfeited, the agent undid each fix to show
+- A review found ten problems in a week's features. For the worst, an ally
+  winning alone after its recruiter forfeited, the agent undid the fix to show
   the new spec fails, then put it back
   ([`8aafd31`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/8aafd31)).
 
@@ -126,12 +131,11 @@ positions skip the wait. The measurements and the two fixes I dropped are in
 
 Everything up to fights went in as one commit,
 [`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f),
-because I didn't commit as I went. Once I noticed, I told the agent to commit
-after every task, and
-[`fbda12f...7a27f8b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/compare/fbda12f...7a27f8b)
-shows one focused commit per change since. The README itself grew to 17,000
-words of rules before I split it: the argument stays in `README.md`, and every
-rule and the API moved to `docs/GUIDE.md`.
+because I didn't commit as I went. After that I had the agent commit after
+every task
+([`fbda12f...7a27f8b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/compare/fbda12f...7a27f8b)).
+The README also grew past 16,000 words of rules before I split the argument
+from `docs/GUIDE.md`.
 
 ## Next
 
