@@ -587,7 +587,7 @@ new MutationObserver(() => { visitPet.dataset.reaction = worldById('visit-touch'
   .observe(worldById('visit-touch'), { attributes: true, attributeFilter: ['data-reaction'] });
 const visitBar = document.createElement('div');
 visitBar.id = 'world-visit-bar'; visitBar.hidden = true;
-visitBar.innerHTML = '<span></span><button type="button" class="world-button">Leave home</button>';
+visitBar.innerHTML = '<span></span><button type="button" class="world-button">Go home</button>';
 worldShell.querySelector('.world-main').append(visitBar);
 visitBar.querySelector('button').addEventListener('click', () => worldById('visit-close').click());
 
@@ -605,7 +605,7 @@ function worldRenderVisit() {
   // The host's TV, chest, clock and the rest stay put (Escape still opens
   // your own game menu, which is yours, not the house's).
   for (const object of worldShell.querySelectorAll('[data-home-action]')) {
-    if (['pet', 'door'].includes(object.dataset.homeAction)) continue;
+    if (object.dataset.homeAction === 'pet') continue;
     object.disabled = Boolean(visiting);
   }
   if (!visiting) return;
@@ -711,7 +711,9 @@ function worldReceive(player) {
       worldIntent = { ...worldPosition };
       worldIntentFacing = player.facing;
     }
-    if (player.scene === 'home' && player.y > 558 && Math.abs(player.x - 480) < 55) worldChangeScene('town');
+    // Your own front door leads to town. A visitor stays inside the host's
+    // home; Go home is their way out.
+    if (player.scene === 'home' && !worldVisiting() && player.y > 558 && Math.abs(player.x - 480) < 55) worldChangeScene('town');
   } else worldRenderPeers();
 }
 
@@ -853,7 +855,8 @@ document.addEventListener('visit:pet', event => {
   worldVisitedPet = event.detail;
   worldRenderVisit();
 });
-document.addEventListener('home:leave', () => worldChangeScene('town'));
+// Ending a visit takes the visitor back to their own home.
+document.addEventListener('home:leave', () => worldChangeScene('home'));
 const worldInteractionButtons = [...original.play.querySelectorAll('[data-touch]'), worldById('home-feed'), worldById('home-clean')];
 function worldSelectInteraction(kind) {
   let label = '';
@@ -1035,11 +1038,12 @@ function worldChangeScene(scene, focus = true, home = worldPlayerId, confirmed =
   worldDraw();
   if (focus && !worldDashboard.hidden) worldStage.focus({ preventScroll: true });
 }
-worldById('home-door').addEventListener('click', () => worldChangeScene('town'));
+worldById('home-door').addEventListener('click', () => { if (!worldVisiting()) worldChangeScene('town'); });
 worldById('town-home').addEventListener('click', () => worldChangeScene('home'));
 worldById('world-home').addEventListener('click', () => worldChangeScene('home'));
-worldById('world-town').addEventListener('click', () => worldChangeScene('town'));
-worldById('world-map').addEventListener('click', () => worldChangeScene(worldScene === 'home' ? 'town' : 'home'));
+// A visitor's way out is Go home; these never take a guest into town.
+worldById('world-town').addEventListener('click', () => { if (!worldVisiting()) worldChangeScene('town'); });
+worldById('world-map').addEventListener('click', () => { if (!worldVisiting()) worldChangeScene(worldScene === 'home' ? 'town' : 'home'); });
 
 function worldCare(kind) {
   const source = worldById('items').querySelector(`[data-item="${kind}"] .chip-use`);
@@ -1057,8 +1061,8 @@ worldById('home-clean').addEventListener('click', () => worldCare('soap'));
 for (const button of worldShell.querySelectorAll('[data-home-action]')) {
   button.addEventListener('click', () => {
     const action = button.dataset.homeAction;
-    // A guest uses only the host's pet (its own handler) and the door.
-    if (worldVisiting() && action !== 'door') return;
+    // A guest uses only the host's pet (its own handler); Go home is their way out.
+    if (worldVisiting()) return;
     if (action === 'tv') worldOpenPlace('journal');
     if (action === 'bed') worldOpenPlace('appearance');
     if (action === 'chest') worldOpenPlace('backpack');
@@ -1144,7 +1148,7 @@ function worldWalkable(x, y) {
 }
 function worldTargets() {
   if (worldVisiting()) return [
-    [480, 375, `Visit ${worldHome}'s pet`, '[data-home-action="pet"]', 90], [480, 565, 'Leave for town', '#home-door'],
+    [480, 375, `Visit ${worldHome}'s pet`, '[data-home-action="pet"]', 90],
   ];
   if (worldScene === 'home') return [
     [220, 241, 'Watch town TV', '[data-home-action="tv"]'], [215, 390, 'Sit on the couch', '[data-home-action="couch"]'],
@@ -1265,7 +1269,7 @@ function worldTick(now) {
     } else {
       if (worldAvatar.dataset.facing !== facing) worldAvatar.dataset.facing = facing;
       worldDraw();
-      if (worldScene === 'home' && worldPosition.y > 558 && Math.abs(worldPosition.x - 480) < 55) return worldChangeScene('town');
+      if (worldScene === 'home' && !worldVisiting() && worldPosition.y > 558 && Math.abs(worldPosition.x - 480) < 55) return worldChangeScene('town');
     }
   }
   if (worldNetworked()) worldPosition = confirmed;
@@ -1328,7 +1332,7 @@ for (const button of worldShell.querySelectorAll('[data-world-direction]')) {
       }
       worldPosition = { x, y };
     }
-    if (worldScene === 'home' && worldPosition.y > 558 && Math.abs(worldPosition.x - 480) < 55) return worldChangeScene('town');
+    if (worldScene === 'home' && !worldVisiting() && worldPosition.y > 558 && Math.abs(worldPosition.x - 480) < 55) return worldChangeScene('town');
     worldDraw();
   });
 }

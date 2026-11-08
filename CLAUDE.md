@@ -65,7 +65,8 @@ the one clicking, raise that with the owner instead of building it.
 
 - Human opponents must be online to start Arena or revenge fights. Visits
   remain available whether the owner is home, elsewhere, or offline. A visitor
-  uses only the host's pet and the door, never the host's furniture. Asking to
+  stays inside the host's home and uses only the host's pet, never the host's
+  door or furniture; Go home takes them back to their own home. Asking to
   join a host's adventure team needs the host online and forming a team, and
   only the leader answers. Share
   saved character positions live between everyone in the same home or town.

@@ -602,10 +602,13 @@ it('opens the visited pet controls from the home hotspot and leaves personal car
     expect(p.$('world-panel-pet').hidden).toBe(true);
     expect(p.$('world-panel-visit').hidden).toBe(false);
     p.$('world-dialog-close').click();
+    expect(p.$('world-visit-bar').querySelector('button')!.textContent).toBe('Go home');
     p.$('world-visit-bar').querySelector('button')!.click();
-    // app.js owns the Leave action; the scene listens to the resulting event.
+    // app.js owns the Go home action; the scene listens to the resulting event
+    // and takes the visitor back to their own home, not the town.
     p.window.document.dispatchEvent(new p.window.CustomEvent('home:leave'));
-    expect(p.$('world-stage').dataset.scene).toBe('town');
+    expect(p.$('world-stage').dataset.scene).toBe('home');
+    expect(p.$('world-stage').getAttribute('aria-label')).toContain('Your home');
   } finally { p.window.close(); }
 });
 
@@ -613,12 +616,15 @@ it("lets a visitor use only the host's pet and the door, never the host's furnit
   const p = page();
   try {
     const object = (action: string) => p.window.document.querySelector<HTMLButtonElement>(`[data-home-action="${action}"]`)!;
-    const furniture = ['tv', 'couch', 'fire', 'bed', 'feed', 'clean', 'chest', 'menu'];
+    const furniture = ['tv', 'couch', 'fire', 'bed', 'feed', 'clean', 'chest', 'menu', 'door'];
     p.window.document.dispatchEvent(new p.window.CustomEvent('home:visit', { detail: { id: 'neighbour' } }));
     // The host's things are off-limits: disabled, so click, tap and Tab all skip them.
     for (const action of furniture) expect(object(action).disabled, action).toBe(true);
     expect(object('pet').disabled).toBe(false);
-    expect(object('door').disabled).toBe(false);
+    // The host's front door doesn't lead a guest into town, even when clicked.
+    object('door').disabled = false; object('door').click(); object('door').disabled = true;
+    expect(p.$('world-stage').dataset.scene).toBe('home');
+    expect(p.$('world-stage').getAttribute('aria-label')).toContain("neighbour's home");
     // Clicking one anyway opens nothing (it used to open the visitor's own journal or backpack).
     object('tv').disabled = false; object('tv').click(); object('tv').disabled = true;
     object('chest').disabled = false; object('chest').click(); object('chest').disabled = true;
@@ -630,7 +636,7 @@ it("lets a visitor use only the host's pet and the door, never the host's furnit
     // Back home, every object works again.
     p.window.document.dispatchEvent(new p.window.CustomEvent('home:leave'));
     p.$('town-home').click();
-    for (const action of [...furniture, 'pet', 'door']) expect(object(action).disabled, action).toBe(false);
+    for (const action of [...furniture, 'pet']) expect(object(action).disabled, action).toBe(false);
   } finally { p.window.close(); }
 });
 

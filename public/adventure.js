@@ -121,7 +121,7 @@ adventure.innerHTML = `
 document.body.append(adventure);
 // Everything a player might look up, kept off the map: how to play, the map
 // key, this floor's monsters, treasure odds, and what a new run costs. It
-// opens on its own for a pet's first adventure, and from Game guide after.
+// opens from the Game guide button in the Adventure menu.
 const guide = document.createElement('dialog');
 guide.id = 'adventure-guide';
 guide.setAttribute('aria-labelledby', 'adventure-guide-title');
