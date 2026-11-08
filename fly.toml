@@ -29,6 +29,9 @@ PORT = "8080"
 # this line (or `flyctl secrets set NEEDS_DECAY=on`) and redeploy to switch it
 # on; remove it to switch it off. See docs/GUIDE.md "Stamina, hygiene and work".
 # NEEDS_DECAY = "on"
+# Don't switch it on yet: a review found it can count away time twice (an
+# Hourglass skip, or a battle saving after a refused action) and can count
+# time online as away after a restart. Fix those first (see docs/GUIDE.md).
 
 [http_service]
 internal_port = 8080

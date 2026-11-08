@@ -107,10 +107,9 @@ I aimed for every fix to land in the harness rather than as a retry:
   `if` branches that never ran. Rewriting them to fail when the behaviour is
   wrong exposed two setup mistakes
   ([`bccd0d1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/bccd0d1)).
-- For a recruited ally I first chose 10% of a run's money. The agent showed
-  that's $0 on almost every run and asked again; I chose $2 a win, and the
-  `CLAUDE.md` rule it broke was rewritten to name the exception rather than
-  bent quietly
+- I first gave a recruited ally 10% of a run's money; the agent showed that's
+  $0 on almost every run, so I chose $2 a win, and the `CLAUDE.md` rule it broke
+  was rewritten to name the exception
   ([`bccd0d1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/bccd0d1)).
 - A review found ten problems in a week's features. For the worst, an ally
   winning alone after its recruiter forfeited, the agent undid the fix to show
@@ -139,6 +138,6 @@ from `docs/GUIDE.md`.
 
 ## Next
 
-Play-test what the spec can't judge: whether coming back to a hungrier pet is a
-reason to return or a chore (switch `NEEDS_DECAY=on`), and whether 100 meals is
-a week's stretch for the real player count.
+Fix the three bugs a final review found in needs that drop while you're away
+(it can count away time twice), then play-test whether a hungrier pet is a
+reason to return or a chore. Shipping it switched off kept those bugs from players.

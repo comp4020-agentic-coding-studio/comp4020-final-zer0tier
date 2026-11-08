@@ -87,7 +87,8 @@ the one clicking, raise that with the owner instead of building it.
 - Needs that drop while the owner is away (`src/needs.ts`) are an owner-run
   play-test: keep them off unless `NEEDS_DECAY=on`, and with them off, keep pet
   data and behaviour exactly as before. Never let decay go below its floor, take
-  online or busy time, or reach the bot. `needs_at` stays server-side.
+  online or busy time, or reach the bot. `needs_at` stays server-side. It has
+  three known bugs (see docs/GUIDE.md); fix them before it is switched on.
 - The weekly town goal shows a compact bar on the town map, below the activity
   bar and hidden at home; the fountain opens its details. Every Food a pet eats
   is a meal for whoever served it, counted in the feeding's transaction. Helpers
