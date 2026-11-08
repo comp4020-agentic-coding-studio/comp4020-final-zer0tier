@@ -520,10 +520,13 @@ const TILE = 64, MAP_SIZE = TILE * 16, FOREST_MARGIN = TILE * 2;
 let sceneSignature = '', mapScene = null, terrain = null, actors = null;
 const actorNodes = new Map();
 let walkingPath = [], walkingTimer = 0, walkingGeneration = 0;
+// A held direction key walks one confirmed step after another (see walkHeld).
+const HELD_STEP_MS = 90; // a floor between steps, so it reads as walking
+let heldDirection = null, heldTimer = 0, heldGeneration = 0;
 const hiddenEnemy = enemy => enemy.hidden ?? enemy.kind !== 'slime-king';
 const typeName = type => ['str', 'cha', 'int'].includes(type) ? type.toUpperCase() : type[0].toUpperCase() + type.slice(1);
 const onGrass = (x, y) => state?.grass?.[y]?.[x] === 'g';
-function stopWalking() { walkingGeneration++; walkingPath = []; clearTimeout(walkingTimer); }
+function stopWalking() { walkingGeneration++; walkingPath = []; clearTimeout(walkingTimer); heldDirection = null; heldGeneration++; clearTimeout(heldTimer); }
 function resetScene() {
   stopWalking();
   for (const actor of actorNodes.values()) clearTimeout(actor.walkTimer);
@@ -1346,14 +1349,52 @@ adventure.addEventListener('keydown', event => {
   const direction = { arrowup: 'w', arrowleft: 'a', arrowdown: 's', arrowright: 'd' }[key] || key;
   if (!['w', 'a', 's', 'd'].includes(direction)) return;
   event.preventDefault();
+  if (event.repeat && heldDirection === direction) return; // already walking that way
   stopWalking();
-  if (entryReady && state && !state.battle?.pending && !runEnded() && !busyText() && packPanel.hidden &&
-    (!event.repeat || performance.now() - lastWalkKey > 170)) {
-    lastWalkKey = performance.now();
-    request({ direction });
-  }
+  if (!canWalk()) return;
+  // The first step goes at once, as before; holding the key carries on.
+  heldDirection = direction;
+  const from = `${state.floor}:${state.x},${state.y}`;
+  walkHeld(request({ direction }), from);
 });
-let lastWalkKey = 0;
+// Holding a direction walks one confirmed step after another. Each step still
+// waits for the server (the pet is drawn only where it says), but the next is
+// sent the moment that reply lands, instead of being dropped while it was in
+// flight and then waiting a further 170 ms. Releasing the key stops it.
+// The same checks a key press always made before moving. (A key can't be
+// pressed in a hidden tab, and windows and blur already stop walking.)
+function canWalk() {
+  return entryReady && state && !state.battle?.pending && !runEnded() && !busyText() && packPanel.hidden;
+}
+// `first` is the first step's request, already sent by the key press.
+// `first` is the first step's request, already sent by the key press, and
+// `from` where the pet stood when it was sent.
+async function walkHeld(first, from) {
+  const walk = ++heldGeneration, direction = heldDirection;
+  clearTimeout(heldTimer);
+  let step = first, before = from, started = performance.now();
+  while (walk === heldGeneration && heldDirection === direction) {
+    const moved = await step;
+    if (walk !== heldGeneration || heldDirection !== direction) return;
+    // A refused move, a wall, a battle, or a new floor ends the walk until the
+    // key is pressed again.
+    const now = state && `${state.floor}:${state.x},${state.y}`;
+    if (!moved || !state || now === before || state.floor !== Number(before?.split(':')[0]) || state.battle?.pending) return releaseHeld();
+    const wait = HELD_STEP_MS - (performance.now() - started);
+    if (wait > 0) await new Promise(resolve => { heldTimer = setTimeout(resolve, wait); });
+    if (walk !== heldGeneration || heldDirection !== direction || !canWalk() || pending) return;
+    // Where the pet stands is taken together with sending its next step.
+    before = `${state.floor}:${state.x},${state.y}`;
+    started = performance.now();
+    step = request({ direction });
+  }
+}
+function releaseHeld() { heldDirection = null; heldGeneration++; clearTimeout(heldTimer); }
+adventure.addEventListener('keyup', event => {
+  const key = event.key.toLowerCase();
+  const direction = { arrowup: 'w', arrowleft: 'a', arrowdown: 's', arrowright: 'd' }[key] || key;
+  if (direction === heldDirection) releaseHeld();
+});
 const packToggle = adventure.querySelector('#adventure-pack-toggle');
 const packPanel = adventure.querySelector('#adventure-pack-panel');
 packToggle.addEventListener('click', () => {
@@ -1405,7 +1446,7 @@ grid.addEventListener('click', event => {
     await request({ direction: walkingPath.shift() });
     if (routeGeneration !== walkingGeneration) return;
     if (!state || state.floor !== floor || `${state.floor}:${state.x},${state.y}` === before || state.battle?.pending) return stopWalking();
-    walkingTimer = setTimeout(step, 180);
+    walkingTimer = setTimeout(step, HELD_STEP_MS);
   }
   step();
 });

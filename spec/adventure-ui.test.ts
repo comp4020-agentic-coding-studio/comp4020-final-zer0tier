@@ -1772,3 +1772,40 @@ it("tells a teammate who is mid-battle that their team set off, rather than pull
     expect(notices).toEqual(["lead's team set off. Open Adventure to join them when your battle ends."]);
   } finally { dom.window.close(); }
 });
+
+it('walks a held key one confirmed step after another, sending the next as soon as each reply lands, and stops on release', async () => {
+  // A visible page: switching away from the tab stops walking, as it should.
+  const { dom, window, $ } = page({ visible: true });
+  Object.defineProperty(window.document, 'hidden', { value: false });
+  const requests: { body: any; finish: (response: Response) => void }[] = [];
+  let y = 2;
+  window.fetch = vi.fn((_url: string, options: RequestInit) => new Promise<Response>(finish => {
+    requests.push({ body: JSON.parse(options.body as string), finish });
+  })) as unknown as typeof fetch;
+  const reply = (index: number) => requests[index].finish(Response.json({ ...map(), y: ++y, revision: `step-${y}` }));
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    $('adventure-open').click();
+    requests[0].finish(Response.json(map()));
+    await vi.waitFor(() => expect($('adventure-player')).not.toBeNull());
+    const grid = $('adventure-grid');
+    grid.focus();
+    const sent = () => requests.filter(r => r.body?.direction).length;
+    grid.dispatchEvent(new window.KeyboardEvent('keydown', { key: 's', bubbles: true }));
+    // The first step goes at once, and only one is ever in flight: the pet is
+    // drawn only where the server says.
+    expect(sent()).toBe(1);
+    grid.dispatchEvent(new window.KeyboardEvent('keydown', { key: 's', repeat: true, bubbles: true }));
+    expect(sent()).toBe(1);
+    // Each confirmed step sends the next while the key stays down.
+    reply(requests.length - 1);
+    await vi.waitFor(() => expect(sent()).toBe(2), { timeout: 1000 });
+    reply(requests.length - 1);
+    await vi.waitFor(() => expect(sent()).toBe(3), { timeout: 1000 });
+    // Letting go stops it: the step in flight lands, and no more are sent.
+    grid.dispatchEvent(new window.KeyboardEvent('keyup', { key: 's', bubbles: true }));
+    reply(requests.length - 1);
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(sent()).toBe(3);
+  } finally { dom.window.close(); }
+});
