@@ -58,14 +58,15 @@ things, so it can never be a lopsided trade.
   It convinced me software doesn't need to serve thousands of strangers like an
   industrial restaurant: VirtuePets is for a room of friends, so it runs on one
   small machine with one database file.
+- Daniel Cook et al.,
+  ["Kind Games: Designing for Prosocial Multiplayer"](https://lostgarden.com/2023/07/08/kind-games-designing-for-prosocial-multiplayer/)
+  (2023). Shallow gifting is "a low social energy transactional exchange",
+  while friends who play together keep coming back: why VirtuePets became
+  Pokémon-like play rather than a pet you click.
 - Clay Shirky,
   ["Situated Software"](https://gwern.net/doc/technology/2004-03-30-shirky-situatedsoftware.html)
-  (2004). Software for a small group works when it shows the group to itself
-  ("What does everyone else think?") and doesn't rely on people checking
-  back. It pushed me to keep everything in sync and make it easy for players
-  to interact: every change reaches every open window live, and the Arena
-  shows who else is playing.
-- The
-  [Final Project brief](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/assessments/final-project/):
-  its multi-user, real-time, and persists requirements.
-- QQ Pets (Tencent, 2005), the game this one is modelled on.
+  (2004). Software for a small group works when it shows the group to itself.
+  It pushed me to keep everything in sync: every change reaches every open
+  window live, and the Arena shows who else is playing.
+- QQ Pets (Tencent, 2005), the game this one is modelled on, and the
+  [Final Project brief](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/assessments/final-project/).

@@ -21,20 +21,21 @@ Robin Sloan's "An app can be a home-cooked meal" describes an app he built for
 just his family, never meant to scale. I agree with him: software doesn't need
 to be offered to thousands of strangers like an industrial restaurant. It can
 be used by just friends, and then there's no need for a complex system. That
-position decided the stack below: one process and one SQLite file on one small
-machine, no database server, no framework, because a game for a room of friends
-doesn't need to survive a million players. Where I went further than Sloan is
-the game itself. Reading also convinced me that keeping people engaged in a
-game is a better way for them to socialise than small, one-off clicks. So I
-gave up making it a completely pet-like game: battles that once played
+position decided the stack below: one process, one SQLite file, no database
+server or framework. Where I went further than Sloan is
+the game itself. Daniel Cook's "Kind Games" convinced me that keeping people
+engaged in a game together is a better way to socialise than small, one-off
+clicks: he calls Farmville-style gifting "a low social energy transactional
+exchange", and found that when friends play together, retention skyrockets. So
+I gave up making it a completely pet-like game: battles that once played
 themselves
 ([`45f9a90`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/45f9a90))
 became Pokémon-like fights, with monsters hiding in grass and every skill
 chosen by hand
 ([`489051f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/489051f),
 [`22068e9`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/22068e9)).
-The system stayed home-cooked, but the game grew, and each feature had to earn
-its place by being something friends play *with* each other.
+The system stayed home-cooked; the game grew, but only with things friends play
+*with* each other.
 
 ## The harness, and the stack it implies
 
