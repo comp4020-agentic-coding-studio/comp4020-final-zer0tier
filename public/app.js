@@ -33,6 +33,7 @@ let onlinePlayers = new Set();
 function updatePresence(players) {
   onlinePlayers = new Set(players);
   renderFightButtons();
+  if (visiting) renderJoinControls();
   for (const status of document.querySelectorAll('[data-online-player]')) {
     status.textContent = onlinePlayers.has(status.dataset.onlinePlayer) ? 'Online' : 'Offline';
   }
@@ -969,6 +970,7 @@ function renderVisit() {
   renderStealControls();
   renderHelpControls();
   renderGiftControls();
+  renderJoinControls();
   document.dispatchEvent(new CustomEvent('visit:pet', { detail: pet }));
 }
 
@@ -1084,6 +1086,63 @@ async function giveGift(choice) {
   }
 }
 
+// Asking to join the adventure team your host is getting together. The host
+// answers from their Team up window; their team:updated tells us the result.
+let asking = false; // an ask request is in flight
+let askedHost = null; // the host this window last asked, until their answer
+function renderJoinControls() {
+  const pet = rivals.get(visiting);
+  if (!pet || !rules || !current) return;
+  const bot = pet.id === rules.botId;
+  const online = onlinePlayers.has(pet.id);
+  const button = $("visit-ask-join");
+  $("visit-join").hidden = bot;
+  button.textContent = asking ? "Asking…" : askedHost === pet.id ? "Asked" : "Ask to join";
+  button.disabled = asking || askedHost === pet.id || !online;
+  button.setAttribute("aria-busy", String(asking));
+  $("visit-join-hint").textContent = !online
+    ? `${pet.id} is offline. You can ask to join their adventure when they're online.`
+    : askedHost === pet.id ? `Waiting for ${pet.id} to answer in their Team up window.`
+    : `If ${pet.id} is getting an adventure team together, ask to come along.`;
+}
+async function askToJoin() {
+  if (!current || !visiting || asking) return;
+  const owner = current.id, host = visiting, visit = visitLoads;
+  asking = true;
+  $("visit-join-error").textContent = "";
+  $("visit-join-news").textContent = "";
+  renderJoinControls();
+  try {
+    const res = await fetch("/api/team", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "ask", player: host }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (current?.id !== owner || visit !== visitLoads) return;
+    if (!res.ok) { $("visit-join-error").textContent = body.error ?? `Couldn't reach ${host}. Try again.`; return; }
+    askedHost = host;
+    $("visit-join-news").textContent = `You asked to join ${host}'s adventure.`;
+  } catch {
+    if (current?.id === owner && visit === visitLoads) $("visit-join-error").textContent = `Couldn't reach ${host}. Try again.`;
+  } finally {
+    if (current?.id === owner) { asking = false; renderJoinControls(); }
+  }
+}
+$("visit-ask-join").addEventListener("click", askToJoin);
+// The host let us in or turned us down: their saved team says which.
+document.addEventListener("team:updated", ({ detail: team }) => {
+  if (!current || !askedHost || team?.leader !== askedHost) return;
+  const me = team.members.find((m) => m.id === current.id);
+  if (me?.requested) return;
+  const host = askedHost;
+  askedHost = null;
+  if (visiting === host) {
+    $("visit-join-news").textContent = me?.joined
+      ? `${host} let you in! Open Adventure to see your team.`
+      : team.status === "forming" ? `${host} can't take you this time.` : `${host}'s team set off.`;
+    renderJoinControls();
+  }
+});
+
 function renderStealControls() {
   const pet = rivals.get(visiting);
   if (!pet || !rules) return;
@@ -1152,6 +1211,8 @@ function closeVisit() {
   $("help-error").textContent = "";
   $("gift-news").textContent = "";
   $("gift-error").textContent = "";
+  $("visit-join-news").textContent = "";
+  $("visit-join-error").textContent = "";
 }
 
 $("visit-close").addEventListener("click", () => {
@@ -2053,6 +2114,8 @@ function connect() {
       renderRivals();
     } else if (event.type === "team:updated") {
       document.dispatchEvent(new CustomEvent("team:updated", { detail: event.team }));
+    } else if (event.type === "team:requested") {
+      document.dispatchEvent(new CustomEvent("team:requested", { detail: event.request }));
     } else if (event.type === "pet:touched") {
       document.dispatchEvent(new CustomEvent("pet:touched", { detail: event.touch }));
     } else if (event.type === "pet:noted") {

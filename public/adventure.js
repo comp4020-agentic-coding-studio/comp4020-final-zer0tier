@@ -1029,9 +1029,27 @@ function renderLobby() {
     const row = document.createElement('li'), name = document.createElement('strong'), detail = document.createElement('span');
     row.innerHTML = avatarFor(member);
     name.textContent = member.id === me ? `${member.id} (you)` : member.id;
-    detail.textContent = [member.id === team?.leader ? 'Leader' : '', !member.joined ? 'Invited' : member.waiting ? `Not ready: ${member.waiting}` : team ? 'Ready' : '']
+    detail.textContent = [member.id === team?.leader ? 'Leader' : '', member.requested ? 'Asked to join' : !member.joined ? 'Invited' : member.waiting ? `Not ready: ${member.waiting}` : team ? 'Ready' : '']
       .filter(Boolean).join(' · ');
     row.append(name, detail);
+    // A visitor asked to join at your home: the leader lets them in or not.
+    if (member.requested && leader) {
+      row.classList.add('team-request');
+      const letIn = document.createElement('button'), turnDown = document.createElement('button');
+      letIn.type = turnDown.type = 'button';
+      letIn.className = 'chip-btn'; turnDown.className = 'chip-btn chip-buy';
+      letIn.textContent = 'Let in'; turnDown.textContent = 'Turn down';
+      letIn.dataset.answer = turnDown.dataset.answer = member.id;
+      letIn.setAttribute('aria-label', `Let ${member.id} join your team`);
+      turnDown.setAttribute('aria-label', `Turn down ${member.id}'s request`);
+      letIn.disabled = turnDown.disabled = lobbyPending;
+      letIn.addEventListener('click', () => teamRequest({ action: 'answer', player: member.id, accept: true }));
+      turnDown.addEventListener('click', () => teamRequest({ action: 'answer', player: member.id, accept: false }));
+      const answers = document.createElement('span');
+      answers.className = 'team-request-answers';
+      answers.append(letIn, turnDown);
+      row.append(answers);
+    }
     members.append(row);
   }
   teamUp.querySelector('#team-invite').hidden = Boolean(team) && !leader;
@@ -1239,6 +1257,13 @@ teamUp.addEventListener('close', () => {
   if (!adventure.open && (focused === document.body || teamUp.contains(focused))) {
     document.getElementById('adventure-open').focus({ preventScroll: true });
   }
+});
+// A visitor asked to join at your home. Say so wherever you are; the Team up
+// window shows the request (team:updated refreshes it) to answer.
+document.addEventListener('team:requested', ({ detail: request }) => {
+  if (!pet || request?.leader !== pet.id) return;
+  const notice = document.getElementById('notice');
+  if (notice) notice.textContent = `${request.player} asked to join your adventure team. Open Adventure to let them in.`;
 });
 // Another player's change to a team this player is on, or invited to.
 document.addEventListener('team:updated', async ({ detail: team }) => {

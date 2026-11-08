@@ -163,6 +163,9 @@
 #team-members li .team-avatar { grid-row: span 2; }
 #team-members li span { color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
 #team-members li strong { overflow-wrap: anywhere; }
+#team-members li.team-request { grid-template-columns: 40px minmax(0, 1fr) auto; }
+.team-request-answers { grid-column: 3; grid-row: 1 / span 2; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+#team-members li.team-request > span:not(.team-request-answers) { grid-column: 2; }
 .team-avatar { display: block; width: 40px; height: 37px; color: var(--pet-color, #f59e0b); }
 #team-invitation-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 #team-invitation-list li span { flex: 1 1 100%; overflow-wrap: anywhere; }

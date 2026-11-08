@@ -44,7 +44,10 @@ export type ServerEvent =
   | { type: "friends:updated"; player: string; friends: Friend[] }
   // The town's weekly meal total changed (someone fed a pet) or a new week
   // began. Everyone hears it: the town map's progress bar is shared.
-  | { type: "town:goal"; goal: TownGoal };
+  | { type: "town:goal"; goal: TownGoal }
+  // A visitor asked to join the team its host is getting together. Only the
+  // host (leader) and the asker hear it; team:updated follows for the window.
+  | { type: "team:requested"; request: { team: number; leader: string; player: string } };
 
 let wss: WebSocketServer | undefined;
 const credentials = new WeakMap<WebSocket, string | undefined>();
@@ -199,6 +202,7 @@ export function broadcast(event: ServerEvent): void {
     : event.type === "pet:noted" ? new Set([event.note.pet, event.note.visitor])
     : event.type === "notes:cleared" ? new Set([event.pet])
     : event.type === "friends:updated" ? new Set([event.player])
+    : event.type === "team:requested" ? new Set([event.request.leader, event.request.player])
     : null;
   let recipients = 0;
   for (const client of wss.clients) {

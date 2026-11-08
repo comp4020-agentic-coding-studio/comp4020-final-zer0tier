@@ -3,7 +3,7 @@ import {
   restartAdventure, skipAdventureCooldown, useAdventureItem, adventureBattleSkill, forfeitAdventureBattle, battleFighters,
   recruitAlly, dismissAlly, alliesNear,
 } from "./adventure.ts";
-import { accept, invite, leave, setOff, teamFor, type TeamOutcome } from "./teams.ts";
+import { accept, answer, ask, invite, leave, setOff, teamFor, type TeamOutcome } from "./teams.ts";
 import express from "express";
 import { ABILITIES, MONSTER_TYPES, TYPE_CHART } from "./combat.ts";
 import { JOBS, JOB_LEVEL_MINUTES, MONSTER_SKILL_DROP_RATE } from './skills.ts';
@@ -338,19 +338,31 @@ app.post("/api/team", (req, res) => {
     outcome = action === "accept" ? accept(id, teamId) : leave(id, teamId);
   } else if (action === "set-off") {
     outcome = setOff(id);
+  } else if (action === "ask") {
+    // Asking to join from a host's home needs the host there to answer.
+    if (!isValidId(player)) return void res.status(400).json({ error: "Player ID must be 1–32 letters, digits, - or _." });
+    if (player !== id && !isOnline(player)) return void res.status(409).json({ error: `${player} is offline. Ask again when they're online.` });
+    outcome = ask(id, player);
+  } else if (action === "answer") {
+    if (!isValidId(player)) return void res.status(400).json({ error: "Player ID must be 1–32 letters, digits, - or _." });
+    if (typeof req.body?.accept !== "boolean") return void res.status(400).json({ error: "Say whether to accept: true or false." });
+    outcome = answer(id, player, req.body.accept);
   } else {
-    return void res.status(400).json({ error: "Choose invite, accept, leave or set-off." });
+    return void res.status(400).json({ error: "Choose invite, accept, leave, set-off, ask or answer." });
   }
   if ("error" in outcome) return void res.status(outcome.status).json({ error: outcome.error });
   logEvent("action_result", {
     user: id, room: ROOM, client_in_room: clientsInRoom(), action: `team_${action}`, team: outcome.team.id,
-    ...(action === "invite" ? { player } : {}),
+    ...(["invite", "ask", "answer"].includes(action) ? { player } : {}),
+    ...(action === "answer" ? { accepted: req.body.accept } : {}),
   });
   // Setting off spends stamina and hygiene, so those pets go out first.
   if (action === "set-off") {
     for (const member of outcome.team.members) broadcast({ type: "pet:updated", pet: getPet(member.id)! });
   }
   broadcast({ type: "team:updated", team: outcome.team });
+  // The host hears a request at once, wherever they are in the game.
+  if (action === "ask") broadcast({ type: "team:requested", request: { team: outcome.team.id, leader: player, player: id } });
   followUp();
   res.json(teamFor(id));
 });

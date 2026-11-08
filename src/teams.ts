@@ -9,7 +9,8 @@ export const TEAM_SIZE = 4;
 
 export type TeamMember = {
   id: string; color: string; appearance: string;
-  joined: boolean; // false while only invited
+  joined: boolean; // false while only invited, or while asking to join
+  requested: boolean; // true while this player asked to join and the leader hasn't answered
   waiting: string | null; // why a joined pet can't set off yet, or null once it can
 };
 export type Team = {
@@ -29,11 +30,11 @@ function read(teamId: number): Team {
     ? db.prepare(`SELECT a.player_id AS id, p.color, p.appearance, 1 AS joined FROM adventures a JOIN pets p ON p.id = a.player_id
         WHERE a.team_id = ? ORDER BY a.player_id = ? DESC, a.player_id`).all(teamId, row.leader)
     : db.prepare(`SELECT m.player_id AS id, p.color, p.appearance, m.joined FROM team_members m JOIN pets p ON p.id = m.player_id
-        WHERE m.team_id = ? ORDER BY m.player_id = ? DESC, m.joined DESC, m.rowid`).all(teamId, row.leader)) as MemberRow[];
+        WHERE m.team_id = ? ORDER BY m.player_id = ? DESC, m.joined = 1 DESC, m.joined = 0 DESC, m.rowid`).all(teamId, row.leader)) as MemberRow[];
   return {
     ...row,
     members: rows.map(m => ({
-      ...m, joined: m.joined === 1,
+      ...m, joined: m.joined === 1, requested: m.joined === 2,
       waiting: m.joined === 1 && row.status === 'forming' ? setOffRefusal(m.id) ?? null : null,
     })),
   };
@@ -106,6 +107,45 @@ export function leave(id: string, teamId: number): TeamOutcome {
     } else {
       db.prepare('DELETE FROM team_members WHERE team_id = ? AND player_id = ?').run(teamId, id);
     }
+    return { team: read(teamId) };
+  });
+}
+
+// Asking to join a team from its leader's home: team_members.joined = 2 is a
+// request waiting for the leader. Only a leader who is forming a team can be
+// asked, and a request counts toward the team's size like an invitation.
+export function ask(id: string, leaderId: string): TeamOutcome {
+  if (leaderId === id) return refuse("That's your own home.", 400);
+  if (!getPet(leaderId) || !db.prepare('SELECT 1 FROM accounts WHERE id = ?').get(leaderId)) return refuse(`No player called ${leaderId}.`, 404);
+  return transaction(() => {
+    const teamId = joinedTeam(leaderId);
+    const team = teamId === undefined ? undefined : read(teamId);
+    if (!team || team.leader !== leaderId) return refuse(`${leaderId} isn't getting a team together right now.`);
+    if (joinedTeam(id) !== undefined) return refuse('Leave your current team before asking to join another.');
+    const member = team.members.find(m => m.id === id);
+    if (member) {
+      return refuse(member.requested ? `You've already asked ${leaderId}.` : member.joined ? `You're already on ${leaderId}'s team.` : `${leaderId} already invited you. Accept it in your Team up window.`);
+    }
+    if (team.members.length >= TEAM_SIZE) return refuse(`${leaderId}'s team is full.`);
+    db.prepare('INSERT INTO team_members (team_id, player_id, joined) VALUES (?, ?, 2)').run(team.id, id);
+    return { team: read(team.id) };
+  });
+}
+
+// The leader lets a player who asked join (they're on the team, as if they'd
+// accepted an invitation) or turns them down.
+export function answer(id: string, playerId: string, yes: boolean): TeamOutcome {
+  return transaction(() => {
+    const teamId = joinedTeam(id);
+    if (teamId === undefined || read(teamId).leader !== id) return refuse('Only the team leader can answer a request.');
+    const asked = db.prepare('SELECT 1 FROM team_members WHERE team_id = ? AND player_id = ? AND joined = 2').get(teamId, playerId);
+    if (!asked) return refuse('That request is no longer open.', 404);
+    if (!yes) {
+      db.prepare('DELETE FROM team_members WHERE team_id = ? AND player_id = ?').run(teamId, playerId);
+      return { team: read(teamId) };
+    }
+    if (joinedTeam(playerId) !== undefined) return refuse(`${playerId} joined another team meanwhile. Turn the request down to clear it.`);
+    db.prepare('UPDATE team_members SET joined = 1 WHERE team_id = ? AND player_id = ?').run(teamId, playerId);
     return { team: read(teamId) };
   });
 }

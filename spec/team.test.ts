@@ -42,3 +42,54 @@ it('two players team up, set off together, and explore one shared map with their
   // Back in the Team up window, both are on their run, not forming a team.
   expect(await (await team(leader)).json()).toMatchObject({ team: null, run: { team: forming.id, state: 'exploring' } });
 });
+
+// Asking to join from a host's home: the visitor asks, the host (team leader)
+// lets them in or turns them down. Only a host getting a team together, and
+// online to answer, can be asked.
+it('asks to join a host who is getting a team together, and the host lets them in or turns them down', async () => {
+  const host = freshId(), invited = freshId(), visitor = freshId(), other = freshId();
+  for (const id of [host, invited, visitor, other]) await signUp(id);
+  // Not yet getting a team together: nothing to ask to join.
+  const early = await team(visitor, { action: 'ask', player: host });
+  expect(early.status).toBe(409);
+  expect((await early.json()).error).toMatch(/isn't getting a team together/);
+  // The host starts a team by inviting someone; now the visitor can ask.
+  const { team: forming } = await (await team(host, { action: 'invite', player: invited })).json();
+  const asked = await team(visitor, { action: 'ask', player: host });
+  expect(asked.status).toBe(200);
+  const shown = (await (await team(host)).json()).team;
+  expect(shown.members.map((m: any) => [m.id, m.joined, m.requested])).toEqual([[host, true, false], [invited, false, false], [visitor, false, true]]);
+  // Asking twice, or for your own home, is refused.
+  expect((await team(visitor, { action: 'ask', player: host })).status).toBe(409);
+  expect((await team(host, { action: 'ask', player: host })).status).toBe(400);
+  // Only the leader answers; the visitor can't let themselves in.
+  expect((await team(visitor, { action: 'answer', player: visitor, accept: true })).status).toBe(409);
+  expect((await team(host, { action: 'answer', player: visitor })).status).toBe(400);
+  const letIn = await (await team(host, { action: 'answer', player: visitor, accept: true })).json();
+  expect(letIn.team.members.find((m: any) => m.id === visitor)).toMatchObject({ joined: true, requested: false });
+  // A second visitor is turned down: their request goes.
+  expect((await team(other, { action: 'ask', player: host })).status).toBe(200);
+  const declined = await (await team(host, { action: 'answer', player: other, accept: false })).json();
+  expect(declined.team.members.some((m: any) => m.id === other)).toBe(false);
+  expect((await team(host, { action: 'answer', player: other, accept: true })).status).toBe(404);
+  expect(forming.id).toBe(letIn.team.id);
+});
+
+it("won't ask an offline host, or a full team, and the request lapses when the team sets off without it", async () => {
+  const host = freshId(), mate = freshId(), visitor = freshId();
+  for (const id of [host, mate, visitor]) await signUp(id);
+  await team(host, { action: 'invite', player: mate });
+  await team(mate, { action: 'accept', team: (await (await team(mate)).json()).invitations[0].id });
+  // Offline hosts can't answer, so they can't be asked.
+  const { disconnectPlayer, connectPlayer } = await import('./helpers.ts');
+  await disconnectPlayer(host);
+  const offline = await team(visitor, { action: 'ask', player: host });
+  expect(offline.status).toBe(409);
+  expect((await offline.json()).error).toMatch(/offline/);
+  await connectPlayer(host);
+  expect((await team(visitor, { action: 'ask', player: host })).status).toBe(200);
+  // Setting off without answering: the request lapses with any invitations.
+  expect((await team(host, { action: 'set-off' })).status).toBe(200);
+  expect((await (await team(visitor)).json()).invitations).toEqual([]);
+  expect((await team(host, { action: 'answer', player: visitor, accept: true })).status).toBe(409);
+});

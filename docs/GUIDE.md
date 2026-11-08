@@ -831,7 +831,10 @@ and the built-in `node:sqlite` for storage.
   (with the `spoils` the winner took), a `feed:added` event for each new
   entry in Happening now (sent after the change it describes), a
   `team:updated` event whenever a team in the **Team up** window changes or
-  sets off, and a `pet:touched` event, carrying the saved touch, whenever a
+  sets off, a `team:requested` event (`{ team, leader, player }`) to the host
+  and the asker only when a visitor asks to join (`POST /api/team` with
+  `{ "action": "ask", "player": host }`; the leader answers with `{ "action":
+  "answer", "player": id, "accept": true }`), and a `pet:touched` event, carrying the saved touch, whenever a
   visitor plays with someone else's pet. `pet:noted` carries a saved
   guestbook note to that pet's owner and the visitor only, and `notes:cleared`
   reaches only the owner's windows; `GET /api/pets/:id/notes` is the owner's
@@ -1062,6 +1065,15 @@ a team. The finished-run panel offers **Team up** for later adventures.
   and can **Join** or **Decline**. A pet joins one forming team at a time.
   **Leave team** takes it off, and the leader's **Disband team** ends the
   team for everyone.
+- **Ask to join** from a friend's home. Visiting someone who is online and
+  getting an adventure team together (they've started one by inviting a
+  player), press **Ask to join** in their pet's window. They get a notice at
+  once, wherever they are, and the request waits in their **Team up?** window
+  marked *Asked to join*, where the leader chooses **Let in** or **Turn down**.
+  Let in, you're on the team as if you'd accepted an invitation, and your visit
+  says so. A request counts toward the 4-pet limit and lapses if the team sets
+  off without answering. You can't ask an offline host, a full team, or someone
+  who isn't forming a team.
 - **Set off together** (leader only) needs at least one other pet to have
   joined, and every joined pet to be ready. Each pet is checked the way
   a new adventure would check it: no run in progress (end it first), no
