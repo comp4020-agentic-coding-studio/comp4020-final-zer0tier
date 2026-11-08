@@ -49,8 +49,10 @@ Every rule follows from one 256 MB Fly machine with one volume:
   course setup; the cost is that this can't scale past one machine, which, as
   above, a game for a room of friends doesn't need.
 - **WebSockets one way.** Players act over HTTP; the socket only carries news,
-  and the database is the only source of truth. Clients never update
-  optimistically, so two windows can't disagree.
+  and the database is the only source of truth, so two windows can't disagree.
+  I tried polling for live battles and replaced it; why WebSockets beat polling
+  and server-sent events is in
+  [ADR 2](docs/adr/0002-websockets-for-server-news.md).
 - **No front-end framework or build step.** Less to fit in 256 MB, but
   `public/app.js` is now the largest file, the first thing I'd revisit.
 
