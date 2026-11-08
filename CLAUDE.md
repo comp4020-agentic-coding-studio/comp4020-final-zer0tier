@@ -90,6 +90,10 @@ the one clicking, raise that with the owner instead of building it.
   data and behaviour exactly as before. Never let decay go below its floor, take
   online or busy time, or reach the bot. `needs_at` stays server-side. It has
   three known bugs (see docs/GUIDE.md); fix them before it is switched on.
+- Team notices (an invitation, someone joining, you joining, a request to join)
+  pop up in the bottom-right banner and clear themselves. While you're on a team
+  getting ready to set off, a compact status bar shows at the top centre of home
+  and town; it is display-only and goes when the team sets off or disbands.
 - The weekly town goal shows a compact bar on the town map, below the activity
   bar and hidden at home; the fountain opens its details. Every Food a pet eats
   is a meal for whoever served it, counted in the feeding's transaction. Helpers

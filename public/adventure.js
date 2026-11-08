@@ -1125,6 +1125,7 @@ async function loadLobby() {
   if (!response.ok) throw new Error(result.error || 'Could not open the Team up window.');
   if (!result?.run) throw new Error('Could not open the Team up window.');
   lobby = result;
+  document.dispatchEvent(new CustomEvent('team:loaded', { detail: lobby }));
   return lobby;
 }
 async function teamRequest(body) {
@@ -1140,6 +1141,7 @@ async function teamRequest(body) {
     if (!response.ok) throw new Error(result.error || 'Could not update the team. Try again.');
     ++lobbyGeneration;
     lobby = result;
+    document.dispatchEvent(new CustomEvent('team:loaded', { detail: lobby }));
     // A friend's Invite leaves whatever is typed in the ID box alone.
     const box = teamUp.querySelector('#team-invite-id');
     if (body.action === 'invite' && box.value.trim() === body.player) box.value = '';
@@ -1262,8 +1264,7 @@ teamUp.addEventListener('close', () => {
 // window shows the request (team:updated refreshes it) to answer.
 document.addEventListener('team:requested', ({ detail: request }) => {
   if (!pet || request?.leader !== pet.id) return;
-  const notice = document.getElementById('notice');
-  if (notice) notice.textContent = `${request.player} asked to join your adventure team. Open Adventure to let them in.`;
+  document.dispatchEvent(new CustomEvent('team:notice', { detail: `${request.player} asked to join your adventure team. Open Adventure to let them in.` }));
 });
 // Another player's change to a team this player is on, or invited to.
 document.addEventListener('team:updated', async ({ detail: team }) => {

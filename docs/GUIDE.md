@@ -1072,6 +1072,11 @@ run ends (once its records have shown). A run still under way reopens as it was.
   and can **Join** or **Decline**. A pet joins one forming team at a time.
   **Leave team** takes it off, and the leader's **Disband team** ends the
   team for everyone.
+- **Team news.** When someone invites you, when a player joins your team, or
+  when you join one, a notice pops up in the bottom-right corner and fades after
+  a few seconds. While you're on a team getting ready to set off, a small bar at
+  the top centre of home and town shows whose team it is and how many have
+  joined (for example *Your team · 2 of 4 joined*), until it sets off.
 - **Ask to join** from a friend's home. Visiting someone who is online and
   getting an adventure team together (they've started one by inviting a
   player), press **Ask to join** in their pet's window. They get a notice at

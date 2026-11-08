@@ -366,6 +366,8 @@ worldShell.querySelector('.world-main').append(worldById('town-activity'));
 // The town goal's small bar shares that corner, under the activity bar.
 worldShell.querySelector('.world-main').append(worldById('town-goal-bar'));
 worldById('town-goal-bar').addEventListener('click', () => worldOpenPlace('goal'));
+// The team status bar sits top centre, over home and town alike.
+worldShell.querySelector('.world-main').append(worldById('team-status-bar'));
 const homeInteractionOutline = worldById('home-interaction-outline');
 const homeOutlineStrokes = homeInteractionOutline.querySelectorAll('use');
 const townInteractionOutline = worldById('town-interaction-outline');

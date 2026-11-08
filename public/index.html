@@ -410,6 +410,11 @@
           <div class="town-activity-clock"><span id="town-activity-left"></span><span id="town-activity-percent"></span></div>
         </div>
 
+        <!-- While you're on a team getting ready to set off: a small status bar, top centre. -->
+        <div id="team-status-bar" role="status" hidden>
+          <span id="team-status-text"></span>
+          <span id="team-status-hint"></span>
+        </div>
         <!-- The town's weekly goal: a small bar on the town map, and its window at the fountain. -->
         <button type="button" id="town-goal-bar" hidden aria-describedby="town-goal-bar-label">
           <span id="town-goal-bar-label"></span>
@@ -674,6 +679,7 @@
     <script type="module" src="/notes.js"></script>
     <script type="module" src="/friends.js"></script>
     <script type="module" src="/town-goal.js"></script>
+    <script type="module" src="/team-news.js"></script>
     <script type="module" src="/world.js"></script>
     <script type="module" src="/music.js"></script>
     <script type="module" src="/battle-audio.js"></script>

@@ -33,7 +33,8 @@ async function setup() {
   }) as typeof fetch;
   const $ = (id: string) => window.document.getElementById(id)!;
   const send = (event: unknown) => socket.dispatchEvent(new window.MessageEvent('message', { data: JSON.stringify(event) }));
-  for (const file of ['app.js', 'adventure.js']) window.eval(readFileSync(`public/${file}`, 'utf8'));
+  // As in index.html: team-news.js shows team notices in the bottom-right banner.
+  for (const file of ['app.js', 'adventure.js', 'team-news.js']) window.eval(readFileSync(`public/${file}`, 'utf8'));
   await vi.waitFor(() => expect(window.document.querySelectorAll('.visit-btn')).toHaveLength(1));
   return {
     dom, window, $, pet, send, bodies,

@@ -1147,7 +1147,7 @@ document.addEventListener("team:updated", ({ detail: team }) => {
     $("visit-join-news").textContent = news;
     renderJoinControls();
   } else {
-    $("notice").textContent = news;
+    document.dispatchEvent(new CustomEvent("team:notice", { detail: news }));
   }
 });
 
