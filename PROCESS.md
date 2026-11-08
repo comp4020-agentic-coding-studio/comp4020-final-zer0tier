@@ -99,16 +99,21 @@ visitors could walk out of a friend's home
 and when a leader set off, teammates who'd closed Team up were left behind
 ([`5772ebd`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/5772ebd)).
 Each fix came with a spec that fails without it, checked in real browsers.
+Walking in the woodland also felt laggy. Measured first, the server took 10 ms
+a step and its 18 KB reply compressed to 3 KB, so neither was the cause: the
+client threw away a held key's repeats while a step was in flight. Fixing that
+took a held key from 1 tile a second to 12 at Fly's delay, though not on a slow
+link, where the round trip bounds it either way
+([`1650699`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/1650699)).
 
 ## Corrections, and where they landed
 
 I aimed for every fix to land in the harness rather than as a retry:
 
-- A review found one malformed WebSocket frame crashed the server. The agent
-  reproduced the crash first, and a spec now sends that frame
+- A malformed WebSocket frame crashed the server; the agent reproduced it first,
+  and a spec now sends that frame
   ([`fbda12f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/fbda12f)).
-- New players went missing from the Arena because WSL's clock jumped
-  backwards; the Arena now orders by insertion, shown against old and new code
+  New players vanishing from the Arena traced to WSL's clock jumping backwards
   ([`204a74b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/204a74b)).
 - Several new tests passed without testing anything: their checks sat inside
   `if` branches that never ran. Rewriting them to fail when the behaviour is
