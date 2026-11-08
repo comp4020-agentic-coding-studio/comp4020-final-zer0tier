@@ -1728,3 +1728,47 @@ it('asks "alone or with a team?" before every new run, so a host can invite frie
     expect($('team-solo').hidden).toBe(false);
   } finally { dom.window.close(); }
 });
+
+it('brings every teammate into the shared map when the leader sets off, even with Team up closed, but never pulls one out of a battle', async () => {
+  const { dom, window, $ } = page();
+  Object.defineProperty(window.document, 'hidden', { value: true });
+  const shared = { ...map(), started: true, team: { id: 9, members: [{ id: 'lead', color: '#654321', appearance: 'panda', floor: 1, x: 2, y: 2, hp: 15, maxHp: 15, status: 'exploring' }] } };
+  const lobby = { team: null, invitations: [], run: { team: 9, state: 'exploring' }, size: 4 };
+  window.fetch = vi.fn(async (url: string) => {
+    if (url === '/api/team') return Response.json(lobby);
+    return Response.json(shared);
+  }) as unknown as typeof fetch;
+  const setOff = { id: 9, leader: 'lead', status: 'exploring', members: [{ id: 'lead', joined: true }, { id: 'mate', joined: true }] };
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    window.document.dispatchEvent(new window.CustomEvent('adventure:pet', { detail: { id: 'mate', color: '#123456', appearance: 'cat', activity: 'idle', coins: {} } }));
+    // The teammate closed Team up long ago and is walking around town.
+    expect(($('team-dialog') as HTMLDialogElement).open).toBe(false);
+    expect(($('adventure-dialog') as HTMLDialogElement).open).toBe(false);
+    window.document.dispatchEvent(new window.CustomEvent('team:updated', { detail: setOff }));
+    // The leader set off: the teammate is in the shared map too, at once.
+    await vi.waitFor(() => expect(($('adventure-dialog') as HTMLDialogElement).open).toBe(true));
+    await vi.waitFor(() => expect($('adventure-team').hidden).toBe(false));
+  } finally { dom.window.close(); }
+});
+
+it("tells a teammate who is mid-battle that their team set off, rather than pulling them out", async () => {
+  const { dom, window, $ } = page();
+  Object.defineProperty(window.document, 'hidden', { value: true });
+  window.fetch = vi.fn(async () => Response.json({ team: null, invitations: [], run: { team: 9, state: 'exploring' }, size: 4 })) as unknown as typeof fetch;
+  const notices: string[] = [];
+  window.document.addEventListener('team:notice', (e) => notices.push((e as CustomEvent).detail));
+  try {
+    window.eval(readFileSync('public/adventure.js', 'utf8'));
+    window.document.dispatchEvent(new window.CustomEvent('adventure:pet', { detail: { id: 'mate', color: '#123456', appearance: 'cat', activity: 'idle', coins: {} } }));
+    // A live battle is on screen (battle.js builds its dialog on first use).
+    const battle = window.document.createElement('dialog');
+    battle.id = 'battle-dialog';
+    window.document.body.append(battle);
+    battle.showModal();
+    window.document.dispatchEvent(new window.CustomEvent('team:updated', { detail: { id: 9, leader: 'lead', status: 'exploring', members: [{ id: 'lead', joined: true }, { id: 'mate', joined: true }] } }));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(($('adventure-dialog') as HTMLDialogElement).open).toBe(false);
+    expect(notices).toEqual(["lead's team set off. Open Adventure to join them when your battle ends."]);
+  } finally { dom.window.close(); }
+});

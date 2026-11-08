@@ -1099,6 +1099,12 @@ run ends (once its records have shown). A run still under way reopens as it was.
   hygiene**, and opens each pet's 4-hour cooldown — same as starting a new
   adventure. Invitations still pending lapse.
 
+When the leader presses **Set off together**, every teammate goes into the
+woodland at the same moment, wherever they are in the game, with no need to
+have Team up open. A teammate in the middle of an Arena or revenge battle isn't
+pulled out of it: a notice says their team set off, and **Adventure** takes them
+in once the battle ends.
+
 Every teammate then explores **one shared map**: one set of floors,
 monsters, and chests, starting together at floor one. Each pet keeps its
 own position, floor, HP, and MP, and the map shows teammates on the same

@@ -157,6 +157,8 @@ the one clicking, raise that with the owner instead of building it.
   available for free. Persist active turns, validate the acting owner and
   saved turn revision, and award battle rewards only once on completion.
   Each teammate controls their own pet; leaving forfeits only that pet.
+  When the leader sets off, every teammate enters the shared map together,
+  wherever they are, except one in a live battle, who is told and joins after.
 - Use cute original monster artwork, detailed treasure chests, and subtle
   environmental animation. Respect reduced-motion preferences and pause scene
   animation when hidden or covered by another window.

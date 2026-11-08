@@ -1268,8 +1268,22 @@ document.addEventListener('team:requested', ({ detail: request }) => {
 });
 // Another player's change to a team this player is on, or invited to.
 document.addEventListener('team:updated', async ({ detail: team }) => {
-  if (!lobby || !pet) return;
-  const mine = lobby.team?.id === team.id || lobby.invitations.some(i => i.id === team.id) || team.members.some(m => m.id === pet.id);
+  if (!pet) return;
+  // The leader set off: every teammate goes into the shared map together,
+  // wherever they are, not only those still looking at Team up. A pet in a
+  // live battle isn't pulled out of it; it hears the news and joins after.
+  const onTeam = team.members.some(m => m.id === pet.id);
+  if (team.status === 'exploring' && onTeam && !adventure.open) {
+    if (document.getElementById('battle-dialog')?.open) {
+      document.dispatchEvent(new CustomEvent('team:notice', { detail: `${team.leader === pet.id ? 'Your' : `${team.leader}'s`} team set off. Open Adventure to join them when your battle ends.` }));
+      return;
+    }
+    try { await loadLobby(); } catch { return; }
+    if (lobby?.run.state === 'exploring' && lobby.run.team === team.id && !adventure.open) return openMap();
+    return;
+  }
+  if (!lobby) return;
+  const mine = lobby.team?.id === team.id || lobby.invitations.some(i => i.id === team.id) || onTeam;
   if (!mine) return;
   try { await loadLobby(); } catch { return; }
   if (teamUp.open && lobby.run.state === 'exploring' && lobby.run.team) return openMap();
