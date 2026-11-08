@@ -6,11 +6,15 @@ with 256 MB of memory and one volume at `/data`. Every rule here follows from th
 
 ## What good means, as rules
 
-The README's definition: **good means the game is interactable with the other
-people playing it.** A feature earns its place only if what one player does
-reaches another player, or what another does reaches them. Hold every change to
-these, each enforced in `spec/`:
+The README's definition: **good means friends can really play with each other
+in real time, rather than just interact through some simple clicks**: fighting
+monsters together, fighting each other, walking into each other's homes. A
+feature earns its place only if players do it *with* each other, live. Hold
+every change to these, each enforced in `spec/`:
 
+- **A fight is played, never auto-played.** Every pet's turn waits for its own
+  owner's skill choice; only monsters, the bot and recruited allies choose
+  automatically (`spec/combat-turns.test.ts`, `spec/manual-battles.test.ts`).
 - **Act only as your own pet.** Every action on another pet is done by the
   signed-in player's own pet, checked by session (401/403) and logged by player
   (`spec/pets.test.ts`, `spec/touch.test.ts`).
@@ -27,8 +31,8 @@ these, each enforced in `spec/`:
 - **Fair, so playing together stays fun.** Published fight rules, a bot at the
   median player, and no draining a weaker pet (`spec/fight.test.ts`).
 
-Before building a feature, ask which player it reaches. If the answer is only
-the one doing it, raise that with the owner instead of building it.
+Before building a feature, ask who plays it with whom. If the answer is only
+the one clicking, raise that with the owner instead of building it.
 
 ## Working with the owner
 

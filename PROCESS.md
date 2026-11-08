@@ -3,11 +3,14 @@
 ## From the brief to a definition of good
 
 I started from a game I already knew was worth returning to, QQ Pets, where you
-raise a pet alongside everyone else's. My definition of good is that the game is
-**interactable with the other people playing it**
+raise a pet alongside everyone else's. My first definition was that the game is
+interactable with the other people playing it
 ([`d1846cf`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/commit/d1846cf)).
-It decided the build order: every feature is something one pet does that
-another player can see or be affected by. The README marks each promise as
+Building it sharpened that: a pat or a "like" is interaction too, but not much
+of a game. Good now means **friends really play with each other in real time,
+rather than just interact through some simple clicks**, which is why the
+biggest features are turn-based fights with friends and walking into each
+other's homes. The README marks each promise as
 enforced by `spec/` or judged by hand, and I wouldn't keep a claim I hadn't
 checked: survival across a restart went in only after I killed the server
 mid-shift and watched the shift still pay.

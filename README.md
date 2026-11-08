@@ -15,43 +15,43 @@ their pet. Every rule, control and the API are in the
 
 ## What good means
 
-**Good means the game is interactable with the other people playing it.** A
-virtual pet you raise alone is just a to-do list. QQ Pets was worth coming
-back to because your pet lived beside everyone else's. So VirtuePets is good
-when what you do reaches other players, what they do reaches you, and none of
-it is lost. Those are the final project's three fixed requirements, read as
-the point of the game, not boxes to tick:
+**Good means friends can really play with each other in real time, rather than
+just interact through some simple clicks.** A virtual pet you raise alone is
+just a to-do list, and a "like" button on someone else's pet isn't much better.
+QQ Pets was worth coming back to because your pet lived beside everyone else's.
+So I added features where friends actually play together, live:
 
-- **Other people are really there.** Each player has one account and one pet.
-  Anyone can look at any pet, but only its owner can act for it. Visiting is
-  how players reach each other: you can play with, feed, clean, give gifts to,
-  or steal from a pet you visit, always *as your own pet*. A visitor can help,
-  but never use up or harm what someone else owns. *Enforced:*
-  `spec/pets.test.ts`, `spec/touch.test.ts`, `spec/help.test.ts`,
-  `spec/gift.test.ts`.
-- **You see each other act.** Every change to a pet, and every fight, reaches
-  every open window within a second. Adventure is the deliberate exception:
-  one player's own run is never broadcast. *Enforced:*
-  `spec/realtime.test.ts` opens real WebSockets and fails if any event takes
-  longer than a second.
-- **Nothing you did is lost.** Pets, accounts, fights, and unfinished lessons
-  and shifts live in SQLite on the Fly volume. *Enforced:* signing back in
-  returns the same pet. *Checked by hand:* I killed the server halfway through
-  a shift; the shift still finished and paid on time.
-- **Interacting is fair.** Fights follow published rules, the bot keeps pace
-  with the median player, and a strong pet can't drain a weak one.
-  *Enforced:* `spec/fight.test.ts`.
+- **Pokémon-like fights in the Adventure.** Up to four friends set off on one
+  shared woodland map and fight its monsters together, turn by turn. Each
+  player picks their own pet's skill every turn; nothing plays itself.
+  *Enforced:* `spec/team.test.ts`, `spec/combat-turns.test.ts` (every human
+  turn waits for its owner's choice).
+- **Fighting each other in the Arena.** Challenge an online player and both of
+  you choose skills turn by turn, while anyone else can watch from the stands.
+  *Enforced:* `spec/manual-battles.test.ts`, `spec/watch.test.ts` (each turn
+  reaches both fighters and the audience within a second, and nobody else).
+- **Visiting other people's houses.** Walk into a friend's home, whether
+  they're in or not, and see each other move there live. Play with their pet,
+  feed it, give it a gift, or leave a note, always as your own pet: a visitor
+  can help, but never use up or harm what someone else owns. *Enforced:*
+  `spec/world-realtime.test.ts`, `spec/touch.test.ts`, `spec/help.test.ts`.
 
-Some of "good" can only be judged by playing, not by `spec/`: whether waiting
-30 minutes for a lesson feels like anticipation or a chore, and whether the
-Arena is more fun with a room full of people — the capstone showcase this is
-built for.
+Underneath all three, the final project's fixed requirements are what make it
+play rather than poke: every change reaches every open window within a second
+(`spec/realtime.test.ts` fails if any event is slower), only a pet's owner can
+act for it (`spec/pets.test.ts`), and nothing is lost: pets, fights and
+unfinished shifts live in SQLite on the Fly volume. *Checked by hand:* I killed
+the server halfway through a shift; it still finished and paid on time.
 
-**What I chose not to build (yet):** chat and trading. A gift moves your own
-items to someone else, but nothing comes back, so it can never be a lopsided
-trade, and guestbook notes use fixed phrases so there's nothing to moderate.
-Needs that drop while you're away are built but switched off until players
-have tried them.
+Some of "good" can only be judged by playing, not by `spec/`: whether a
+turn-based fight with a friend is more fun than one against the bot, and
+whether the Arena feels alive with a room full of people — the capstone
+showcase this is built for.
+
+**What I chose not to build (yet):** chat and trading. Both are more clicks
+between people rather than playing together, and both would need moderating.
+Guestbook notes use fixed phrases instead, and a gift moves only your own
+things, so it can never be a lopsided trade.
 
 **What I read or looked at:**
 
