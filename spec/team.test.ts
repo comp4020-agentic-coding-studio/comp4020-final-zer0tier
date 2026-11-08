@@ -93,3 +93,17 @@ it("won't ask an offline host, or a full team, and the request lapses when the t
   expect((await (await team(visitor)).json()).invitations).toEqual([]);
   expect((await team(host, { action: 'answer', player: visitor, accept: true })).status).toBe(409);
 });
+
+it("joining a team withdraws the player's requests to join others, so no leader is left with one they can't answer", async () => {
+  const hostA = freshId(), hostB = freshId(), mateA = freshId(), mateB = freshId(), visitor = freshId();
+  for (const id of [hostA, hostB, mateA, mateB, visitor]) await signUp(id);
+  await team(hostA, { action: 'invite', player: mateA });
+  const { team: b } = await (await team(hostB, { action: 'invite', player: visitor })).json();
+  // The visitor asks to join A, then accepts B's invitation instead.
+  expect((await team(visitor, { action: 'ask', player: hostA })).status).toBe(200);
+  expect((await (await team(hostA)).json()).team.members.some((m: any) => m.id === visitor && m.requested)).toBe(true);
+  expect((await team(visitor, { action: 'accept', team: b.id })).status).toBe(200);
+  // A's leader no longer sees a request they could never let in.
+  expect((await (await team(hostA)).json()).team.members.some((m: any) => m.id === visitor)).toBe(false);
+  expect((await team(hostA, { action: 'answer', player: visitor, accept: true })).status).toBe(404);
+});

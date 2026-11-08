@@ -1135,11 +1135,18 @@ document.addEventListener("team:updated", ({ detail: team }) => {
   if (me?.requested) return;
   const host = askedHost;
   askedHost = null;
+  const news = me?.joined
+    ? `${host} let you in! Open Adventure to see your team.`
+    : team.status === "forming" ? `${host} can't take you this time.`
+    : team.status === "disbanded" ? `${host} stopped getting a team together.`
+    : `${host}'s team set off without you.`;
+  // Still on that visit, the answer shows there; walked away, it's a notice,
+  // just as the host heard the request wherever they were.
   if (visiting === host) {
-    $("visit-join-news").textContent = me?.joined
-      ? `${host} let you in! Open Adventure to see your team.`
-      : team.status === "forming" ? `${host} can't take you this time.` : `${host}'s team set off.`;
+    $("visit-join-news").textContent = news;
     renderJoinControls();
+  } else {
+    $("notice").textContent = news;
   }
 });
 

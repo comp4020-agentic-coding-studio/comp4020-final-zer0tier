@@ -41,3 +41,17 @@ it("team:requested reaches the host's and the asker's windows within 1s, and nob
     expect(overheard).toEqual([]);
   } finally { sockets.forEach(socket => socket.close()); }
 });
+
+it("team:updated reaches another leader within 1s when a player who asked them joins a different team", async () => {
+  const hostA = freshId(), hostB = freshId(), mateA = freshId(), visitor = freshId();
+  for (const id of [hostA, hostB, mateA, visitor]) await signUp(id);
+  const { team: a } = await (await post("/api/team", { action: "invite", player: mateA }, hostA)).json();
+  const { team: b } = await (await post("/api/team", { action: "invite", player: visitor }, hostB)).json();
+  expect((await post("/api/team", { action: "ask", player: hostA }, visitor)).status).toBe(200);
+  const socket = await open(hostA);
+  try {
+    const withdrawn = next(socket, event => event.type === "team:updated" && event.team.id === a.id && !event.team.members.some((m: any) => m.id === visitor));
+    expect((await post("/api/team", { action: "accept", team: b.id }, visitor)).status).toBe(200);
+    await withdrawn;
+  } finally { socket.close(); }
+});

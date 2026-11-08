@@ -17,7 +17,18 @@ export type Team = {
   id: number; leader: string; status: 'forming' | 'exploring' | 'disbanded';
   members: TeamMember[]; // the leader first, then joined pets, then invitations
 };
-export type TeamOutcome = { team: Team } | { status: 400 | 404 | 409; error: string };
+// `withdrawn` lists other teams whose pending request from this player went
+// because they joined a team: their leaders' windows need refreshing too.
+export type TeamOutcome = { team: Team; withdrawn?: Team[] } | { status: 400 | 404 | 409; error: string };
+
+// A pet joins one team at a time, so joining one withdraws its requests to
+// join any others. Returns those teams, as saved, for broadcasting.
+function withdrawRequests(playerId: string, keepTeam: number): Team[] {
+  const others = db.prepare(`SELECT m.team_id AS id FROM team_members m JOIN teams t ON t.id = m.team_id
+      WHERE m.player_id = ? AND m.joined = 2 AND m.team_id != ? AND t.status = 'forming'`).all(playerId, keepTeam) as { id: number }[];
+  for (const { id } of others) db.prepare('DELETE FROM team_members WHERE team_id = ? AND player_id = ? AND joined = 2').run(id, playerId);
+  return others.map(({ id }) => read(id));
+}
 
 type Row = { id: number; leader: string; status: Team['status'] };
 type MemberRow = { id: string; color: string; appearance: string; joined: number };
@@ -90,7 +101,7 @@ export function accept(id: string, teamId: number): TeamOutcome {
     if (!invited) return refuse('That invitation is no longer open.', 404);
     if (joinedTeam(id) !== undefined) return refuse('Leave your current team before joining another.');
     db.prepare('UPDATE team_members SET joined = 1 WHERE team_id = ? AND player_id = ?').run(teamId, id);
-    return { team: read(teamId) };
+    return { team: read(teamId), withdrawn: withdrawRequests(id, teamId) };
   });
 }
 
@@ -146,7 +157,7 @@ export function answer(id: string, playerId: string, yes: boolean): TeamOutcome 
     }
     if (joinedTeam(playerId) !== undefined) return refuse(`${playerId} joined another team meanwhile. Turn the request down to clear it.`);
     db.prepare('UPDATE team_members SET joined = 1 WHERE team_id = ? AND player_id = ?').run(teamId, playerId);
-    return { team: read(teamId) };
+    return { team: read(teamId), withdrawn: withdrawRequests(playerId, teamId) };
   });
 }
 

@@ -361,6 +361,8 @@ app.post("/api/team", (req, res) => {
     for (const member of outcome.team.members) broadcast({ type: "pet:updated", pet: getPet(member.id)! });
   }
   broadcast({ type: "team:updated", team: outcome.team });
+  // Joining a team withdrew this pet's requests to join others.
+  for (const team of outcome.withdrawn ?? []) broadcast({ type: "team:updated", team });
   // The host hears a request at once, wherever they are in the game.
   if (action === "ask") broadcast({ type: "team:requested", request: { team: outcome.team.id, leader: player, player: id } });
   followUp();
