@@ -222,7 +222,7 @@ The supplied MP3 is included as `public/audio/rainbows.mp3`, re-encoded from
 256 kbps to 128 kbps so it downloads faster; it has not been edited or
 trimmed. The game loops the recording and lets players adjust playback
 volume. The music remains licensed under CC BY 4.0.
-Asset attribution is also included in [public/audio/README.md](public/audio/README.md).
+Every outside asset, its creator and its licence are listed in [CREDITS.md](https://github.com/comp4020-agentic-coding-studio/comp4020-final-zer0tier/blob/main/CREDITS.md).
 
 Battle music comes from [Kevin MacLeod's Incompetech listing for
 “Raving Energy (faster)”](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900012).
